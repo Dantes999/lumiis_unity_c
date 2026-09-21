@@ -21,21 +21,26 @@ public sealed class GameServer : INetEventListener
         public readonly NetPeer Peer;
         public int? EntityId;
         public bool Closing;
-        public long CloseAtTick;
+        public long CloseAtMs;
 
-        public ConnectionState(NetPeer peer, long closeAtTick)
+        public ConnectionState(NetPeer peer, long closeAtMs)
         {
             Peer = peer;
-            CloseAtTick = closeAtTick;
+            CloseAtMs = closeAtMs;
         }
     }
 
     private const int MaxConsecutiveFailedTicks = 50;
 
+    // Monotone Standard-Uhr, geteilt über alle Instanzen (läuft seit Prozessstart, nie negativ).
+    private static readonly Stopwatch DefaultClock = Stopwatch.StartNew();
+    private static long DefaultNowMs() => DefaultClock.ElapsedMilliseconds;
+
     private readonly ServerConfig _config;
     private readonly World _world;
     private readonly NetManager _netManager;
     private readonly ILogger _logger;
+    private readonly Func<long> _nowMs;
     private readonly Dictionary<int, ConnectionState> _connections = new();
     private uint _tick;
     private int _consecutiveFailedTicks;
@@ -43,12 +48,14 @@ public sealed class GameServer : INetEventListener
     /// <summary>Nur für Tests: wenn gesetzt, wird es beim Verarbeiten von MoveTo aufgerufen (zum Simulieren eines Fehlers in einem Handler).</summary>
     internal Action? TestFaultHook { get; set; }
 
-    public GameServer(ServerConfig config, ILogger logger)
+    /// <summary>nowMs: injizierbare Uhr für Fristen (Join-Timeout, Reject-Grace). Default: monotone Wandzeit seit Prozessstart. Ticks bleiben rein für die Simulation.</summary>
+    public GameServer(ServerConfig config, ILogger logger, Func<long>? nowMs = null)
     {
         _config = config;
         _logger = logger;
         _world = new World(config.MaxPlayers);
         _netManager = new NetManager(this) { UpdateTime = 15 };
+        _nowMs = nowMs ?? DefaultNowMs;
     }
 
     /// <summary>Tatsächlich gebundener Port (nach Start relevant, falls ServerConfig.Port 0 war).</summary>
@@ -96,10 +103,11 @@ public sealed class GameServer : INetEventListener
 
         if (_connections.Count > 0)
         {
+            long now = _nowMs();
             foreach (ConnectionState conn in new List<ConnectionState>(_connections.Values))
             {
                 bool awaitingDeadline = conn.Closing || conn.EntityId == null;
-                if (awaitingDeadline && _tick >= conn.CloseAtTick)
+                if (awaitingDeadline && now >= conn.CloseAtMs)
                 {
                     _logger.Info($"Verbindung {conn.Peer.Id} getrennt ({(conn.Closing ? "nach JoinRejected" : "Join-Timeout")})");
                     conn.Peer.Disconnect();
@@ -158,7 +166,7 @@ public sealed class GameServer : INetEventListener
     {
         try
         {
-            _connections[peer.Id] = new ConnectionState(peer, _tick + _config.JoinTimeoutTicks);
+            _connections[peer.Id] = new ConnectionState(peer, _nowMs() + _config.JoinTimeoutMs);
             _logger.Info($"Verbindung {peer.Id} akzeptiert");
         }
         catch (Exception ex)
@@ -317,7 +325,7 @@ public sealed class GameServer : INetEventListener
     {
         conn.Peer.SendPacket(new JoinRejectedPacket { Reason = reason });
         conn.Closing = true;
-        conn.CloseAtTick = _tick + _config.RejectGraceTicks;
+        conn.CloseAtMs = _nowMs() + _config.RejectGraceMs;
         _logger.Info($"Join abgelehnt ({reason}) für Verbindung {conn.Peer.Id}");
     }
 

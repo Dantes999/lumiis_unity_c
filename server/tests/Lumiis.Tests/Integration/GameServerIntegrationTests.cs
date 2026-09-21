@@ -21,15 +21,15 @@ namespace Lumiis.Tests.Integration
             public void Error(string message) { }
         }
 
-        private static GameServer CreateServer()
+        private static GameServer CreateServer(Func<long>? nowMs = null)
         {
             var config = new ServerConfig
             {
                 Port = 0, // freier Port, vom OS vergeben
                 MaxPlayers = 10,
-                RejectGraceTicks = 3
+                RejectGraceMs = 100 // echte Uhr, kleiner Wert - siehe M1-fixes.md Punkt 2
             };
-            return new GameServer(config, new NullLogger());
+            return new GameServer(config, new NullLogger(), nowMs);
         }
 
         private static bool Pump(Func<bool> condition, GameServer server, params TestClient[] clients)
@@ -252,6 +252,66 @@ namespace Lumiis.Tests.Integration
                 Assert.True(Pump(
                     () => clientB.Received.OfType<EntityMovePacket>().Any(m => m.TargetX == 2000 && m.TargetY == 2000),
                     server, clientA, clientB));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void JoinTimeout_UsesFakeClock_DisconnectsOnlyAfterDeadlineReached()
+        {
+            long fakeNow = 0;
+            const int joinTimeoutMs = 5000; // ServerConfig.JoinTimeoutMs-Default aus CreateServer()
+            GameServer server = CreateServer(nowMs: () => fakeNow);
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                // Vor Ablauf der Frist: mehrfach ticken, ohne die Uhr vorzudrehen - keine Trennung.
+                for (int i = 0; i < 5; i++) server.Update();
+                client.Poll();
+                Assert.False(client.Disconnected);
+
+                // Uhr über die Frist hinausdrehen (kein echtes Warten nötig) - jetzt trennt der nächste Tick.
+                fakeNow = joinTimeoutMs + 1;
+                Assert.True(Pump(() => client.Disconnected, server, client));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void RejectGrace_UsesFakeClock_KeepsConnectionUntilDeadlineReached()
+        {
+            long fakeNow = 0;
+            GameServer server = CreateServer(nowMs: () => fakeNow);
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "ab" }); // ungültiger Name
+                Assert.True(Pump(
+                    () => client.Received.OfType<JoinRejectedPacket>().Any(r => r.Reason == JoinRejectReason.InvalidName),
+                    server, client));
+
+                // JoinRejected ist angekommen, Grace-Frist läuft noch (Uhr steht still) - noch nicht getrennt.
+                for (int i = 0; i < 5; i++) server.Update();
+                client.Poll();
+                Assert.False(client.Disconnected);
+
+                // Uhr über die Grace-Frist hinausdrehen - jetzt trennt der nächste Tick.
+                fakeNow = 100 + 1; // RejectGraceMs aus CreateServer()
+                Assert.True(Pump(() => client.Disconnected, server, client));
             }
             finally
             {
