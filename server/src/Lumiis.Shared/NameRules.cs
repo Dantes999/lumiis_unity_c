@@ -14,7 +14,9 @@ namespace Lumiis.Shared
             for (int i = 0; i < name.Length; i++)
             {
                 char c = name[i];
-                if (!char.IsLetter(c) && !char.IsDigit(c) && c != '_')
+                bool isAsciiLetter = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+                bool isAsciiDigit = c >= '0' && c <= '9';
+                if (!isAsciiLetter && !isAsciiDigit && c != '_')
                     return false;
             }
 

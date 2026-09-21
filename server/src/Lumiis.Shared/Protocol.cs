@@ -10,5 +10,8 @@ namespace Lumiis.Shared
 
         /// <summary>Maximale Länge eines Strings im Paket (UTF-8-Bytes).</summary>
         public const int MaxStringBytes = 1024;
+
+        /// <summary>Maximale Größe eines gesamten Pakets in Bytes; größere Pakete werden vor dem Decode verworfen.</summary>
+        public const int MaxPacketBytes = 1200;
     }
 }

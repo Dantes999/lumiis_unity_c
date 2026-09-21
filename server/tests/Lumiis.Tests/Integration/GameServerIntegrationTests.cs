@@ -222,6 +222,34 @@ namespace Lumiis.Tests.Integration
         }
 
         [Fact]
+        public void OversizedPacket_DisconnectsClient_ServerStaysAlive()
+        {
+            GameServer server = CreateServer();
+            server.Start();
+            try
+            {
+                using var badClient = new TestClient();
+                badClient.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, badClient));
+
+                badClient.SendRaw(new byte[Protocol.MaxPacketBytes + 1]); // größer als erlaubt
+                Assert.True(Pump(() => badClient.Disconnected, server, badClient));
+
+                // Server lebt weiter: ein neuer Client kann normal joinen.
+                using var goodClient = new TestClient();
+                goodClient.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, goodClient));
+
+                goodClient.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Alice" });
+                Assert.True(Pump(() => goodClient.Received.OfType<JoinAcceptedPacket>().Any(), server, goodClient));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
         public void ExceptionInHandler_DisconnectsOnlyThatConnection_ServerAndOthersStayAlive()
         {
             GameServer server = CreateServer();

@@ -202,6 +202,13 @@ public sealed class GameServer : INetEventListener
             if (!_connections.TryGetValue(peer.Id, out ConnectionState? conn) || conn.Closing)
                 return;
 
+            if (reader.AvailableBytes > Protocol.MaxPacketBytes)
+            {
+                _logger.Warn($"Paket von Verbindung {peer.Id} zu groß ({reader.AvailableBytes} Bytes) - getrennt");
+                peer.Disconnect();
+                return;
+            }
+
             byte[] data = reader.GetRemainingBytes();
 
             IPacket packet;
