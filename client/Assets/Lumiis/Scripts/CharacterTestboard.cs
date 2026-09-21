@@ -1,3 +1,4 @@
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
 using System.Collections.Generic;
 using Lumiis.Shared;
 using Lumiis.Shared.Net;
@@ -78,3 +79,4 @@ namespace Lumiis.Client
         }
     }
 }
+#endif

@@ -26,8 +26,10 @@ namespace Lumiis.Client
         private Sprite _localMarkerSprite;
         private LookCatalogClient _lookCatalog;
         private CachingSpriteProvider _spriteProvider;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         private CharacterTestboard _testboard;
         private CharacterTestboard _sortingTestboard;
+#endif
 
         private UiState _uiState = UiState.Login;
         private string _host = "127.0.0.1";
