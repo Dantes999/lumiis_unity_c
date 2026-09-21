@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Lumiis.Bot/Lumiis.Bot.csproj" />
+    <Project Path="src/Lumiis.Server/Lumiis.Server.csproj" />
+    <Project Path="src/Lumiis.Shared/Lumiis.Shared.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Lumiis.Tests/Lumiis.Tests.csproj" />
+  </Folder>
+</Solution>
