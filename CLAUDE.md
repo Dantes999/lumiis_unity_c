@@ -30,12 +30,30 @@ client/ (Unity-Projekt), server/ (Solution mit Shared, Server, Bot, Tests), data
 - Server: dotnet run --project server/src/Lumiis.Server
 - Bot: dotnet run --project server/src/Lumiis.Bot -- --count 3
 
+## Client
+Setup nach dem Klonen (auch auf dem zweiten Rechner):
+1. `cd server && dotnet build` - baut Lumiis.Shared und kopiert dabei Lumiis.Shared.dll sowie die netstandard2.1-Variante von LiteNetLib.dll nach `client/Assets/Plugins/Lumiis/` (git-ignoriert, entsteht bei jedem Build neu).
+2. Danach `client/` mit Unity Hub öffnen (6000.3.24f1). Beim ersten Öffnen importiert Unity die kopierten Plugin-DLLs und legt die zugehörigen .meta-Dateien an.
+
+Struktur (`client/Assets/Lumiis/Scripts/`, Namespace `Lumiis.Client`, code-first, kein Inspector-Verkabeln, kein asmdef):
+- `Bootstrap.cs`: RuntimeInitializeOnLoadMethod (AfterSceneLoad), erzeugt Kamera und das Root-GameObject mit NetClient/GameClient.
+- `NetClient.cs`: dünner LiteNetLib-Adapter (MonoBehaviour) - Connect/JoinRequest, PacketCodec.Decode, C#-Events für Connected/Disconnected/Paket.
+- `ClientWorld.cs`: reine Weltsicht ohne UnityEngine-Bezug und ohne `Time.*`; Bewegung wird über `MovementMath` (Shared) anhand einer von außen übergebenen Zeit interpoliert (Client-Empfangszeit, keine Uhrensynchronisation in M1b).
+- `GameClient.cs`: Orchestrierung - Views, Klick-Eingabe (New Input System, `Mouse.current`), Kamera-Folgen, temporäre IMGUI-Debug-UI (wird in M2 durch UI Toolkit ersetzt).
+- `EntityView.cs`, `PlaceholderSprites.cs`: Darstellung (zur Laufzeit erzeugte einfarbige Quadrate/Raster, keine Kunst-Assets).
+
+Demo-Ablauf:
+1. Server starten: `dotnet run --project server/src/Lumiis.Server`.
+2. Unity-Projekt öffnen, Play drücken. Im Login-Fenster Host/Port/Name eingeben (Default 127.0.0.1:7777), "Verbinden" klicken.
+3. Linksklick auf den Boden bewegt das eigene (farblich hervorgehobene) Quadrat dorthin.
+4. Bots dazuholen: `dotnet run --project server/src/Lumiis.Bot -- --count 3` - erscheinen als 3 weitere laufende Quadrate mit Namen über sich.
+
 ## Alpha-Umfang (Ziel)
 Map 1 (Startdorf + Feld), Krieger, Level 1-25, Monster/Bosse/Lumiis-Steine, Items/Drops/Shop, Chat, Gruppe. NICHT: Quests/Lua, Reittiere, Kostüme, Drachenseelen, Gildenkrieg, weitere Reiche.
 
 ## Meilensteine
-M0 Fundament (fertig) | M1 Walking Skeleton (in Arbeit) | M2 Account & Charakter | M3 Welt (Grid, AOI, Mobs) | M4 Kampf | M5 Items | M6 Metin-Kern | M7 Sozial | M8 Alpha-Betrieb.
-Aktuelle Aufgabe: docs/tasks/M1-server-bot.md
+M0 Fundament (fertig) | M1 Walking Skeleton (fertig, inkl. M1b Unity-Client) | M2 Account & Charakter | M3 Welt (Grid, AOI, Mobs) | M4 Kampf | M5 Items | M6 Metin-Kern | M7 Sozial | M8 Alpha-Betrieb.
+Aktuelle Aufgabe: keine - M1 und M1b sind fertig, für M2 gibt es noch keine Task-Datei unter docs/tasks/.
 
 ## Arbeitsweise
 - Kleine Schritte. Jeder endet mit grünem `dotnet test` und einem Commit (Präfix "M1: ...").
@@ -51,3 +69,11 @@ Aktuelle Aufgabe: docs/tasks/M1-server-bot.md
 - M0 fertig. Shared: PacketWriter/PacketReader/PacketCodec, PacketId (JoinRequest, MoveTo), 23 Tests grün.
 - M1 (Server, Bot, Bewegung) fertig, in 5 Commits: Shared (Server->Client-Pakete 1000-1005, GameConstants, NameRules), Game-Logik (World/Entity, reine Bewegung pro Tick), Transport/GameServer (LiteNetLib-Adapter, fester 25-Hz-Loop, Join/Move/Disconnect-Handling), Bot (Lumiis.Bot joint und läuft zufällig), Integrationstests (echtes LiteNetLib auf Loopback). 62 Tests grün, manuell mit Server + `Lumiis.Bot -- --count 3` getestet. M1b (Unity-Client) ist eine eigene, noch offene Aufgabe.
 - M1-Fixes (Architektur-Review-Ergebnis) fertig, in 3 Commits: (1) Exceptions dürfen den Server nie beenden - jeder Netzwerk-Callback fängt Fehler ab, nur die betroffene Verbindung wird getrennt, 50 fehlerhafte Ticks in Folge lösen einen sauberen Shutdown mit Exit-Code 1 aus; (2) Fristen laufen in Wandzeit (ms) mit injizierbarer Uhr statt in Ticks; (3) Paketgrößenlimit (1200 Bytes, vor dem Decode geprüft) und NameRules nur noch ASCII (Homoglyph-Schutz). 67 Tests grün, 5x hintereinander stabil.
+- M1b (Unity-Client) fertig, in 4 Commits: Shared (Protocol.ConnectionKey, MovementMath + Vertragstest gegen Entity.Tick), MSBuild-Kopierschritt nach client/Assets/Plugins/Lumiis/, Unity-Code (Bootstrap/NetClient/ClientWorld/GameClient, s. Abschnitt "Client"), Doku. 77 Tests grün, 5x stabil. Unity-Batchmode-Kompilierlauf (Lizenz vorhanden) lief fehlerfrei durch (0 Compiler-Fehler); Play-Modus/Demo wurden nicht automatisiert geprüft, siehe Prüf-Checkliste unten. Nebenbei einen Bug in .gitignore behoben, der seit M0 alle Unity-.meta-Dateien verschluckt hat.
+
+### Noch zu prüfen (Editor/Play-Modus, vom User)
+- Unity öffnet `client/` ohne Compiler-Fehler in der Console (Batchmode-Check war bereits grün, Editor-Check zur Sicherheit trotzdem empfohlen).
+- Play drücken: Login-Fenster erscheint, Verbinden mit laufendem Server klappt, eigenes Quadrat erscheint, Klick auf den Boden bewegt es sichtbar interpoliert zum Zielpunkt.
+- `Lumiis.Bot -- --count 3` parallel starten: 3 weitere Quadrate mit Namen erscheinen und laufen zufällig.
+- Server stoppen bzw. Verbindung kappen: Client zeigt "Getrennt", räumt alle Quadrate auf und zeigt wieder das Login-Fenster.
+- Ungültiger Name (z. B. "ab") bzw. falscher Port testen: Statuszeile/Login zeigt eine verständliche Fehlermeldung statt eines stillen Hängers.
