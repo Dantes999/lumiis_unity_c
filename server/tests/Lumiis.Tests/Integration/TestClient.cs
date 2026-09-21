@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using LiteNetLib;
+using Lumiis.Shared;
 using Lumiis.Shared.Net;
 
 namespace Lumiis.Tests.Integration
@@ -23,7 +24,7 @@ namespace Lumiis.Tests.Integration
 
         public void Connect(int port)
         {
-            Peer = _netManager.Connect("127.0.0.1", port, "lumiis");
+            Peer = _netManager.Connect("127.0.0.1", port, Protocol.ConnectionKey);
         }
 
         public void Poll()

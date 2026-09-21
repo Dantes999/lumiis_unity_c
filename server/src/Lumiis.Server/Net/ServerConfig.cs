@@ -1,10 +1,12 @@
+using Lumiis.Shared;
+
 namespace Lumiis.Server.Net;
 
 public sealed class ServerConfig
 {
     public int Port = 7777;
     public int MaxPlayers = 100;
-    public string ConnectionKey = "lumiis";
+    public string ConnectionKey = Protocol.ConnectionKey;
 
     /// <summary>Verbindungen ohne gültiges JoinRequest werden nach dieser Wandzeit getrennt, in ms (Default 5 s).</summary>
     public int JoinTimeoutMs = 5000;

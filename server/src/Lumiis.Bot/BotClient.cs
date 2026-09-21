@@ -25,7 +25,7 @@ public sealed class BotClient : INetEventListener
     public void Connect(string host, int port)
     {
         _netManager.Start();
-        _peer = _netManager.Connect(host, port, "lumiis");
+        _peer = _netManager.Connect(host, port, Protocol.ConnectionKey);
     }
 
     /// <summary>Wird aus dem gemeinsamen Poll-Loop im Hauptthread aufgerufen.</summary>
