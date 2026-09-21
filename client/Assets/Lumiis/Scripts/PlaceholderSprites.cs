@@ -46,5 +46,36 @@ namespace Lumiis.Client
 
             return Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), pixelsPerUnit);
         }
+
+        /// <summary>Ein Ring (Kreisring), z. B. als Markierung unter den Füßen. Wird per SpriteRenderer.color eingefärbt.</summary>
+        public static Sprite CreateRing(int pixelSize = 32, float innerRadiusFraction = 0.65f, int pixelsPerUnit = 48)
+        {
+            var texture = new Texture2D(pixelSize, pixelSize, TextureFormat.RGBA32, false);
+            texture.filterMode = FilterMode.Bilinear;
+
+            Color32 clear = new Color32(0, 0, 0, 0);
+            Color32 white = new Color32(255, 255, 255, 255);
+            Color32[] pixels = new Color32[pixelSize * pixelSize];
+
+            float center = pixelSize / 2f;
+            float outerRadius = pixelSize / 2f;
+            float innerRadius = outerRadius * innerRadiusFraction;
+
+            for (int y = 0; y < pixelSize; y++)
+            {
+                for (int x = 0; x < pixelSize; x++)
+                {
+                    float dx = x + 0.5f - center;
+                    float dy = y + 0.5f - center;
+                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                    pixels[y * pixelSize + x] = (dist <= outerRadius && dist >= innerRadius) ? white : clear;
+                }
+            }
+
+            texture.SetPixels32(pixels);
+            texture.Apply();
+
+            return Sprite.Create(texture, new Rect(0, 0, pixelSize, pixelSize), new Vector2(0.5f, 0.5f), pixelsPerUnit);
+        }
     }
 }

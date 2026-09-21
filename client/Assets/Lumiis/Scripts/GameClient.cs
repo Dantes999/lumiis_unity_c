@@ -23,6 +23,7 @@ namespace Lumiis.Client
         private readonly Dictionary<int, CharacterView> _views = new Dictionary<int, CharacterView>();
         private readonly Dictionary<int, CharacterAnimator> _animators = new Dictionary<int, CharacterAnimator>();
         private Sprite _squareSprite;
+        private Sprite _localMarkerSprite;
         private LookCatalogClient _lookCatalog;
         private ISpriteProvider _spriteProvider;
         private CharacterTestboard _testboard;
@@ -45,6 +46,7 @@ namespace Lumiis.Client
             _netClient = netClient;
             _camera = camera;
             _squareSprite = PlaceholderSprites.CreateSquare();
+            _localMarkerSprite = PlaceholderSprites.CreateRing();
 
             try
             {
@@ -319,6 +321,14 @@ namespace Lumiis.Client
             var animator = go.AddComponent<CharacterAnimator>();
             animator.Initialize(view);
             _animators[entity.Id] = animator;
+
+            if (entity.Id == _world.LocalEntityId)
+            {
+                var markerGo = new GameObject("LocalPlayerMarker");
+                markerGo.transform.SetParent(go.transform, false);
+                LocalPlayerMarker marker = markerGo.AddComponent<LocalPlayerMarker>();
+                marker.Initialize(_localMarkerSprite);
+            }
         }
 
         private void OnEntityDespawned(int entityId)
@@ -502,7 +512,12 @@ namespace Lumiis.Client
                 if (screenPos.z < 0) continue; // hinter der Kamera
 
                 float guiY = Screen.height - screenPos.y; // GUI-Koordinaten sind Y-invertiert gegenüber Screen-Koordinaten
+
+                // Eigener Name in Gelb statt Ebenen-Tönung - unterscheidet den lokalen Spieler zusätzlich zum Ring am Fuß.
+                Color previousColor = GUI.color;
+                GUI.color = entity.Id == _world.LocalEntityId ? Color.yellow : Color.white;
                 GUI.Label(new Rect(screenPos.x - 40, guiY - 10, 80, 20), entity.Name);
+                GUI.color = previousColor;
             }
         }
     }
