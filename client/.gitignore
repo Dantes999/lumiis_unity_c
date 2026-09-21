@@ -1,0 +1,33 @@
+# Unity-spezifisch, nach dem Vorbild der offiziellen Unity .gitignore
+# (https://github.com/github/gitignore/blob/main/Unity.gitignore). Gilt nur für client/
+# (siehe CLAUDE.md-Konvention: Ignore-Regeln pro Teilbaum, keine generischen Muster im Root).
+
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/MemoryCaptures/
+/Recordings/
+
+*.csproj
+*.sln
+*.slnx
+*.suo
+*.user
+
+/.vs/
+/.idea/
+
+# Von server/ per dotnet build kopierte Binärartefakte (Lumiis.Shared.dll, LiteNetLib.dll) -
+# entstehen bei jedem Build neu.
+/Assets/Plugins/
+/Assets/Plugins.meta
+
+# Von server/ per dotnet build kopierte Spieldaten (data/looks.json) - entsteht bei jedem Build
+# neu. Nur der generierte Unterordner, nicht StreamingAssets/ als Ganzes (dort könnten später
+# auch von Hand gepflegte Streaming-Assets liegen).
+/Assets/StreamingAssets/lumiis-data/
+/Assets/StreamingAssets/lumiis-data.meta

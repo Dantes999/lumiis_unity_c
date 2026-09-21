@@ -27,6 +27,7 @@ client/ (Unity-Projekt), server/ (Solution mit Shared, Server, Bot, Tests), data
 - Keine Original-Assets, Referenzbilder oder Namen aus Metin2 oder anderen Spielen. Herkunft jedes Assets in docs/art-provenance.md.
 - Der Client berechnet nie Spielzustand. Eigene Charakterdaten kommen im JoinAccepted (später als eigenes Paket), öffentliche Daten über EntitySpawn.
 - Unity-Ordner nie blind mit git add -A stagen. Vor jedem Commit git status --short und git diff --cached --stat prüfen. ProjectSettings/, Packages/ und Assets/Settings/ nur gezielt stagen. Dateien mit Konto-, Cloud-, Lizenz- oder Signaturdaten nie committen, dem User melden.
+- Ignore-Regeln pro Teilbaum (server/, client/), keine generischen Muster im Root.
 
 ## Befehle
 - Build/Test: cd server && dotnet build && dotnet test
