@@ -8,12 +8,14 @@ namespace Lumiis.Shared.Net
         ServerFull = 4
     }
 
-    /// <summary>Der Client wurde aufgenommen und an der genannten Position gespawnt.</summary>
+    /// <summary>Der Client wurde aufgenommen und an der genannten Position gespawnt. Appearance ist die eigene
+    /// Figur - der Client berechnet sie nie selbst, siehe CLAUDE.md-Konvention.</summary>
     public sealed class JoinAcceptedPacket : IPacket
     {
         public int EntityId;
         public int X;
         public int Y;
+        public Appearance Appearance;
 
         public PacketId Id
         {
@@ -25,6 +27,7 @@ namespace Lumiis.Shared.Net
             writer.WriteInt32(EntityId);
             writer.WriteInt32(X);
             writer.WriteInt32(Y);
+            Appearance.Write(writer);
         }
 
         public void Read(PacketReader reader)
@@ -32,6 +35,7 @@ namespace Lumiis.Shared.Net
             EntityId = reader.ReadInt32();
             X = reader.ReadInt32();
             Y = reader.ReadInt32();
+            Appearance.Read(reader);
         }
     }
 
@@ -56,13 +60,15 @@ namespace Lumiis.Shared.Net
         }
     }
 
-    /// <summary>Eine (neue oder bereits vorhandene) Entity erscheint für den Client.</summary>
+    /// <summary>Eine (neue oder bereits vorhandene) Entity erscheint für den Client - eine andere Figur,
+    /// öffentliche Daten inklusive Appearance.</summary>
     public sealed class EntitySpawnPacket : IPacket
     {
         public int EntityId;
         public string Name;
         public int X;
         public int Y;
+        public Appearance Appearance;
 
         public PacketId Id
         {
@@ -75,6 +81,7 @@ namespace Lumiis.Shared.Net
             writer.WriteString(Name);
             writer.WriteInt32(X);
             writer.WriteInt32(Y);
+            Appearance.Write(writer);
         }
 
         public void Read(PacketReader reader)
@@ -83,6 +90,7 @@ namespace Lumiis.Shared.Net
             Name = reader.ReadString();
             X = reader.ReadInt32();
             Y = reader.ReadInt32();
+            Appearance.Read(reader);
         }
     }
 

@@ -1,0 +1,156 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
+using Lumiis.Shared.Net;
+
+namespace Lumiis.Server.Looks;
+
+/// <summary>Lädt und validiert data/looks.json. Fehler beim Laden bedeuten Abbruch beim Serverstart.</summary>
+public sealed class LookCatalog
+{
+    public const string BodySlot = "Body";
+    public const string HelmetSlot = "Helmet";
+
+    private readonly LookCatalogDto _data;
+    private readonly Dictionary<string, List<int>> _idsBySlot;
+
+    private LookCatalog(LookCatalogDto data)
+    {
+        _data = data;
+        _idsBySlot = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
+        foreach (LookEntryDto entry in data.Looks)
+        {
+            if (!_idsBySlot.TryGetValue(entry.Slot, out List<int>? ids))
+            {
+                ids = new List<int>();
+                _idsBySlot[entry.Slot] = ids;
+            }
+            ids.Add(entry.Id);
+        }
+    }
+
+    public int CanvasPx => _data.Settings.CanvasPx;
+    public int Ppu => _data.Settings.Ppu;
+    public IReadOnlyList<string> HairColors => _data.HairColors;
+
+    public static LookCatalog LoadFromFile(string path)
+    {
+        string json;
+        try
+        {
+            json = File.ReadAllText(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new LookCatalogException($"looks.json konnte nicht gelesen werden ({path}): {ex.Message}");
+        }
+
+        return LoadFromJson(json);
+    }
+
+    public static LookCatalog LoadFromJson(string json)
+    {
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        LookCatalogDto? data;
+        try
+        {
+            data = JsonSerializer.Deserialize<LookCatalogDto>(json, options);
+        }
+        catch (JsonException ex)
+        {
+            throw new LookCatalogException($"looks.json ist kein gültiges JSON: {ex.Message}");
+        }
+
+        if (data == null)
+            throw new LookCatalogException("looks.json ist leer.");
+
+        Validate(data);
+        return new LookCatalog(data);
+    }
+
+    private static void Validate(LookCatalogDto data)
+    {
+        if (data.HairColors == null || data.HairColors.Count == 0)
+            throw new LookCatalogException("looks.json: hairColors darf nicht leer sein.");
+
+        var seenIds = new HashSet<(string Slot, int Id)>();
+        bool hasBody = false;
+
+        foreach (LookEntryDto entry in data.Looks)
+        {
+            if (string.IsNullOrWhiteSpace(entry.Slot))
+                throw new LookCatalogException($"looks.json: Look-Eintrag ohne Slot (Id {entry.Id}).");
+
+            (string Slot, int Id) key = (entry.Slot, entry.Id);
+            if (!seenIds.Add(key))
+                throw new LookCatalogException($"looks.json: doppelte Id {entry.Id} für Slot {entry.Slot}.");
+
+            if (entry.HidesHair && !string.Equals(entry.Slot, HelmetSlot, StringComparison.OrdinalIgnoreCase))
+                throw new LookCatalogException($"looks.json: hidesHair ist nur bei Slot {HelmetSlot} erlaubt (Id {entry.Id}, Slot {entry.Slot}).");
+
+            if (string.Equals(entry.Slot, BodySlot, StringComparison.OrdinalIgnoreCase))
+                hasBody = true;
+        }
+
+        if (!hasBody)
+            throw new LookCatalogException($"looks.json: mindestens ein Look mit Slot {BodySlot} wird benötigt.");
+    }
+
+    /// <summary>Übergangslösung bis M2 (dann kommt die Appearance aus der DB): weist deterministisch aus dem
+    /// Namen eine Appearance zu, per FNV-1a-Hash, nur mit gültigen IDs aus dem Katalog.</summary>
+    public Appearance CreateAppearanceForName(string name)
+    {
+        var appearance = new Appearance
+        {
+            BodyId = PickRequired(name, BodySlot),
+            HairStyleId = PickOptional(name, "Hair"),
+            HairColorId = PickColor(name),
+            ArmorId = PickOptional(name, "Armor"),
+            HelmetId = PickOptional(name, HelmetSlot),
+            WeaponId = PickOptional(name, "Weapon"),
+            ShieldId = PickOptional(name, "Shield")
+        };
+        return appearance;
+    }
+
+    private int PickRequired(string name, string slot)
+    {
+        List<int>? ids = GetIds(slot);
+        if (ids == null || ids.Count == 0) return 0;
+        uint hash = Fnv1a.Hash(name + ":" + slot);
+        return ids[(int)(hash % (uint)ids.Count)];
+    }
+
+    /// <summary>0 (keine Ebene) ist eine gleichberechtigte Option neben den Katalog-Ids.</summary>
+    private int PickOptional(string name, string slot)
+    {
+        List<int>? ids = GetIds(slot);
+        if (ids == null || ids.Count == 0) return 0;
+        uint hash = Fnv1a.Hash(name + ":" + slot);
+        uint index = hash % (uint)(ids.Count + 1);
+        return index == 0 ? 0 : ids[(int)index - 1];
+    }
+
+    /// <summary>1-basierter Index in HairColors (0 = keine Ebene, konsistent mit den übrigen Feldern;
+    /// irrelevant, wenn HairStyleId 0 ist).</summary>
+    private int PickColor(string name)
+    {
+        if (_data.HairColors.Count == 0) return 0;
+        uint hash = Fnv1a.Hash(name + ":HairColor");
+        return (int)(hash % (uint)_data.HairColors.Count) + 1;
+    }
+
+    private List<int>? GetIds(string slot)
+    {
+        _idsBySlot.TryGetValue(slot, out List<int>? ids);
+        return ids;
+    }
+}
+
+public sealed class LookCatalogException : Exception
+{
+    public LookCatalogException(string message) : base(message)
+    {
+    }
+}

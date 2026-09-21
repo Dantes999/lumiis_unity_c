@@ -28,11 +28,13 @@ namespace Lumiis.Tests
         [Fact]
         public void JoinAccepted_RoundTrip()
         {
-            var original = new JoinAcceptedPacket { EntityId = 42, X = 50000, Y = 50000 };
+            var appearance = new Appearance { BodyId = 1, HairStyleId = 2, HairColorId = 3, ArmorId = 4, HelmetId = 0, WeaponId = 1, ShieldId = 0 };
+            var original = new JoinAcceptedPacket { EntityId = 42, X = 50000, Y = 50000, Appearance = appearance };
             var decoded = Assert.IsType<JoinAcceptedPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
             Assert.Equal(original.EntityId, decoded.EntityId);
             Assert.Equal(original.X, decoded.X);
             Assert.Equal(original.Y, decoded.Y);
+            Assert.Equal(original.Appearance, decoded.Appearance);
         }
 
         [Fact]
@@ -46,12 +48,14 @@ namespace Lumiis.Tests
         [Fact]
         public void EntitySpawn_RoundTrip()
         {
-            var original = new EntitySpawnPacket { EntityId = 7, Name = "Held_1", X = 100, Y = -200 };
+            var appearance = new Appearance { BodyId = 1, HairStyleId = 3, HairColorId = 5, ArmorId = 2, HelmetId = 2, WeaponId = 0, ShieldId = 1 };
+            var original = new EntitySpawnPacket { EntityId = 7, Name = "Held_1", X = 100, Y = -200, Appearance = appearance };
             var decoded = Assert.IsType<EntitySpawnPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
             Assert.Equal(original.EntityId, decoded.EntityId);
             Assert.Equal(original.Name, decoded.Name);
             Assert.Equal(original.X, decoded.X);
             Assert.Equal(original.Y, decoded.Y);
+            Assert.Equal(original.Appearance, decoded.Appearance);
         }
 
         [Fact]

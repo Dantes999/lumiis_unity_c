@@ -4,6 +4,7 @@ using System.Threading;
 using LiteNetLib;
 using Lumiis.Server;
 using Lumiis.Server.Logging;
+using Lumiis.Server.Looks;
 using Lumiis.Server.Net;
 using Lumiis.Shared;
 using Lumiis.Shared.Net;
@@ -29,7 +30,8 @@ namespace Lumiis.Tests.Integration
                 MaxPlayers = 10,
                 RejectGraceMs = 100 // echte Uhr, kleiner Wert - siehe M1-fixes.md Punkt 2
             };
-            return new GameServer(config, new NullLogger(), nowMs);
+            LookCatalog lookCatalog = TestLookCatalogs.CreateMinimal();
+            return new GameServer(config, new NullLogger(), lookCatalog, nowMs);
         }
 
         private static bool Pump(Func<bool> condition, GameServer server, params TestClient[] clients)
@@ -73,6 +75,36 @@ namespace Lumiis.Tests.Integration
 
                 // B sieht den Spawn von A (als vorhandene Entity beim eigenen Join).
                 Assert.True(Pump(() => clientB.Received.OfType<EntitySpawnPacket>().Any(p => p.Name == "Alice"), server, clientA, clientB));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void Appearance_IsIdenticalBetweenOwnJoinAcceptedAndOthersEntitySpawn()
+        {
+            GameServer server = CreateServer();
+            server.Start();
+            try
+            {
+                using var clientA = new TestClient();
+                using var clientB = new TestClient();
+                clientA.Connect(server.ListenPort);
+                clientB.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, clientA, clientB));
+
+                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Alice" });
+                Assert.True(Pump(() => clientA.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
+                Appearance aliceOwnAppearance = clientA.Received.OfType<JoinAcceptedPacket>().First().Appearance;
+
+                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Bob" });
+                Assert.True(Pump(() => clientB.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
+                Assert.True(Pump(() => clientB.Received.OfType<EntitySpawnPacket>().Any(p => p.Name == "Alice"), server, clientA, clientB));
+
+                Appearance aliceAsSeenByBob = clientB.Received.OfType<EntitySpawnPacket>().First(p => p.Name == "Alice").Appearance;
+                Assert.Equal(aliceOwnAppearance, aliceAsSeenByBob);
             }
             finally
             {

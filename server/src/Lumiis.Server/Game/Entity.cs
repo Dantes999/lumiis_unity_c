@@ -1,3 +1,5 @@
+using Lumiis.Shared.Net;
+
 namespace Lumiis.Server.Game;
 
 /// <summary>Eine bewegliche Entity in der Welt (in M1 nur Spieler). Reine Logik, kein Netzwerk.</summary>
@@ -5,6 +7,9 @@ public sealed class Entity
 {
     public int Id { get; }
     public string Name { get; }
+
+    /// <summary>Wird von GameServer direkt nach dem Join gesetzt (LookCatalog.CreateAppearanceForName).</summary>
+    public Appearance Appearance { get; set; }
 
     public double X { get; private set; }
     public double Y { get; private set; }

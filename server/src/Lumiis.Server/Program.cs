@@ -1,10 +1,13 @@
-﻿using System.Threading;
+﻿using System.IO;
+using System.Threading;
 using Lumiis.Server;
 using Lumiis.Server.Logging;
+using Lumiis.Server.Looks;
 using Lumiis.Server.Net;
 
 ILogger logger = new ConsoleLogger();
 ServerConfig config = new ServerConfig();
+string dataDir = "data";
 
 for (int i = 0; i < args.Length; i++)
 {
@@ -16,10 +19,24 @@ for (int i = 0; i < args.Length; i++)
         case "--max-players":
             config.MaxPlayers = int.Parse(args[++i]);
             break;
+        case "--data-dir":
+            dataDir = args[++i];
+            break;
         default:
             logger.Warn($"Unbekanntes Argument: {args[i]}");
             break;
     }
+}
+
+LookCatalog lookCatalog;
+try
+{
+    lookCatalog = LookCatalog.LoadFromFile(Path.Combine(dataDir, "looks.json"));
+}
+catch (Exception ex)
+{
+    logger.Error($"looks.json konnte nicht geladen werden: {ex.Message}");
+    return 1;
 }
 
 using CancellationTokenSource cts = new CancellationTokenSource();
@@ -29,7 +46,7 @@ Console.CancelKeyPress += (_, eventArgs) =>
     cts.Cancel();
 };
 
-GameServer server = new GameServer(config, logger);
+GameServer server = new GameServer(config, logger, lookCatalog);
 
 try
 {

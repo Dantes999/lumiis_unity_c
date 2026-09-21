@@ -61,6 +61,12 @@ public sealed class BotClient : INetEventListener
         _peer?.Send(PacketCodec.Encode(packet), DeliveryMethod.ReliableOrdered);
     }
 
+    private static string Describe(Appearance appearance)
+    {
+        return $"[Body={appearance.BodyId} Hair={appearance.HairStyleId}/{appearance.HairColorId} " +
+               $"Armor={appearance.ArmorId} Helmet={appearance.HelmetId} Weapon={appearance.WeaponId} Shield={appearance.ShieldId}]";
+    }
+
     // ---- INetEventListener ----
 
     public void OnConnectionRequest(ConnectionRequest request)
@@ -102,14 +108,14 @@ public sealed class BotClient : INetEventListener
                 _joined = true;
                 _spawnX = accepted.X;
                 _spawnY = accepted.Y;
-                Console.WriteLine($"[{_name}] JoinAccepted: Entity {accepted.EntityId} @ ({accepted.X},{accepted.Y})");
+                Console.WriteLine($"[{_name}] JoinAccepted: Entity {accepted.EntityId} @ ({accepted.X},{accepted.Y}) {Describe(accepted.Appearance)}");
                 ScheduleNextMove();
                 break;
             case JoinRejectedPacket rejected:
                 Console.WriteLine($"[{_name}] JoinRejected: {rejected.Reason}");
                 break;
             case EntitySpawnPacket spawn:
-                Console.WriteLine($"[{_name}] Spawn: {spawn.Name} (Entity {spawn.EntityId}) @ ({spawn.X},{spawn.Y})");
+                Console.WriteLine($"[{_name}] Spawn: {spawn.Name} (Entity {spawn.EntityId}) @ ({spawn.X},{spawn.Y}) {Describe(spawn.Appearance)}");
                 break;
             case EntityDespawnPacket despawn:
                 Console.WriteLine($"[{_name}] Despawn: Entity {despawn.EntityId}");

@@ -7,6 +7,7 @@ using System.Threading;
 using LiteNetLib;
 using Lumiis.Server.Game;
 using Lumiis.Server.Logging;
+using Lumiis.Server.Looks;
 using Lumiis.Server.Net;
 using Lumiis.Shared;
 using Lumiis.Shared.Net;
@@ -38,6 +39,7 @@ public sealed class GameServer : INetEventListener
 
     private readonly ServerConfig _config;
     private readonly World _world;
+    private readonly LookCatalog _lookCatalog;
     private readonly NetManager _netManager;
     private readonly ILogger _logger;
     private readonly Func<long> _nowMs;
@@ -49,10 +51,11 @@ public sealed class GameServer : INetEventListener
     internal Action? TestFaultHook { get; set; }
 
     /// <summary>nowMs: injizierbare Uhr für Fristen (Join-Timeout, Reject-Grace). Default: monotone Wandzeit seit Prozessstart. Ticks bleiben rein für die Simulation.</summary>
-    public GameServer(ServerConfig config, ILogger logger, Func<long>? nowMs = null)
+    public GameServer(ServerConfig config, ILogger logger, LookCatalog lookCatalog, Func<long>? nowMs = null)
     {
         _config = config;
         _logger = logger;
+        _lookCatalog = lookCatalog;
         _world = new World(config.MaxPlayers);
         _netManager = new NetManager(this) { UpdateTime = 15 };
         _nowMs = nowMs ?? DefaultNowMs;
@@ -298,15 +301,17 @@ public sealed class GameServer : INetEventListener
         }
 
         conn.EntityId = entity!.Id;
+        // Übergangslösung bis M2 (dann aus der DB): Appearance deterministisch aus dem Namen.
+        entity.Appearance = _lookCatalog.CreateAppearanceForName(entity.Name);
 
-        conn.Peer.SendPacket(new JoinAcceptedPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY });
+        conn.Peer.SendPacket(new JoinAcceptedPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY, Appearance = entity.Appearance });
 
         // Der Joiner bekommt alle vorhandenen Entities, laufende Bewegungen zusätzlich als EntityMove ab aktueller Position.
         foreach (Entity other in _world.Entities)
         {
             if (other.Id == entity.Id) continue;
 
-            conn.Peer.SendPacket(new EntitySpawnPacket { EntityId = other.Id, Name = other.Name, X = other.IntX, Y = other.IntY });
+            conn.Peer.SendPacket(new EntitySpawnPacket { EntityId = other.Id, Name = other.Name, X = other.IntX, Y = other.IntY, Appearance = other.Appearance });
             if (other.IsMoving)
             {
                 conn.Peer.SendPacket(new EntityMovePacket
@@ -323,7 +328,7 @@ public sealed class GameServer : INetEventListener
         }
 
         // TODO(M3): Sichtbarkeit/AOI - aktuell sehen alle Verbindungen alle Entities.
-        BroadcastToJoined(new EntitySpawnPacket { EntityId = entity.Id, Name = entity.Name, X = entity.IntX, Y = entity.IntY }, exceptPeerId: conn.Peer.Id);
+        BroadcastToJoined(new EntitySpawnPacket { EntityId = entity.Id, Name = entity.Name, X = entity.IntX, Y = entity.IntY, Appearance = entity.Appearance }, exceptPeerId: conn.Peer.Id);
 
         _logger.Info($"{entity.Name} (Entity {entity.Id}) beigetreten");
     }
