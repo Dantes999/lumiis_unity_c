@@ -5,4 +5,18 @@
     <Nullable>disable</Nullable>
     <RootNamespace>Lumiis.Shared</RootNamespace>
   </PropertyGroup>
+
+  <!-- Kopiert Lumiis.Shared.dll und LiteNetLib.dll (netstandard2.1) nach client/Assets/Plugins/Lumiis/,
+       aber nur wenn ein Unity-Client-Checkout vorhanden ist. Keine PDBs, plattformunabhängig. -->
+  <Target Name="CopyToUnityPlugins" AfterTargets="Build" Condition="Exists('$(MSBuildThisFileDirectory)../../../client/Assets')">
+    <PropertyGroup>
+      <UnityPluginsDir>$(MSBuildThisFileDirectory)../../../client/Assets/Plugins/Lumiis/</UnityPluginsDir>
+      <LiteNetLibDll>$(NuGetPackageRoot)litenetlib/$(LiteNetLibVersion)/lib/netstandard2.1/LiteNetLib.dll</LiteNetLibDll>
+    </PropertyGroup>
+    <ItemGroup>
+      <UnityPluginFiles Include="$(TargetPath)" />
+      <UnityPluginFiles Include="$(LiteNetLibDll)" Condition="Exists('$(LiteNetLibDll)')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(UnityPluginFiles)" DestinationFolder="$(UnityPluginsDir)" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

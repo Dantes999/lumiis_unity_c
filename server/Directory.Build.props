@@ -1,0 +1,8 @@
+<Project>
+  <!-- Gilt für alle Projekte unter server/. Eine Stelle für die LiteNetLib-Version, damit
+       Lumiis.Shared beim Unity-Kopierschritt dieselbe Version findet wie Server/Bot referenzieren,
+       ohne dass Lumiis.Shared selbst eine Abhängigkeit auf LiteNetLib bekommt. -->
+  <PropertyGroup>
+    <LiteNetLibVersion>2.1.4</LiteNetLibVersion>
+  </PropertyGroup>
+</Project>
