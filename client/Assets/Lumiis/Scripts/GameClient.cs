@@ -29,6 +29,12 @@ namespace Lumiis.Client
         private string _name = "";
         private string _pendingLoginName = "";
         private string _statusMessage = "";
+        private bool _debugOverlayVisible = true;
+
+        private const float MinZoom = 3f;
+        private const float MaxZoom = 300f;
+        private const float ZoomStep = 1f;
+        private const int MaxDebugEntityRows = 12;
 
         private static readonly Color LocalPlayerColor = new Color(1f, 0.85f, 0.2f);
 
@@ -61,6 +67,26 @@ namespace Lumiis.Client
             }
 
             if (_uiState == UiState.InGame) HandleClickInput();
+            HandleZoomInput();
+            HandleDebugToggleInput();
+        }
+
+        private void HandleZoomInput()
+        {
+            if (Mouse.current == null) return;
+            float scrollY = Mouse.current.scroll.ReadValue().y;
+            if (scrollY == 0f) return;
+
+            // Nur das Vorzeichen nutzen, da der Betrag je Plattform (Windows/Linux) unterschiedlich skaliert.
+            float sign = Mathf.Sign(scrollY);
+            _camera.orthographicSize = Mathf.Clamp(_camera.orthographicSize - sign * ZoomStep, MinZoom, MaxZoom);
+        }
+
+        private void HandleDebugToggleInput()
+        {
+            if (Keyboard.current == null) return;
+            if (Keyboard.current.f1Key.wasPressedThisFrame)
+                _debugOverlayVisible = !_debugOverlayVisible;
         }
 
         private void LateUpdate()
@@ -128,6 +154,7 @@ namespace Lumiis.Client
             EntitySpawnPacket spawn = packet as EntitySpawnPacket;
             if (spawn != null)
             {
+                Debug.Log("EntitySpawn: Id=" + spawn.EntityId + " Name=" + spawn.Name + " Pos=(" + (spawn.X / 100.0) + "," + (spawn.Y / 100.0) + ")");
                 _world.HandleEntitySpawn(spawn.EntityId, spawn.Name, spawn.X, spawn.Y);
                 return;
             }
@@ -135,6 +162,11 @@ namespace Lumiis.Client
             EntityDespawnPacket despawn = packet as EntityDespawnPacket;
             if (despawn != null)
             {
+                ClientEntity existing;
+                if (_world.Entities.TryGetValue(despawn.EntityId, out existing))
+                    Debug.Log("EntityDespawn: Id=" + despawn.EntityId + " Name=" + existing.Name + " Pos=(" + (existing.X / 100.0) + "," + (existing.Y / 100.0) + ")");
+                else
+                    Debug.Log("EntityDespawn: Id=" + despawn.EntityId + " (unbekannt)");
                 _world.HandleEntityDespawn(despawn.EntityId);
                 return;
             }
@@ -247,8 +279,12 @@ namespace Lumiis.Client
         {
             if (_uiState == UiState.InGame)
             {
-                DrawStatusLine();
-                DrawEntityLabels();
+                if (_debugOverlayVisible)
+                {
+                    DrawStatusLine();
+                    DrawEntityList();
+                    DrawEntityLabels();
+                }
             }
             else
             {
@@ -309,8 +345,42 @@ namespace Lumiis.Client
             if (_world.LocalEntityId >= 0 && _world.Entities.TryGetValue(_world.LocalEntityId, out local))
                 posText = local.IntX + ", " + local.IntY;
 
-            string text = _statusMessage + " | Pos (Wire): " + posText + " | Entities: " + _world.Entities.Count + " | Ping: " + _netClient.Ping + " ms";
+            string text = _statusMessage + " | Pos (Wire): " + posText + " | Entities: " + _world.Entities.Count + " | Ping: " + _netClient.Ping + " ms" + " | F1: Overlay";
             GUI.Label(new Rect(10, 10, 700, 20), text);
+        }
+
+        /// <summary>Liste aller Entities, nach Entfernung zum lokalen Spieler sortiert, maximal MaxDebugEntityRows Zeilen.
+        /// Die Gesamtzahl bleibt unabhängig davon in DrawStatusLine sichtbar.</summary>
+        private void DrawEntityList()
+        {
+            ClientEntity local = null;
+            if (_world.LocalEntityId >= 0) _world.Entities.TryGetValue(_world.LocalEntityId, out local);
+
+            List<ClientEntity> sorted = new List<ClientEntity>(_world.Entities.Values);
+            sorted.Sort((a, b) => DistanceToLocal(local, a).CompareTo(DistanceToLocal(local, b)));
+
+            float y = 32f;
+            int shown = 0;
+            foreach (ClientEntity entity in sorted)
+            {
+                if (shown >= MaxDebugEntityRows) break;
+
+                double distance = DistanceToLocal(local, entity);
+                string line = "#" + entity.Id + " " + entity.Name
+                    + "  (" + (entity.X / 100.0).ToString("0.0") + ", " + (entity.Y / 100.0).ToString("0.0") + ")"
+                    + "  " + distance.ToString("0.0") + " Einh.";
+                GUI.Label(new Rect(10, y, 400, 18), line);
+                y += 18f;
+                shown++;
+            }
+        }
+
+        private static double DistanceToLocal(ClientEntity local, ClientEntity entity)
+        {
+            if (local == null) return 0.0;
+            double dx = entity.X - local.X;
+            double dy = entity.Y - local.Y;
+            return System.Math.Sqrt(dx * dx + dy * dy) / 100.0;
         }
 
         private void DrawEntityLabels()
