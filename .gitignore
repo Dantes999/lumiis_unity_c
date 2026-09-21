@@ -496,3 +496,7 @@ client/.idea/
 # Von server/ per dotnet build nach client/Assets/Plugins/ kopierte Binärartefakte (Lumiis.Shared.dll, LiteNetLib.dll)
 client/Assets/Plugins/
 client/Assets/Plugins.meta
+
+# Von server/ per dotnet build nach client/Assets/StreamingAssets/ kopierte Spieldaten (data/looks.json)
+client/Assets/StreamingAssets/
+client/Assets/StreamingAssets.meta

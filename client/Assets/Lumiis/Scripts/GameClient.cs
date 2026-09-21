@@ -20,8 +20,12 @@ namespace Lumiis.Client
         private NetClient _netClient;
         private Camera _camera;
         private readonly ClientWorld _world = new ClientWorld();
-        private readonly Dictionary<int, EntityView> _views = new Dictionary<int, EntityView>();
+        private readonly Dictionary<int, CharacterView> _views = new Dictionary<int, CharacterView>();
+        private readonly Dictionary<int, CharacterAnimator> _animators = new Dictionary<int, CharacterAnimator>();
         private Sprite _squareSprite;
+        private LookCatalogClient _lookCatalog;
+        private ISpriteProvider _spriteProvider;
+        private CharacterTestboard _testboard;
 
         private UiState _uiState = UiState.Login;
         private string _host = "127.0.0.1";
@@ -36,13 +40,23 @@ namespace Lumiis.Client
         private const float ZoomStep = 1f;
         private const int MaxDebugEntityRows = 12;
 
-        private static readonly Color LocalPlayerColor = new Color(1f, 0.85f, 0.2f);
-
         public void Initialize(NetClient netClient, Camera camera)
         {
             _netClient = netClient;
             _camera = camera;
             _squareSprite = PlaceholderSprites.CreateSquare();
+
+            try
+            {
+                _lookCatalog = LookCatalogClient.LoadFromStreamingAssets();
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError("looks.json konnte nicht geladen werden (Assets/StreamingAssets/lumiis-data/looks.json). "
+                    + "Wurde 'cd server && dotnet build' vor dem Öffnen von Unity ausgeführt? " + ex);
+                throw;
+            }
+            _spriteProvider = new PlaceholderSpriteProvider(_lookCatalog.CanvasPx, _lookCatalog.Ppu);
 
             _world.EntitySpawned += OnEntitySpawned;
             _world.EntityDespawned += OnEntityDespawned;
@@ -59,16 +73,24 @@ namespace Lumiis.Client
         {
             _world.Tick(Time.timeAsDouble);
 
-            foreach (KeyValuePair<int, EntityView> kvp in _views)
+            foreach (KeyValuePair<int, CharacterView> kvp in _views)
             {
                 ClientEntity entity;
                 if (_world.Entities.TryGetValue(kvp.Key, out entity))
+                {
                     kvp.Value.SetWorldPosition(entity.X / 100.0, entity.Y / 100.0);
+                    kvp.Value.SetFacing(entity.Facing);
+                    if (_animators.TryGetValue(kvp.Key, out CharacterAnimator animator))
+                        animator.Animate(entity.IsMoving);
+                }
             }
 
             if (_uiState == UiState.InGame) HandleClickInput();
             HandleZoomInput();
             HandleDebugToggleInput();
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            HandleDebugHotkeys();
+#endif
         }
 
         private void HandleZoomInput()
@@ -89,9 +111,94 @@ namespace Lumiis.Client
                 _debugOverlayVisible = !_debugOverlayVisible;
         }
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        private void HandleDebugHotkeys()
+        {
+            if (Keyboard.current == null) return;
+
+            if (Keyboard.current.f2Key.wasPressedThisFrame) ToggleTestboard();
+
+            if (_world.LocalEntityId < 0) return;
+            if (Keyboard.current.f3Key.wasPressedThisFrame) CycleLocalAppearanceSlot("Hair");
+            if (Keyboard.current.f4Key.wasPressedThisFrame) CycleLocalHairColor();
+            if (Keyboard.current.f5Key.wasPressedThisFrame) CycleLocalAppearanceSlot("Armor");
+            if (Keyboard.current.f6Key.wasPressedThisFrame) CycleLocalAppearanceSlot("Helmet");
+            if (Keyboard.current.f7Key.wasPressedThisFrame) CycleLocalAppearanceSlot("Weapon");
+            if (Keyboard.current.f8Key.wasPressedThisFrame) CycleLocalAppearanceSlot("Shield");
+        }
+
+        private void ToggleTestboard()
+        {
+            if (_testboard == null)
+            {
+                var go = new GameObject("CharacterTestboard");
+                go.transform.position = new Vector3(GameConstants.MapWidth / 100f + 3f, GameConstants.MapHeight / 200f, 0f);
+                _testboard = go.AddComponent<CharacterTestboard>();
+
+                List<int> bodyIds = new List<int>(_lookCatalog.GetIdsForSlot("Body"));
+                int bodyId = bodyIds.Count > 0 ? bodyIds[0] : 1;
+                _testboard.Build(_spriteProvider, _lookCatalog, bodyId, _lookCatalog.GetIdsForSlot("Armor"));
+                go.SetActive(false);
+            }
+
+            _testboard.gameObject.SetActive(!_testboard.gameObject.activeSelf);
+        }
+
+        /// <summary>Zyklus 0 (keine Ebene) -> erste Katalog-Id -> ... -> letzte -> zurück zu 0. Rein lokal,
+        /// wird nicht an den Server geschickt.</summary>
+        private void CycleLocalAppearanceSlot(string slot)
+        {
+            if (!_world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity local)) return;
+
+            Appearance appearance = local.Appearance;
+            switch (slot)
+            {
+                case "Hair": appearance.HairStyleId = NextIdInCycle("Hair", appearance.HairStyleId); break;
+                case "Armor": appearance.ArmorId = NextIdInCycle("Armor", appearance.ArmorId); break;
+                case "Helmet": appearance.HelmetId = NextIdInCycle("Helmet", appearance.HelmetId); break;
+                case "Weapon": appearance.WeaponId = NextIdInCycle("Weapon", appearance.WeaponId); break;
+                case "Shield": appearance.ShieldId = NextIdInCycle("Shield", appearance.ShieldId); break;
+            }
+            local.Appearance = appearance;
+
+            if (_views.TryGetValue(local.Id, out CharacterView view))
+                view.SetAppearance(appearance);
+        }
+
+        private void CycleLocalHairColor()
+        {
+            if (!_world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity local)) return;
+
+            int colorCount = _lookCatalog.HairColors.Count;
+            if (colorCount == 0) return;
+
+            Appearance appearance = local.Appearance;
+            appearance.HairColorId = appearance.HairColorId % colorCount + 1; // 1-basiert, siehe Appearance-Doku
+            local.Appearance = appearance;
+
+            if (_views.TryGetValue(local.Id, out CharacterView view))
+                view.SetAppearance(appearance);
+        }
+
+        private int NextIdInCycle(string slot, int currentId)
+        {
+            IReadOnlyList<int> ids = _lookCatalog.GetIdsForSlot(slot);
+            if (ids.Count == 0) return 0;
+
+            int currentIndex = -1;
+            for (int i = 0; i < ids.Count; i++)
+            {
+                if (ids[i] == currentId) { currentIndex = i; break; }
+            }
+
+            int nextIndex = currentIndex + 1;
+            return nextIndex >= ids.Count ? 0 : ids[nextIndex];
+        }
+#endif
+
         private void LateUpdate()
         {
-            EntityView localView;
+            CharacterView localView;
             if (_world.LocalEntityId >= 0 && _views.TryGetValue(_world.LocalEntityId, out localView))
             {
                 Vector3 target = localView.transform.position;
@@ -138,7 +245,7 @@ namespace Lumiis.Client
             if (accepted != null)
             {
                 _world.Reset();
-                _world.HandleJoinAccepted(accepted.EntityId, accepted.X, accepted.Y, _pendingLoginName);
+                _world.HandleJoinAccepted(accepted.EntityId, accepted.X, accepted.Y, _pendingLoginName, accepted.Appearance);
                 _statusMessage = "Verbunden als " + _pendingLoginName;
                 _uiState = UiState.InGame;
                 return;
@@ -155,7 +262,7 @@ namespace Lumiis.Client
             if (spawn != null)
             {
                 Debug.Log("EntitySpawn: Id=" + spawn.EntityId + " Name=" + spawn.Name + " Pos=(" + (spawn.X / 100.0) + "," + (spawn.Y / 100.0) + ")");
-                _world.HandleEntitySpawn(spawn.EntityId, spawn.Name, spawn.X, spawn.Y);
+                _world.HandleEntitySpawn(spawn.EntityId, spawn.Name, spawn.X, spawn.Y, spawn.Appearance);
                 return;
             }
 
@@ -202,22 +309,26 @@ namespace Lumiis.Client
         private void OnEntitySpawned(ClientEntity entity)
         {
             var go = new GameObject("Entity_" + entity.Id + "_" + entity.Name);
-            var view = go.AddComponent<EntityView>();
-            bool isLocal = entity.Id == _world.LocalEntityId;
-            Color color = isLocal ? LocalPlayerColor : ColorForEntity(entity.Id);
-            view.Initialize(entity.Id, entity.Name, color, _squareSprite);
+            var view = go.AddComponent<CharacterView>();
+            view.Initialize(entity.Id, entity.Name, _spriteProvider, _lookCatalog);
+            view.SetAppearance(entity.Appearance);
+            view.SetFacing(entity.Facing);
             view.SetWorldPosition(entity.X / 100.0, entity.Y / 100.0);
             _views[entity.Id] = view;
+
+            var animator = go.AddComponent<CharacterAnimator>();
+            animator.Initialize(view);
+            _animators[entity.Id] = animator;
         }
 
         private void OnEntityDespawned(int entityId)
         {
-            EntityView view;
-            if (_views.TryGetValue(entityId, out view))
+            if (_views.TryGetValue(entityId, out CharacterView view))
             {
                 if (view != null) Destroy(view.gameObject);
                 _views.Remove(entityId);
             }
+            _animators.Remove(entityId);
         }
 
         private void OnWorldWarning(string message)
@@ -227,16 +338,11 @@ namespace Lumiis.Client
 
         private void CleanupEntities()
         {
-            foreach (EntityView view in _views.Values)
+            foreach (CharacterView view in _views.Values)
                 if (view != null) Destroy(view.gameObject);
             _views.Clear();
+            _animators.Clear();
             _world.Reset();
-        }
-
-        private static Color ColorForEntity(int entityId)
-        {
-            float hue = (entityId * 0.618033988749895f) % 1f; // Goldener Schnitt verteilt Farben gut auseinander
-            return Color.HSVToRGB(hue, 0.65f, 0.95f);
         }
 
         // ---- Boden & Kartenbegrenzung ----
@@ -385,12 +491,13 @@ namespace Lumiis.Client
 
         private void DrawEntityLabels()
         {
-            foreach (KeyValuePair<int, EntityView> kvp in _views)
+            foreach (KeyValuePair<int, CharacterView> kvp in _views)
             {
                 ClientEntity entity;
                 if (!_world.Entities.TryGetValue(kvp.Key, out entity)) continue;
 
-                Vector3 worldPos = new Vector3((float)(entity.X / 100.0), (float)(entity.Y / 100.0) + 0.6f, 0f);
+                Vector3 basePos = new Vector3((float)(entity.X / 100.0), (float)(entity.Y / 100.0), 0f);
+                Vector3 worldPos = basePos + kvp.Value.GetHeadWorldOffset();
                 Vector3 screenPos = _camera.WorldToScreenPoint(worldPos);
                 if (screenPos.z < 0) continue; // hinter der Kamera
 

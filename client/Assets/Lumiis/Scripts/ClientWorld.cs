@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Lumiis.Shared;
+using Lumiis.Shared.Net;
 
 namespace Lumiis.Client
 {
@@ -11,6 +12,8 @@ namespace Lumiis.Client
         public string Name;
         public double X;
         public double Y;
+        public Appearance Appearance;
+        public Facing Facing = new Facing(FacingDirection.Down, false);
 
         public bool IsMoving;
         public int StartX;
@@ -32,7 +35,9 @@ namespace Lumiis.Client
     }
 
     /// <summary>Reine Client-Weltsicht: verwaltet Entities aus Server-Paketen. Kennt kein UnityEngine, kein Time.* -
-    /// die aktuelle Zeit wird von außen übergeben (Client-Empfangszeit, keine Uhrensynchronisation in M1b).</summary>
+    /// die aktuelle Zeit wird von außen übergeben (Client-Empfangszeit, keine Uhrensynchronisation in M1b).
+    /// Der Client berechnet nie Spielzustand selbst: eigene Charakterdaten kommen im JoinAccepted, öffentliche
+    /// Daten über EntitySpawn - beide laufen über denselben Pfad (ApplyAppearance), keine doppelte Logik.</summary>
     public sealed class ClientWorld
     {
         private readonly Dictionary<int, ClientEntity> _entities = new Dictionary<int, ClientEntity>();
@@ -55,18 +60,22 @@ namespace Lumiis.Client
             foreach (int id in ids) EntityDespawned?.Invoke(id);
         }
 
-        /// <summary>JoinAccepted enthält keinen Namen - der Client kennt ihn selbst (er hat ihn zum Join geschickt).</summary>
-        public void HandleJoinAccepted(int entityId, int x, int y, string localName)
+        public void HandleJoinAccepted(int entityId, int x, int y, string localName, Appearance appearance)
         {
             LocalEntityId = entityId;
-            var entity = new ClientEntity { Id = entityId, Name = localName, X = x, Y = y };
-            _entities[entityId] = entity;
-            EntitySpawned?.Invoke(entity);
+            ApplyAppearance(entityId, localName, x, y, appearance);
         }
 
-        public void HandleEntitySpawn(int entityId, string name, int x, int y)
+        public void HandleEntitySpawn(int entityId, string name, int x, int y, Appearance appearance)
         {
-            var entity = new ClientEntity { Id = entityId, Name = name, X = x, Y = y };
+            ApplyAppearance(entityId, name, x, y, appearance);
+        }
+
+        /// <summary>Gemeinsamer Erzeugungs-/Aktualisierungspfad für die eigene Figur (aus JoinAccepted) und
+        /// andere Figuren (aus EntitySpawn) - kein zweiter Codepfad.</summary>
+        private void ApplyAppearance(int entityId, string name, int x, int y, Appearance appearance)
+        {
+            var entity = new ClientEntity { Id = entityId, Name = name, X = x, Y = y, Appearance = appearance };
             _entities[entityId] = entity;
             EntitySpawned?.Invoke(entity);
         }
@@ -99,6 +108,7 @@ namespace Lumiis.Client
             entity.MoveStartTime = receivedAtTime;
             entity.X = startX;
             entity.Y = startY;
+            entity.Facing = FacingMath.FromDelta(targetX - startX, targetY - startY, entity.Facing);
         }
 
         public void HandleEntityStop(int entityId, int x, int y)
