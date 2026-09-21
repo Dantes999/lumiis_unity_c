@@ -6,6 +6,7 @@ string host = "127.0.0.1";
 int port = 7777;
 int count = 1;
 string namePrefix = "Bot";
+int radius = 20;
 
 for (int i = 0; i < args.Length; i++)
 {
@@ -23,6 +24,9 @@ for (int i = 0; i < args.Length; i++)
         case "--name":
             namePrefix = args[++i];
             break;
+        case "--radius":
+            radius = int.Parse(args[++i]);
+            break;
         default:
             Console.WriteLine($"Unbekanntes Argument: {args[i]}");
             break;
@@ -32,7 +36,7 @@ for (int i = 0; i < args.Length; i++)
 List<BotClient> bots = new List<BotClient>();
 for (int i = 1; i <= count; i++)
 {
-    BotClient bot = new BotClient($"{namePrefix}{i}");
+    BotClient bot = new BotClient($"{namePrefix}{i}", radius);
     bot.Connect(host, port);
     bots.Add(bot);
 }

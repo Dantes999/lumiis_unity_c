@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Lumiis.Shared\Lumiis.Shared.csproj" />
     <ProjectReference Include="..\..\src\Lumiis.Server\Lumiis.Server.csproj" />
+    <ProjectReference Include="..\..\src\Lumiis.Bot\Lumiis.Bot.csproj" />
   </ItemGroup>
 
 </Project>

@@ -9,16 +9,20 @@ namespace Lumiis.Bot;
 public sealed class BotClient : INetEventListener
 {
     private readonly string _name;
+    private readonly int _radiusUnits;
     private readonly NetManager _netManager;
     private readonly Random _random = new();
 
     private NetPeer? _peer;
     private bool _joined;
+    private int _spawnX;
+    private int _spawnY;
     private DateTime _nextMoveAtUtc;
 
-    public BotClient(string name)
+    public BotClient(string name, int radiusUnits)
     {
         _name = name;
+        _radiusUnits = radiusUnits;
         _netManager = new NetManager(this) { UpdateTime = 15 };
     }
 
@@ -48,8 +52,7 @@ public sealed class BotClient : INetEventListener
 
     private void SendRandomMoveTo()
     {
-        int x = _random.Next(0, GameConstants.MapWidth + 1);
-        int y = _random.Next(0, GameConstants.MapHeight + 1);
+        BotTargetPicker.PickTarget(_spawnX, _spawnY, _radiusUnits, _random, out int x, out int y);
         Send(new MoveToPacket { X = x, Y = y });
     }
 
@@ -97,6 +100,8 @@ public sealed class BotClient : INetEventListener
         {
             case JoinAcceptedPacket accepted:
                 _joined = true;
+                _spawnX = accepted.X;
+                _spawnY = accepted.Y;
                 Console.WriteLine($"[{_name}] JoinAccepted: Entity {accepted.EntityId} @ ({accepted.X},{accepted.Y})");
                 ScheduleNextMove();
                 break;
