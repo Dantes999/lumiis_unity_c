@@ -26,6 +26,76 @@ namespace Lumiis.Tests
         }
 
         [Fact]
+        public void JoinAccepted_RoundTrip()
+        {
+            var original = new JoinAcceptedPacket { EntityId = 42, X = 50000, Y = 50000 };
+            var decoded = Assert.IsType<JoinAcceptedPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.EntityId, decoded.EntityId);
+            Assert.Equal(original.X, decoded.X);
+            Assert.Equal(original.Y, decoded.Y);
+        }
+
+        [Fact]
+        public void JoinRejected_RoundTrip()
+        {
+            var original = new JoinRejectedPacket { Reason = JoinRejectReason.NameTaken };
+            var decoded = Assert.IsType<JoinRejectedPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.Reason, decoded.Reason);
+        }
+
+        [Fact]
+        public void EntitySpawn_RoundTrip()
+        {
+            var original = new EntitySpawnPacket { EntityId = 7, Name = "Held_1", X = 100, Y = -200 };
+            var decoded = Assert.IsType<EntitySpawnPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.EntityId, decoded.EntityId);
+            Assert.Equal(original.Name, decoded.Name);
+            Assert.Equal(original.X, decoded.X);
+            Assert.Equal(original.Y, decoded.Y);
+        }
+
+        [Fact]
+        public void EntityDespawn_RoundTrip()
+        {
+            var original = new EntityDespawnPacket { EntityId = 7 };
+            var decoded = Assert.IsType<EntityDespawnPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.EntityId, decoded.EntityId);
+        }
+
+        [Fact]
+        public void EntityMove_RoundTrip()
+        {
+            var original = new EntityMovePacket
+            {
+                EntityId = 3,
+                StartX = 1000,
+                StartY = 2000,
+                TargetX = 5000,
+                TargetY = 6000,
+                Speed = 500,
+                ServerTick = 123456u
+            };
+            var decoded = Assert.IsType<EntityMovePacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.EntityId, decoded.EntityId);
+            Assert.Equal(original.StartX, decoded.StartX);
+            Assert.Equal(original.StartY, decoded.StartY);
+            Assert.Equal(original.TargetX, decoded.TargetX);
+            Assert.Equal(original.TargetY, decoded.TargetY);
+            Assert.Equal(original.Speed, decoded.Speed);
+            Assert.Equal(original.ServerTick, decoded.ServerTick);
+        }
+
+        [Fact]
+        public void EntityStop_RoundTrip()
+        {
+            var original = new EntityStopPacket { EntityId = 3, X = 5000, Y = 6000 };
+            var decoded = Assert.IsType<EntityStopPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.EntityId, decoded.EntityId);
+            Assert.Equal(original.X, decoded.X);
+            Assert.Equal(original.Y, decoded.Y);
+        }
+
+        [Fact]
         public void Decode_HonorsOffsetAndCount()
         {
             byte[] body = PacketCodec.Encode(new MoveToPacket { X = 1, Y = 2 });
