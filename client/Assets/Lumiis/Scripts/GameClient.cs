@@ -25,7 +25,7 @@ namespace Lumiis.Client
         private Sprite _squareSprite;
         private Sprite _localMarkerSprite;
         private LookCatalogClient _lookCatalog;
-        private ISpriteProvider _spriteProvider;
+        private CachingSpriteProvider _spriteProvider;
         private CharacterTestboard _testboard;
         private CharacterTestboard _sortingTestboard;
 
@@ -59,7 +59,7 @@ namespace Lumiis.Client
                     + "Wurde 'cd server && dotnet build' vor dem Öffnen von Unity ausgeführt? " + ex);
                 throw;
             }
-            _spriteProvider = new PlaceholderSpriteProvider(_lookCatalog.CanvasPx, _lookCatalog.Ppu);
+            _spriteProvider = new CachingSpriteProvider(new PlaceholderSpriteProvider(_lookCatalog.CanvasPx, _lookCatalog.Ppu));
 
             _world.EntitySpawned += OnEntitySpawned;
             _world.EntityDespawned += OnEntityDespawned;
@@ -70,6 +70,11 @@ namespace Lumiis.Client
             _netClient.PacketReceived += OnPacketReceived;
 
             CreateFloorAndBoundary();
+        }
+
+        private void OnDestroy()
+        {
+            _spriteProvider?.DestroyAll();
         }
 
         private void Update()
@@ -480,7 +485,8 @@ namespace Lumiis.Client
             if (_world.LocalEntityId >= 0 && _world.Entities.TryGetValue(_world.LocalEntityId, out local))
                 posText = local.IntX + ", " + local.IntY;
 
-            string text = _statusMessage + " | Pos (Wire): " + posText + " | Entities: " + _world.Entities.Count + " | Ping: " + _netClient.Ping + " ms" + " | F1: Overlay";
+            string text = _statusMessage + " | Pos (Wire): " + posText + " | Entities: " + _world.Entities.Count
+                + " | Ping: " + _netClient.Ping + " ms" + " | Sprites im Cache: " + _spriteProvider.Count + " | F1: Overlay";
             GUI.Label(new Rect(10, 10, 700, 20), text);
         }
 
