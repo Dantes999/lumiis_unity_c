@@ -220,5 +220,43 @@ namespace Lumiis.Tests.Integration
                 server.Stop();
             }
         }
+
+        [Fact]
+        public void ExceptionInHandler_DisconnectsOnlyThatConnection_ServerAndOthersStayAlive()
+        {
+            GameServer server = CreateServer();
+            server.TestFaultHook = () => throw new InvalidOperationException("Simulierter Fehler im Handler");
+            server.Start();
+            try
+            {
+                using var clientA = new TestClient();
+                using var clientB = new TestClient();
+                clientA.Connect(server.ListenPort);
+                clientB.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, clientA, clientB));
+
+                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Alice" });
+                Assert.True(Pump(() => clientA.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
+                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Bob" });
+                Assert.True(Pump(() => clientB.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
+
+                // A löst über den Test-Hook eine Exception im MoveTo-Handler aus.
+                clientA.Send(new MoveToPacket { X = 1000, Y = 1000 });
+                Assert.True(Pump(() => clientA.Disconnected, server, clientA, clientB));
+
+                // Server lebt weiter, B ist unbeeinträchtigt und kann normal weiter spielen.
+                server.TestFaultHook = null;
+                Assert.False(clientB.Disconnected);
+
+                clientB.Send(new MoveToPacket { X = 2000, Y = 2000 });
+                Assert.True(Pump(
+                    () => clientB.Received.OfType<EntityMovePacket>().Any(m => m.TargetX == 2000 && m.TargetY == 2000),
+                    server, clientA, clientB));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
     }
 }

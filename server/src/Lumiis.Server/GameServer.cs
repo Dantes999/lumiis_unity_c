@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net;
@@ -29,12 +30,18 @@ public sealed class GameServer : INetEventListener
         }
     }
 
+    private const int MaxConsecutiveFailedTicks = 50;
+
     private readonly ServerConfig _config;
     private readonly World _world;
     private readonly NetManager _netManager;
     private readonly ILogger _logger;
     private readonly Dictionary<int, ConnectionState> _connections = new();
     private uint _tick;
+    private int _consecutiveFailedTicks;
+
+    /// <summary>Nur für Tests: wenn gesetzt, wird es beim Verarbeiten von MoveTo aufgerufen (zum Simulieren eines Fehlers in einem Handler).</summary>
+    internal Action? TestFaultHook { get; set; }
 
     public GameServer(ServerConfig config, ILogger logger)
     {
@@ -59,8 +66,30 @@ public sealed class GameServer : INetEventListener
         _logger.Info("Server gestoppt");
     }
 
-    /// <summary>Ein Tick: Netzwerkereignisse verarbeiten, Timeouts prüfen, Bewegung fortschreiben. Manuell aufrufbar für Tests.</summary>
+    /// <summary>Ein Tick: Netzwerkereignisse verarbeiten, Timeouts prüfen, Bewegung fortschreiben. Manuell aufrufbar für Tests.
+    /// Fängt Fehler im gesamten Tick ab und loggt sie, damit ein einzelner kaputter Tick den Server nicht beendet;
+    /// erst nach MaxConsecutiveFailedTicks in Folge wird sauber (Fail-fast) abgebrochen.</summary>
     public void Update()
+    {
+        try
+        {
+            RunTick();
+            _consecutiveFailedTicks = 0;
+        }
+        catch (Exception ex)
+        {
+            _consecutiveFailedTicks++;
+            _logger.Error($"Fehler in Tick {_tick} ({_consecutiveFailedTicks}/{MaxConsecutiveFailedTicks} in Folge): {ex}");
+
+            if (_consecutiveFailedTicks >= MaxConsecutiveFailedTicks)
+            {
+                throw new GameServerFatalException(
+                    $"{MaxConsecutiveFailedTicks} aufeinanderfolgende fehlerhafte Ticks - Server wird beendet.", ex);
+            }
+        }
+    }
+
+    private void RunTick()
     {
         _netManager.PollEvents();
         _tick++;
@@ -115,56 +144,93 @@ public sealed class GameServer : INetEventListener
 
     public void OnConnectionRequest(ConnectionRequest request)
     {
-        request.AcceptIfKey(_config.ConnectionKey);
+        try
+        {
+            request.AcceptIfKey(_config.ConnectionKey);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Fehler in OnConnectionRequest: {ex}");
+        }
     }
 
     public void OnPeerConnected(NetPeer peer)
     {
-        _connections[peer.Id] = new ConnectionState(peer, _tick + _config.JoinTimeoutTicks);
-        _logger.Info($"Verbindung {peer.Id} akzeptiert");
+        try
+        {
+            _connections[peer.Id] = new ConnectionState(peer, _tick + _config.JoinTimeoutTicks);
+            _logger.Info($"Verbindung {peer.Id} akzeptiert");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Fehler in OnPeerConnected für Verbindung {peer.Id}: {ex}");
+            peer.Disconnect();
+        }
     }
 
     public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
     {
-        if (!_connections.Remove(peer.Id, out ConnectionState? conn)) return;
-
-        if (conn.EntityId is int entityId)
+        try
         {
-            _world.Remove(entityId);
-            BroadcastToJoined(new EntityDespawnPacket { EntityId = entityId });
-            _logger.Info($"Entity {entityId} despawnt (Disconnect, {disconnectInfo.Reason})");
+            if (!_connections.Remove(peer.Id, out ConnectionState? conn)) return;
+
+            if (conn.EntityId is int entityId)
+            {
+                _world.Remove(entityId);
+                BroadcastToJoined(new EntityDespawnPacket { EntityId = entityId });
+                _logger.Info($"Entity {entityId} despawnt (Disconnect, {disconnectInfo.Reason})");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Fehler in OnPeerDisconnected für Verbindung {peer.Id}: {ex}");
         }
     }
 
     public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
-        if (!_connections.TryGetValue(peer.Id, out ConnectionState? conn) || conn.Closing)
-        {
-            reader.Recycle();
-            return;
-        }
-
-        byte[] data = reader.GetRemainingBytes();
-        reader.Recycle();
-
-        IPacket packet;
         try
         {
-            packet = PacketCodec.Decode(data);
-        }
-        catch (PacketFormatException ex)
-        {
-            _logger.Warn($"Kaputtes Paket von Verbindung {peer.Id}: {ex.Message}");
-            peer.Disconnect();
-            return;
-        }
+            if (!_connections.TryGetValue(peer.Id, out ConnectionState? conn) || conn.Closing)
+                return;
 
-        HandlePacket(conn, packet);
+            byte[] data = reader.GetRemainingBytes();
+
+            IPacket packet;
+            try
+            {
+                packet = PacketCodec.Decode(data);
+            }
+            catch (PacketFormatException ex)
+            {
+                _logger.Warn($"Kaputtes Paket von Verbindung {peer.Id}: {ex.Message}");
+                peer.Disconnect();
+                return;
+            }
+
+            HandlePacket(conn, packet);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Fehler beim Verarbeiten eines Pakets von Verbindung {peer.Id}: {ex}");
+            peer.Disconnect();
+        }
+        finally
+        {
+            reader.Recycle();
+        }
     }
 
     public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
     {
-        _logger.Warn($"Netzwerkfehler von {endPoint}: {socketError}");
+        try
+        {
+            _logger.Warn($"Netzwerkfehler von {endPoint}: {socketError}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Fehler beim Loggen eines Netzwerkfehlers: {ex}");
+        }
     }
 
     public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
@@ -263,6 +329,8 @@ public sealed class GameServer : INetEventListener
             conn.Peer.Disconnect();
             return;
         }
+
+        TestFaultHook?.Invoke();
 
         _world.SetDestination(entityId, moveTo.X, moveTo.Y);
         _world.TryGet(entityId, out Entity? entity);

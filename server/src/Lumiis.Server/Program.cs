@@ -30,12 +30,27 @@ Console.CancelKeyPress += (_, eventArgs) =>
 };
 
 GameServer server = new GameServer(config, logger);
-server.Start();
+
+try
+{
+    server.Start();
+}
+catch (Exception ex)
+{
+    logger.Error($"Serverstart fehlgeschlagen: {ex}");
+    return 1;
+}
+
 try
 {
     server.Run(cts.Token);
 }
-finally
+catch (Exception ex)
 {
+    logger.Error($"Server wird wegen eines unerwarteten Fehlers beendet: {ex}");
     server.Stop();
+    return 1;
 }
+
+server.Stop();
+return 0;
