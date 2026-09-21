@@ -44,10 +44,13 @@ public sealed class GameServer : INetEventListener
         _netManager = new NetManager(this) { UpdateTime = 15 };
     }
 
+    /// <summary>Tatsächlich gebundener Port (nach Start relevant, falls ServerConfig.Port 0 war).</summary>
+    public int ListenPort => _netManager.LocalPort;
+
     public void Start()
     {
         _netManager.Start(_config.Port);
-        _logger.Info($"Server gestartet auf Port {_config.Port} (max. {_config.MaxPlayers} Spieler)");
+        _logger.Info($"Server gestartet auf Port {_netManager.LocalPort} (max. {_config.MaxPlayers} Spieler)");
     }
 
     public void Stop()
