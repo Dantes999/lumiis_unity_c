@@ -3,11 +3,18 @@ using System.Collections.Generic;
 using Lumiis.Shared;
 using Lumiis.Shared.Net;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Lumiis.Client
 {
     /// <summary>Baut eine Figur aus Ebenen zusammen (Paper Doll). Ersetzt das einfarbige Quadrat der EntityView
-    /// aus M1b für Spieler. Reihenfolge/Sortierung nach docs/sprite-spec.md.</summary>
+    /// aus M1b für Spieler. Reihenfolge/Sortierung nach docs/sprite-spec.md.
+    ///
+    /// Sortierung zwischen Figuren läuft über eine SortingGroup am Figuren-Root (immer sortingOrder 0, Root-
+    /// Position = Fußpunkt) plus Transparency Sort Mode "Custom Axis" (0,1,0) auf dem URP-2D-Renderer - dafür
+    /// sorgt die kontinuierliche Y-Position der Gruppe, kein von Hand berechneter Wert. Innerhalb einer Figur
+    /// sortieren die Kind-Renderer nur noch über ihren festen Slot-Rang (0-5 je Zeichenreihenfolge-Tabelle,
+    /// Marker-Ring -1) - keine Y-Formel mehr, die den gültigen sortingOrder-Bereich (short) überschreiten könnte.</summary>
     public sealed class CharacterView : MonoBehaviour
     {
         private static readonly CharacterSlot[] OrderDown = { CharacterSlot.Body, CharacterSlot.Armor, CharacterSlot.Shield, CharacterSlot.Weapon, CharacterSlot.Hair, CharacterSlot.Helmet };
@@ -32,6 +39,9 @@ namespace Lumiis.Client
             EntityName = entityName;
             _spriteProvider = spriteProvider;
             _lookCatalog = lookCatalog;
+
+            SortingGroup sortingGroup = gameObject.AddComponent<SortingGroup>();
+            sortingGroup.sortingOrder = 0;
 
             var visualRootGo = new GameObject("VisualRoot");
             visualRootGo.transform.SetParent(transform, false);
@@ -126,22 +136,16 @@ namespace Lumiis.Client
                 renderer.flipX = _facing.FlipX;
         }
 
+        /// <summary>Nur der feste Rang (0-5) innerhalb der Figur - welche Figur vor welcher liegt, entscheidet
+        /// die SortingGroup zusammen mit dem Custom-Axis-Sort des Renderers, nicht dieser Wert.</summary>
         private void ApplySortingOrder()
         {
             CharacterSlot[] order = OrderForDirection(_facing.Direction);
-            // Weiter unten (kleineres Y) = weiter vorne = höherer sortingOrder. *100, um die Wire-Auflösung
-            // (1/100 Einheit) verlustfrei abzubilden; *10 je Figur reicht für 6 Ebenen ohne Überschneidung.
-            int basis = -Mathf.RoundToInt(transform.position.y * 100f);
             for (int rank = 0; rank < order.Length; rank++)
             {
                 if (_renderers.TryGetValue(order[rank], out SpriteRenderer renderer))
-                    renderer.sortingOrder = basis * 10 + rank;
+                    renderer.sortingOrder = rank;
             }
-        }
-
-        private void LateUpdate()
-        {
-            ApplySortingOrder();
         }
 
         private static CharacterSlot[] OrderForDirection(FacingDirection direction)

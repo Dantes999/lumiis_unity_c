@@ -27,6 +27,7 @@ namespace Lumiis.Client
         private LookCatalogClient _lookCatalog;
         private ISpriteProvider _spriteProvider;
         private CharacterTestboard _testboard;
+        private CharacterTestboard _sortingTestboard;
 
         private UiState _uiState = UiState.Login;
         private string _host = "127.0.0.1";
@@ -119,6 +120,7 @@ namespace Lumiis.Client
             if (Keyboard.current == null) return;
 
             if (Keyboard.current.f2Key.wasPressedThisFrame) ToggleTestboard();
+            if (Keyboard.current.f9Key.wasPressedThisFrame) ToggleSortingTest();
 
             if (_world.LocalEntityId < 0) return;
             if (Keyboard.current.f3Key.wasPressedThisFrame) CycleLocalAppearanceSlot("Hair");
@@ -139,11 +141,28 @@ namespace Lumiis.Client
 
                 List<int> bodyIds = new List<int>(_lookCatalog.GetIdsForSlot("Body"));
                 int bodyId = bodyIds.Count > 0 ? bodyIds[0] : 1;
-                _testboard.Build(_spriteProvider, _lookCatalog, bodyId, _lookCatalog.GetIdsForSlot("Armor"));
+                _testboard.BuildArmorGrid(_spriteProvider, _lookCatalog, bodyId, _lookCatalog.GetIdsForSlot("Armor"));
                 go.SetActive(false);
             }
 
             _testboard.gameObject.SetActive(!_testboard.gameObject.activeSelf);
+        }
+
+        private void ToggleSortingTest()
+        {
+            if (_sortingTestboard == null)
+            {
+                var go = new GameObject("SortingTestboard");
+                go.transform.position = new Vector3(GameConstants.MapWidth / 100f + 3f, GameConstants.MapHeight / 200f - 8f, 0f);
+                _sortingTestboard = go.AddComponent<CharacterTestboard>();
+
+                List<int> bodyIds = new List<int>(_lookCatalog.GetIdsForSlot("Body"));
+                int bodyId = bodyIds.Count > 0 ? bodyIds[0] : 1;
+                _sortingTestboard.BuildSortingTest(_spriteProvider, _lookCatalog, bodyId, _lookCatalog.GetIdsForSlot("Armor"));
+                go.SetActive(false);
+            }
+
+            _sortingTestboard.gameObject.SetActive(!_sortingTestboard.gameObject.activeSelf);
         }
 
         /// <summary>Zyklus 0 (keine Ebene) -> erste Katalog-Id -> ... -> letzte -> zurück zu 0. Rein lokal,
@@ -367,7 +386,7 @@ namespace Lumiis.Client
             floorRenderer.sprite = PlaceholderSprites.CreateCheckerTile();
             floorRenderer.drawMode = SpriteDrawMode.Tiled;
             floorRenderer.size = new Vector2(mapUnitsX, mapUnitsY);
-            floorRenderer.sortingOrder = -10;
+            floorRenderer.sortingOrder = -100;
             floorGo.transform.position = new Vector3(mapUnitsX / 2f, mapUnitsY / 2f, 0f);
 
             Color borderColor = new Color(1f, 0.3f, 0.3f, 1f);
@@ -384,7 +403,7 @@ namespace Lumiis.Client
             var renderer = go.AddComponent<SpriteRenderer>();
             renderer.sprite = _squareSprite;
             renderer.color = color;
-            renderer.sortingOrder = -5;
+            renderer.sortingOrder = -50;
             go.transform.position = position;
             go.transform.localScale = scale;
         }
