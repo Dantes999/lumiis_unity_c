@@ -81,6 +81,80 @@ namespace Lumiis.Tests.Integration
         }
 
         [Fact]
+        public void ExistingClient_SeesLaterJoinerViaBroadcast()
+        {
+            // Deckt den Fall ab, der bei TwoClients_JoinAndSeeEachOthersSpawn NICHT geprüft wird:
+            // A ist schon drin, B joint SPÄTER - kommt bei A ein EntitySpawn für B per Broadcast an?
+            GameServer server = CreateServer();
+            server.Start();
+            try
+            {
+                using var clientA = new TestClient();
+                clientA.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, clientA));
+
+                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Alice" });
+                Assert.True(Pump(() => clientA.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA));
+
+                using var clientB = new TestClient();
+                clientB.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, clientA, clientB));
+
+                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Bob" });
+                Assert.True(Pump(() => clientB.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
+
+                Assert.True(Pump(() => clientA.Received.OfType<EntitySpawnPacket>().Any(p => p.Name == "Bob"), server, clientA, clientB));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void ExistingClient_SeesBurstOfLaterJoiners()
+        {
+            // Näher an "Lumiis.Bot --count 3": mehrere neue Clients joinen kurz hintereinander,
+            // ohne dass zwischendurch gewartet wird - sieht der bereits verbundene Client alle drei?
+            GameServer server = CreateServer();
+            server.Start();
+            try
+            {
+                using var clientA = new TestClient();
+                clientA.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, clientA));
+
+                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Alice" });
+                Assert.True(Pump(() => clientA.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA));
+
+                using var bot1 = new TestClient();
+                using var bot2 = new TestClient();
+                using var bot3 = new TestClient();
+                bot1.Connect(server.ListenPort);
+                bot2.Connect(server.ListenPort);
+                bot3.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, clientA, bot1, bot2, bot3));
+
+                bot1.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Bot1" });
+                bot2.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Bot2" });
+                bot3.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Bot3" });
+
+                Assert.True(Pump(
+                    () => clientA.Received.OfType<EntitySpawnPacket>().Select(p => p.Name).Distinct().Count() >= 3,
+                    server, clientA, bot1, bot2, bot3));
+
+                var seenNames = clientA.Received.OfType<EntitySpawnPacket>().Select(p => p.Name).Distinct().ToList();
+                Assert.Contains("Bot1", seenNames);
+                Assert.Contains("Bot2", seenNames);
+                Assert.Contains("Bot3", seenNames);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
         public void MoveTo_BroadcastsMoveThenStopAtExactTarget()
         {
             GameServer server = CreateServer();

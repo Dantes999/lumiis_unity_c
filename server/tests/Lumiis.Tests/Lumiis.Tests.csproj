@@ -24,4 +24,10 @@
     <ProjectReference Include="..\..\src\Lumiis.Bot\Lumiis.Bot.csproj" />
   </ItemGroup>
 
+  <!-- ClientWorld hat bewusst keine UnityEngine-Abhängigkeit (siehe Kommentar dort) - deshalb per
+       Compile-Include direkt testbar, ohne das Unity-Projekt oder eine Plugin-DLL anzufassen. -->
+  <ItemGroup>
+    <Compile Include="..\..\..\client\Assets\Lumiis\Scripts\ClientWorld.cs" Link="ClientCode\ClientWorld.cs" />
+  </ItemGroup>
+
 </Project>
