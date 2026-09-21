@@ -66,6 +66,13 @@ Aktuelle Aufgabe: keine - M1 (inkl. aller Unteraufgaben) ist fertig, für M2 gib
 - Architektur nicht eigenmächtig ändern. Bei Widerspruch oder Unklarheit stoppen und den User fragen (ein Architekt-Chat prüft die Ergebnisse).
 - Am Ende jeder Aufgabe den Abschnitt "Status" hier aktualisieren.
 
+## Bekannte Eigenheiten
+- Unity-Editor drosselt die Play-Mode-Update-Schleife (und damit NetClient.PollEvents), wenn das Unity-Fenster
+  nicht fokussiert ist. Beim Testen mit mehreren Bots im Editor: entweder das Unity-Fenster fokussiert halten,
+  oder in den Editor-Preferences unter "Interaction Mode" (Menüort kann je Unity-Version abweichen) auf
+  "No Throttling" stellen. Ein Standalone-Build ist davon nicht betroffen (siehe Abschnitt "Client" -
+  Development-Build für Tests ohne Fokus-Effekt).
+
 ## Bekannte Lücken
 - AOI (Sichtbarkeit): Aktuell sehen alle Verbindungen alle Entities, keine Kartenausschnitt-Filterung. Geplant für M3 (Grid, AOI, Mobs). Markiert mit TODO(M3) in `World.cs` und `GameServer.cs`.
 - Rate-Limit pro Verbindung: Kein Schutz gegen Paketflut eines einzelnen Clients (z. B. MoveTo-Spam). Geplant für M8 (Alpha-Betrieb).
@@ -79,12 +86,12 @@ Aktuelle Aufgabe: keine - M1 (inkl. aller Unteraufgaben) ist fertig, für M2 gib
 - M1c (Sichtbarkeit beim Testen) fertig, in 3 Commits: (1) Bot `--radius` (Default 20 Einheiten) für Zielwahl um den Spawn-Punkt, klemmt auf Kartengrenzen, `--radius 0` = ganze Karte wie bisher; Zielwahl in `BotTargetPicker` ausgelagert und getestet. (2) Zoom (Mausrad, Orthographic Size 3-300, nur Vorzeichen des Scroll-Werts wegen Plattformunterschieden) und F1-Umschaltung fürs Debug-Overlay; Overlay zeigt jetzt zusätzlich eine nach Entfernung sortierte Entity-Liste (max. 12 Zeilen); Debug.Log bei EntitySpawn/EntityDespawn. (3) Auf User-Meldung hin (Bots, die nach dem Unity-Client joinen, erscheinen nicht) `ClientWorld` per Compile-Include in `Lumiis.Tests` testbar gemacht und den Empfangspfad untersucht - siehe unten, Ursache noch offen. 91 Tests grün, 3-5x stabil. Batchmode-Kompilierlauf konnte für Punkt 2-4 nicht laufen, da der User-eigene Editor das Projekt offen hatte; die neu genutzten Input-System-APIs wurden stattdessen im Paket-Quellcode verifiziert.
 - M1c-layered-characters (Ebenen-Charaktere/Paper Doll mit Platzhaltern) fertig, in 4 Commits: (1) data/looks.json (Platzhalter-Katalog) plus Shared `Appearance` (Struct, eine Write/Read-Implementierung für JoinAccepted UND EntitySpawn) und `Facing`/`FacingMath` (Hysterese gegen Flackern). (2) Server: `LookCatalog` lädt/validiert looks.json (`--data-dir`), Appearance-Vergabe deterministisch aus dem Namen per FNV-1a - bewusst serverintern, Übergangslösung bis M2; Protocol.Version 2. (3) Client: `LookCatalogClient` (JsonUtility), `PlaceholderSpriteProvider`, `CharacterView`/`CharacterAnimator`/`CharacterTestboard` - Sortierung, Spiegeln, Hand-/Kopf-Anker, Haar-Tönung, hidesHair, F2-Testboard, F3-F8 lokale Look-Hotkeys. `EntityView` entfernt (durch `CharacterView` ersetzt). (4) Doku: neue Konventionen (Asset-Herkunft, Client berechnet nie Spielzustand), docs/art-provenance.md angelegt. 133 Tests grün, 5x stabil. Unity-Batchmode-Kompilierlauf: 0 Compiler-Fehler.
 
-### Offen: später beitretende Entities erscheinen nicht im Unity-Client
-Beobachtung (User): Bots, die VOR dem Unity-Client joinen, erscheinen korrekt; Bots, die NACH ihm joinen, nicht (Hierarchy zeigt nur die eigene Entity). Untersucht und NICHT als Ursache bestätigt:
-- `ClientWorld` (reine Logik, jetzt testbar via Compile-Include): Test mit JoinAccepted gefolgt von späterem EntitySpawn/EntityMove ist grün, auch mit mehreren späteren Joinern.
-- Server-Broadcast an bereits verbundene Clients: zwei neue Integrationstests (einzelner später Joiner, Burst mit 3) sind grün.
-- Code-Review NetClient/GameClient: kein Zustand/Flag gefunden, das späteres EntitySpawn anders behandelt als initiales.
-Nicht abschließend geklärt: ob der Unity-Editor `Update()`/`PollEvents()` bei Fokusverlust im Play-Modus drosselt (offizielle Doku deckt das nicht ab). Braucht weitere Diagnose vom User (Fokus beim Testen, Console-Warnungen, Server-Log, Verhalten mit genau einem späteren Bot) - siehe Chat.
+### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client
+War kein Codefehler. User hat den Test mit fokussiertem Unity-Fenster wiederholt (Server, Unity Play, dann Bots
+gestartet, ins Unity-Fenster geklickt): alle Spawns kamen an, auch mit 99 Bots. Wahrscheinliche Ursache war die
+Drosselung der Editor-Update-Schleife ohne Fensterfokus (siehe "Bekannte Eigenheiten" unten) - kein
+Server-/Client-Bug. Die dabei entstandenen Tests (ClientWorld ohne Unity testbar, Integrationstests für spätere
+Joiner/Burst) bleiben als nützliche Regressionsabdeckung erhalten.
 
 ### Noch zu prüfen (Editor/Play-Modus, vom User)
 - Unity öffnet `client/` ohne Compiler-Fehler in der Console (Batchmode-Check war bereits grün, Editor-Check zur Sicherheit trotzdem empfohlen).
