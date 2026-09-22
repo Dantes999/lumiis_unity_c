@@ -18,25 +18,29 @@ namespace Lumiis.Client
 
         private NetManager _netManager;
         private NetPeer _peer;
-        private string _pendingName;
+        private string _pendingToken;
+        private int _pendingCharacterId;
 
         public bool IsConnected { get; private set; }
         public int Ping { get; private set; }
 
-        /// <summary>Baut die Verbindung auf und merkt sich den Namen fürs JoinRequest nach dem Connect.
-        /// Gibt false zurück, wenn der Name schon vorab ungültig ist (kein Verbindungsversuch).</summary>
-        public bool Connect(string host, int port, string name)
+        /// <summary>Baut die Verbindung auf und merkt sich Token+CharacterId fürs JoinRequest nach dem
+        /// Connect (M2b-Protokoll: Server verlangt Token statt Name). Gibt false zurück, wenn das Token
+        /// schon vorab leer ist (kein Verbindungsversuch) - die eigentliche Gültigkeitsprüfung macht ohnehin
+        /// immer der Server.</summary>
+        public bool Connect(string host, int port, string token, int characterId)
         {
-            if (!NameRules.IsValid(name))
+            if (string.IsNullOrEmpty(token))
             {
-                Debug.LogWarning("NetClient.Connect: ungültiger Name '" + name + "'");
+                Debug.LogWarning("NetClient.Connect: leeres Token");
                 return false;
             }
 
             if (_netManager != null) _netManager.Stop();
 
             _netManager = new NetManager(this) { UpdateTime = 15 };
-            _pendingName = name;
+            _pendingToken = token;
+            _pendingCharacterId = characterId;
             IsConnected = false;
             _netManager.Start();
             _peer = _netManager.Connect(host, port, Protocol.ConnectionKey);
@@ -87,7 +91,7 @@ namespace Lumiis.Client
         public void OnPeerConnected(NetPeer peer)
         {
             IsConnected = true;
-            Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = _pendingName });
+            Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = _pendingToken, CharacterId = _pendingCharacterId });
             Connected?.Invoke();
         }
 

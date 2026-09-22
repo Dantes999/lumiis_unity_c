@@ -17,6 +17,9 @@ namespace Lumiis.Client
             var netClient = root.AddComponent<NetClient>();
             var gameClient = root.AddComponent<GameClient>();
             gameClient.Initialize(netClient, camera);
+
+            var loginController = root.AddComponent<LoginController>();
+            loginController.Initialize(netClient, gameClient);
         }
 
         private static Camera EnsureOrthographicMainCamera()

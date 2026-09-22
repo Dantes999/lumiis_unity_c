@@ -44,6 +44,14 @@ namespace Lumiis.Client
         private const float ZoomStep = 1f;
         private const int MaxDebugEntityRows = 12;
 
+        /// <summary>Von LoginController aufgerufen, bevor NetClient.Connect - der Server schickt den eigenen
+        /// Namen nie zurück (JoinAcceptedPacket kennt kein Name-Feld), der Client muss ihn sich also selbst
+        /// merken (jetzt: der in der Charakterauswahl gewählte Name, statt wie bisher das freie Namensfeld).</summary>
+        public void PrepareJoin(string characterName)
+        {
+            _pendingLoginName = characterName;
+        }
+
         public void Initialize(NetClient netClient, Camera camera)
         {
             _netClient = netClient;
@@ -395,8 +403,10 @@ namespace Lumiis.Client
             switch (reason)
             {
                 case JoinRejectReason.VersionMismatch: return "Protokollversion stimmt nicht überein";
-                case JoinRejectReason.InvalidName: return "Ungültiger Name";
-                case JoinRejectReason.NameTaken: return "Name bereits vergeben";
+                case JoinRejectReason.InvalidToken: return "Ungültiges Token";
+                case JoinRejectReason.TokenExpired: return "Token abgelaufen";
+                case JoinRejectReason.CharacterNotFound: return "Charakter nicht gefunden";
+                case JoinRejectReason.CharacterAlreadyOnline: return "Charakter bereits online";
                 case JoinRejectReason.ServerFull: return "Server voll";
                 default: return reason.ToString();
             }
