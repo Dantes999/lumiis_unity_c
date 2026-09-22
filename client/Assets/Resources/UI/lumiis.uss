@@ -12,8 +12,8 @@
 }
 
 .panel {
-    width: 360px;
-    padding: 16px;
+    width: 420px;
+    padding: 20px;
     background-color: rgb(30, 30, 36);
     border-width: 1px;
     border-color: rgb(60, 60, 70);
@@ -24,19 +24,33 @@
     color: rgb(235, 235, 240);
     -unity-text-align: middle-center;
     -unity-font-style: bold;
-    margin-bottom: 12px;
+    margin-bottom: 16px;
+}
+
+/* Eingabefelder explizit groß/klar dimensioniert statt sich allein auf das Default-Theme zu verlassen -
+   dessen Basiswerte machten die Felder kaum sichtbar/klickbar. */
+.unity-text-field {
+    min-height: 34px;
+    margin-bottom: 10px;
 }
 
 .unity-text-field__label {
     color: rgb(210, 210, 215);
-    min-width: 110px;
+    min-width: 120px;
+    font-size: 14px;
+    -unity-text-align: middle-left;
 }
 
 .unity-text-field__input {
     background-color: rgb(18, 18, 22);
     color: rgb(235, 235, 240);
     border-width: 1px;
-    border-color: rgb(70, 70, 80);
+    border-color: rgb(90, 90, 105);
+    border-radius: 3px;
+    min-height: 30px;
+    padding: 4px 8px;
+    font-size: 14px;
+    flex-grow: 1;
 }
 
 .unity-foldout {
@@ -59,7 +73,10 @@ Button {
     border-width: 0;
     border-radius: 4px;
     margin: 4px;
-    padding: 6px 14px;
+    padding: 8px 16px;
+    min-height: 34px;
+    min-width: 120px;
+    font-size: 14px;
 }
 
 Button:hover {
