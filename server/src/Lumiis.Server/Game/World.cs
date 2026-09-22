@@ -79,8 +79,7 @@ public sealed class World
     /// <summary>Setzt ein Bewegungsziel, zuerst auf die Kartengrenzen geklemmt, danach (falls eine
     /// CollisionMap gesetzt ist) gegen sie geprüft: die gerade Linie von der aktuellen Position zum
     /// geklemmten Ziel wird zellenweise abgeschritten (ClipToLastWalkableCell), die Bewegung stoppt an der
-    /// letzten begehbaren Zelle vor einer blockierten. TODO(M3): Sichtbarkeit/AOI - aktuell sehen alle
-    /// Entities alle anderen.</summary>
+    /// letzten begehbaren Zelle vor einer blockierten.</summary>
     public bool SetDestination(int entityId, int targetX, int targetY)
     {
         if (!_entities.TryGetValue(entityId, out Entity? entity)) return false;
