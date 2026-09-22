@@ -102,10 +102,13 @@ Button:disabled {
 }
 
 .character-list {
-    max-height: 220px;
-    margin-bottom: 8px;
+    height: 180px;
+    margin-bottom: 12px;
     border-width: 1px;
     border-color: rgb(55, 55, 62);
+    flex-grow: 0;
+    flex-shrink: 0;
+    overflow: hidden;
 }
 
 .character-button {
@@ -121,6 +124,7 @@ Button:disabled {
 .new-character-row {
     flex-direction: row;
     align-items: center;
+    flex-shrink: 0;
 }
 
 .new-character-row .unity-text-field {
