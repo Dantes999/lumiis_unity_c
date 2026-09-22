@@ -1,0 +1,18 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <Style src="lumiis.uss" />
+    <ui:VisualElement name="character-select-root" class="screen">
+        <ui:VisualElement class="panel">
+            <ui:Label text="Charakter wählen" class="title" />
+            <ui:ScrollView name="character-list" class="character-list" />
+            <ui:VisualElement class="new-character-row">
+                <ui:TextField name="new-character-name-field" label="Neu" />
+                <ui:Button text="Erstellen" name="create-character-button" />
+            </ui:VisualElement>
+            <ui:Label name="character-select-status" class="status-text" />
+            <ui:Label name="character-select-error" class="error-text" />
+            <ui:VisualElement class="button-row">
+                <ui:Button text="Abmelden" name="logout-button" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

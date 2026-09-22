@@ -1,0 +1,21 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <Style src="lumiis.uss" />
+    <ui:VisualElement name="login-root" class="screen">
+        <ui:VisualElement class="panel">
+            <ui:Label text="Lumiis - Anmeldung" class="title" />
+            <ui:TextField label="Benutzername" name="username-field" />
+            <ui:TextField label="Passwort" name="password-field" password="true" />
+            <ui:VisualElement class="button-row">
+                <ui:Button text="Anmelden" name="login-button" />
+                <ui:Button text="Registrieren" name="register-button" />
+            </ui:VisualElement>
+            <ui:Label name="login-status" class="status-text" />
+            <ui:Label name="login-error" class="error-text" />
+            <ui:Foldout text="Erweitert" name="advanced-foldout" value="false">
+                <ui:TextField label="Auth-URL" name="auth-url-field" value="http://127.0.0.1:5080" />
+                <ui:TextField label="Server-Host" name="server-host-field" value="127.0.0.1" />
+                <ui:TextField label="Server-Port" name="server-port-field" value="7777" />
+            </ui:Foldout>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

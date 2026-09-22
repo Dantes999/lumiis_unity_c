@@ -1,0 +1,111 @@
+/* Minimale, funktionale Gestaltung (lesbar, keine Design-Arbeit - das kommt später mit dem Art-Stil). */
+
+.screen {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(8, 8, 12, 0.85);
+}
+
+.panel {
+    width: 360px;
+    padding: 16px;
+    background-color: rgb(30, 30, 36);
+    border-width: 1px;
+    border-color: rgb(60, 60, 70);
+}
+
+.title {
+    font-size: 22px;
+    color: rgb(235, 235, 240);
+    -unity-text-align: middle-center;
+    -unity-font-style: bold;
+    margin-bottom: 12px;
+}
+
+.unity-text-field__label {
+    color: rgb(210, 210, 215);
+    min-width: 110px;
+}
+
+.unity-text-field__input {
+    background-color: rgb(18, 18, 22);
+    color: rgb(235, 235, 240);
+    border-width: 1px;
+    border-color: rgb(70, 70, 80);
+}
+
+.unity-foldout {
+    margin-top: 8px;
+}
+
+.unity-foldout__text {
+    color: rgb(190, 190, 200);
+}
+
+.button-row {
+    flex-direction: row;
+    justify-content: center;
+    margin-top: 8px;
+}
+
+Button {
+    background-color: rgb(55, 90, 140);
+    color: rgb(240, 240, 245);
+    border-width: 0;
+    border-radius: 4px;
+    margin: 4px;
+    padding: 6px 14px;
+}
+
+Button:hover {
+    background-color: rgb(70, 105, 160);
+}
+
+Button:disabled {
+    background-color: rgb(60, 60, 65);
+    color: rgb(150, 150, 155);
+}
+
+.error-text {
+    color: rgb(230, 100, 100);
+    white-space: normal;
+    margin-top: 8px;
+    min-height: 18px;
+}
+
+.status-text {
+    color: rgb(190, 190, 200);
+    -unity-text-align: middle-center;
+    margin-top: 6px;
+}
+
+.character-list {
+    max-height: 220px;
+    margin-bottom: 8px;
+    border-width: 1px;
+    border-color: rgb(55, 55, 62);
+}
+
+.character-button {
+    -unity-text-align: middle-left;
+    background-color: rgb(40, 40, 48);
+    margin: 2px 0;
+}
+
+.character-button:hover {
+    background-color: rgb(55, 55, 65);
+}
+
+.new-character-row {
+    flex-direction: row;
+    align-items: center;
+}
+
+.new-character-row .unity-text-field {
+    flex-grow: 1;
+}
