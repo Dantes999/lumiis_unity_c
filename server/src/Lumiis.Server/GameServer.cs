@@ -2,9 +2,11 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using LiteNetLib;
 using Lumiis.Data;
@@ -42,7 +44,15 @@ public sealed class GameServer : INetEventListener
     /// JoinRejected getrennt, wie jeder andere Disconnect ohne JoinAccepted (siehe CLAUDE.md-Konvention).</summary>
     private sealed record JoinLookupResult(int PeerId, Character? Character, JoinRejectReason? RejectReason);
 
+    /// <summary>Eine zu speichernde Position, per Channel an den Hintergrund-Task übergeben (siehe
+    /// RunPositionSaveConsumerAsync).</summary>
+    private readonly record struct PositionSaveRequest(int CharacterId, int X, int Y);
+
     private const int MaxConsecutiveFailedTicks = 50;
+
+    /// <summary>Fix, keine Konfiguration (siehe CLAUDE.md "Bekannte Lücken") - alle 30s wird die Position
+    /// jedes verbundenen Spielers gespeichert, zusätzlich sofort bei Disconnect.</summary>
+    private const long PositionSaveIntervalMs = 30_000;
 
     // Monotone Standard-Uhr, geteilt über alle Instanzen (läuft seit Prozessstart, nie negativ).
     private static readonly Stopwatch DefaultClock = Stopwatch.StartNew();
@@ -57,6 +67,9 @@ public sealed class GameServer : INetEventListener
     private readonly Func<long> _nowMs;
     private readonly Dictionary<int, ConnectionState> _connections = new();
     private readonly ConcurrentQueue<JoinLookupResult> _pendingJoinResults = new();
+    private readonly Channel<PositionSaveRequest> _positionSaveChannel;
+    private readonly CancellationTokenSource _positionSaveCts = new();
+    private Task? _positionSaveConsumerTask;
     private uint _tick;
     private int _consecutiveFailedTicks;
 
@@ -75,6 +88,21 @@ public sealed class GameServer : INetEventListener
         _world = new World(config.MaxPlayers);
         _netManager = new NetManager(this) { UpdateTime = 15 };
         _nowMs = nowMs ?? DefaultNowMs;
+
+        // Kapazität = MaxPlayers: höchstens einmal pro Spieler pro 30s-Zyklus (oder einmalig bei
+        // Disconnect) wird ein Save enqueued, mehr gleichzeitig ausstehende Anfragen sollten unter
+        // normalem Betrieb nie vorkommen. FullMode=DropOldest statt eines blockierenden Writers, falls
+        // der Hintergrund-Task doch einmal ins Hintertreffen gerät (z. B. DB kurzzeitig langsam): die
+        // älteste, noch nicht geschriebene Position wird verworfen, die neueste gewinnt - Positionsdaten
+        // sind ohnehin "best effort" (siehe CLAUDE.md "Bekannte Lücken"), nur der letzte bekannte Stand
+        // zählt, ein übersprungener Zwischenstand ist unkritisch. GameServer selbst ist der einzige
+        // Schreiber (immer vom Game-Loop-Thread: periodisch aus RunTick, sofort aus OnPeerDisconnected).
+        _positionSaveChannel = Channel.CreateBounded<PositionSaveRequest>(new BoundedChannelOptions(config.MaxPlayers)
+        {
+            FullMode = BoundedChannelFullMode.DropOldest,
+            SingleReader = true,
+            SingleWriter = true
+        });
     }
 
     /// <summary>Tatsächlich gebundener Port (nach Start relevant, falls ServerConfig.Port 0 war).</summary>
@@ -83,12 +111,15 @@ public sealed class GameServer : INetEventListener
     public void Start()
     {
         _netManager.Start(_config.Port);
+        _positionSaveConsumerTask = Task.Run(() => RunPositionSaveConsumerAsync(_positionSaveCts.Token));
         _logger.Info($"Server gestartet auf Port {_netManager.LocalPort} (max. {_config.MaxPlayers} Spieler)");
     }
 
     public void Stop()
     {
         _netManager.Stop();
+        _positionSaveChannel.Writer.TryComplete();
+        _positionSaveCts.Cancel();
         _logger.Info("Server gestoppt");
     }
 
@@ -139,6 +170,58 @@ public sealed class GameServer : INetEventListener
         List<Entity> arrived = _world.Tick(deltaSeconds);
         foreach (Entity entity in arrived)
             BroadcastToJoined(new EntityStopPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY });
+
+        EnqueueDuePositionSaves();
+    }
+
+    /// <summary>Nicht-blockierend (Channel.Writer.TryWrite): reine Buchhaltung + Enqueue, kein DB-Zugriff
+    /// auf dem Game-Loop-Thread. Siehe RunPositionSaveConsumerAsync für den eigentlichen Schreibvorgang.</summary>
+    private void EnqueueDuePositionSaves()
+    {
+        long now = _nowMs();
+        foreach (Entity entity in SelectDueForSave(_world.Entities, now, PositionSaveIntervalMs))
+        {
+            entity.LastSaveAtMs = now;
+            _positionSaveChannel.Writer.TryWrite(new PositionSaveRequest(entity.CharacterId, entity.IntX, entity.IntY));
+        }
+    }
+
+    /// <summary>Reine Entscheidung (kein DB-, kein Netzwerkzugriff): welche Entities sind fällig (letzter
+    /// Save mindestens intervalMs her)? Statisch und pur, damit ohne echten GameServer/DB testbar.</summary>
+    internal static List<Entity> SelectDueForSave(IEnumerable<Entity> entities, long nowMs, long intervalMs)
+    {
+        return entities.Where(e => nowMs - e.LastSaveAtMs >= intervalMs).ToList();
+    }
+
+    /// <summary>Läuft auf einem Threadpool-Thread, NIE auf dem Game-Loop-Thread. Fehler werden geloggt,
+    /// bringen den Server nicht zum Absturz (bestehende Fehlerbehandlungs-Konvention) - eine einzelne
+    /// fehlgeschlagene Positions-Speicherung ist nicht kritisch, der nächste 30s-Zyklus versucht es erneut.</summary>
+    private async Task RunPositionSaveConsumerAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await foreach (PositionSaveRequest request in _positionSaveChannel.Reader.ReadAllAsync(cancellationToken))
+            {
+                try
+                {
+                    await using LumiisDbContext db = _dbContextFactory();
+                    Character? character = await db.Characters.FindAsync(new object[] { request.CharacterId }, cancellationToken);
+                    if (character == null) continue; // Charakter inzwischen gelöscht o. Ä. - kein Fehler, einfach überspringen.
+
+                    character.PositionX = request.X;
+                    character.PositionY = request.Y;
+                    await db.SaveChangesAsync(cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"Fehler beim Speichern der Position für Charakter {request.CharacterId}: {ex}");
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Erwarteter Abbruch beim Stop() - kein Fehler.
+        }
     }
 
     /// <summary>Fester 25-Hz-Loop (Stopwatch, Catch-up begrenzt), bis der Token abgebrochen wird.</summary>
@@ -204,8 +287,10 @@ public sealed class GameServer : INetEventListener
 
             if (conn.EntityId is int entityId)
             {
-                // TODO(M2b-3): letzte Position sofort speichern statt auf den nächsten periodischen Save
-                // zu warten (Positions-Speicherung ist eigener Abschnitt der Aufgabe).
+                // Letzte Position sofort speichern statt auf den nächsten periodischen Save (30s) zu warten.
+                if (_world.TryGet(entityId, out Entity? entity))
+                    _positionSaveChannel.Writer.TryWrite(new PositionSaveRequest(entity!.CharacterId, entity.IntX, entity.IntY));
+
                 _world.Remove(entityId);
                 BroadcastToJoined(new EntityDespawnPacket { EntityId = entityId });
                 _logger.Info($"Entity {entityId} despawnt (Disconnect, {disconnectInfo.Reason})");
@@ -395,6 +480,7 @@ public sealed class GameServer : INetEventListener
 
         conn.EntityId = entity!.Id;
         entity.Appearance = ToAppearance(character);
+        entity.LastSaveAtMs = _nowMs(); // Position kommt gerade erst aus der DB - kein sofortiger Save nötig.
 
         conn.Peer.SendPacket(new JoinAcceptedPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY, Appearance = entity.Appearance });
 

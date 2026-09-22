@@ -27,6 +27,11 @@ public sealed class Entity
     public int IntX => (int)System.Math.Round(X);
     public int IntY => (int)System.Math.Round(Y);
 
+    /// <summary>Wandzeit (siehe GameServer._nowMs) des letzten Positions-Speicherversuchs - vom Game-Loop-
+    /// Thread gesetzt (GameServer.EnqueueDuePositionSaves), rein Buchhaltung für die 30s-Speicherentscheidung,
+    /// keine Aussage darüber, ob der Hintergrund-Task den Schreibvorgang schon abgeschlossen hat.</summary>
+    public long LastSaveAtMs { get; set; }
+
     public Entity(int id, int characterId, string name, int x, int y)
     {
         Id = id;

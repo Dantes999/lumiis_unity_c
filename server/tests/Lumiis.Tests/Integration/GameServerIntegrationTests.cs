@@ -381,6 +381,47 @@ namespace Lumiis.Tests.Integration
         }
 
         [Fact]
+        public void Disconnect_SavesPositionImmediatelyToDatabase()
+        {
+            // Position wird asynchron über einen Hintergrund-Task geschrieben (siehe GameServer.
+            // RunPositionSaveConsumerAsync) - deshalb auf die (InMemory-)DB pollen statt fest zu warten.
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice"); // Startposition: Kartenmitte (PositionX/Y null in der DB)
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+
+                int targetX = GameConstants.MapWidth / 2 + 500;
+                int targetY = GameConstants.MapHeight / 2;
+                client.Send(new MoveToPacket { X = targetX, Y = targetY });
+                Assert.True(Pump(() => client.Received.OfType<EntityStopPacket>().Any(), server, client)); // exakt angekommen, bevor getrennt wird
+
+                client.Peer!.Disconnect();
+                Assert.True(Pump(() => client.Disconnected, server, client));
+
+                bool saved = Pump(() =>
+                {
+                    using LumiisDbContext db = fixture.OpenDb();
+                    Character? character = db.Characters.Find(characterId);
+                    return character != null && character.PositionX == targetX && character.PositionY == targetY;
+                }, server, client);
+
+                Assert.True(saved);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
         public void WrongProtocolVersion_IsRejected()
         {
             var fixture = new ServerFixture();
