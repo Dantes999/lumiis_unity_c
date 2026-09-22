@@ -130,12 +130,12 @@ namespace Lumiis.Client
             if (Keyboard.current.f9Key.wasPressedThisFrame) ToggleSortingTest();
 
             if (_world.LocalEntityId < 0) return;
-            if (Keyboard.current.f3Key.wasPressedThisFrame) CycleLocalAppearanceSlot("Hair");
-            if (Keyboard.current.f4Key.wasPressedThisFrame) CycleLocalHairColor();
-            if (Keyboard.current.f5Key.wasPressedThisFrame) CycleLocalAppearanceSlot("Armor");
-            if (Keyboard.current.f6Key.wasPressedThisFrame) CycleLocalAppearanceSlot("Helmet");
-            if (Keyboard.current.f7Key.wasPressedThisFrame) CycleLocalAppearanceSlot("Weapon");
-            if (Keyboard.current.f8Key.wasPressedThisFrame) CycleLocalAppearanceSlot("Shield");
+            if (Keyboard.current.f3Key.wasPressedThisFrame) CycleLocalAppearanceSlot("Hair", true);
+            if (Keyboard.current.f4Key.wasPressedThisFrame) CycleLocalHairColor(true);
+            if (Keyboard.current.f5Key.wasPressedThisFrame) CycleLocalAppearanceSlot("Armor", true);
+            if (Keyboard.current.f6Key.wasPressedThisFrame) CycleLocalAppearanceSlot("Helmet", true);
+            if (Keyboard.current.f7Key.wasPressedThisFrame) CycleLocalAppearanceSlot("Weapon", true);
+            if (Keyboard.current.f8Key.wasPressedThisFrame) CycleLocalAppearanceSlot("Shield", true);
         }
 
         private void ToggleTestboard()
@@ -172,20 +172,20 @@ namespace Lumiis.Client
             _sortingTestboard.gameObject.SetActive(!_sortingTestboard.gameObject.activeSelf);
         }
 
-        /// <summary>Zyklus 0 (keine Ebene) -> erste Katalog-Id -> ... -> letzte -> zurück zu 0. Rein lokal,
-        /// wird nicht an den Server geschickt.</summary>
-        private void CycleLocalAppearanceSlot(string slot)
+        /// <summary>Zyklus 0 (keine Ebene) -> erste Katalog-Id -> ... -> letzte -> zurück zu 0 (und umgekehrt
+        /// rückwärts). Rein lokal, wird nicht an den Server geschickt.</summary>
+        private void CycleLocalAppearanceSlot(string slot, bool forward)
         {
             if (!_world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity local)) return;
 
             Appearance appearance = local.Appearance;
             switch (slot)
             {
-                case "Hair": appearance.HairStyleId = NextIdInCycle("Hair", appearance.HairStyleId); break;
-                case "Armor": appearance.ArmorId = NextIdInCycle("Armor", appearance.ArmorId); break;
-                case "Helmet": appearance.HelmetId = NextIdInCycle("Helmet", appearance.HelmetId); break;
-                case "Weapon": appearance.WeaponId = NextIdInCycle("Weapon", appearance.WeaponId); break;
-                case "Shield": appearance.ShieldId = NextIdInCycle("Shield", appearance.ShieldId); break;
+                case "Hair": appearance.HairStyleId = CycleIdInSlot("Hair", appearance.HairStyleId, forward); break;
+                case "Armor": appearance.ArmorId = CycleIdInSlot("Armor", appearance.ArmorId, forward); break;
+                case "Helmet": appearance.HelmetId = CycleIdInSlot("Helmet", appearance.HelmetId, forward); break;
+                case "Weapon": appearance.WeaponId = CycleIdInSlot("Weapon", appearance.WeaponId, forward); break;
+                case "Shield": appearance.ShieldId = CycleIdInSlot("Shield", appearance.ShieldId, forward); break;
             }
             local.Appearance = appearance;
 
@@ -193,7 +193,7 @@ namespace Lumiis.Client
                 view.SetAppearance(appearance);
         }
 
-        private void CycleLocalHairColor()
+        private void CycleLocalHairColor(bool forward)
         {
             if (!_world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity local)) return;
 
@@ -201,14 +201,15 @@ namespace Lumiis.Client
             if (colorCount == 0) return;
 
             Appearance appearance = local.Appearance;
-            appearance.HairColorId = appearance.HairColorId % colorCount + 1; // 1-basiert, siehe Appearance-Doku
+            int zeroBased = ((appearance.HairColorId - 1) + (forward ? 1 : -1) + colorCount) % colorCount;
+            appearance.HairColorId = zeroBased + 1; // 1-basiert, siehe Appearance-Dokumentation
             local.Appearance = appearance;
 
             if (_views.TryGetValue(local.Id, out CharacterView view))
                 view.SetAppearance(appearance);
         }
 
-        private int NextIdInCycle(string slot, int currentId)
+        private int CycleIdInSlot(string slot, int currentId, bool forward)
         {
             IReadOnlyList<int> ids = _lookCatalog.GetIdsForSlot(slot);
             if (ids.Count == 0) return 0;
@@ -219,8 +220,77 @@ namespace Lumiis.Client
                 if (ids[i] == currentId) { currentIndex = i; break; }
             }
 
-            int nextIndex = currentIndex + 1;
-            return nextIndex >= ids.Count ? 0 : ids[nextIndex];
+            if (forward)
+            {
+                int nextIndex = currentIndex + 1;
+                return nextIndex >= ids.Count ? 0 : ids[nextIndex];
+            }
+
+            if (currentIndex < 0) return ids[ids.Count - 1]; // keine Ebene -> letzte Id
+            int previousIndex = currentIndex - 1;
+            return previousIndex < 0 ? 0 : ids[previousIndex]; // erste Id -> keine Ebene
+        }
+
+        // ---- Debug-Test-Panel (Buttons statt F-Tasten merken, F-Tasten bleiben zusätzlich nutzbar) ----
+
+        private void DrawDebugTestPanel()
+        {
+            const float w = 220f;
+            Rect area = new Rect(Screen.width - w - 10f, 10f, w, 300f);
+            GUILayout.BeginArea(area, GUI.skin.box);
+
+            GUILayout.Label("Debug-Test (F-Tasten bleiben aktiv)");
+
+            if (GUILayout.Button("Testboard: " + (_testboard != null && _testboard.gameObject.activeSelf ? "an" : "aus")))
+                ToggleTestboard();
+            if (GUILayout.Button("Sortier-Testfeld: " + (_sortingTestboard != null && _sortingTestboard.gameObject.activeSelf ? "an" : "aus")))
+                ToggleSortingTest();
+
+            if (_world.LocalEntityId >= 0 && _world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity local))
+            {
+                Appearance appearance = local.Appearance;
+                DrawCycleRow("Frisur", "Hair", appearance.HairStyleId);
+                DrawHairColorRow(appearance.HairColorId);
+                DrawCycleRow("Ruestung", "Armor", appearance.ArmorId);
+                DrawCycleRow("Helm", "Helmet", appearance.HelmetId);
+                DrawCycleRow("Waffe", "Weapon", appearance.WeaponId);
+                DrawCycleRow("Schild", "Shield", appearance.ShieldId);
+            }
+
+            GUILayout.EndArea();
+        }
+
+        private void DrawCycleRow(string label, string slot, int currentId)
+        {
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(label, GUILayout.Width(60));
+            if (GUILayout.Button("<", GUILayout.Width(24))) CycleLocalAppearanceSlot(slot, false);
+            GUILayout.Label(DisplayNameFor(slot, currentId), GUILayout.Width(70));
+            if (GUILayout.Button(">", GUILayout.Width(24))) CycleLocalAppearanceSlot(slot, true);
+            GUILayout.EndHorizontal();
+        }
+
+        private void DrawHairColorRow(int currentColorId)
+        {
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Haarfarbe", GUILayout.Width(60));
+            if (GUILayout.Button("<", GUILayout.Width(24))) CycleLocalHairColor(false);
+            GUILayout.Label(DisplayHairColor(currentColorId), GUILayout.Width(70));
+            if (GUILayout.Button(">", GUILayout.Width(24))) CycleLocalHairColor(true);
+            GUILayout.EndHorizontal();
+        }
+
+        private string DisplayNameFor(string slot, int id)
+        {
+            if (id <= 0) return "Keine";
+            return _lookCatalog.TryGetEntry(slot, id, out LookEntryJson entry) ? entry.name : "#" + id;
+        }
+
+        private string DisplayHairColor(int id)
+        {
+            IReadOnlyList<string> colors = _lookCatalog.HairColors;
+            if (id <= 0 || id > colors.Count) return "-";
+            return colors[id - 1];
         }
 #endif
 
@@ -427,6 +497,9 @@ namespace Lumiis.Client
                     DrawEntityList();
                     DrawEntityLabels();
                 }
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                DrawDebugTestPanel();
+#endif
             }
             else
             {
