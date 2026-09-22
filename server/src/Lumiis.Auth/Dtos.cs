@@ -14,6 +14,10 @@ public sealed record LoginResponse(string Token, long ExpiresAtUnix, IReadOnlyLi
 
 public sealed record CharacterSummary(int Id, string Name);
 
+/// <summary>GET /characters: Top-Level-JSON-Arrays kann Unitys JsonUtility nicht parsen, deshalb
+/// eingepackt statt eines rohen Arrays.</summary>
+public sealed record CharacterListResponse(IReadOnlyList<CharacterSummary> Characters);
+
 public sealed record CreateCharacterRequest(string? Name);
 
 public sealed record ErrorResponse(string Error);

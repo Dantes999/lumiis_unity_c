@@ -83,7 +83,7 @@ public static class AuthEndpoints
             .Select(c => new CharacterSummary(c.Id, c.Name))
             .ToListAsync();
 
-        return Results.Json(characters);
+        return Results.Json(new CharacterListResponse(characters));
     }
 
     private static async Task<IResult> CreateCharacter(

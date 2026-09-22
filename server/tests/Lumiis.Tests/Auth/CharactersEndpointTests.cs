@@ -48,6 +48,21 @@ public class CharactersEndpointTests : IClassFixture<AuthWebApplicationFactory>
     }
 
     [Fact]
+    public async Task GetCharacters_ResponseIsObjectWithCharactersProperty_NotRawArray()
+    {
+        // Unitys JsonUtility kann Top-Level-JSON-Arrays nicht parsen (siehe M2c) - die Antwort muss ein
+        // Objekt mit einer "characters"-Eigenschaft sein, kein rohes Array.
+        string token = await RegisterAndLoginAsync("chars_contract");
+
+        HttpResponseMessage response = await GetCharactersAsync(token);
+
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(JsonValueKind.Object, body.ValueKind);
+        Assert.True(body.TryGetProperty("characters", out JsonElement characters));
+        Assert.Equal(JsonValueKind.Array, characters.ValueKind);
+    }
+
+    [Fact]
     public async Task GetCharacters_EmptyInitially_Returns200WithEmptyArray()
     {
         string token = await RegisterAndLoginAsync("chars_empty");
@@ -56,7 +71,7 @@ public class CharactersEndpointTests : IClassFixture<AuthWebApplicationFactory>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal(0, body.GetArrayLength());
+        Assert.Equal(0, body.GetProperty("characters").GetArrayLength());
     }
 
     [Fact]
@@ -80,7 +95,8 @@ public class CharactersEndpointTests : IClassFixture<AuthWebApplicationFactory>
         Assert.True(created.GetProperty("id").GetInt32() > 0);
 
         HttpResponseMessage getResponse = await GetCharactersAsync(token);
-        JsonElement characters = await getResponse.Content.ReadFromJsonAsync<JsonElement>();
+        JsonElement getBody = await getResponse.Content.ReadFromJsonAsync<JsonElement>();
+        JsonElement characters = getBody.GetProperty("characters");
         Assert.Equal(1, characters.GetArrayLength());
         Assert.Equal("TestHeld", characters[0].GetProperty("name").GetString());
     }

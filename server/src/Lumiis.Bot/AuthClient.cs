@@ -64,7 +64,8 @@ public sealed class AuthClient
         if (!getResponse.IsSuccessStatusCode)
             throw new InvalidOperationException($"GET /characters für {name} fehlgeschlagen: {(int)getResponse.StatusCode}");
 
-        JsonElement characters = await getResponse.Content.ReadFromJsonAsync<JsonElement>();
+        JsonElement body = await getResponse.Content.ReadFromJsonAsync<JsonElement>();
+        JsonElement characters = body.GetProperty("characters"); // GET /characters: { "characters": [...] } statt rohem Array (siehe M2c)
         if (characters.GetArrayLength() > 0)
         {
             int existingId = characters[0].GetProperty("id").GetInt32();
