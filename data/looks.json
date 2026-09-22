@@ -4,9 +4,9 @@
   "looks": [
     { "id": 1, "slot": "Body", "name": "Basis",
       "anchors": {
-        "down": { "hand": [20, 40], "head": [0, 100] },
-        "up": { "hand": [-20, 40], "head": [0, 100] },
-        "side": { "hand": [10, 42], "head": [0, 100] }
+        "down": { "hand": [20, 70], "head": [0, 100] },
+        "up": { "hand": [-20, 70], "head": [0, 100] },
+        "side": { "hand": [10, 70], "head": [0, 100] }
       } },
 
     { "id": 1, "slot": "Hair", "name": "Kurz" },

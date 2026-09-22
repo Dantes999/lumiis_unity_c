@@ -30,7 +30,7 @@ namespace Lumiis.Client
                 case CharacterSlot.Body: DrawBody(pixels, direction); break;
                 case CharacterSlot.Armor: DrawArmor(pixels, direction, lookId); break;
                 case CharacterSlot.Shield: DrawShield(pixels, direction); break;
-                case CharacterSlot.Weapon: DrawWeapon(pixels, direction, lookId); break;
+                case CharacterSlot.Weapon: DrawWeapon(pixels, lookId, pivotNormalized); break;
                 case CharacterSlot.Hair: DrawHair(pixels, direction); break;
                 case CharacterSlot.Helmet: DrawHelmet(pixels, direction); break;
             }
@@ -114,11 +114,15 @@ namespace Lumiis.Client
             FillCircle(pixels, CenterX, _canvasPx * 7 / 8, _canvasPx / 8, metal);
         }
 
-        private void DrawWeapon(Color32[] pixels, FacingDirection direction, int lookId)
+        /// <summary>Zeichnet den Griff exakt am übergebenen Pivot (Hand-Anker, siehe CharacterView.ComputeWeaponPivot),
+        /// damit Zeichenposition und Sprite-Pivot deckungsgleich sind - sonst würde ein Versatz zwischen beiden die
+        /// Rotation um den Griff (CharacterAnimator) und die Weltraum-Höhe (CharacterView.PositionWeapon) minimal
+        /// auseinanderziehen.</summary>
+        private void DrawWeapon(Color32[] pixels, int lookId, Vector2 pivotNormalized)
         {
             Color32 blade = new Color32(200, 200, 210, 255);
-            int handX = CenterX + (direction == FacingDirection.Side ? _canvasPx / 10 : _canvasPx / 6);
-            int handY = _canvasPx * 2 / 5;
+            int handX = Mathf.RoundToInt(pivotNormalized.x * _canvasPx);
+            int handY = Mathf.RoundToInt(pivotNormalized.y * _canvasPx);
             int length = _canvasPx * 2 / 5;
             FillRect(pixels, handX - 2, handY, 4, length, blade);
 

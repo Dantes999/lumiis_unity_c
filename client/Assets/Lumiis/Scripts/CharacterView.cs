@@ -134,6 +134,30 @@ namespace Lumiis.Client
         {
             foreach (SpriteRenderer renderer in _renderers.Values)
                 renderer.flipX = _facing.FlipX;
+
+            PositionWeapon();
+        }
+
+        /// <summary>Verschiebt den Waffen-Slot-Transform an die Weltraum-Position des Hand-Ankers (gespiegelt bei
+        /// FlipX, analog zu GetHeadWorldOffset). Der Sprite-Pivot (siehe ComputeWeaponPivot) sorgt dafür, dass
+        /// exakt der Griff-Pixel dorthin fällt - ohne diese Verschiebung würde der Anker-Höhenbeitrag durch den
+        /// Pivot rechnerisch wieder aufgehoben und der Griff landete am Fußpunkt statt auf Handhöhe.</summary>
+        private void PositionWeapon()
+        {
+            Transform weaponTransform = _renderers[CharacterSlot.Weapon].transform;
+            LookAnchorJson anchor = GetBodyAnchor(_facing.Direction);
+            int ppu = _lookCatalog?.Ppu ?? 0;
+            if (anchor?.hand != null && anchor.hand.Length >= 2 && ppu > 0)
+            {
+                float worldX = anchor.hand[0] / (float)ppu;
+                float worldY = anchor.hand[1] / (float)ppu;
+                if (_facing.FlipX) worldX = -worldX;
+                weaponTransform.localPosition = new Vector3(worldX, worldY, 0f);
+            }
+            else
+            {
+                weaponTransform.localPosition = Vector3.zero;
+            }
         }
 
         /// <summary>Nur der feste Rang (0-5) innerhalb der Figur - welche Figur vor welcher liegt, entscheidet
