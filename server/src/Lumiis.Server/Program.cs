@@ -1,6 +1,7 @@
 ﻿using System.Threading;
 using Lumiis.Data;
 using Lumiis.Data.Maps;
+using Lumiis.Data.Mobs;
 using Lumiis.Server;
 using Lumiis.Server.Logging;
 using Lumiis.Server.Net;
@@ -48,6 +49,21 @@ catch (Exception ex)
     return 1;
 }
 
+// Ebenfalls nur "village" hartkodiert (siehe Kommentar oben). SpawnCatalog braucht MobCatalog+CollisionMap
+// zur Validierung (jede MobId muss existieren, jede Position begehbar sein).
+MobCatalog mobCatalog;
+SpawnCatalog spawnCatalog;
+try
+{
+    mobCatalog = MobCatalog.LoadFromFile(Path.Combine(config.DataDir, "mobs.json"));
+    spawnCatalog = SpawnCatalog.LoadFromFile(Path.Combine(config.DataDir, "maps", "village", "spawns.json"), mobCatalog, collisionMap);
+}
+catch (Exception ex)
+{
+    logger.Error($"Serverstart fehlgeschlagen (Mob-/Spawn-Daten): {ex.Message}");
+    return 1;
+}
+
 // Dieselben Variablen, dieselbe Fail-Fast-Regel wie Lumiis.Auth (siehe CLAUDE.md): fehlt eine, bricht der
 // Start mit klarer Meldung ab. Keine eigene Migration hier (bleibt Sache von Auth in Development).
 string connectionString;
@@ -76,7 +92,7 @@ Console.CancelKeyPress += (_, eventArgs) =>
     cts.Cancel();
 };
 
-GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, collisionMap: collisionMap);
+GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, collisionMap: collisionMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog);
 
 try
 {

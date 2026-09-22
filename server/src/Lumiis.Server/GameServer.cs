@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using LiteNetLib;
 using Lumiis.Data;
 using Lumiis.Data.Maps;
+using Lumiis.Data.Mobs;
 using Lumiis.Server.Game;
 using Lumiis.Server.Logging;
 using Lumiis.Server.Net;
@@ -86,9 +87,12 @@ public sealed class GameServer : INetEventListener
     /// dbContextFactory: erzeugt pro Hintergrund-Operation einen frischen LumiisDbContext (DbContext ist nicht thread-safe/langlebig) - World und Entities bleiben
     /// dabei ausschließlich dem Game-Loop-Thread vorbehalten, siehe World-Klassenkommentar.
     /// collisionMap: null bedeutet "überall begehbar" (z. B. Tests ohne Kollisionsbezug) - Program.cs lädt
-    /// beim echten Serverstart immer eine Instanz aus data/maps/village/collision.bin (siehe CLAUDE.md).</summary>
+    /// beim echten Serverstart immer eine Instanz aus data/maps/village/collision.bin (siehe CLAUDE.md).
+    /// mobCatalog/spawnCatalog: null bedeutet "keine Monster" (z. B. bestehende Tests ohne Monster-Bezug) -
+    /// Program.cs lädt beim echten Serverstart immer beide. Monster werden hier einmalig beim Serverstart
+    /// angelegt (kein aktiver Respawn in M3c, siehe docs/tasks/M3c-monsters.md).</summary>
     public GameServer(ServerConfig config, ILogger logger, TokenService tokenService, Func<LumiisDbContext> dbContextFactory,
-        Func<long>? nowMs = null, CollisionMap? collisionMap = null)
+        Func<long>? nowMs = null, CollisionMap? collisionMap = null, MobCatalog? mobCatalog = null, SpawnCatalog? spawnCatalog = null)
     {
         _config = config;
         _logger = logger;
@@ -97,6 +101,15 @@ public sealed class GameServer : INetEventListener
         _world = new World(config.MaxPlayers, collisionMap);
         _netManager = new NetManager(this) { UpdateTime = 15 };
         _nowMs = nowMs ?? DefaultNowMs;
+
+        if (spawnCatalog != null && mobCatalog != null)
+        {
+            foreach (SpawnPoint spawn in spawnCatalog.Spawns)
+            {
+                mobCatalog.TryGet(spawn.MobId, out MobDefinition mobDef); // Existenz bereits von SpawnCatalog.LoadFromFile geprüft.
+                _world.SpawnMonster(spawn.MobId, mobDef.Name, spawn.PositionX, spawn.PositionY);
+            }
+        }
 
         // Kapazität = MaxPlayers: höchstens einmal pro Spieler pro 30s-Zyklus (oder einmalig bei
         // Disconnect) wird ein Save enqueued, mehr gleichzeitig ausstehende Anfragen sollten unter
@@ -192,15 +205,16 @@ public sealed class GameServer : INetEventListener
         foreach (Entity entity in SelectDueForSave(_world.Entities, now, PositionSaveIntervalMs))
         {
             entity.LastSaveAtMs = now;
-            _positionSaveChannel.Writer.TryWrite(new PositionSaveRequest(entity.CharacterId, entity.IntX, entity.IntY));
+            _positionSaveChannel.Writer.TryWrite(new PositionSaveRequest(entity.CharacterId!.Value, entity.IntX, entity.IntY));
         }
     }
 
     /// <summary>Reine Entscheidung (kein DB-, kein Netzwerkzugriff): welche Entities sind fällig (letzter
-    /// Save mindestens intervalMs her)? Statisch und pur, damit ohne echten GameServer/DB testbar.</summary>
+    /// Save mindestens intervalMs her)? Nur Spieler (CharacterId gesetzt) - Monster haben keine DB-Zeile, für
+    /// sie gibt es nichts zu speichern. Statisch und pur, damit ohne echten GameServer/DB testbar.</summary>
     internal static List<Entity> SelectDueForSave(IEnumerable<Entity> entities, long nowMs, long intervalMs)
     {
-        return entities.Where(e => nowMs - e.LastSaveAtMs >= intervalMs).ToList();
+        return entities.Where(e => e.CharacterId.HasValue && nowMs - e.LastSaveAtMs >= intervalMs).ToList();
     }
 
     /// <summary>Einmal pro Tick: World.ComputeVisibility aufrufen und pro Verbindung gegen den letzten
@@ -224,7 +238,7 @@ public sealed class GameServer : INetEventListener
                 if (conn.VisibleEntityIds.Contains(otherId)) continue;
                 if (!_world.TryGet(otherId, out Entity? other)) continue; // sollte nicht vorkommen (Entity gerade erst in ComputeVisibility gesehen)
 
-                conn.Peer.SendPacket(new EntitySpawnPacket { EntityId = other!.Id, Name = other.Name, X = other.IntX, Y = other.IntY, Appearance = other.Appearance });
+                conn.Peer.SendPacket(new EntitySpawnPacket { EntityId = other!.Id, Name = other.Name, X = other.IntX, Y = other.IntY, Appearance = other.Appearance, Kind = other.Kind, MobId = other.MobId });
                 if (other.IsMoving)
                 {
                     conn.Peer.SendPacket(new EntityMovePacket
@@ -346,8 +360,10 @@ public sealed class GameServer : INetEventListener
             if (conn.EntityId is int entityId)
             {
                 // Letzte Position sofort speichern statt auf den nächsten periodischen Save (30s) zu warten.
-                if (_world.TryGet(entityId, out Entity? entity))
-                    _positionSaveChannel.Writer.TryWrite(new PositionSaveRequest(entity!.CharacterId, entity.IntX, entity.IntY));
+                // CharacterId ist hier immer gesetzt: OnPeerDisconnected feuert nur für Verbindungen
+                // (conn.EntityId), Monster werden nie über eine Verbindung angelegt (siehe World.SpawnMonster).
+                if (_world.TryGet(entityId, out Entity? entity) && entity!.CharacterId.HasValue)
+                    _positionSaveChannel.Writer.TryWrite(new PositionSaveRequest(entity.CharacterId.Value, entity.IntX, entity.IntY));
 
                 _world.Remove(entityId);
 
@@ -561,7 +577,7 @@ public sealed class GameServer : INetEventListener
         {
             if (!_world.TryGet(otherId, out Entity? other)) continue; // sollte nicht vorkommen
 
-            conn.Peer.SendPacket(new EntitySpawnPacket { EntityId = other!.Id, Name = other.Name, X = other.IntX, Y = other.IntY, Appearance = other.Appearance });
+            conn.Peer.SendPacket(new EntitySpawnPacket { EntityId = other!.Id, Name = other.Name, X = other.IntX, Y = other.IntY, Appearance = other.Appearance, Kind = other.Kind, MobId = other.MobId });
             if (other.IsMoving)
             {
                 conn.Peer.SendPacket(new EntityMovePacket

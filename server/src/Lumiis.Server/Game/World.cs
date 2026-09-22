@@ -63,11 +63,26 @@ public sealed class World
         return true;
     }
 
+    /// <summary>Legt eine Monster-Entity an (Serverstart, siehe GameServer/Program.cs) - EntityId aus
+    /// demselben Zähler wie Spieler (siehe World-Klassenkommentar/_nextEntityId), kein Verbindungsbezug, kein
+    /// Spielerlimit-Check. x/y kommen bereits geprüft aus SpawnCatalog (begehbare Zelle), werden hier trotzdem
+    /// defensiv auf die Kartengrenzen geklemmt, analog zu TryJoin.</summary>
+    public Entity SpawnMonster(int mobId, string name, int x, int y)
+    {
+        int clampedX = Math.Clamp(x, 0, GameConstants.MapWidth);
+        int clampedY = Math.Clamp(y, 0, GameConstants.MapHeight);
+
+        int id = _nextEntityId++;
+        Entity entity = Entity.CreateMonster(id, mobId, name, clampedX, clampedY);
+        _entities[id] = entity;
+        return entity;
+    }
+
     public bool Remove(int entityId)
     {
         if (!_entities.TryGetValue(entityId, out Entity? entity)) return false;
         _entities.Remove(entityId);
-        _entityIdByCharacterId.Remove(entity.CharacterId);
+        if (entity.CharacterId is int characterId) _entityIdByCharacterId.Remove(characterId); // Monster (CharacterId null) waren nie drin.
         return true;
     }
 
