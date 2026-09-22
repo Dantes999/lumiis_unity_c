@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
@@ -72,6 +73,20 @@ namespace Lumiis.Client
             _netClient.PacketReceived += OnPacketReceived;
             _netClient.Disconnected += OnNetDisconnected;
 
+            // Nicht sofort bauen: Initialize() läuft über Bootstraps RuntimeInitializeOnLoadMethod
+            // (AfterSceneLoad), also vor dem ersten echten Frame. UI Toolkit ermittelt die Panel-Größe für
+            // Layout UND Klick-Trefferbereich einmalig aus Screen.width/height beim Aktivieren des
+            // UIDocument - ist die Game-View zu diesem sehr frühen Zeitpunkt noch nicht auf ihre
+            // tatsächliche Größe eingeschwungen, zeichnet Unity später zwar an der richtigen Bildschirm-
+            // position, Layout/Trefferbereich bleiben aber auf der ursprünglich falschen Größe hängen
+            // (Buttons kaum klickbar, TextFields kollabiert/unsichtbar - ohne jede Fehlermeldung). Einen
+            // Frame warten behebt das.
+            StartCoroutine(BuildUiNextFrame());
+        }
+
+        private IEnumerator BuildUiNextFrame()
+        {
+            yield return null;
             BuildUi();
             ShowLogin();
         }
