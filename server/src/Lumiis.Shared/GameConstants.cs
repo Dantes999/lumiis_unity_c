@@ -11,5 +11,9 @@ namespace Lumiis.Shared
 
         /// <summary>Spielergeschwindigkeit in 1/100 Welteinheiten pro Sekunde (entspricht 5 Einheiten/s).</summary>
         public const int PlayerSpeed = 500;
+
+        /// <summary>Sichtbarkeitsradius (AOI) in 1/100 Welteinheiten (entspricht 15 Einheiten) - spätere
+        /// Justierung erwartet, siehe CLAUDE.md Abschnitt "Sichtbarkeitsbereich (AOI)".</summary>
+        public const int AoiRadiusWire = 1500;
     }
 }
