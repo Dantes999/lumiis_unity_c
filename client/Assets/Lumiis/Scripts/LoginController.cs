@@ -88,14 +88,17 @@ namespace Lumiis.Client
             panelSettings.themeStyleSheet = Resources.Load<ThemeStyleSheet>("UI/DefaultRuntimeTheme");
             _uiDocument.panelSettings = panelSettings;
 
+            // Erst jetzt aktivieren: UIDocument.OnEnable() erzeugt rootVisualElement aus den PanelSettings,
+            // das braucht ein aktives GameObject. Vorher zugewiesene PanelSettings sorgen dafür, dass
+            // OnEnable nicht mit leeren/Default-Settings läuft.
+            go.SetActive(true);
+
             VisualTreeAsset loginAsset = Resources.Load<VisualTreeAsset>("UI/Login");
             VisualTreeAsset characterSelectAsset = Resources.Load<VisualTreeAsset>("UI/CharacterSelect");
             _loginRoot = loginAsset.CloneTree();
             _characterSelectRoot = characterSelectAsset.CloneTree();
             _uiDocument.rootVisualElement.Add(_loginRoot);
             _uiDocument.rootVisualElement.Add(_characterSelectRoot);
-
-            go.SetActive(true);
 
             _usernameField = _loginRoot.Q<TextField>("username-field");
             _passwordField = _loginRoot.Q<TextField>("password-field");
