@@ -1,22 +1,28 @@
 using System;
 using System.Collections.Generic;
+using Lumiis.Data.Maps;
 using Lumiis.Shared;
 using Lumiis.Shared.Net;
 
 namespace Lumiis.Server.Game;
 
 /// <summary>Hält alle Entities einer Map und die reine Spiellogik (Join, Despawn, Bewegung). Kein Netzwerk,
-/// kein EF Core/Lumiis.Data-Bezug - bekommt nur einfache Werte übergeben (CharacterId, Name, Appearance-
-/// freie Position), die Charakter-Zeile selbst lädt GameServer.</summary>
+/// kein EF Core-Bezug - bekommt nur einfache Werte übergeben (CharacterId, Name, Appearance-freie Position),
+/// die Charakter-Zeile selbst lädt GameServer. CollisionMap (Lumiis.Data, aber ohne EF-Core-Kopplung) wird
+/// ebenso injiziert statt selbst geladen - World bleibt frei von Dateizugriffen.</summary>
 public sealed class World
 {
     private readonly Dictionary<int, Entity> _entities = new();
     private readonly Dictionary<int, int> _entityIdByCharacterId = new();
+    private readonly CollisionMap? _collisionMap;
     private int _nextEntityId = 1;
 
-    public World(int maxPlayers)
+    /// <summary>collisionMap: null bedeutet "überall begehbar" (z. B. bestehende Tests ohne Kollisionsbezug) -
+    /// echte Karten liefern immer eine Instanz mit, siehe GameServer/Program.cs.</summary>
+    public World(int maxPlayers, CollisionMap? collisionMap = null)
     {
         MaxPlayers = maxPlayers;
+        _collisionMap = collisionMap;
     }
 
     public int MaxPlayers { get; }
@@ -70,15 +76,80 @@ public sealed class World
         return _entities.TryGetValue(entityId, out entity);
     }
 
-    /// <summary>Setzt ein Bewegungsziel, geklemmt auf die Kartengrenzen. TODO(M3): Sichtbarkeit/AOI - aktuell sehen alle Entities alle anderen.</summary>
+    /// <summary>Setzt ein Bewegungsziel, zuerst auf die Kartengrenzen geklemmt, danach (falls eine
+    /// CollisionMap gesetzt ist) gegen sie geprüft: die gerade Linie von der aktuellen Position zum
+    /// geklemmten Ziel wird zellenweise abgeschritten (ClipToLastWalkableCell), die Bewegung stoppt an der
+    /// letzten begehbaren Zelle vor einer blockierten. TODO(M3): Sichtbarkeit/AOI - aktuell sehen alle
+    /// Entities alle anderen.</summary>
     public bool SetDestination(int entityId, int targetX, int targetY)
     {
         if (!_entities.TryGetValue(entityId, out Entity? entity)) return false;
 
         int clampedX = Math.Clamp(targetX, 0, GameConstants.MapWidth);
         int clampedY = Math.Clamp(targetY, 0, GameConstants.MapHeight);
-        entity.MoveTo(clampedX, clampedY, GameConstants.PlayerSpeed);
+
+        if (_collisionMap == null)
+        {
+            entity.MoveTo(clampedX, clampedY, GameConstants.PlayerSpeed);
+            return true;
+        }
+
+        int startCellX = entity.IntX / 100;
+        int startCellY = entity.IntY / 100;
+
+        // Sollte nicht vorkommen (Spawn-Positionen und vorherige Bewegungsziele landen nie auf einer
+        // blockierten Zelle), aber abgesichert: von einer blockierten Startzelle aus keine Bewegung auslösen.
+        if (_collisionMap.IsBlocked(startCellX, startCellY))
+            return true;
+
+        int targetCellX = clampedX / 100;
+        int targetCellY = clampedY / 100;
+
+        (int stopCellX, int stopCellY) = ClipToLastWalkableCell(_collisionMap, startCellX, startCellY, targetCellX, targetCellY);
+
+        if (stopCellX == targetCellX && stopCellY == targetCellY)
+        {
+            // Ganzer Weg begehbar - Ziel exakt wie ohne Kollisionsprüfung, kein Zellen-Snapping.
+            entity.MoveTo(clampedX, clampedY, GameConstants.PlayerSpeed);
+            return true;
+        }
+
+        if (stopCellX == startCellX && stopCellY == startCellY)
+            return true; // Schon die erste Zelle Richtung Ziel ist blockiert - keine Bewegung.
+
+        entity.MoveTo(stopCellX * 100 + 50, stopCellY * 100 + 50, GameConstants.PlayerSpeed);
         return true;
+    }
+
+    /// <summary>Bresenham-Linienalgorithmus von der Start- zur Zielzelle: schreitet die Zellen der geraden
+    /// Verbindungslinie ab und gibt die letzte NICHT blockierte Zelle zurück (das ist die Zielzelle selbst,
+    /// wenn der ganze Weg frei ist, oder die Startzelle, wenn schon der erste Schritt blockiert ist).</summary>
+    private static (int CellX, int CellY) ClipToLastWalkableCell(CollisionMap map, int startCellX, int startCellY, int targetCellX, int targetCellY)
+    {
+        int dx = Math.Abs(targetCellX - startCellX);
+        int dy = -Math.Abs(targetCellY - startCellY);
+        int sx = startCellX < targetCellX ? 1 : -1;
+        int sy = startCellY < targetCellY ? 1 : -1;
+        int err = dx + dy;
+
+        int cellX = startCellX;
+        int cellY = startCellY;
+        int lastWalkableX = startCellX;
+        int lastWalkableY = startCellY;
+
+        while (cellX != targetCellX || cellY != targetCellY)
+        {
+            int e2 = 2 * err;
+            if (e2 >= dy) { err += dy; cellX += sx; }
+            if (e2 <= dx) { err += dx; cellY += sy; }
+
+            if (map.IsBlocked(cellX, cellY)) break;
+
+            lastWalkableX = cellX;
+            lastWalkableY = cellY;
+        }
+
+        return (lastWalkableX, lastWalkableY);
     }
 
     /// <summary>Schreibt alle Bewegungen um deltaSeconds fort. Gibt die Entities zurück, die in diesem Tick exakt am Ziel angekommen sind.</summary>

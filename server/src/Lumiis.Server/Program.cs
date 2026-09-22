@@ -1,8 +1,10 @@
 ﻿using System.Threading;
 using Lumiis.Data;
+using Lumiis.Data.Maps;
 using Lumiis.Server;
 using Lumiis.Server.Logging;
 using Lumiis.Server.Net;
+using Lumiis.Shared;
 using Microsoft.EntityFrameworkCore;
 
 ILogger logger = new ConsoleLogger();
@@ -18,10 +20,28 @@ for (int i = 0; i < args.Length; i++)
         case "--max-players":
             config.MaxPlayers = int.Parse(args[++i]);
             break;
+        case "--data-dir":
+            config.DataDir = args[++i];
+            break;
         default:
             logger.Warn($"Unbekanntes Argument: {args[i]}");
             break;
     }
+}
+
+// Nur eine Karte "village" in M3a (siehe docs/tasks/M3a-collision.md) - Mehrkarten-Unterstützung ist
+// bewusst kein Ziel hier, der Pfad ist deshalb noch hartkodiert. GameConstants.MapWidth/Height sind in
+// 1/100-Einheiten, collision.bin zählt in Zellen (1 Zelle = 1 Weltenheit) - daher /100.
+string collisionMapPath = Path.Combine(config.DataDir, "maps", "village", "collision.bin");
+CollisionMap collisionMap;
+try
+{
+    collisionMap = CollisionMap.LoadFromFile(collisionMapPath, GameConstants.MapWidth / 100, GameConstants.MapHeight / 100);
+}
+catch (Exception ex)
+{
+    logger.Error($"Serverstart fehlgeschlagen (Kollisionskarte): {ex.Message}");
+    return 1;
 }
 
 // Dieselben Variablen, dieselbe Fail-Fast-Regel wie Lumiis.Auth (siehe CLAUDE.md): fehlt eine, bricht der
@@ -52,7 +72,7 @@ Console.CancelKeyPress += (_, eventArgs) =>
     cts.Cancel();
 };
 
-GameServer server = new GameServer(config, logger, tokenService, dbContextFactory);
+GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, collisionMap: collisionMap);
 
 try
 {

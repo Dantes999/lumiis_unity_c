@@ -10,6 +10,7 @@ using System.Threading.Channels;
 using System.Threading.Tasks;
 using LiteNetLib;
 using Lumiis.Data;
+using Lumiis.Data.Maps;
 using Lumiis.Server.Game;
 using Lumiis.Server.Logging;
 using Lumiis.Server.Net;
@@ -78,14 +79,17 @@ public sealed class GameServer : INetEventListener
 
     /// <summary>nowMs: injizierbare Uhr für Fristen (Join-Timeout, Reject-Grace). Default: monotone Wandzeit seit Prozessstart. Ticks bleiben rein für die Simulation.
     /// dbContextFactory: erzeugt pro Hintergrund-Operation einen frischen LumiisDbContext (DbContext ist nicht thread-safe/langlebig) - World und Entities bleiben
-    /// dabei ausschließlich dem Game-Loop-Thread vorbehalten, siehe World-Klassenkommentar.</summary>
-    public GameServer(ServerConfig config, ILogger logger, TokenService tokenService, Func<LumiisDbContext> dbContextFactory, Func<long>? nowMs = null)
+    /// dabei ausschließlich dem Game-Loop-Thread vorbehalten, siehe World-Klassenkommentar.
+    /// collisionMap: null bedeutet "überall begehbar" (z. B. Tests ohne Kollisionsbezug) - Program.cs lädt
+    /// beim echten Serverstart immer eine Instanz aus data/maps/village/collision.bin (siehe CLAUDE.md).</summary>
+    public GameServer(ServerConfig config, ILogger logger, TokenService tokenService, Func<LumiisDbContext> dbContextFactory,
+        Func<long>? nowMs = null, CollisionMap? collisionMap = null)
     {
         _config = config;
         _logger = logger;
         _tokenService = tokenService;
         _dbContextFactory = dbContextFactory;
-        _world = new World(config.MaxPlayers);
+        _world = new World(config.MaxPlayers, collisionMap);
         _netManager = new NetManager(this) { UpdateTime = 15 };
         _nowMs = nowMs ?? DefaultNowMs;
 
