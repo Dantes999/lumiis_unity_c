@@ -10,6 +10,8 @@ using Microsoft.EntityFrameworkCore;
 ILogger logger = new ConsoleLogger();
 ServerConfig config = new ServerConfig();
 
+string? explicitDataDir = null;
+
 for (int i = 0; i < args.Length; i++)
 {
     switch (args[i])
@@ -21,13 +23,15 @@ for (int i = 0; i < args.Length; i++)
             config.MaxPlayers = int.Parse(args[++i]);
             break;
         case "--data-dir":
-            config.DataDir = args[++i];
+            explicitDataDir = args[++i];
             break;
         default:
             logger.Warn($"Unbekanntes Argument: {args[i]}");
             break;
     }
 }
+
+config.DataDir = explicitDataDir ?? ResolveDefaultDataDir();
 
 // Nur eine Karte "village" in M3a (siehe docs/tasks/M3a-collision.md) - Mehrkarten-Unterstützung ist
 // bewusst kein Ziel hier, der Pfad ist deshalb noch hartkodiert. GameConstants.MapWidth/Height sind in
@@ -97,3 +101,19 @@ catch (Exception ex)
 
 server.Stop();
 return 0;
+
+// Lumiis.Server ist eine Konsolen-App ohne launchSettings.json (anders als Lumiis.Auth, siehe dessen
+// Program.cs-Kommentar) - "dotnet run --project ..." ändert das Arbeitsverzeichnis hier NICHT auf den
+// Projektordner, es bleibt das des Aufrufers. Trotzdem zwei plausible Aufrufer-Verzeichnisse: Repo-Root
+// (CLAUDE.md-Konvention "dotnet run --project server/src/Lumiis.Server") oder server/ (wenn jemand vorher
+// dorthin wechselt und "dotnet run --project src/Lumiis.Server" tippt) - beide werden hier geprüft, statt
+// nur den Repo-Root-Fall stillschweigend anzunehmen.
+static string ResolveDefaultDataDir()
+{
+    if (File.Exists(Path.Combine("data", "maps", "village", "collision.bin"))) return "data";
+
+    string fromServerDir = Path.Combine("..", "data");
+    if (File.Exists(Path.Combine(fromServerDir, "maps", "village", "collision.bin"))) return fromServerDir;
+
+    return "data"; // Existiert keins von beiden, soll die Fehlermeldung von CollisionMap.LoadFromFile den erwarteten Pfad nennen.
+}
