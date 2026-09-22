@@ -34,7 +34,7 @@ client/ (Unity-Projekt), server/ (Solution mit Shared, Server, Bot, Data, Auth, 
 - Server: dotnet run --project server/src/Lumiis.Server
 - Bot: dotnet run --project server/src/Lumiis.Bot -- --count 3
 - Postgres starten: docker compose up -d (Repo-Root, braucht eine .env - siehe .env.example)
-- Migration anwenden: cd server && dotnet ef database update --project src/Lumiis.Data --startup-project src/Lumiis.Data
+- Migration anwenden: cd server/src/Lumiis.Auth && dotnet ef database update --project ../Lumiis.Data (Migrationen liegen in Lumiis.Data, Lumiis.Auth referenziert Microsoft.EntityFrameworkCore.Design zusätzlich selbst, damit es als Startup-Projekt für dotnet ef taugt)
 - Auth-Dienst: dotnet run --project server/src/Lumiis.Auth (Port 5080, siehe Abschnitt "Datenbank & Auth-Dienst")
 
 ## Datenbank & Auth-Dienst
