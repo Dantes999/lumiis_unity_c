@@ -99,6 +99,10 @@ namespace Lumiis.Client
             _characterSelectRoot = characterSelectAsset.CloneTree();
             _uiDocument.rootVisualElement.Add(_loginRoot);
             _uiDocument.rootVisualElement.Add(_characterSelectRoot);
+            // Sofort auf den Anfangszustand (LoggedOut) einschränken, statt sich auf den direkt folgenden
+            // ShowLogin()-Aufruf des Callers zu verlassen - BuildUi() soll für sich allein schon nie zwei
+            // sichtbare Wurzeln gleichzeitig erzeugen.
+            _characterSelectRoot.style.display = DisplayStyle.None;
 
             _usernameField = _loginRoot.Q<TextField>("username-field");
             _passwordField = _loginRoot.Q<TextField>("password-field");
