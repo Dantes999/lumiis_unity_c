@@ -255,5 +255,81 @@ namespace Lumiis.Tests.Game
             Assert.True(ok); // gültiger Aufruf (Entity existiert), nur keine Bewegung ausgelöst.
             Assert.False(entity.IsMoving);
         }
+
+        // ---- M3b: Sichtbarkeitsbereich (AOI, siehe docs/tasks/M3b-aoi.md Abschnitt 5) ----
+
+        [Fact]
+        public void ComputeVisibility_WithinRadius_SeeEachOther()
+        {
+            var world = new World(maxPlayers: 10);
+            world.TryJoin(characterId: 1, "A", x: 50000, y: 50000, out Entity? a, out _);
+            world.TryJoin(characterId: 2, "B", x: 50000, y: 50500, out Entity? b, out _); // 500 < AoiRadiusWire
+
+            var visibility = world.ComputeVisibility(GameConstants.AoiRadiusWire);
+
+            Assert.Contains(b!.Id, visibility[a!.Id]);
+            Assert.Contains(a.Id, visibility[b.Id]);
+        }
+
+        [Fact]
+        public void ComputeVisibility_OutsideRadius_DoNotSeeEachOther()
+        {
+            var world = new World(maxPlayers: 10);
+            world.TryJoin(characterId: 1, "A", x: 50000, y: 50000, out Entity? a, out _);
+            world.TryJoin(characterId: 2, "B", x: 50000, y: 50000 + GameConstants.AoiRadiusWire + 1, out Entity? b, out _);
+
+            var visibility = world.ComputeVisibility(GameConstants.AoiRadiusWire);
+
+            Assert.DoesNotContain(b!.Id, visibility[a!.Id]);
+            Assert.DoesNotContain(a.Id, visibility[b.Id]);
+        }
+
+        [Fact]
+        public void ComputeVisibility_ExactlyAtRadius_IsInclusive()
+        {
+            // Grenzfall bewusst inklusiv (siehe World.ComputeVisibility-Kommentar).
+            var world = new World(maxPlayers: 10);
+            world.TryJoin(characterId: 1, "A", x: 50000, y: 50000, out Entity? a, out _);
+            world.TryJoin(characterId: 2, "B", x: 50000, y: 50000 + GameConstants.AoiRadiusWire, out Entity? b, out _);
+
+            var visibility = world.ComputeVisibility(GameConstants.AoiRadiusWire);
+
+            Assert.Contains(b!.Id, visibility[a!.Id]);
+        }
+
+        [Fact]
+        public void ComputeVisibility_IsSymmetric()
+        {
+            var world = new World(maxPlayers: 10);
+            world.TryJoin(characterId: 1, "A", x: 40000, y: 40000, out Entity? a, out _);
+            world.TryJoin(characterId: 2, "B", x: 40500, y: 40500, out Entity? b, out _);
+            world.TryJoin(characterId: 3, "C", x: 90000, y: 90000, out Entity? c, out _);
+
+            var visibility = world.ComputeVisibility(GameConstants.AoiRadiusWire);
+
+            Assert.Equal(visibility[a!.Id].Contains(b!.Id), visibility[b.Id].Contains(a.Id));
+            Assert.Equal(visibility[a.Id].Contains(c!.Id), visibility[c.Id].Contains(a.Id));
+        }
+
+        [Fact]
+        public void ComputeVisibility_EntityNeverSeesItself()
+        {
+            var world = new World(maxPlayers: 10);
+            world.TryJoin(characterId: 1, "A", x: 50000, y: 50000, out Entity? a, out _);
+
+            var visibility = world.ComputeVisibility(GameConstants.AoiRadiusWire);
+
+            Assert.DoesNotContain(a!.Id, visibility[a.Id]);
+        }
+
+        [Fact]
+        public void ComputeVisibility_EmptyWorld_ReturnsEmptyDictionary()
+        {
+            var world = new World(maxPlayers: 10);
+
+            var visibility = world.ComputeVisibility(GameConstants.AoiRadiusWire);
+
+            Assert.Empty(visibility);
+        }
     }
 }

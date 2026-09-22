@@ -119,6 +119,19 @@ namespace Lumiis.Tests.Integration
             return Pump(() => clients.All(c => c.Peer != null && c.Peer.ConnectionState == ConnectionState.Connected), server, clients);
         }
 
+        /// <summary>Für Negativ-Prüfungen ("in dieser Zeit ist nichts passiert") - pumpt IMMER die volle
+        /// Dauer, anders als Pump() (das bei erfüllter Bedingung sofort zurückkehrt).</summary>
+        private static void PumpForDuration(TimeSpan duration, GameServer server, params TestClient[] clients)
+        {
+            DateTime deadline = DateTime.UtcNow + duration;
+            while (DateTime.UtcNow < deadline)
+            {
+                server.Update();
+                foreach (TestClient client in clients) client.Poll();
+                Thread.Sleep(15);
+            }
+        }
+
         [Fact]
         public void TwoClients_JoinAndSeeEachOthersSpawn()
         {
@@ -817,6 +830,211 @@ namespace Lumiis.Tests.Integration
 
                 Assert.False(collisionMap.IsBlocked(stop.X / 100, stop.Y / 100), $"EntityStop bei ({stop.X},{stop.Y}) liegt auf einer blockierten Zelle - sollte davor stehen bleiben.");
                 Assert.False(stop.X == targetX && stop.Y == targetY, "EntityStop kam exakt am Teich-Ziel an - Kollision hätte greifen müssen.");
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        // ---- M3b: Sichtbarkeitsbereich (AOI, siehe docs/tasks/M3b-aoi.md Abschnitt 5) ----
+
+        [Fact]
+        public void TwoPlayersOutsideAoiRadius_NeitherSeesTheOther()
+        {
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var clientA = new TestClient();
+                using var clientB = new TestClient();
+                clientA.Connect(server.ListenPort);
+                clientB.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, clientA, clientB));
+
+                (int idA, string tokenA) = fixture.CreateCharacter("Alice", positionX: 10000, positionY: 10000);
+                (int idB, string tokenB) = fixture.CreateCharacter("Bob", positionX: 10000, positionY: 12000); // 2000 > AoiRadiusWire (1500)
+
+                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = tokenA, CharacterId = idA });
+                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = tokenB, CharacterId = idB });
+                Assert.True(Pump(() => clientA.Received.OfType<JoinAcceptedPacket>().Any() && clientB.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
+
+                // Mehrere Ticks abwarten (nicht nur "kein Fehler") - keiner darf je ein EntitySpawn für den anderen bekommen.
+                PumpForDuration(TimeSpan.FromMilliseconds(400), server, clientA, clientB);
+
+                Assert.Empty(clientA.Received.OfType<EntitySpawnPacket>());
+                Assert.Empty(clientB.Received.OfType<EntitySpawnPacket>());
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void PlayerMovesIntoRange_ObserverGetsSpawnAndMove()
+        {
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var observer = new TestClient();
+                using var mover = new TestClient();
+                observer.Connect(server.ListenPort);
+                mover.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, observer, mover));
+
+                (int observerCharacterId, string observerToken) = fixture.CreateCharacter("Observer", positionX: 50000, positionY: 50000);
+                // 1600 > AoiRadiusWire (1500) - außerhalb, beim Join noch nicht sichtbar.
+                (int moverCharacterId, string moverToken) = fixture.CreateCharacter("Mover", positionX: 50000, positionY: 51600);
+
+                observer.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = observerToken, CharacterId = observerCharacterId });
+                mover.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = moverToken, CharacterId = moverCharacterId });
+                Assert.True(Pump(() => observer.Received.OfType<JoinAcceptedPacket>().Any() && mover.Received.OfType<JoinAcceptedPacket>().Any(), server, observer, mover));
+
+                // EntityId (World-intern, per TryJoin vergeben) ist NICHT dasselbe wie CharacterId (DB) - beide
+                // Zähler starten bei fixen ServerFixtures zufällig bei 1 und stimmen nur zufällig überein, je
+                // nachdem in welcher Reihenfolge die asynchronen Joins tatsächlich abgeschlossen werden.
+                int moverEntityId = mover.Received.OfType<JoinAcceptedPacket>().First().EntityId;
+
+                // 800 Wire-Einheiten näher (Ziel 800 von observer entfernt, innerhalb des Radius) - kurze Strecke, damit der Test schnell bleibt.
+                mover.Send(new MoveToPacket { X = 50000, Y = 50800 });
+
+                Assert.True(Pump(
+                    () => observer.Received.OfType<EntitySpawnPacket>().Any(s => s.EntityId == moverEntityId),
+                    server, observer, mover));
+                Assert.Contains(observer.Received.OfType<EntityMovePacket>(), m => m.EntityId == moverEntityId);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void PlayerMovesOutOfRange_ObserverGetsDespawn()
+        {
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var observer = new TestClient();
+                using var mover = new TestClient();
+                observer.Connect(server.ListenPort);
+                mover.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, observer, mover));
+
+                (int observerCharacterId, string observerToken) = fixture.CreateCharacter("Observer", positionX: 50000, positionY: 50000);
+                (int moverCharacterId, string moverToken) = fixture.CreateCharacter("Mover", positionX: 50000, positionY: 50500); // 500 < AoiRadiusWire, von Anfang an sichtbar.
+
+                observer.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = observerToken, CharacterId = observerCharacterId });
+                mover.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = moverToken, CharacterId = moverCharacterId });
+                Assert.True(Pump(() => observer.Received.OfType<JoinAcceptedPacket>().Any() && mover.Received.OfType<JoinAcceptedPacket>().Any(), server, observer, mover));
+
+                int moverEntityId = mover.Received.OfType<JoinAcceptedPacket>().First().EntityId;
+
+                Assert.True(Pump(() => observer.Received.OfType<EntitySpawnPacket>().Any(s => s.EntityId == moverEntityId), server, observer, mover));
+
+                mover.Send(new MoveToPacket { X = 50000, Y = 51600 }); // 1600 > AoiRadiusWire - verlässt den Radius.
+
+                Assert.True(Pump(
+                    () => observer.Received.OfType<EntityDespawnPacket>().Any(d => d.EntityId == moverEntityId),
+                    server, observer, mover));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void JoinWhileVisiblePlayerIsMoving_GetsSpawnWithCurrentPositionAndMove()
+        {
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var mover = new TestClient();
+                mover.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, mover));
+
+                (int moverCharacterId, string moverToken) = fixture.CreateCharacter("Mover", positionX: 50000, positionY: 50000);
+                mover.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = moverToken, CharacterId = moverCharacterId });
+                Assert.True(Pump(() => mover.Received.OfType<JoinAcceptedPacket>().Any(), server, mover));
+
+                int moverEntityId = mover.Received.OfType<JoinAcceptedPacket>().First().EntityId;
+
+                // Lange genug Strecke, damit "mover" beim späteren Join des Joiners nachweislich noch in
+                // Bewegung ist (1000 Wire-Einheiten bei PlayerSpeed 500/s = 2s), aber kurz genug für den Test.
+                mover.Send(new MoveToPacket { X = 51000, Y = 50000 });
+
+                using var joiner = new TestClient();
+                joiner.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, joiner, mover));
+
+                // 300 von der URSPRÜNGLICHEN Position von "mover" entfernt - selbst nach etwas Bewegung
+                // seit dem MoveTo oben klar innerhalb des AoiRadiusWire (1500).
+                (int joinerCharacterId, string joinerToken) = fixture.CreateCharacter("Joiner", positionX: 50300, positionY: 50000);
+                joiner.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = joinerToken, CharacterId = joinerCharacterId });
+                Assert.True(Pump(() => joiner.Received.OfType<JoinAcceptedPacket>().Any(), server, joiner, mover));
+
+                Assert.Contains(joiner.Received.OfType<EntitySpawnPacket>(), s => s.EntityId == moverEntityId);
+                Assert.Contains(joiner.Received.OfType<EntityMovePacket>(), m => m.EntityId == moverEntityId && m.TargetX == 51000);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void Disconnect_OnlyVisibleObserverGetsDespawn_OtherObserverGetsNothing()
+        {
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var target = new TestClient();
+                using var nearObserver = new TestClient();
+                using var farObserver = new TestClient();
+                target.Connect(server.ListenPort);
+                nearObserver.Connect(server.ListenPort);
+                farObserver.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, target, nearObserver, farObserver));
+
+                (int targetCharacterId, string targetToken) = fixture.CreateCharacter("Target", positionX: 50000, positionY: 50000);
+                (int nearCharacterId, string nearToken) = fixture.CreateCharacter("Near", positionX: 50000, positionY: 50500); // 500 < Radius
+                (int farCharacterId, string farToken) = fixture.CreateCharacter("Far", positionX: 90000, positionY: 90000); // weit weg
+
+                target.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = targetToken, CharacterId = targetCharacterId });
+                nearObserver.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = nearToken, CharacterId = nearCharacterId });
+                farObserver.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = farToken, CharacterId = farCharacterId });
+                Assert.True(Pump(
+                    () => target.Received.OfType<JoinAcceptedPacket>().Any()
+                        && nearObserver.Received.OfType<JoinAcceptedPacket>().Any()
+                        && farObserver.Received.OfType<JoinAcceptedPacket>().Any(),
+                    server, target, nearObserver, farObserver));
+
+                int targetEntityId = target.Received.OfType<JoinAcceptedPacket>().First().EntityId;
+
+                Assert.True(Pump(
+                    () => nearObserver.Received.OfType<EntitySpawnPacket>().Any(s => s.EntityId == targetEntityId),
+                    server, target, nearObserver, farObserver));
+
+                target.Peer!.Disconnect();
+
+                Assert.True(Pump(
+                    () => nearObserver.Received.OfType<EntityDespawnPacket>().Any(d => d.EntityId == targetEntityId),
+                    server, nearObserver, farObserver));
+
+                // Negativ-Prüfung mit echtem Timeout, nicht nur "kein Fehler aufgetreten".
+                PumpForDuration(TimeSpan.FromMilliseconds(400), server, farObserver);
+                Assert.DoesNotContain(farObserver.Received.OfType<EntityDespawnPacket>(), d => d.EntityId == targetEntityId);
             }
             finally
             {
