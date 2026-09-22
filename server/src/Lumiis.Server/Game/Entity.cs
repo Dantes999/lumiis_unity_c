@@ -6,9 +6,14 @@ namespace Lumiis.Server.Game;
 public sealed class Entity
 {
     public int Id { get; }
+
+    /// <summary>Die Datenbank-Id des Charakters (Lumiis.Data.Character) - World nutzt sie, um pro
+    /// CharacterId nur eine gleichzeitige Verbindung zuzulassen (siehe World._entityIdByCharacterId).</summary>
+    public int CharacterId { get; }
+
     public string Name { get; }
 
-    /// <summary>Wird von GameServer direkt nach dem Join gesetzt (LookCatalog.CreateAppearanceForName).</summary>
+    /// <summary>Wird von GameServer direkt nach dem Join aus der geladenen Character-Zeile gesetzt.</summary>
     public Appearance Appearance { get; set; }
 
     public double X { get; private set; }
@@ -22,9 +27,10 @@ public sealed class Entity
     public int IntX => (int)System.Math.Round(X);
     public int IntY => (int)System.Math.Round(Y);
 
-    public Entity(int id, string name, int x, int y)
+    public Entity(int id, int characterId, string name, int x, int y)
     {
         Id = id;
+        CharacterId = characterId;
         Name = name;
         X = x;
         Y = y;

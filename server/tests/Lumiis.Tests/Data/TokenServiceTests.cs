@@ -93,6 +93,48 @@ public class TokenServiceTests
         Assert.Equal(42, accountId);
     }
 
+    [Fact]
+    public void Validate_ExpiredToken_ReturnsExpiredNotInvalid()
+    {
+        // Der Spielserver (M2b) unterscheidet InvalidToken/TokenExpired als unterschiedliche
+        // JoinRejectReason-Werte - anders als TryValidate, das beides gleich behandelt (401 bei Auth).
+        var clock = new FakeClock(1_000_000);
+        TokenService service = CreateService(clock);
+        string token = service.Issue(42);
+        clock.NowUnixSeconds += TokenService.ValiditySeconds + 1;
+
+        TokenValidationResult result = service.Validate(token, out int accountId);
+
+        Assert.Equal(TokenValidationResult.Expired, result);
+        Assert.Equal(0, accountId);
+    }
+
+    [Fact]
+    public void Validate_TamperedSignature_ReturnsInvalidNotExpired()
+    {
+        TokenService service = CreateService(new FakeClock(1_000_000));
+        string token = service.Issue(42);
+        int dotIndex = token.IndexOf('.');
+        string tampered = token[..dotIndex] + "." + new string('A', token.Length - dotIndex - 1);
+
+        TokenValidationResult result = service.Validate(tampered, out int accountId);
+
+        Assert.Equal(TokenValidationResult.Invalid, result);
+        Assert.Equal(0, accountId);
+    }
+
+    [Fact]
+    public void Validate_ValidToken_ReturnsValid()
+    {
+        TokenService service = CreateService(new FakeClock(1_000_000));
+        string token = service.Issue(42);
+
+        TokenValidationResult result = service.Validate(token, out int accountId);
+
+        Assert.Equal(TokenValidationResult.Valid, result);
+        Assert.Equal(42, accountId);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]

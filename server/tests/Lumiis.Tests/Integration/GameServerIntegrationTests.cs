@@ -2,19 +2,24 @@ using System;
 using System.Linq;
 using System.Threading;
 using LiteNetLib;
+using Lumiis.Data;
 using Lumiis.Server;
 using Lumiis.Server.Logging;
-using Lumiis.Data.Looks;
 using Lumiis.Server.Net;
 using Lumiis.Shared;
 using Lumiis.Shared.Net;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace Lumiis.Tests.Integration
 {
-    /// <summary>Echtes LiteNetLib auf Loopback (freier Port). Server und Clients werden manuell gepumpt, mit Timeout statt festen Sleeps.</summary>
+    /// <summary>Echtes LiteNetLib auf Loopback (freier Port), DB per EF-Core-InMemory statt echtem Postgres -
+    /// Logik-Tests, kein Beweis für echtes Postgres-Verhalten (siehe Lumiis.Tests.Auth-Klassenkommentare).
+    /// Server und Clients werden manuell gepumpt, mit Timeout statt festen Sleeps.</summary>
     public class GameServerIntegrationTests
     {
+        private const string TokenSecret = "integration-test-token-secret-at-least-32b";
+
         private sealed class NullLogger : ILogger
         {
             public void Info(string message) { }
@@ -22,16 +27,75 @@ namespace Lumiis.Tests.Integration
             public void Error(string message) { }
         }
 
-        private static GameServer CreateServer(Func<long>? nowMs = null)
+        /// <summary>Bündelt einen GameServer mit einer eigenen InMemory-Datenbank und TokenService -
+        /// CreateCharacter() legt Account+Character an und gibt (CharacterId, Token) zurück, direkt für
+        /// JoinRequestPacket nutzbar.</summary>
+        private sealed class ServerFixture
         {
-            var config = new ServerConfig
+            private readonly Func<LumiisDbContext> _dbFactory;
+
+            public GameServer Server { get; }
+            public TokenService TokenService { get; }
+
+            public ServerFixture(Func<long>? nowMs = null, Func<long>? tokenNowUnixSeconds = null)
             {
-                Port = 0, // freier Port, vom OS vergeben
-                MaxPlayers = 10,
-                RejectGraceMs = 100 // echte Uhr, kleiner Wert - siehe M1-fixes.md Punkt 2
-            };
-            LookCatalog lookCatalog = TestLookCatalogs.CreateMinimal();
-            return new GameServer(config, new NullLogger(), lookCatalog, nowMs);
+                DbContextOptions<LumiisDbContext> options = new DbContextOptionsBuilder<LumiisDbContext>()
+                    .UseInMemoryDatabase("gameserver-test-" + Guid.NewGuid())
+                    .Options;
+                _dbFactory = () => new LumiisDbContext(options);
+                TokenService = new TokenService(TokenSecret, tokenNowUnixSeconds);
+
+                var config = new ServerConfig
+                {
+                    Port = 0, // freier Port, vom OS vergeben
+                    MaxPlayers = 10,
+                    RejectGraceMs = 100 // echte Uhr, kleiner Wert - siehe M1-fixes.md Punkt 2
+                };
+                Server = new GameServer(config, new NullLogger(), TokenService, _dbFactory, nowMs);
+            }
+
+            public (int CharacterId, string Token) CreateCharacter(string name, int? positionX = null, int? positionY = null, int? accountId = null)
+            {
+                using LumiisDbContext db = _dbFactory();
+                int ownerAccountId = accountId ?? CreateAccount(db);
+
+                var character = new Character
+                {
+                    AccountId = ownerAccountId,
+                    Name = name,
+                    BodyId = 1,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    PositionX = positionX,
+                    PositionY = positionY
+                };
+                db.Characters.Add(character);
+                db.SaveChanges();
+
+                return (character.Id, TokenService.Issue(ownerAccountId));
+            }
+
+            public int CreateAccount()
+            {
+                using LumiisDbContext db = _dbFactory();
+                return CreateAccount(db);
+            }
+
+            public LumiisDbContext OpenDb() => _dbFactory();
+
+            private static int CreateAccount(LumiisDbContext db)
+            {
+                var account = new Account
+                {
+                    Username = "acc_" + Guid.NewGuid().ToString("N")[..12],
+                    PasswordHash = new byte[] { 0 },
+                    PasswordSalt = new byte[] { 0 },
+                    PasswordIterations = 1,
+                    CreatedAtUtc = DateTime.UtcNow
+                };
+                db.Accounts.Add(account);
+                db.SaveChanges();
+                return account.Id;
+            }
         }
 
         private static bool Pump(Func<bool> condition, GameServer server, params TestClient[] clients)
@@ -56,7 +120,8 @@ namespace Lumiis.Tests.Integration
         [Fact]
         public void TwoClients_JoinAndSeeEachOthersSpawn()
         {
-            GameServer server = CreateServer();
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
             server.Start();
             try
             {
@@ -67,10 +132,12 @@ namespace Lumiis.Tests.Integration
 
                 Assert.True(WaitConnected(server, clientA, clientB));
 
-                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Alice" });
+                (int aliceId, string aliceToken) = fixture.CreateCharacter("Alice");
+                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = aliceToken, CharacterId = aliceId });
                 Assert.True(Pump(() => clientA.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
 
-                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Bob" });
+                (int bobId, string bobToken) = fixture.CreateCharacter("Bob");
+                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = bobToken, CharacterId = bobId });
                 Assert.True(Pump(() => clientB.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
 
                 // B sieht den Spawn von A (als vorhandene Entity beim eigenen Join).
@@ -85,7 +152,8 @@ namespace Lumiis.Tests.Integration
         [Fact]
         public void Appearance_IsIdenticalBetweenOwnJoinAcceptedAndOthersEntitySpawn()
         {
-            GameServer server = CreateServer();
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
             server.Start();
             try
             {
@@ -95,11 +163,13 @@ namespace Lumiis.Tests.Integration
                 clientB.Connect(server.ListenPort);
                 Assert.True(WaitConnected(server, clientA, clientB));
 
-                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Alice" });
+                (int aliceId, string aliceToken) = fixture.CreateCharacter("Alice");
+                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = aliceToken, CharacterId = aliceId });
                 Assert.True(Pump(() => clientA.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
                 Appearance aliceOwnAppearance = clientA.Received.OfType<JoinAcceptedPacket>().First().Appearance;
 
-                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Bob" });
+                (int bobId, string bobToken) = fixture.CreateCharacter("Bob");
+                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = bobToken, CharacterId = bobId });
                 Assert.True(Pump(() => clientB.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
                 Assert.True(Pump(() => clientB.Received.OfType<EntitySpawnPacket>().Any(p => p.Name == "Alice"), server, clientA, clientB));
 
@@ -113,11 +183,55 @@ namespace Lumiis.Tests.Integration
         }
 
         [Fact]
+        public void JoinAccepted_AppearanceMatchesCharacterRow()
+        {
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice");
+                using (LumiisDbContext db = fixture.OpenDb())
+                {
+                    Character character = db.Characters.Single(c => c.Id == characterId);
+                    character.HairStyleId = 2;
+                    character.HairColorId = 3;
+                    character.ArmorId = 4;
+                    character.HelmetId = 1;
+                    character.WeaponId = 2;
+                    character.ShieldId = 1;
+                    db.SaveChanges();
+                }
+
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+
+                Appearance appearance = client.Received.OfType<JoinAcceptedPacket>().First().Appearance;
+                Assert.Equal(1, appearance.BodyId);
+                Assert.Equal(2, appearance.HairStyleId);
+                Assert.Equal(3, appearance.HairColorId);
+                Assert.Equal(4, appearance.ArmorId);
+                Assert.Equal(1, appearance.HelmetId);
+                Assert.Equal(2, appearance.WeaponId);
+                Assert.Equal(1, appearance.ShieldId);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
         public void ExistingClient_SeesLaterJoinerViaBroadcast()
         {
             // Deckt den Fall ab, der bei TwoClients_JoinAndSeeEachOthersSpawn NICHT geprüft wird:
             // A ist schon drin, B joint SPÄTER - kommt bei A ein EntitySpawn für B per Broadcast an?
-            GameServer server = CreateServer();
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
             server.Start();
             try
             {
@@ -125,14 +239,16 @@ namespace Lumiis.Tests.Integration
                 clientA.Connect(server.ListenPort);
                 Assert.True(WaitConnected(server, clientA));
 
-                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Alice" });
+                (int aliceId, string aliceToken) = fixture.CreateCharacter("Alice");
+                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = aliceToken, CharacterId = aliceId });
                 Assert.True(Pump(() => clientA.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA));
 
                 using var clientB = new TestClient();
                 clientB.Connect(server.ListenPort);
                 Assert.True(WaitConnected(server, clientA, clientB));
 
-                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Bob" });
+                (int bobId, string bobToken) = fixture.CreateCharacter("Bob");
+                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = bobToken, CharacterId = bobId });
                 Assert.True(Pump(() => clientB.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
 
                 Assert.True(Pump(() => clientA.Received.OfType<EntitySpawnPacket>().Any(p => p.Name == "Bob"), server, clientA, clientB));
@@ -148,7 +264,8 @@ namespace Lumiis.Tests.Integration
         {
             // Näher an "Lumiis.Bot --count 3": mehrere neue Clients joinen kurz hintereinander,
             // ohne dass zwischendurch gewartet wird - sieht der bereits verbundene Client alle drei?
-            GameServer server = CreateServer();
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
             server.Start();
             try
             {
@@ -156,7 +273,8 @@ namespace Lumiis.Tests.Integration
                 clientA.Connect(server.ListenPort);
                 Assert.True(WaitConnected(server, clientA));
 
-                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Alice" });
+                (int aliceId, string aliceToken) = fixture.CreateCharacter("Alice");
+                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = aliceToken, CharacterId = aliceId });
                 Assert.True(Pump(() => clientA.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA));
 
                 using var bot1 = new TestClient();
@@ -167,9 +285,12 @@ namespace Lumiis.Tests.Integration
                 bot3.Connect(server.ListenPort);
                 Assert.True(WaitConnected(server, clientA, bot1, bot2, bot3));
 
-                bot1.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Bot1" });
-                bot2.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Bot2" });
-                bot3.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Bot3" });
+                (int bot1Id, string bot1Token) = fixture.CreateCharacter("Bot1");
+                (int bot2Id, string bot2Token) = fixture.CreateCharacter("Bot2");
+                (int bot3Id, string bot3Token) = fixture.CreateCharacter("Bot3");
+                bot1.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = bot1Token, CharacterId = bot1Id });
+                bot2.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = bot2Token, CharacterId = bot2Id });
+                bot3.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = bot3Token, CharacterId = bot3Id });
 
                 Assert.True(Pump(
                     () => clientA.Received.OfType<EntitySpawnPacket>().Select(p => p.Name).Distinct().Count() >= 3,
@@ -189,7 +310,8 @@ namespace Lumiis.Tests.Integration
         [Fact]
         public void MoveTo_BroadcastsMoveThenStopAtExactTarget()
         {
-            GameServer server = CreateServer();
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
             server.Start();
             try
             {
@@ -199,9 +321,11 @@ namespace Lumiis.Tests.Integration
                 clientB.Connect(server.ListenPort);
                 Assert.True(WaitConnected(server, clientA, clientB));
 
-                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Alice" });
+                (int aliceId, string aliceToken) = fixture.CreateCharacter("Alice");
+                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = aliceToken, CharacterId = aliceId });
                 Assert.True(Pump(() => clientA.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
-                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Bob" });
+                (int bobId, string bobToken) = fixture.CreateCharacter("Bob");
+                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = bobToken, CharacterId = bobId });
                 Assert.True(Pump(() => clientB.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
 
                 int targetX = GameConstants.MapWidth / 2 + 1000; // 2s Laufzeit bei PlayerSpeed
@@ -225,7 +349,8 @@ namespace Lumiis.Tests.Integration
         [Fact]
         public void Disconnect_SendsDespawnToOthers()
         {
-            GameServer server = CreateServer();
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
             server.Start();
             try
             {
@@ -235,16 +360,18 @@ namespace Lumiis.Tests.Integration
                 clientB.Connect(server.ListenPort);
                 Assert.True(WaitConnected(server, clientA, clientB));
 
-                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Alice" });
+                (int aliceId, string aliceToken) = fixture.CreateCharacter("Alice");
+                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = aliceToken, CharacterId = aliceId });
                 Assert.True(Pump(() => clientA.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
-                int aliceId = clientA.Received.OfType<JoinAcceptedPacket>().First().EntityId;
+                int aliceEntityId = clientA.Received.OfType<JoinAcceptedPacket>().First().EntityId;
 
-                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Bob" });
+                (int bobId, string bobToken) = fixture.CreateCharacter("Bob");
+                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = bobToken, CharacterId = bobId });
                 Assert.True(Pump(() => clientB.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
 
                 clientA.Peer!.Disconnect();
                 Assert.True(Pump(
-                    () => clientB.Received.OfType<EntityDespawnPacket>().Any(d => d.EntityId == aliceId),
+                    () => clientB.Received.OfType<EntityDespawnPacket>().Any(d => d.EntityId == aliceEntityId),
                     server, clientA, clientB));
             }
             finally
@@ -256,7 +383,8 @@ namespace Lumiis.Tests.Integration
         [Fact]
         public void WrongProtocolVersion_IsRejected()
         {
-            GameServer server = CreateServer();
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
             server.Start();
             try
             {
@@ -264,7 +392,8 @@ namespace Lumiis.Tests.Integration
                 client.Connect(server.ListenPort);
                 Assert.True(WaitConnected(server, client));
 
-                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version + 1, Name = "Alice" });
+                (int characterId, string token) = fixture.CreateCharacter("Alice");
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version + 1, Token = token, CharacterId = characterId });
 
                 Assert.True(Pump(
                     () => client.Received.OfType<JoinRejectedPacket>().Any(r => r.Reason == JoinRejectReason.VersionMismatch),
@@ -277,9 +406,10 @@ namespace Lumiis.Tests.Integration
         }
 
         [Fact]
-        public void InvalidName_IsRejected()
+        public void InvalidToken_IsRejected()
         {
-            GameServer server = CreateServer();
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
             server.Start();
             try
             {
@@ -287,11 +417,136 @@ namespace Lumiis.Tests.Integration
                 client.Connect(server.ListenPort);
                 Assert.True(WaitConnected(server, client));
 
-                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "ab" });
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = "kauderwelsch.not-a-token", CharacterId = 1 });
 
                 Assert.True(Pump(
-                    () => client.Received.OfType<JoinRejectedPacket>().Any(r => r.Reason == JoinRejectReason.InvalidName),
+                    () => client.Received.OfType<JoinRejectedPacket>().Any(r => r.Reason == JoinRejectReason.InvalidToken),
                     server, client));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void ExpiredToken_IsRejectedAsExpiredNotInvalid()
+        {
+            long fakeTokenNow = 1_000_000;
+            var fixture = new ServerFixture(tokenNowUnixSeconds: () => fakeTokenNow);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice");
+                fakeTokenNow += TokenService.ValiditySeconds + 1; // Token nach der Ausgabe ablaufen lassen.
+
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+
+                Assert.True(Pump(
+                    () => client.Received.OfType<JoinRejectedPacket>().Any(r => r.Reason == JoinRejectReason.TokenExpired),
+                    server, client));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void CharacterFromDifferentAccount_IsRejectedAsNotFound()
+        {
+            // Eigentümerschaft geprüft: eine gültige CharacterId, aber ein Token für einen ANDEREN Account.
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, _) = fixture.CreateCharacter("Alice");
+                int otherAccountId = fixture.CreateAccount();
+                string otherAccountToken = fixture.TokenService.Issue(otherAccountId);
+
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = otherAccountToken, CharacterId = characterId });
+
+                Assert.True(Pump(
+                    () => client.Received.OfType<JoinRejectedPacket>().Any(r => r.Reason == JoinRejectReason.CharacterNotFound),
+                    server, client));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void UnknownCharacterId_IsRejectedAsNotFound()
+        {
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                int accountId = fixture.CreateAccount();
+                string token = fixture.TokenService.Issue(accountId);
+
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = 999999 });
+
+                Assert.True(Pump(
+                    () => client.Received.OfType<JoinRejectedPacket>().Any(r => r.Reason == JoinRejectReason.CharacterNotFound),
+                    server, client));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void SecondJoinWithSameCharacterId_IsRejectedWhileFirstStillConnected_ThenSucceedsAfterDisconnect()
+        {
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var clientA = new TestClient();
+                clientA.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, clientA));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice");
+                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => clientA.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA));
+
+                using var clientB = new TestClient();
+                clientB.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, clientA, clientB));
+                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+
+                Assert.True(Pump(
+                    () => clientB.Received.OfType<JoinRejectedPacket>().Any(r => r.Reason == JoinRejectReason.CharacterAlreadyOnline),
+                    server, clientA, clientB));
+
+                // Nach dem Disconnect des ersten Clients klappt ein erneuter Join mit derselben CharacterId wieder.
+                clientA.Peer!.Disconnect();
+                Assert.True(Pump(() => clientA.Disconnected, server, clientA, clientB));
+
+                using var clientC = new TestClient();
+                clientC.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, clientC));
+                clientC.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => clientC.Received.OfType<JoinAcceptedPacket>().Any(), server, clientC));
             }
             finally
             {
@@ -302,7 +557,8 @@ namespace Lumiis.Tests.Integration
         [Fact]
         public void GarbagePacket_DisconnectsClient_ServerStaysAlive()
         {
-            GameServer server = CreateServer();
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
             server.Start();
             try
             {
@@ -318,7 +574,8 @@ namespace Lumiis.Tests.Integration
                 goodClient.Connect(server.ListenPort);
                 Assert.True(WaitConnected(server, goodClient));
 
-                goodClient.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Alice" });
+                (int characterId, string token) = fixture.CreateCharacter("Alice");
+                goodClient.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
                 Assert.True(Pump(() => goodClient.Received.OfType<JoinAcceptedPacket>().Any(), server, goodClient));
             }
             finally
@@ -330,7 +587,8 @@ namespace Lumiis.Tests.Integration
         [Fact]
         public void OversizedPacket_DisconnectsClient_ServerStaysAlive()
         {
-            GameServer server = CreateServer();
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
             server.Start();
             try
             {
@@ -346,7 +604,8 @@ namespace Lumiis.Tests.Integration
                 goodClient.Connect(server.ListenPort);
                 Assert.True(WaitConnected(server, goodClient));
 
-                goodClient.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Alice" });
+                (int characterId, string token) = fixture.CreateCharacter("Alice");
+                goodClient.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
                 Assert.True(Pump(() => goodClient.Received.OfType<JoinAcceptedPacket>().Any(), server, goodClient));
             }
             finally
@@ -358,7 +617,8 @@ namespace Lumiis.Tests.Integration
         [Fact]
         public void ExceptionInHandler_DisconnectsOnlyThatConnection_ServerAndOthersStayAlive()
         {
-            GameServer server = CreateServer();
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
             server.TestFaultHook = () => throw new InvalidOperationException("Simulierter Fehler im Handler");
             server.Start();
             try
@@ -369,9 +629,11 @@ namespace Lumiis.Tests.Integration
                 clientB.Connect(server.ListenPort);
                 Assert.True(WaitConnected(server, clientA, clientB));
 
-                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Alice" });
+                (int aliceId, string aliceToken) = fixture.CreateCharacter("Alice");
+                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = aliceToken, CharacterId = aliceId });
                 Assert.True(Pump(() => clientA.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
-                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "Bob" });
+                (int bobId, string bobToken) = fixture.CreateCharacter("Bob");
+                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = bobToken, CharacterId = bobId });
                 Assert.True(Pump(() => clientB.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
 
                 // A löst über den Test-Hook eine Exception im MoveTo-Handler aus.
@@ -397,8 +659,9 @@ namespace Lumiis.Tests.Integration
         public void JoinTimeout_UsesFakeClock_DisconnectsOnlyAfterDeadlineReached()
         {
             long fakeNow = 0;
-            const int joinTimeoutMs = 5000; // ServerConfig.JoinTimeoutMs-Default aus CreateServer()
-            GameServer server = CreateServer(nowMs: () => fakeNow);
+            const int joinTimeoutMs = 5000; // ServerConfig.JoinTimeoutMs-Default
+            var fixture = new ServerFixture(nowMs: () => fakeNow);
+            GameServer server = fixture.Server;
             server.Start();
             try
             {
@@ -425,7 +688,8 @@ namespace Lumiis.Tests.Integration
         public void RejectGrace_UsesFakeClock_KeepsConnectionUntilDeadlineReached()
         {
             long fakeNow = 0;
-            GameServer server = CreateServer(nowMs: () => fakeNow);
+            var fixture = new ServerFixture(nowMs: () => fakeNow);
+            GameServer server = fixture.Server;
             server.Start();
             try
             {
@@ -433,9 +697,9 @@ namespace Lumiis.Tests.Integration
                 client.Connect(server.ListenPort);
                 Assert.True(WaitConnected(server, client));
 
-                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "ab" }); // ungültiger Name
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version + 1, Token = "egal", CharacterId = 1 }); // synchron ablehnbar (falsche Version), kein DB-Lookup nötig
                 Assert.True(Pump(
-                    () => client.Received.OfType<JoinRejectedPacket>().Any(r => r.Reason == JoinRejectReason.InvalidName),
+                    () => client.Received.OfType<JoinRejectedPacket>().Any(r => r.Reason == JoinRejectReason.VersionMismatch),
                     server, client));
 
                 // JoinRejected ist angekommen, Grace-Frist läuft noch (Uhr steht still) - noch nicht getrennt.
@@ -444,7 +708,7 @@ namespace Lumiis.Tests.Integration
                 Assert.False(client.Disconnected);
 
                 // Uhr über die Grace-Frist hinausdrehen - jetzt trennt der nächste Tick.
-                fakeNow = 100 + 1; // RejectGraceMs aus CreateServer()
+                fakeNow = 100 + 1; // RejectGraceMs aus ServerFixture()
                 Assert.True(Pump(() => client.Disconnected, server, client));
             }
             finally

@@ -1,16 +1,19 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 using LiteNetLib;
+using Lumiis.Data;
 using Lumiis.Server.Game;
 using Lumiis.Server.Logging;
-using Lumiis.Data.Looks;
 using Lumiis.Server.Net;
 using Lumiis.Shared;
 using Lumiis.Shared.Net;
+using Microsoft.EntityFrameworkCore;
 
 namespace Lumiis.Server;
 
@@ -21,6 +24,7 @@ public sealed class GameServer : INetEventListener
     {
         public readonly NetPeer Peer;
         public int? EntityId;
+        public bool JoinPending;
         public bool Closing;
         public long CloseAtMs;
 
@@ -31,6 +35,13 @@ public sealed class GameServer : INetEventListener
         }
     }
 
+    /// <summary>Ergebnis eines asynchronen Charakter-Lookups (siehe LookupCharacterForJoinAsync), auf dem
+    /// Game-Loop-Thread eingesammelt (DrainPendingJoinResults). Character != null: Join darf fortgesetzt
+    /// werden (World.TryJoin entscheidet endgültig, z. B. CharacterAlreadyOnline). RejectReason != null:
+    /// expliziter Ablehnungsgrund. Beides null: unerwarteter Fehler (siehe Log) - die Verbindung wird ohne
+    /// JoinRejected getrennt, wie jeder andere Disconnect ohne JoinAccepted (siehe CLAUDE.md-Konvention).</summary>
+    private sealed record JoinLookupResult(int PeerId, Character? Character, JoinRejectReason? RejectReason);
+
     private const int MaxConsecutiveFailedTicks = 50;
 
     // Monotone Standard-Uhr, geteilt über alle Instanzen (läuft seit Prozessstart, nie negativ).
@@ -39,23 +50,28 @@ public sealed class GameServer : INetEventListener
 
     private readonly ServerConfig _config;
     private readonly World _world;
-    private readonly LookCatalog _lookCatalog;
+    private readonly TokenService _tokenService;
+    private readonly Func<LumiisDbContext> _dbContextFactory;
     private readonly NetManager _netManager;
     private readonly ILogger _logger;
     private readonly Func<long> _nowMs;
     private readonly Dictionary<int, ConnectionState> _connections = new();
+    private readonly ConcurrentQueue<JoinLookupResult> _pendingJoinResults = new();
     private uint _tick;
     private int _consecutiveFailedTicks;
 
     /// <summary>Nur für Tests: wenn gesetzt, wird es beim Verarbeiten von MoveTo aufgerufen (zum Simulieren eines Fehlers in einem Handler).</summary>
     internal Action? TestFaultHook { get; set; }
 
-    /// <summary>nowMs: injizierbare Uhr für Fristen (Join-Timeout, Reject-Grace). Default: monotone Wandzeit seit Prozessstart. Ticks bleiben rein für die Simulation.</summary>
-    public GameServer(ServerConfig config, ILogger logger, LookCatalog lookCatalog, Func<long>? nowMs = null)
+    /// <summary>nowMs: injizierbare Uhr für Fristen (Join-Timeout, Reject-Grace). Default: monotone Wandzeit seit Prozessstart. Ticks bleiben rein für die Simulation.
+    /// dbContextFactory: erzeugt pro Hintergrund-Operation einen frischen LumiisDbContext (DbContext ist nicht thread-safe/langlebig) - World und Entities bleiben
+    /// dabei ausschließlich dem Game-Loop-Thread vorbehalten, siehe World-Klassenkommentar.</summary>
+    public GameServer(ServerConfig config, ILogger logger, TokenService tokenService, Func<LumiisDbContext> dbContextFactory, Func<long>? nowMs = null)
     {
         _config = config;
         _logger = logger;
-        _lookCatalog = lookCatalog;
+        _tokenService = tokenService;
+        _dbContextFactory = dbContextFactory;
         _world = new World(config.MaxPlayers);
         _netManager = new NetManager(this) { UpdateTime = 15 };
         _nowMs = nowMs ?? DefaultNowMs;
@@ -102,6 +118,7 @@ public sealed class GameServer : INetEventListener
     private void RunTick()
     {
         _netManager.PollEvents();
+        DrainPendingJoinResults();
         _tick++;
 
         if (_connections.Count > 0)
@@ -187,6 +204,8 @@ public sealed class GameServer : INetEventListener
 
             if (conn.EntityId is int entityId)
             {
+                // TODO(M2b-3): letzte Position sofort speichern statt auf den nächsten periodischen Save
+                // zu warten (Positions-Speicherung ist eigener Abschnitt der Aufgabe).
                 _world.Remove(entityId);
                 BroadcastToJoined(new EntityDespawnPacket { EntityId = entityId });
                 _logger.Info($"Entity {entityId} despawnt (Disconnect, {disconnectInfo.Reason})");
@@ -279,9 +298,12 @@ public sealed class GameServer : INetEventListener
         }
     }
 
+    /// <summary>Token wird sofort (synchron, reine Kryptografie) geprüft. Der Charakter-Lookup läuft
+    /// dagegen asynchron im Hintergrund (siehe LookupCharacterForJoinAsync/DrainPendingJoinResults) -
+    /// World und Entities bleiben so ausschließlich dem Game-Loop-Thread vorbehalten.</summary>
     private void HandleJoin(ConnectionState conn, JoinRequestPacket join)
     {
-        if (conn.EntityId != null)
+        if (conn.EntityId != null || conn.JoinPending)
         {
             _logger.Warn($"Doppeltes JoinRequest von Verbindung {conn.Peer.Id}");
             conn.Peer.Disconnect();
@@ -294,15 +316,85 @@ public sealed class GameServer : INetEventListener
             return;
         }
 
-        if (!_world.TryJoin(join.Name, out Entity? entity, out JoinRejectReason reason))
+        TokenValidationResult tokenResult = _tokenService.Validate(join.Token, out int accountId);
+        if (tokenResult == TokenValidationResult.Expired)
+        {
+            RejectJoin(conn, JoinRejectReason.TokenExpired);
+            return;
+        }
+        if (tokenResult != TokenValidationResult.Valid)
+        {
+            RejectJoin(conn, JoinRejectReason.InvalidToken);
+            return;
+        }
+
+        conn.JoinPending = true;
+        int peerId = conn.Peer.Id;
+        int characterId = join.CharacterId;
+        _ = Task.Run(() => LookupCharacterForJoinAsync(peerId, accountId, characterId));
+    }
+
+    /// <summary>Läuft auf einem Threadpool-Thread, NIE auf dem Game-Loop-Thread. Fängt jeden Fehler ab und
+    /// meldet ihn über die Queue zurück statt zu werfen (kein unbeobachteter Task-Fehler möglich).</summary>
+    private async Task LookupCharacterForJoinAsync(int peerId, int accountId, int characterId)
+    {
+        try
+        {
+            await using LumiisDbContext db = _dbContextFactory();
+            Character? character = await db.Characters.AsNoTracking().SingleOrDefaultAsync(c => c.Id == characterId);
+
+            // Eigentümerschaft prüfen: die CharacterId muss zur AccountId aus dem Token gehören, sonst wie
+            // "nicht gefunden" behandeln (kein Unterschied in der Antwort, der verriete, dass die Id
+            // existiert, aber jemand anderem gehört).
+            if (character == null || character.AccountId != accountId)
+            {
+                _pendingJoinResults.Enqueue(new JoinLookupResult(peerId, null, JoinRejectReason.CharacterNotFound));
+                return;
+            }
+
+            _pendingJoinResults.Enqueue(new JoinLookupResult(peerId, character, null));
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Fehler beim Laden des Charakters {characterId} für Verbindung {peerId}: {ex}");
+            _pendingJoinResults.Enqueue(new JoinLookupResult(peerId, null, null));
+        }
+    }
+
+    /// <summary>Sammelt abgeschlossene Charakter-Lookups ein (siehe LookupCharacterForJoinAsync) - läuft
+    /// einmal pro Tick auf dem Game-Loop-Thread, damit World nie von einem anderen Thread berührt wird.</summary>
+    private void DrainPendingJoinResults()
+    {
+        while (_pendingJoinResults.TryDequeue(out JoinLookupResult? result))
+        {
+            if (!_connections.TryGetValue(result.PeerId, out ConnectionState? conn) || conn.EntityId != null)
+                continue; // Verbindung inzwischen getrennt oder (sollte nicht vorkommen) schon gejoint.
+
+            conn.JoinPending = false;
+
+            if (result.Character == null)
+            {
+                if (result.RejectReason is JoinRejectReason reason)
+                    RejectJoin(conn, reason);
+                else
+                    conn.Peer.Disconnect(); // Unerwarteter Fehler (siehe Log) - generischer Fehlschlag, wie jeder andere Disconnect ohne JoinAccepted.
+                continue;
+            }
+
+            CompleteJoin(conn, result.Character);
+        }
+    }
+
+    private void CompleteJoin(ConnectionState conn, Character character)
+    {
+        if (!_world.TryJoin(character.Id, character.Name, character.PositionX, character.PositionY, out Entity? entity, out JoinRejectReason reason))
         {
             RejectJoin(conn, reason);
             return;
         }
 
         conn.EntityId = entity!.Id;
-        // Übergangslösung bis M2 (dann aus der DB): Appearance deterministisch aus dem Namen.
-        entity.Appearance = _lookCatalog.CreateAppearanceForName(entity.Name);
+        entity.Appearance = ToAppearance(character);
 
         conn.Peer.SendPacket(new JoinAcceptedPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY, Appearance = entity.Appearance });
 
@@ -330,7 +422,21 @@ public sealed class GameServer : INetEventListener
         // TODO(M3): Sichtbarkeit/AOI - aktuell sehen alle Verbindungen alle Entities.
         BroadcastToJoined(new EntitySpawnPacket { EntityId = entity.Id, Name = entity.Name, X = entity.IntX, Y = entity.IntY, Appearance = entity.Appearance }, exceptPeerId: conn.Peer.Id);
 
-        _logger.Info($"{entity.Name} (Entity {entity.Id}) beigetreten");
+        _logger.Info($"{entity.Name} (Entity {entity.Id}, Character {character.Id}) beigetreten");
+    }
+
+    private static Appearance ToAppearance(Character character)
+    {
+        return new Appearance
+        {
+            BodyId = character.BodyId,
+            HairStyleId = character.HairStyleId,
+            HairColorId = character.HairColorId,
+            ArmorId = character.ArmorId,
+            HelmetId = character.HelmetId,
+            WeaponId = character.WeaponId,
+            ShieldId = character.ShieldId
+        };
     }
 
     private void RejectJoin(ConnectionState conn, JoinRejectReason reason)

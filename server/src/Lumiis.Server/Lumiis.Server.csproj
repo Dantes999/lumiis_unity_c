@@ -7,6 +7,8 @@
 
   <ItemGroup>
     <PackageReference Include="LiteNetLib" Version="$(LiteNetLibVersion)" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="$(EfCoreVersion)" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="$(EfCoreVersion)" />
   </ItemGroup>
 
   <PropertyGroup>

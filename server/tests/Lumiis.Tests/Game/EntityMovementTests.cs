@@ -8,7 +8,7 @@ namespace Lumiis.Tests.Game
         [Fact]
         public void Tick_ArrivesExactlyAtTarget_NoOvershoot()
         {
-            var entity = new Entity(1, "Bot", 0, 0);
+            var entity = new Entity(1, 1, "Bot", 0, 0);
             entity.MoveTo(1000, 0, 500);
 
             bool arrived = entity.Tick(3.0); // mehr Zeit als nötig (2s bei Speed 500)
@@ -22,7 +22,7 @@ namespace Lumiis.Tests.Game
         [Fact]
         public void Tick_StepByStepAt25Hz_ArrivesExactlyWithoutOvershoot()
         {
-            var entity = new Entity(1, "Bot", 0, 0);
+            var entity = new Entity(1, 1, "Bot", 0, 0);
             entity.MoveTo(1000, 500, 500);
 
             const double deltaSeconds = 1.0 / 25.0;
@@ -44,7 +44,7 @@ namespace Lumiis.Tests.Game
         [Fact]
         public void Tick_Diagonal_MovesProportionallyOnBothAxes()
         {
-            var entity = new Entity(1, "Bot", 0, 0);
+            var entity = new Entity(1, 1, "Bot", 0, 0);
             entity.MoveTo(1000, 1000, 500);
 
             bool arrived = entity.Tick(1.0);
@@ -59,12 +59,12 @@ namespace Lumiis.Tests.Game
         [Fact]
         public void Tick_RespectsSpeed()
         {
-            var slow = new Entity(1, "Slow", 0, 0);
+            var slow = new Entity(1, 1, "Slow", 0, 0);
             slow.MoveTo(1000, 0, 100);
             slow.Tick(1.0);
             Assert.Equal(100, slow.IntX);
 
-            var fast = new Entity(2, "Fast", 0, 0);
+            var fast = new Entity(2, 2, "Fast", 0, 0);
             fast.MoveTo(1000, 0, 400);
             fast.Tick(1.0);
             Assert.Equal(400, fast.IntX);
@@ -73,7 +73,7 @@ namespace Lumiis.Tests.Game
         [Fact]
         public void Tick_WhileNotMoving_DoesNothing()
         {
-            var entity = new Entity(1, "Bot", 10, 20);
+            var entity = new Entity(1, 1, "Bot", 10, 20);
 
             bool arrived = entity.Tick(1.0);
 

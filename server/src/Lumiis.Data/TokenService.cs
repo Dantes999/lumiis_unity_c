@@ -6,6 +6,13 @@ using System.Text.Json.Serialization;
 
 namespace Lumiis.Data;
 
+public enum TokenValidationResult
+{
+    Valid,
+    Invalid,
+    Expired
+}
+
 /// <summary>Signierte, zustandslose Session-Token: base64url(JSON-Payload) + "." + base64url(HMACSHA256-
 /// Signatur über den Payload-Teil). Der Server (M2b) validiert das Token lokal per Signatur, kein
 /// Netzwerk-Aufruf zu Lumiis.Auth nötig. Trägt nur die AccountId (keine CharacterId), damit ein Account
@@ -43,36 +50,44 @@ public sealed class TokenService
         return (payloadPart + "." + ComputeSignature(payloadPart), expiresAtUnix);
     }
 
-    /// <summary>Lehnt manipulierte Signatur, abgelaufenes Token und Kauderwelsch ab - wirft nie, egal was
-    /// hereinkommt (das Token kommt später vom Client, siehe M2b).</summary>
+    /// <summary>Wie Validate, ohne zwischen ungültig und abgelaufen zu unterscheiden - für Lumiis.Auth
+    /// (GET/POST /characters), wo beides gleich behandelt wird (401).</summary>
     public bool TryValidate(string? token, out int accountId)
     {
+        return Validate(token, out accountId) == TokenValidationResult.Valid;
+    }
+
+    /// <summary>Wie TryValidate, unterscheidet aber ungültig (manipulierte Signatur, Kauderwelsch) von
+    /// abgelaufen - für den Spielserver (M2b), der dafür unterschiedliche JoinRejectReason-Werte schickt
+    /// (InvalidToken/TokenExpired). Wirft nie, egal was hereinkommt (das Token kommt vom Client).</summary>
+    public TokenValidationResult Validate(string? token, out int accountId)
+    {
         accountId = 0;
-        if (string.IsNullOrEmpty(token)) return false;
+        if (string.IsNullOrEmpty(token)) return TokenValidationResult.Invalid;
 
         int dotIndex = token.IndexOf('.');
-        if (dotIndex <= 0 || dotIndex == token.Length - 1) return false;
+        if (dotIndex <= 0 || dotIndex == token.Length - 1) return TokenValidationResult.Invalid;
 
         string payloadPart = token[..dotIndex];
         string signaturePart = token[(dotIndex + 1)..];
 
         try
         {
-            if (!FixedTimeEqualsUtf8(signaturePart, ComputeSignature(payloadPart))) return false;
+            if (!FixedTimeEqualsUtf8(signaturePart, ComputeSignature(payloadPart))) return TokenValidationResult.Invalid;
 
             TokenPayload? payload = JsonSerializer.Deserialize<TokenPayload>(Base64UrlDecode(payloadPart));
-            if (payload == null) return false;
-            if (payload.Exp < _nowUnixSeconds()) return false;
+            if (payload == null) return TokenValidationResult.Invalid;
+            if (payload.Exp < _nowUnixSeconds()) return TokenValidationResult.Expired;
 
             accountId = payload.Aid;
-            return true;
+            return TokenValidationResult.Valid;
         }
         catch (Exception)
         {
             // "Wirft nie" gilt für beliebige Eingaben (das Token kommt vom Client, siehe M2b) - bewusst
             // breit gefangen statt einzelne Exception-Typen (FormatException, JsonException, ...)
             // aufzuzählen, da hier Korrektheit gegenüber Kauderwelsch wichtiger ist als Präzision.
-            return false;
+            return TokenValidationResult.Invalid;
         }
     }
 

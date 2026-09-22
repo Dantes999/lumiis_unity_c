@@ -5,11 +5,13 @@ using Lumiis.Shared.Net;
 
 namespace Lumiis.Server.Game;
 
-/// <summary>Hält alle Entities einer Map und die reine Spiellogik (Join, Despawn, Bewegung). Kein Netzwerk.</summary>
+/// <summary>Hält alle Entities einer Map und die reine Spiellogik (Join, Despawn, Bewegung). Kein Netzwerk,
+/// kein EF Core/Lumiis.Data-Bezug - bekommt nur einfache Werte übergeben (CharacterId, Name, Appearance-
+/// freie Position), die Charakter-Zeile selbst lädt GameServer.</summary>
 public sealed class World
 {
     private readonly Dictionary<int, Entity> _entities = new();
-    private readonly Dictionary<string, int> _entityIdByNameLower = new();
+    private readonly Dictionary<int, int> _entityIdByCharacterId = new();
     private int _nextEntityId = 1;
 
     public World(int maxPlayers)
@@ -21,22 +23,21 @@ public sealed class World
 
     public IReadOnlyCollection<Entity> Entities => _entities.Values;
 
-    /// <summary>Prüft Name und Spielerlimit und spawnt bei Erfolg am Kartenzentrum.</summary>
-    public bool TryJoin(string name, out Entity? entity, out JoinRejectReason reason)
+    /// <summary>Prüft, ob dieser Charakter schon online ist, und das Spielerlimit; spawnt bei Erfolg an der
+    /// übergebenen Position (null = Kartenmitte). Name und Existenz des Charakters sind zu diesem Zeitpunkt
+    /// bereits geprüft (GameServer lädt die Character-Zeile per CharacterId+AccountId aus der DB, bevor
+    /// TryJoin aufgerufen wird). Keine eigene Namens-Eindeutigkeitsprüfung mehr hier: Character.Name ist
+    /// seit M2b0 über einen case-insensitiven Unique-Index in der DB global eindeutig (siehe
+    /// LumiisDbContext) - eine zweite, rein speicherresidente Prüfung hier wäre redundant und könnte bei
+    /// direkten DB-Änderungen sogar von der tatsächlichen Quelle der Wahrheit abweichen.</summary>
+    public bool TryJoin(int characterId, string name, int? x, int? y, out Entity? entity, out JoinRejectReason reason)
     {
         entity = null;
         reason = default;
 
-        if (!NameRules.IsValid(name))
+        if (_entityIdByCharacterId.ContainsKey(characterId))
         {
-            reason = JoinRejectReason.InvalidName;
-            return false;
-        }
-
-        string key = name.ToLowerInvariant();
-        if (_entityIdByNameLower.ContainsKey(key))
-        {
-            reason = JoinRejectReason.NameTaken;
+            reason = JoinRejectReason.CharacterAlreadyOnline;
             return false;
         }
 
@@ -46,10 +47,13 @@ public sealed class World
             return false;
         }
 
+        int spawnX = Math.Clamp(x ?? GameConstants.MapWidth / 2, 0, GameConstants.MapWidth);
+        int spawnY = Math.Clamp(y ?? GameConstants.MapHeight / 2, 0, GameConstants.MapHeight);
+
         int id = _nextEntityId++;
-        entity = new Entity(id, name, GameConstants.MapWidth / 2, GameConstants.MapHeight / 2);
+        entity = new Entity(id, characterId, name, spawnX, spawnY);
         _entities[id] = entity;
-        _entityIdByNameLower[key] = id;
+        _entityIdByCharacterId[characterId] = id;
         return true;
     }
 
@@ -57,7 +61,7 @@ public sealed class World
     {
         if (!_entities.TryGetValue(entityId, out Entity? entity)) return false;
         _entities.Remove(entityId);
-        _entityIdByNameLower.Remove(entity.Name.ToLowerInvariant());
+        _entityIdByCharacterId.Remove(entity.CharacterId);
         return true;
     }
 

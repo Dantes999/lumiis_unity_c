@@ -97,24 +97,6 @@ public sealed class LookCatalog
             throw new LookCatalogException($"looks.json: mindestens ein Look mit Slot {BodySlot} wird benötigt.");
     }
 
-    /// <summary>Übergangslösung bis M2b (dann übernimmt der eingeloggte Server-Join den Weg über
-    /// gespeicherte Charaktere): weist deterministisch aus dem Namen eine Appearance zu, per FNV-1a-Hash,
-    /// nur mit gültigen IDs aus dem Katalog.</summary>
-    public Appearance CreateAppearanceForName(string name)
-    {
-        var appearance = new Appearance
-        {
-            BodyId = PickRequired(name, BodySlot),
-            HairStyleId = PickOptional(name, "Hair"),
-            HairColorId = PickColor(name),
-            ArmorId = PickOptional(name, "Armor"),
-            HelmetId = PickOptional(name, HelmetSlot),
-            WeaponId = PickOptional(name, "Weapon"),
-            ShieldId = PickOptional(name, "Shield")
-        };
-        return appearance;
-    }
-
     /// <summary>Für die automatische Charaktererstellung in Lumiis.Auth (POST /characters, M2a): erster
     /// gültiger Eintrag je Slot statt Namens-Hash - keine Auswahl in M2a, siehe Aufgabe.</summary>
     public Appearance CreateDefaultAppearance()
@@ -135,33 +117,6 @@ public sealed class LookCatalog
     {
         List<int>? ids = GetIds(slot);
         return ids != null && ids.Count > 0 ? ids[0] : 0;
-    }
-
-    private int PickRequired(string name, string slot)
-    {
-        List<int>? ids = GetIds(slot);
-        if (ids == null || ids.Count == 0) return 0;
-        uint hash = Fnv1a.Hash(name + ":" + slot);
-        return ids[(int)(hash % (uint)ids.Count)];
-    }
-
-    /// <summary>0 (keine Ebene) ist eine gleichberechtigte Option neben den Katalog-Ids.</summary>
-    private int PickOptional(string name, string slot)
-    {
-        List<int>? ids = GetIds(slot);
-        if (ids == null || ids.Count == 0) return 0;
-        uint hash = Fnv1a.Hash(name + ":" + slot);
-        uint index = hash % (uint)(ids.Count + 1);
-        return index == 0 ? 0 : ids[(int)index - 1];
-    }
-
-    /// <summary>1-basierter Index in HairColors (0 = keine Ebene, konsistent mit den übrigen Feldern;
-    /// irrelevant, wenn HairStyleId 0 ist).</summary>
-    private int PickColor(string name)
-    {
-        if (_data.HairColors.Count == 0) return 0;
-        uint hash = Fnv1a.Hash(name + ":HairColor");
-        return (int)(hash % (uint)_data.HairColors.Count) + 1;
     }
 
     private List<int>? GetIds(string slot)

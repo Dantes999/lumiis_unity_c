@@ -1,13 +1,12 @@
-﻿using System.IO;
-using System.Threading;
+﻿using System.Threading;
+using Lumiis.Data;
 using Lumiis.Server;
 using Lumiis.Server.Logging;
-using Lumiis.Data.Looks;
 using Lumiis.Server.Net;
+using Microsoft.EntityFrameworkCore;
 
 ILogger logger = new ConsoleLogger();
 ServerConfig config = new ServerConfig();
-string dataDir = "data";
 
 for (int i = 0; i < args.Length; i++)
 {
@@ -19,25 +18,32 @@ for (int i = 0; i < args.Length; i++)
         case "--max-players":
             config.MaxPlayers = int.Parse(args[++i]);
             break;
-        case "--data-dir":
-            dataDir = args[++i];
-            break;
         default:
             logger.Warn($"Unbekanntes Argument: {args[i]}");
             break;
     }
 }
 
-LookCatalog lookCatalog;
+// Dieselben Variablen, dieselbe Fail-Fast-Regel wie Lumiis.Auth (siehe CLAUDE.md): fehlt eine, bricht der
+// Start mit klarer Meldung ab. Keine eigene Migration hier (bleibt Sache von Auth in Development).
+string connectionString;
+string? tokenSecret = Environment.GetEnvironmentVariable("LUMIIS_TOKEN_SECRET");
+TokenService tokenService;
 try
 {
-    lookCatalog = LookCatalog.LoadFromFile(Path.Combine(dataDir, "looks.json"));
+    connectionString = DbConnectionOptions.BuildConnectionString();
+    tokenService = new TokenService(tokenSecret ?? throw new InvalidOperationException("LUMIIS_TOKEN_SECRET ist nicht gesetzt. Siehe .env.example."));
 }
 catch (Exception ex)
 {
-    logger.Error($"looks.json konnte nicht geladen werden: {ex.Message}");
+    logger.Error($"Serverstart fehlgeschlagen (Umgebungsvariablen): {ex.Message}");
     return 1;
 }
+
+DbContextOptions<LumiisDbContext> dbOptions = new DbContextOptionsBuilder<LumiisDbContext>()
+    .UseNpgsql(connectionString)
+    .Options;
+Func<LumiisDbContext> dbContextFactory = () => new LumiisDbContext(dbOptions);
 
 using CancellationTokenSource cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, eventArgs) =>
@@ -46,7 +52,7 @@ Console.CancelKeyPress += (_, eventArgs) =>
     cts.Cancel();
 };
 
-GameServer server = new GameServer(config, logger, lookCatalog);
+GameServer server = new GameServer(config, logger, tokenService, dbContextFactory);
 
 try
 {

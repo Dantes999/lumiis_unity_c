@@ -100,57 +100,6 @@ namespace Lumiis.Tests.Data
         }
 
         [Fact]
-        public void CreateAppearanceForName_IsDeterministic()
-        {
-            LookCatalog catalog = TestLookCatalogs.CreateMinimal();
-            Appearance first = catalog.CreateAppearanceForName("Alice");
-            Appearance second = catalog.CreateAppearanceForName("Alice");
-            Assert.Equal(first, second);
-        }
-
-        [Fact]
-        public void CreateAppearanceForName_DifferentNames_ProduceVariety()
-        {
-            // Der Testkatalog hat nur 1 Option je Slot (0 oder 1), zwei einzelne Namen können also leicht
-            // kollidieren. Über eine größere Stichprobe muss aber Varianz auftreten, sonst flösse der Name
-            // gar nicht in die Berechnung ein.
-            LookCatalog catalog = TestLookCatalogs.CreateMinimal();
-            var seen = new System.Collections.Generic.HashSet<Appearance>();
-            for (int i = 0; i < 30; i++)
-                seen.Add(catalog.CreateAppearanceForName("Bot" + i));
-
-            Assert.True(seen.Count > 1, "Erwartet mehrere unterschiedliche Appearances über 30 verschiedene Namen.");
-        }
-
-        [Fact]
-        public void CreateAppearanceForName_AlwaysAssignsValidBody()
-        {
-            LookCatalog catalog = TestLookCatalogs.CreateMinimal();
-            Appearance appearance = catalog.CreateAppearanceForName("Bob");
-            Assert.Equal(1, appearance.BodyId); // einziger Body-Look im Testkatalog
-        }
-
-        [Theory]
-        [InlineData("Alice")]
-        [InlineData("Bob")]
-        [InlineData("Zzzzzzzzzzzzzzz")]
-        [InlineData("Umlaut_Äöü")]
-        public void CreateAppearanceForName_OnlyReturnsValidIds(string name)
-        {
-            LookCatalog catalog = TestLookCatalogs.CreateMinimal();
-            Appearance appearance = catalog.CreateAppearanceForName(name);
-
-            // Testkatalog hat je optionalem Slot genau Id 1 (oder 0 = keine Ebene) und 2 Haarfarben (1-basiert).
-            Assert.Equal(1, appearance.BodyId);
-            Assert.True(appearance.HairStyleId == 0 || appearance.HairStyleId == 1);
-            Assert.True(appearance.ArmorId == 0 || appearance.ArmorId == 1);
-            Assert.True(appearance.HelmetId == 0 || appearance.HelmetId == 1);
-            Assert.True(appearance.WeaponId == 0 || appearance.WeaponId == 1);
-            Assert.True(appearance.ShieldId == 0 || appearance.ShieldId == 1);
-            Assert.True(appearance.HairColorId >= 0 && appearance.HairColorId <= 2);
-        }
-
-        [Fact]
         public void CreateDefaultAppearance_PicksFirstEntryPerSlot()
         {
             const string json = @"{

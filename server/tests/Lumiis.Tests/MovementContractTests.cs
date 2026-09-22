@@ -14,7 +14,7 @@ namespace Lumiis.Tests
         [InlineData(100, 200, 50000, 3000, 500)]
         public void ServerTickAndMovementMath_AgreeAfterEveryTick(int startX, int startY, int targetX, int targetY, int speed)
         {
-            var entity = new Entity(1, "Bot", startX, startY);
+            var entity = new Entity(1, 1, "Bot", startX, startY);
             entity.MoveTo(targetX, targetY, speed);
 
             double deltaSeconds = 1.0 / Protocol.TickRate; // "N Ticks à 1000/Protocol.TickRate ms"
