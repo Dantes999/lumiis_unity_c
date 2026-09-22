@@ -9,7 +9,7 @@ Unity-2D-Online-RPG. Mechaniken 1:1 wie Metin2 "unter der Haube", eigene Optik (
 - Koordinaten auf der Leitung: int in 1/100 Welteinheit.
 - Spiellogik (World, Entities, Movement, Combat) kennt weder LiteNetLib noch Sockets und ist ohne Netzwerk testbar. Transport-Adapter sind dünn.
 - Spieldaten (Mobs, Items, Skills, Drops, Maps) als JSON in /data (Prinzip mob_proto/item_proto), beim Serverstart validiert. Nichts hartkodieren, was Spieldaten sind.
-- DB ab M2a: PostgreSQL + EF Core (docker compose), siehe Abschnitt "Datenbank & Auth-Dienst". Zugriff nur über server/src/Lumiis.Data (Entities, DbContext) und server/src/Lumiis.Auth (Account/Charakter-Verwaltung als eigener Dienst) - der Spielserver (Lumiis.Server) selbst hat bis M2b keine DB-Anbindung.
+- DB ab M2a: PostgreSQL + EF Core (docker compose), siehe Abschnitt "Datenbank & Auth-Dienst". Zugriff nur über server/src/Lumiis.Data (Entities, DbContext). Sowohl Lumiis.Auth (Account/Charakter-Verwaltung) als auch seit M2b der Spielserver (Lumiis.Server, Charakter-Lookup beim Join, Positions-Speicherung) greifen darüber zu - der Spielserver macht das ausschließlich asynchron auf Threadpool-Threads, nie auf dem Game-Loop-Thread (siehe Konventionen).
 - Client: Unity 6.3 LTS (6000.3.24f1), 2D Top-Down, 4 Richtungen, code-first (Bootstrap-Szene erzeugt alles per Code, Platzhalter-Grafik wird generiert), UI per UI Toolkit (UXML/USS). Kein Inspector-Verkabeln, keine veränderlichen statischen Zustände (Fast Enter Play Mode / CoreCLR).
 - Tests: xUnit (server/tests) plus Konsolen-Bot (Lumiis.Bot).
 
@@ -33,15 +33,15 @@ client/ (Unity-Projekt), server/ (Solution mit Shared, Server, Bot, Data, Auth, 
 - Build/Test: cd server && dotnet build && dotnet test (läuft ohne laufendes Postgres - die Lumiis.Auth-Tests nutzen EF-Core-InMemory, siehe Status M2a)
 - Server: dotnet run --project server/src/Lumiis.Server
 - Bot: dotnet run --project server/src/Lumiis.Bot -- --count 3
-- Umgebungsvariablen laden: source tools/dev-env.sh (mit "source", NICHT ./ - sonst gelten die Variablen nur im Subprozess des Skripts). Davor nötig für docker compose, dotnet ef, dotnet run --project server/src/Lumiis.Auth.
+- Umgebungsvariablen laden: source tools/dev-env.sh (mit "source", NICHT ./ - sonst gelten die Variablen nur im Subprozess des Skripts). Davor nötig für docker compose, dotnet ef, dotnet run --project server/src/Lumiis.Auth UND (seit M2b) server/src/Lumiis.Server.
 - Postgres starten: docker compose up -d (Repo-Root, nach source tools/dev-env.sh)
 - Migration anwenden: cd server/src/Lumiis.Auth && dotnet ef database update --project ../Lumiis.Data (nach source tools/dev-env.sh; Migrationen liegen in Lumiis.Data, Lumiis.Auth referenziert Microsoft.EntityFrameworkCore.Design zusätzlich selbst, damit es als Startup-Projekt für dotnet ef taugt)
 - Auth-Dienst: dotnet run --project server/src/Lumiis.Auth (nach source tools/dev-env.sh; Port 5080, siehe Abschnitt "Datenbank & Auth-Dienst")
 
 ## Datenbank & Auth-Dienst
-Pflicht-Umgebungsvariablen (siehe .env.example, .env selbst ist git-ignoriert), nur EIN Variablensatz, gelesen sowohl von docker-compose.yml als auch von den .NET-Projekten - kein eigener POSTGRES_*-Satz mehr, keine zwei Werte, die auseinanderlaufen können:
-- LUMIIS_DB_NAME, LUMIIS_DB_USER, LUMIIS_DB_PASSWORD (kein Default, Lumiis.Auth UND die Design-Time-Factory für dotnet ef brechen ohne abweichenden Fallback mit klarer Meldung ab, wenn eine fehlt - siehe server/src/Lumiis.Data/LumiisDbContextFactory.cs). LUMIIS_DB_HOST/PORT haben Defaults (localhost/5432).
-- LUMIIS_TOKEN_SECRET (mind. 32 Byte, kein Default, gleicher Abbruch-Mechanismus) - Signier-Geheimnis für Session-Token (server/src/Lumiis.Data/TokenService.cs).
+Pflicht-Umgebungsvariablen (siehe .env.example, .env selbst ist git-ignoriert), nur EIN Variablensatz, gelesen von docker-compose.yml UND von jedem .NET-Prozess, der sie braucht - kein eigener POSTGRES_*-Satz mehr, keine zwei Werte, die auseinanderlaufen können. Seit M2b gilt das nicht mehr nur für Lumiis.Auth, sondern genauso für Lumiis.Server (derselbe Fail-Fast-Mechanismus, dieselbe klare Abbruchmeldung):
+- LUMIIS_DB_NAME, LUMIIS_DB_USER, LUMIIS_DB_PASSWORD (kein Default, Lumiis.Auth, Lumiis.Server UND die Design-Time-Factory für dotnet ef brechen ohne abweichenden Fallback mit klarer Meldung ab, wenn eine fehlt - siehe server/src/Lumiis.Data/LumiisDbContextFactory.cs). LUMIIS_DB_HOST/PORT haben Defaults (localhost/5432).
+- LUMIIS_TOKEN_SECRET (mind. 32 Byte, kein Default, gleicher Abbruch-Mechanismus) - Signier-Geheimnis für Session-Token (server/src/Lumiis.Data/TokenService.cs), von Lumiis.Auth (Ausstellen) UND Lumiis.Server (lokale Prüfung beim Join, kein HTTP-Aufruf zu Auth) genutzt.
 
 Setup: `cp .env.example .env`, eigene Werte eintragen, dann **immer** `source tools/dev-env.sh` VOR docker compose/dotnet ef/dotnet run ausführen (lädt .env in die aktuelle Shell) - sonst brechen diese Befehle mit einer Umgebungsvariablen-Fehlermeldung ab (oder, bei `dotnet ef`, mit einer irreführenden Postgres-Authentifizierungs-Fehlermeldung, wenn zufällig noch ein alter Container mit anderem Passwort läuft). Danach `docker compose up -d`, dann die Migration anwenden (Befehl oben). `dotnet run --project server/src/Lumiis.Auth` migriert in Development automatisch beim Start (nur wenn ASPNETCORE_ENVIRONMENT=Development), sonst nur eine Warnung.
 
@@ -53,7 +53,30 @@ Lumiis.Auth (server/src/Lumiis.Auth, ASP.NET Core Minimal API, nur HTTP, Port 50
 
 Fehlerantworten immer als knappes JSON { error: "..." }, nie ein Stacktrace nach außen. Session-Token: eigenes, minimales Format (kein JWT-Standard), signiert per HMACSHA256, 30 Minuten gültig, trägt nur die AccountId (siehe server/src/Lumiis.Data/TokenService.cs).
 
+Spielserver-Join (Lumiis.Server, seit M2b, Protocol.Version 3): JoinRequestPacket trägt Token + CharacterId
+statt Name. Ablauf: Token sofort synchron per TokenService.Validate geprüft (InvalidToken/TokenExpired als
+unterschiedliche JoinRejectReason) -> bei gültigem Token läuft der Charakter-Lookup (CharacterId + AccountId
+aus dem Token, Eigentümerschaft geprüft) asynchron auf einem Threadpool-Thread, Ergebnis kommt über eine
+Queue zurück und wird einmal pro Tick eingesammelt (World bleibt ausschließlich dem Game-Loop-Thread
+vorbehalten) -> nicht gefunden/falscher Account: CharacterNotFound; Charakter bereits online (eigenes
+Dictionary CharacterId->EntityId in World): CharacterAlreadyOnline. Erfolgreicher Join: Appearance und
+Startposition kommen aus der geladenen Character-Zeile (null-Position = Kartenmitte). Position wird alle 30s
+(fix, keine Konfiguration) sowie sofort bei Disconnect über einen bounded Channel + Hintergrund-Task
+gespeichert (server/src/Lumiis.Server/GameServer.cs).
+
+Lumiis.Bot (server/src/Lumiis.Bot) macht seit M2b denselben Weg wie ein echter Client: pro Bot POST
+/register (bei 409 stattdessen POST /login), GET /characters, bei Bedarf POST /characters - Passwort intern
+fest als "botpass-<name>-2026" (nur Test-Tool). Option --auth-url (Default http://localhost:5080).
+
 ## Client
+**Seit M2b nicht mehr kompatibel, kompiliert in Unity nicht mehr:** Protocol.Version ist auf 3, JoinRequestPacket
+trägt Token+CharacterId statt Name, JoinRejectReason ist neu durchnummeriert (InvalidName/NameTaken entfernt).
+`GameClient.cs` sendet noch das alte JoinRequestPacket mit Name und hat einen DescribeReason-Switch auf die
+entfernten Enum-Werte - beides bricht, sobald Unity gegen die neu gebaute Lumiis.Shared.dll kompiliert. Das ist
+bewusst so (Aufgabe M2b: "Unity wird in dieser Aufgabe NICHT angefasst, kommt in M2c") - der Demo-Ablauf unten
+gilt bis M2c nur noch für Lumiis.Bot, nicht für den Unity-Client. M2c muss GameClient.cs auf den neuen Join-Ablauf
+umstellen (Login-UI, Token/CharacterId statt Name) und diesen Hinweis wieder entfernen.
+
 Setup nach dem Klonen (auch auf dem zweiten Rechner):
 1. `cd server && dotnet build` - baut Lumiis.Shared und kopiert dabei Lumiis.Shared.dll sowie die netstandard2.1-Variante von LiteNetLib.dll nach `client/Assets/Plugins/Lumiis/` (git-ignoriert, entsteht bei jedem Build neu).
 2. Danach `client/` mit Unity Hub öffnen (6000.3.24f1). Beim ersten Öffnen importiert Unity die kopierten Plugin-DLLs und legt die zugehörigen .meta-Dateien an.
@@ -70,11 +93,11 @@ Struktur (`client/Assets/Lumiis/Scripts/`, Namespace `Lumiis.Client`, code-first
 - `LocalPlayerMarker.cs`: Ring am Fußpunkt der eigenen Figur; der eigene Name wird zusätzlich gelb gezeichnet (in `GameClient.DrawEntityLabels`) - keine Ebenen-Tönung, keine Protokolländerung.
 - `Editor/BuildScript.cs` (Namespace `Lumiis.Editor`, liegt im Ordner `Editor` - von Unity automatisch aus allen Player-Builds ausgeschlossen): `BuildScript.BuildDevelopment` baut einen Development-Standalone-Build für die aktuelle Plattform nach `client/Builds/<plattform>/` (git-ignoriert, vom bestehenden Muster `client/[Bb]uild*/` abgedeckt).
 
-Demo-Ablauf:
-1. Server starten: `dotnet run --project server/src/Lumiis.Server`.
+Demo-Ablauf (bis M2c nur Server+Bot, siehe Warnung oben - Unity-Schritte 2/3/5 gelten erst wieder ab M2c):
+1. `docker compose up -d` (nach `source tools/dev-env.sh`), Migration anwenden, dann Server starten: `dotnet run --project server/src/Lumiis.Server` und Auth-Dienst: `dotnet run --project server/src/Lumiis.Auth` (siehe Abschnitt "Datenbank & Auth-Dienst").
 2. Unity-Projekt öffnen, Play drücken. Im Login-Fenster Host/Port/Name eingeben (Default 127.0.0.1:7777), "Verbinden" klicken.
 3. Linksklick auf den Boden bewegt die eigene Figur dorthin, sichtbar interpoliert und mit Blickrichtungswechsel. Die eigene Figur ist am gelben Namen und am Ring unter den Füßen erkennbar.
-4. Bots dazuholen: `dotnet run --project server/src/Lumiis.Bot -- --count 6` - erscheinen mit unterschiedlichen, deterministisch aus dem Namen vergebenen Looks (siehe `LookCatalog.CreateAppearanceForName`).
+4. Bots dazuholen: `dotnet run --project server/src/Lumiis.Bot -- --count 6` - melden sich selbst per HTTP bei Lumiis.Auth an (Login-oder-Registrieren, legen bei Bedarf einen Charakter an) und erscheinen dann mit dem beim Anlegen vergebenen Aussehen (siehe `LookCatalog.CreateDefaultAppearance`).
 5. Rechts oben zeigt das Debug-Test-Panel (nur Editor/Development-Build) Buttons für Testboard/Sortier-Testfeld sowie "<"/">"-Paare für Frisur/Haarfarbe/Rüstung/Helm/Waffe/Schild der eigenen Figur (rein kosmetisch, nicht gesendet) - primärer Weg zum Durchklicken. F2/F3-F8/F9 bleiben als Tastatur-Shortcuts zusätzlich nutzbar.
 
 Zwei Clients gleichzeitig testen: Editor plus Build. Der Play-Modus im Editor drosselt ohne Fensterfokus (siehe
@@ -87,8 +110,8 @@ Fokus-Drosselung, beide können gleichzeitig gegen denselben Server verbunden se
 Map 1 (Startdorf + Feld), Krieger, Level 1-25, Monster/Bosse/Lumiis-Steine, Items/Drops/Shop, Chat, Gruppe. NICHT: Quests/Lua, Reittiere, Kostüme, Drachenseelen, Gildenkrieg, weitere Reiche.
 
 ## Meilensteine
-M0 Fundament (fertig) | M1 Walking Skeleton (fertig, inkl. M1b Unity-Client, M1c Sichtbarkeit/Testing, M1c-layered-characters Paper-Doll-Charaktere) | M2 Account & Charakter, aufgeteilt in M2a Datenbank & Auth-Dienst (fertig), M2b Server-Join über Account/Token/Charakter (offen), M2c weitere Account-Funktionen (offen, noch nicht geplant) | M3 Welt (Grid, AOI, Mobs) | M4 Kampf | M5 Items | M6 Metin-Kern | M7 Sozial | M8 Alpha-Betrieb.
-Aktuelle Aufgabe: keine - M2a ist fertig, für M2b gibt es noch keine Task-Datei unter docs/tasks/.
+M0 Fundament (fertig) | M1 Walking Skeleton (fertig, inkl. M1b Unity-Client, M1c Sichtbarkeit/Testing, M1c-layered-characters Paper-Doll-Charaktere) | M2 Account & Charakter, aufgeteilt in M2a Datenbank & Auth-Dienst (fertig), M2b Server-Join über Account/Token/Charakter (fertig), M2c Unity-Login-UI + Umstellung von GameClient.cs auf Token/CharacterId (offen, noch nicht geplant) | M3 Welt (Grid, AOI, Mobs) | M4 Kampf | M5 Items | M6 Metin-Kern | M7 Sozial | M8 Alpha-Betrieb.
+Aktuelle Aufgabe: keine - M2b ist fertig, für M2c gibt es noch keine Task-Datei unter docs/tasks/.
 
 ## Arbeitsweise
 - Kleine Schritte. Jeder endet mit grünem `dotnet test` und einem Commit (Präfix "M1: ...").
@@ -105,8 +128,9 @@ Aktuelle Aufgabe: keine - M2a ist fertig, für M2b gibt es noch keine Task-Datei
 ## Bekannte Lücken
 - AOI (Sichtbarkeit): Aktuell sehen alle Verbindungen alle Entities, keine Kartenausschnitt-Filterung. Geplant für M3 (Grid, AOI, Mobs). Markiert mit TODO(M3) in `World.cs` und `GameServer.cs`.
 - Rate-Limit pro Verbindung: Kein Schutz gegen Paketflut eines einzelnen Clients (z. B. MoveTo-Spam). Geplant für M8 (Alpha-Betrieb).
-- Authentifizierung im Spielbetrieb: JoinRequest (Lumiis.Server) prüft weiterhin nur Name/ProtocolVersion, kein Login/Account - Accounts/Charaktere existieren seit M2a nur im separaten Lumiis.Auth-Dienst, noch nicht mit dem Spielserver verdrahtet. Geplant für M2b (Token/CharacterId im JoinRequest statt Name, siehe Kontext-Abschnitt in docs/tasks/M2a-data-and-auth.md).
 - Lumiis.Auth: kein Passwort-Reset, keine E-Mail-Verifizierung. Läuft nur über HTTP (kein TLS) - für ein echtes Deploy vor einen TLS-terminierenden Reverse-Proxy stellen.
+- Positions-Speicherintervall (Lumiis.Server) fix bei 30s, keine Konfiguration (siehe `GameServer.PositionSaveIntervalMs`).
+- Unity-Client seit M2b nicht mehr kompatibel (kompiliert nicht mehr gegen die neue Lumiis.Shared.dll) - siehe Warnung im Abschnitt "Client". Geplant für M2c.
 
 ## Status
 - M0 fertig. Shared: PacketWriter/PacketReader/PacketCodec, PacketId (JoinRequest, MoveTo), 23 Tests grün.
@@ -119,6 +143,8 @@ Aktuelle Aufgabe: keine - M2a ist fertig, für M2b gibt es noch keine Task-Datei
 - M1c-Review-Fixes fertig, in 5 Commits (4 geplante Punkte plus eine nachgetragene .meta-Datei): (1) Sortierung: `CharacterView` bekommt eine `SortingGroup` am Figuren-Root (immer sortingOrder 0), Kind-Renderer sortieren nur noch über den festen Slot-Rang (0-5, Marker-Ring -1) statt der überlaufenden Y-Formel; `Renderer2D.asset` auf Transparency Sort Mode "Custom Axis" (Wert 3, per Metadaten-Reflection auf UnityEngine.CoreModule.dll verifiziert) mit der schon vorhandenen Achse (0,1,0) umgestellt; Camera-Properties in Bootstrap bewusst NICHT gesetzt (URP-2D-Quellcode zeigt: nur Renderer2DData wird gelesen); neues F9-Sortier-Testfeld. (2) `CachingSpriteProvider` (Instanz auf GameClient, kein Static) cacht nach (Slot,LookId,Facing,State,Frame), `OnDestroy` räumt Sprites und Texturen auf, Cache-Größe im Debug-Overlay. (3) `CharacterTestboard.cs` komplett in `#if UNITY_EDITOR || DEVELOPMENT_BUILD`, dafür auch die Feld-Deklarationen in `GameClient.cs` abgesichert. (4) Vier vom ersten Build veränderte Unity-Settings-Dateien geprüft und als reines Housekeeping bestätigt und committet. 133 Tests grün, 5x stabil, gesammelter Batchmode-Compile-Check am Ende: 0 Fehler.
 - Waffen-Positionsfix + Debug-Test-Panel fertig, in 2 Commits: (1) Waffe hing am Fußpunkt statt auf Handhöhe - `CharacterView.ComputeWeaponPivot` setzte den Sprite-Pivot der Waffe auf den Hand-Anker (richtig für die Schwung-Rotation um den Griff), ließ den Slot-Transform aber wie alle anderen Ebenen bei (0,0) stehen, wodurch der Anker-Pivot seinen eigenen Höhenbeitrag rechnerisch wieder aufhob; `PositionWeapon()` verschiebt den Transform jetzt zusätzlich an die Anker-Weltposition, `PlaceholderSpriteProvider.DrawWeapon` zeichnet exakt am übergebenen Pivot, `hand`-Y-Anker in looks.json von 40/40/42 auf 70 angehoben (≈64 % Körperhöhe). (2) Neues Debug-Test-Panel rechts oben (nur Editor/Development-Build, überlappt das Status-Overlay nicht): Buttons für Testboard/Sortier-Testfeld sowie "<"/">"-Paare für Frisur/Haarfarbe/Rüstung/Helm/Waffe/Schild - primärer Weg statt F-Tasten-Gedächtnis, F1-F9-Hotkeys bleiben zusätzlich bestehen. 172 Tests grün.
 - M2a (Datenbank & Auth-Dienst) fertig, in 6 Commits: (1) docker-compose.yml (Postgres 16) plus neues Projekt Lumiis.Data (Account/Character-Entities, LumiisDbContext, DbConnectionOptions liest LUMIIS_DB_* mit klarem Abbruch bei Fehlern, UsernameRules), EF-Core-Tool lokal eingerichtet, erste Migration erzeugt und gegen echtes Postgres verifiziert. (2) PasswordHasher: PBKDF2-HMAC-SHA256, 600.000 Iterationen (pro Zeile gespeichert), Konstantzeit-Vergleich. (3) TokenService: eigenes signiertes Token-Format (kein JWT), trägt nur die AccountId, 30 Minuten gültig, injizierbare Uhr. (4) LookCatalog von Lumiis.Server nach Lumiis.Data verschoben (beide Dienste brauchen ihn), Verhalten unverändert. (5) Neuer Dienst Lumiis.Auth (ASP.NET Core Minimal API, nur HTTP, Port 5080) mit POST /register, POST /login, GET/POST /characters (siehe Abschnitt "Datenbank & Auth-Dienst"); `LookCatalog.CreateDefaultAppearance()` (erster gültiger Eintrag je Slot) für automatische Charakter-Aussehen; `EfCoreVersion` zentral in Directory.Build.props gepinnt (sonst echter Assembly-Versionskonflikt zwischen Lumiis.Data und Lumiis.Auth); Bug gefunden und behoben - `dotnet run --project server/src/Lumiis.Auth` setzt bei Web-SDK-Projekten das Arbeitsverzeichnis auf den Projektordner statt auf das des Aufrufers (launchSettings.json-Mechanismus der dotnet-run-CLI, deren eigenes "workingDirectory"-Feld dabei ignoriert wird), Programm fällt deshalb auf einen zweiten data-dir-Kandidaten zurück; manuell end-to-end mit echtem Postgres und curl verifiziert. (6) Endpunkt-Tests über WebApplicationFactory mit EF-Core-InMemory (ausdrücklich Logik-Tests, kein Beweis für Postgres-Verhalten); zwei DI/Namenskollisions-Bugs beim Umbauen gefunden und behoben (AddDbContext-Verkettung erfordert einen breiteren Removal-Sweep statt nur RemoveAll<DbContextOptions<T>>(); Lumiis.Server.Program kollidiert dank dessen [InternalsVisibleTo] mit Lumiis.Auth.Program, neuer `AuthEntryPointMarker` als eindeutiger WebApplicationFactory-Typ). 187 Tests grün, 5x stabil, ohne dass Postgres dafür laufen muss.
+- M2a-Nachbesserungen (vom User beim ersten Testlauf gefundene Fehler): echter Root-Cause-Bug in `LumiisDbContextFactory` behoben - fing bei fehlenden `LUMIIS_DB_*` still auf einen abweichenden Dummy-Connection-String zurück statt den Fehler zu melden (Ursache für "password authentication failed" trotz korrektem `.env`); `docker-compose.yml` liest jetzt direkt `LUMIIS_DB_*` statt eigener `POSTGRES_*`-Namen (nur noch ein Variablensatz); neues `tools/dev-env.sh` lädt `.env` zentral in die Shell. Danach von Grund auf mit frischem Test-Passwort verifiziert (`docker compose down -v`, neues `.env`, vier curl-Aufrufe tatsächlich ausgeführt).
+- M2b (Server-Join über Account/Token/Charakter) fertig, in 5 Commits (Punkt 0 Review-Fix, 1 Shared, 2 Server, 3 Positions-Speicherung, 4 Bot - Punkt 5 Tests bereits durch 2/3 abgedeckt, Punkt 6 diese Doku-Aktualisierung): (0) Review-Fix aus M2a: Charakternamen waren bereits global (nicht pro Account) eindeutig, aber nicht case-insensitiv - `LumiisDbContext` bekommt eine berechnete Kleinschreibungs-Schattenspalte `NameNormalized` mit Unique-Index, App-Check in `AuthEndpoints.CreateCharacter` vergleicht jetzt ebenfalls kleingeschrieben; NameRules-Validierung war schon vorhanden. (1) Shared: Protocol.Version 3, JoinRequestPacket trägt Token+CharacterId statt Name, JoinRejectReason sauber neu durchnummeriert. (2) Server liest LUMIIS_DB_*/LUMIIS_TOKEN_SECRET wie Auth; Join validiert das Token sofort synchron, lädt den Charakter (Eigentümerschaft geprüft) asynchron auf einem Threadpool-Thread und sammelt das Ergebnis einmal pro Tick ein (World bleibt dem Game-Loop-Thread vorbehalten); World.TryJoin um CharacterId/Position erweitert, eigene Namens-Eindeutigkeitsprüfung entfällt (jetzt DB-Sache, siehe Punkt 0); Appearance kommt aus der Character-Zeile, FNV-1a-Hash-Mechanismus (`LookCatalog.CreateAppearanceForName`, `Fnv1a.cs`) komplett entfernt. (3) Positions-Speicherung: bounded Channel (Kapazität=MaxPlayers, DropOldest) + Hintergrund-Task, alle 30s (fix) sowie sofort bei Disconnect. (4) Bot bekommt einen echten HTTP-Login-Flow (`AuthClient`: Register-oder-Login, Charakter finden/anlegen) vor dem LiteNetLib-Connect. Unity-Client wird bewusst NICHT angefasst (kompiliert seither nicht mehr gegen Lumiis.Shared, siehe "Bekannte Lücken" - Aufgabe für M2c). 197 Tests grün, 5x stabil, weiterhin ohne laufendes Postgres.
 
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client
 War kein Codefehler. User hat den Test mit fokussiertem Unity-Fenster wiederholt (Server, Unity Play, dann Bots
