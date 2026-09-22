@@ -2,12 +2,15 @@ services:
   postgres:
     image: postgres:16
     restart: unless-stopped
+    # Rechts stehen dieselben Variablennamen, die auch die .NET-Projekte lesen (DbConnectionOptions.cs) -
+    # nur EIN Satz Variablennamen in .env, keine eigenen POSTGRES_*-Namen hier. Links stehen die vom
+    # postgres-Image selbst vorgegebenen Variablennamen (nicht änderbar).
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${LUMIIS_DB_USER}
+      POSTGRES_PASSWORD: ${LUMIIS_DB_PASSWORD}
+      POSTGRES_DB: ${LUMIIS_DB_NAME}
     ports:
-      - "5432:5432"
+      - "${LUMIIS_DB_PORT:-5432}:5432"
     volumes:
       - lumiis-postgres-data:/var/lib/postgresql/data
 
