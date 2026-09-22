@@ -1,10 +1,13 @@
 namespace Lumiis.Shared.Net
 {
-    /// <summary>Erste Nachricht des Clients nach dem Verbinden.</summary>
+    /// <summary>Erste Nachricht des Clients nach dem Verbinden. Ab Protocol.Version 3: Token statt Name -
+    /// der Server validiert das Token lokal (Lumiis.Data.TokenService, kein HTTP-Aufruf zu Auth) und lädt
+    /// den Charakter per CharacterId + der im Token enthaltenen AccountId (Eigentümerschaft geprüft).</summary>
     public sealed class JoinRequestPacket : IPacket
     {
         public int ProtocolVersion;
-        public string Name;
+        public string Token;
+        public int CharacterId;
 
         public PacketId Id
         {
@@ -14,13 +17,15 @@ namespace Lumiis.Shared.Net
         public void Write(PacketWriter writer)
         {
             writer.WriteInt32(ProtocolVersion);
-            writer.WriteString(Name);
+            writer.WriteString(Token);
+            writer.WriteInt32(CharacterId);
         }
 
         public void Read(PacketReader reader)
         {
             ProtocolVersion = reader.ReadInt32();
-            Name = reader.ReadString();
+            Token = reader.ReadString();
+            CharacterId = reader.ReadInt32();
         }
     }
 

@@ -3,9 +3,11 @@ namespace Lumiis.Shared.Net
     public enum JoinRejectReason : byte
     {
         VersionMismatch = 1,
-        InvalidName = 2,
-        NameTaken = 3,
-        ServerFull = 4
+        InvalidToken = 2,
+        TokenExpired = 3,
+        CharacterNotFound = 4,
+        CharacterAlreadyOnline = 5,
+        ServerFull = 6
     }
 
     /// <summary>Der Client wurde aufgenommen und an der genannten Position gespawnt. Appearance ist die eigene

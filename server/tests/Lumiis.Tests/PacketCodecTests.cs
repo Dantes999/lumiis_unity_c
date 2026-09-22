@@ -10,10 +10,11 @@ namespace Lumiis.Tests
         [Fact]
         public void JoinRequest_RoundTrip()
         {
-            var original = new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = "\u00C4rger" };
+            var original = new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = "abc.def", CharacterId = 42 };
             var decoded = Assert.IsType<JoinRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
             Assert.Equal(original.ProtocolVersion, decoded.ProtocolVersion);
-            Assert.Equal(original.Name, decoded.Name);
+            Assert.Equal(original.Token, decoded.Token);
+            Assert.Equal(original.CharacterId, decoded.CharacterId);
         }
 
         [Fact]
@@ -40,7 +41,7 @@ namespace Lumiis.Tests
         [Fact]
         public void JoinRejected_RoundTrip()
         {
-            var original = new JoinRejectedPacket { Reason = JoinRejectReason.NameTaken };
+            var original = new JoinRejectedPacket { Reason = JoinRejectReason.CharacterAlreadyOnline };
             var decoded = Assert.IsType<JoinRejectedPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
             Assert.Equal(original.Reason, decoded.Reason);
         }
