@@ -89,6 +89,11 @@ namespace Lumiis.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("NameNormalized")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("text")
+                        .HasComputedColumnSql("lower(\"Name\")", true);
+
                     b.Property<int?>("PositionX")
                         .HasColumnType("integer");
 
@@ -105,7 +110,7 @@ namespace Lumiis.Data.Migrations
 
                     b.HasIndex("AccountId");
 
-                    b.HasIndex("Name")
+                    b.HasIndex("NameNormalized")
                         .IsUnique();
 
                     b.ToTable("Characters");

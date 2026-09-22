@@ -20,7 +20,15 @@ public sealed class LumiisDbContext : DbContext
 
         modelBuilder.Entity<Character>(entity =>
         {
-            entity.HasIndex(c => c.Name).IsUnique();
+            // Case-insensitiv UND global eindeutig (nicht pro Account) - wie bisher bei der In-Memory-
+            // Namensvergabe des Servers (World.cs nutzte name.ToLowerInvariant() als Dictionary-Key). Ein
+            // schlichter HasIndex(c => c.Name).IsUnique() wäre case-sensitiv (Postgres-Textvergleich ist
+            // standardmäßig case-sensitiv) - deshalb stattdessen ein berechneter Kleinschreibungs-
+            // Schattenwert mit Unique-Index darauf.
+            entity.Property<string>("NameNormalized")
+                .HasComputedColumnSql("lower(\"Name\")", stored: true);
+            entity.HasIndex("NameNormalized").IsUnique();
+
             entity.HasOne(c => c.Account)
                 .WithMany(a => a.Characters)
                 .HasForeignKey(c => c.AccountId)

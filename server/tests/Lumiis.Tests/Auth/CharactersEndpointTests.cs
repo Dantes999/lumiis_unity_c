@@ -114,6 +114,19 @@ public class CharactersEndpointTests : IClassFixture<AuthWebApplicationFactory>
     }
 
     [Fact]
+    public async Task PostCharacters_DuplicateNameDifferentCase_Returns409()
+    {
+        // Global eindeutig UND case-insensitiv - wie bisher bei der In-Memory-Namensvergabe des Servers.
+        string tokenA = await RegisterAndLoginAsync("chars_dup_case_a");
+        string tokenB = await RegisterAndLoginAsync("chars_dup_case_b");
+        (await CreateCharacterAsync(tokenA, "MixedCase")).EnsureSuccessStatusCode();
+
+        HttpResponseMessage response = await CreateCharacterAsync(tokenB, "mixedcase");
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
     public async Task PostCharacters_InvalidName_Returns400()
     {
         string token = await RegisterAndLoginAsync("chars_invalid_name");

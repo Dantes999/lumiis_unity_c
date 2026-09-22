@@ -95,7 +95,10 @@ public static class AuthEndpoints
         if (request.Name == null || !NameRules.IsValid(request.Name))
             return Results.Json(new ErrorResponse("Ungültiger Charaktername."), statusCode: StatusCodes.Status400BadRequest);
 
-        bool taken = await db.Characters.AnyAsync(c => c.Name == request.Name);
+        // Global eindeutig (nicht pro Account) UND case-insensitiv - wie bisher bei der In-Memory-
+        // Namensvergabe des Servers, siehe LumiisDbContext (computed lowercase Unique-Index).
+        string normalizedName = request.Name.ToLowerInvariant();
+        bool taken = await db.Characters.AnyAsync(c => c.Name.ToLower() == normalizedName);
         if (taken)
             return Results.Json(new ErrorResponse("Charaktername bereits vergeben."), statusCode: StatusCodes.Status409Conflict);
 
