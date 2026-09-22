@@ -31,6 +31,11 @@ public sealed class GameServer : INetEventListener
         public bool Closing;
         public long CloseAtMs;
 
+        /// <summary>Letzter bekannter Sichtbarkeits-Stand (siehe UpdateVisibility) - welche EntityIds diese
+        /// Verbindung laut dem letzten Tick sieht. Start leer, auch für Entities, die schon beim Join
+        /// gesendet wurden (siehe CompleteJoin) - der erste UpdateVisibility-Tick nach dem Join gleicht das an.</summary>
+        public readonly HashSet<int> VisibleEntityIds = new();
+
         public ConnectionState(NetPeer peer, long closeAtMs)
         {
             Peer = peer;
@@ -175,6 +180,7 @@ public sealed class GameServer : INetEventListener
         foreach (Entity entity in arrived)
             BroadcastToJoined(new EntityStopPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY });
 
+        UpdateVisibility();
         EnqueueDuePositionSaves();
     }
 
@@ -195,6 +201,54 @@ public sealed class GameServer : INetEventListener
     internal static List<Entity> SelectDueForSave(IEnumerable<Entity> entities, long nowMs, long intervalMs)
     {
         return entities.Where(e => nowMs - e.LastSaveAtMs >= intervalMs).ToList();
+    }
+
+    /// <summary>Einmal pro Tick: World.ComputeVisibility aufrufen und pro Verbindung gegen den letzten
+    /// bekannten Stand (ConnectionState.VisibleEntityIds) diffen. Neu sichtbar: EntitySpawn (plus
+    /// EntityMove ab der aktuellen Position, falls die Entity gerade in Bewegung ist - gleiches Muster wie
+    /// beim Join in CompleteJoin für bereits laufende Entities). Nicht mehr sichtbar: EntityDespawn.
+    /// Weiterhin sichtbar: keine Aktion hier, die normalen Move/Stop-Broadcasts decken das ab (siehe
+    /// HandleMoveTo/RunTick - eingeschränkt auf sichtbare Verbindungen in Abschnitt 4 dieser Aufgabe).</summary>
+    private void UpdateVisibility()
+    {
+        Dictionary<int, HashSet<int>> visibility = _world.ComputeVisibility(GameConstants.AoiRadiusWire);
+
+        foreach (ConnectionState conn in _connections.Values)
+        {
+            if (conn.EntityId is not int selfId) continue;
+
+            HashSet<int> nowVisible = visibility.TryGetValue(selfId, out HashSet<int>? v) ? v : new HashSet<int>();
+
+            foreach (int otherId in nowVisible)
+            {
+                if (conn.VisibleEntityIds.Contains(otherId)) continue;
+                if (!_world.TryGet(otherId, out Entity? other)) continue; // sollte nicht vorkommen (Entity gerade erst in ComputeVisibility gesehen)
+
+                conn.Peer.SendPacket(new EntitySpawnPacket { EntityId = other!.Id, Name = other.Name, X = other.IntX, Y = other.IntY, Appearance = other.Appearance });
+                if (other.IsMoving)
+                {
+                    conn.Peer.SendPacket(new EntityMovePacket
+                    {
+                        EntityId = other.Id,
+                        StartX = other.IntX,
+                        StartY = other.IntY,
+                        TargetX = other.TargetX,
+                        TargetY = other.TargetY,
+                        Speed = other.Speed,
+                        ServerTick = _tick
+                    });
+                }
+            }
+
+            foreach (int otherId in conn.VisibleEntityIds)
+            {
+                if (!nowVisible.Contains(otherId))
+                    conn.Peer.SendPacket(new EntityDespawnPacket { EntityId = otherId });
+            }
+
+            conn.VisibleEntityIds.Clear();
+            conn.VisibleEntityIds.UnionWith(nowVisible);
+        }
     }
 
     /// <summary>Läuft auf einem Threadpool-Thread, NIE auf dem Game-Loop-Thread. Fehler werden geloggt,
