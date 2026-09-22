@@ -10,13 +10,6 @@ namespace Lumiis.Client
     /// Wird von Bootstrap erzeugt, keine Inspector-Verkabelung.</summary>
     public sealed class GameClient : MonoBehaviour
     {
-        private enum UiState
-        {
-            Login,
-            Connecting,
-            InGame
-        }
-
         private NetClient _netClient;
         private Camera _camera;
         private readonly ClientWorld _world = new ClientWorld();
@@ -31,10 +24,9 @@ namespace Lumiis.Client
         private CharacterTestboard _sortingTestboard;
 #endif
 
-        private UiState _uiState = UiState.Login;
-        private string _host = "127.0.0.1";
-        private string _portText = "7777";
-        private string _name = "";
+        // Login/Charakterauswahl übernimmt LoginController (UI Toolkit) - GameClient merkt sich nur, ob
+        // der Join bereits geglückt ist (fürs Gating von Klick-Eingabe und Debug-Overlay).
+        private bool _inGame;
         private string _pendingLoginName = "";
         private string _statusMessage = "";
         private bool _debugOverlayVisible = true;
@@ -75,7 +67,6 @@ namespace Lumiis.Client
             _world.EntityDespawned += OnEntityDespawned;
             _world.Warning += OnWorldWarning;
 
-            _netClient.Connected += OnNetConnected;
             _netClient.Disconnected += OnNetDisconnected;
             _netClient.PacketReceived += OnPacketReceived;
 
@@ -103,7 +94,7 @@ namespace Lumiis.Client
                 }
             }
 
-            if (_uiState == UiState.InGame) HandleClickInput();
+            if (_inGame) HandleClickInput();
             HandleZoomInput();
             HandleDebugToggleInput();
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -330,19 +321,10 @@ namespace Lumiis.Client
 
         // ---- Netzwerk-Events ----
 
-        private void OnNetConnected()
-        {
-            _statusMessage = "Verbunden, sende JoinRequest ...";
-        }
-
         private void OnNetDisconnected(string reason)
         {
-            _statusMessage = _uiState == UiState.InGame
-                ? "Getrennt (" + reason + ")"
-                : "Verbindung fehlgeschlagen (" + reason + ")";
-
             CleanupEntities();
-            _uiState = UiState.Login;
+            _inGame = false;
         }
 
         private void OnPacketReceived(IPacket packet)
@@ -353,16 +335,12 @@ namespace Lumiis.Client
                 _world.Reset();
                 _world.HandleJoinAccepted(accepted.EntityId, accepted.X, accepted.Y, _pendingLoginName, accepted.Appearance);
                 _statusMessage = "Verbunden als " + _pendingLoginName;
-                _uiState = UiState.InGame;
+                _inGame = true;
                 return;
             }
 
-            JoinRejectedPacket rejected = packet as JoinRejectedPacket;
-            if (rejected != null)
-            {
-                _statusMessage = "JoinRejected: " + DescribeReason(rejected.Reason);
-                return;
-            }
+            // JoinRejected: keine eigene Behandlung hier nötig - LoginController zeigt die Fehlermeldung im
+            // UI, GameClient war zu diesem Zeitpunkt ohnehin nie InGame.
 
             EntitySpawnPacket spawn = packet as EntitySpawnPacket;
             if (spawn != null)
@@ -395,20 +373,6 @@ namespace Lumiis.Client
             if (stop != null)
             {
                 _world.HandleEntityStop(stop.EntityId, stop.X, stop.Y);
-            }
-        }
-
-        private static string DescribeReason(JoinRejectReason reason)
-        {
-            switch (reason)
-            {
-                case JoinRejectReason.VersionMismatch: return "Protokollversion stimmt nicht überein";
-                case JoinRejectReason.InvalidToken: return "Ungültiges Token";
-                case JoinRejectReason.TokenExpired: return "Token abgelaufen";
-                case JoinRejectReason.CharacterNotFound: return "Charakter nicht gefunden";
-                case JoinRejectReason.CharacterAlreadyOnline: return "Charakter bereits online";
-                case JoinRejectReason.ServerFull: return "Server voll";
-                default: return reason.ToString();
             }
         }
 
@@ -495,72 +459,21 @@ namespace Lumiis.Client
             go.transform.localScale = scale;
         }
 
-        // ---- Debug-UI (IMGUI, temporär - wird in M2 durch UI Toolkit ersetzt) ----
+        // ---- Debug-UI (IMGUI) - Login/Charakterauswahl übernimmt LoginController (UI Toolkit, siehe dort). ----
 
         private void OnGUI()
         {
-            if (_uiState == UiState.InGame)
+            if (!_inGame) return;
+
+            if (_debugOverlayVisible)
             {
-                if (_debugOverlayVisible)
-                {
-                    DrawStatusLine();
-                    DrawEntityList();
-                    DrawEntityLabels();
-                }
+                DrawStatusLine();
+                DrawEntityList();
+                DrawEntityLabels();
+            }
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-                DrawDebugTestPanel();
+            DrawDebugTestPanel();
 #endif
-            }
-            else
-            {
-                DrawLoginWindow();
-            }
-        }
-
-        private void DrawLoginWindow()
-        {
-            const float w = 260f, h = 190f;
-            Rect rect = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
-            GUI.Box(rect, "Lumiis - Login");
-
-            float y = rect.y + 25f;
-            GUI.Label(new Rect(rect.x + 10, y, 60, 20), "Host:");
-            _host = GUI.TextField(new Rect(rect.x + 80, y, 160, 20), _host);
-            y += 25f;
-            GUI.Label(new Rect(rect.x + 10, y, 60, 20), "Port:");
-            _portText = GUI.TextField(new Rect(rect.x + 80, y, 160, 20), _portText);
-            y += 25f;
-            GUI.Label(new Rect(rect.x + 10, y, 60, 20), "Name:");
-            _name = GUI.TextField(new Rect(rect.x + 80, y, 160, 20), _name);
-            y += 30f;
-
-            if (GUI.Button(new Rect(rect.x + 10, y, 150, 25), "Verbinden"))
-            {
-                TryConnect();
-            }
-            y += 30f;
-            GUI.Label(new Rect(rect.x + 10, y, w - 20, 40), _statusMessage);
-        }
-
-        private void TryConnect()
-        {
-            int port;
-            if (!int.TryParse(_portText, out port))
-            {
-                _statusMessage = "Ungültiger Port";
-                return;
-            }
-
-            if (!NameRules.IsValid(_name))
-            {
-                _statusMessage = "Ungültiger Name (" + NameRules.MinLength + "-" + NameRules.MaxLength + " Zeichen, nur ASCII-Buchstaben/Ziffern/_)";
-                return;
-            }
-
-            _pendingLoginName = _name;
-            bool started = _netClient.Connect(_host, port, _name);
-            _uiState = started ? UiState.Connecting : UiState.Login;
-            _statusMessage = started ? "Verbinde ..." : "Verbindung fehlgeschlagen";
         }
 
         private void DrawStatusLine()
