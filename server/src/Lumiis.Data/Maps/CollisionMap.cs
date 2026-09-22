@@ -80,7 +80,11 @@ public sealed class CollisionMap
     }
 
     /// <summary>Zellkoordinaten (1 Zelle = 1 Weltenheit = 1 Pixel im Quellbild). Außerhalb der Karte gilt als
-    /// blockiert.</summary>
+    /// blockiert - das betrifft am rechten/unteren Rand auch die exakte Wire-Koordinate GameConstants.MapWidth/
+    /// Height selbst (World.SetDestination klemmt Ziele per Math.Clamp inklusiv darauf, das entspricht Zelle
+    /// Width/Height, eine mehr als der letzte gültige Index Width-1/Height-1) - bei der echten village-Karte
+    /// unsichtbar, weil dort ohnehin die ganze Randzeile/-spalte bemalt blockiert ist (siehe
+    /// collision-source.png).</summary>
     public bool IsBlocked(int cellX, int cellY)
     {
         if (cellX < 0 || cellY < 0 || cellX >= Width || cellY >= Height) return true;

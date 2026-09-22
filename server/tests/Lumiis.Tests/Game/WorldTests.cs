@@ -1,3 +1,6 @@
+using System;
+using System.Text;
+using Lumiis.Data.Maps;
 using Lumiis.Server.Game;
 using Lumiis.Shared;
 using Lumiis.Shared.Net;
@@ -7,6 +10,31 @@ namespace Lumiis.Tests.Game
 {
     public class WorldTests
     {
+        /// <summary>Baut eine synthetische 1000x1000-Zellen-CollisionMap (deckt GameConstants.MapWidth/Height
+        /// exakt ab, siehe M3a-collision.md) direkt aus Bytes - kein echtes File nötig.</summary>
+        private static CollisionMap BuildCollisionMap(params (int X, int Y)[] blockedCells)
+        {
+            const int width = 1000;
+            const int height = 1000;
+            int cellCount = width * height;
+            byte[] packed = new byte[(cellCount + 7) / 8];
+            foreach ((int x, int y) in blockedCells)
+            {
+                int index = y * width + x;
+                packed[index / 8] |= (byte)(1 << (index % 8));
+            }
+
+            byte[] header = new byte[12];
+            Encoding.ASCII.GetBytes("LCM1").CopyTo(header, 0);
+            BitConverter.GetBytes(width).CopyTo(header, 4);
+            BitConverter.GetBytes(height).CopyTo(header, 8);
+
+            byte[] bytes = new byte[header.Length + packed.Length];
+            header.CopyTo(bytes, 0);
+            packed.CopyTo(bytes, header.Length);
+            return CollisionMap.LoadFromBytes(bytes, width, height);
+        }
+
         [Fact]
         public void TryJoin_NullPosition_SpawnsAtMapCenter()
         {
@@ -133,6 +161,98 @@ namespace Lumiis.Tests.Game
             var arrived = world.Tick(10.0); // genug Zeit, um definitiv anzukommen
 
             Assert.Contains(entity, arrived);
+            Assert.False(entity.IsMoving);
+        }
+
+        // ---- M3a: Kollision (siehe docs/tasks/M3a-collision.md Abschnitt 3) ----
+
+        [Fact]
+        public void SetDestination_WithOpenCollisionMap_FreeMovement_Unchanged()
+        {
+            var world = new World(maxPlayers: 10, BuildCollisionMap());
+            world.TryJoin(characterId: 1, "Bot", x: 10000, y: 10000, out Entity? entity, out _);
+
+            world.SetDestination(entity!.Id, 20000, 15000);
+
+            Assert.Equal(20000, entity.TargetX);
+            Assert.Equal(15000, entity.TargetY);
+        }
+
+        [Fact]
+        public void SetDestination_DirectlyIntoWall_StopsExactlyBefore()
+        {
+            // Senkrechte Wand bei Zelle x=10 (y=0..19); Spieler bei Zelle (5,10), Ziel weit dahinter bei
+            // Zelle (15,10) - die Bewegung darf Zelle 10 nie erreichen.
+            var blocked = new System.Collections.Generic.List<(int, int)>();
+            for (int y = 0; y <= 19; y++) blocked.Add((10, y));
+            var world = new World(maxPlayers: 10, BuildCollisionMap(blocked.ToArray()));
+            world.TryJoin(characterId: 1, "Bot", x: 550, y: 1050, out Entity? entity, out _); // Zelle (5,10)
+
+            world.SetDestination(entity!.Id, 1550, 1050); // Zelle (15,10), jenseits der Wand
+
+            Assert.Equal(950, entity.TargetX); // Zellenmitte von Zelle 9 (letzte begehbare vor der Wand)
+            Assert.Equal(1050, entity.TargetY);
+        }
+
+        [Fact]
+        public void SetDestination_ParallelToWall_Unaffected()
+        {
+            // Dieselbe Wand wie oben, aber die Bewegung verläuft komplett links davon (Zelle x=5 konstant) -
+            // darf von der Wand bei x=10 nicht beeinflusst werden.
+            var blocked = new System.Collections.Generic.List<(int, int)>();
+            for (int y = 0; y <= 19; y++) blocked.Add((10, y));
+            var world = new World(maxPlayers: 10, BuildCollisionMap(blocked.ToArray()));
+            world.TryJoin(characterId: 1, "Bot", x: 550, y: 100, out Entity? entity, out _); // Zelle (5,1)
+
+            world.SetDestination(entity!.Id, 550, 1900); // Zelle (5,19), Ziel exakt wie angefragt erreichbar
+
+            Assert.Equal(550, entity.TargetX);
+            Assert.Equal(1900, entity.TargetY);
+        }
+
+        [Fact]
+        public void SetDestination_TargetBeyondMapBorder_ClampedFirstThenCheckedForCollision()
+        {
+            // Offene Karte, ein Zelle größer als GameConstants.MapWidth/Height/100 (1001 statt 1000): Math.Clamp
+            // erlaubt als Zielwert exakt GameConstants.MapWidth (100000), das entspricht Zelle 1000 - bei einer
+            // genau 1000 Zellen breiten Karte wäre das bereits aus deren Sicht "außerhalb" (siehe
+            // CollisionMap.IsBlocked) und würde fälschlich wie eine Kollision aussehen. Das ist eine enge,
+            // vorbestehende Eigenheit des inklusiven Clamps (nicht Gegenstand dieser Aufgabe) - hier bewusst
+            // umgangen, um wirklich nur "wird zuerst geklemmt, dann auf Kollision geprüft" zu testen, nicht
+            // diese unabhängige Grenzwert-Eigenheit. Mit der echten (1000x1000, Rand bemalt blockiert)
+            // village-Karte ist das ohnehin unsichtbar, weil die Randzeile/-spalte sowieso blockiert ist.
+            const int width = 1001;
+            const int height = 1001;
+            byte[] header = new byte[12];
+            Encoding.ASCII.GetBytes("LCM1").CopyTo(header, 0);
+            BitConverter.GetBytes(width).CopyTo(header, 4);
+            BitConverter.GetBytes(height).CopyTo(header, 8);
+            byte[] packed = new byte[(width * height + 7) / 8];
+            byte[] bytes = new byte[header.Length + packed.Length];
+            header.CopyTo(bytes, 0);
+            packed.CopyTo(bytes, header.Length);
+            CollisionMap openMap = CollisionMap.LoadFromBytes(bytes, width, height);
+
+            var world = new World(maxPlayers: 10, openMap);
+            world.TryJoin(characterId: 1, "Bot", x: 10000, y: 10000, out Entity? entity, out _);
+
+            world.SetDestination(entity!.Id, GameConstants.MapWidth * 10, GameConstants.MapHeight * 10);
+
+            Assert.Equal(GameConstants.MapWidth, entity.TargetX);
+            Assert.Equal(GameConstants.MapHeight, entity.TargetY);
+        }
+
+        [Fact]
+        public void SetDestination_StartCellBlocked_NoMovementTriggered()
+        {
+            // Sollte nicht vorkommen (siehe World.SetDestination-Kommentar), aber abgesichert: steht die
+            // Entity schon auf einer blockierten Zelle, löst SetDestination trotzdem keine Bewegung aus.
+            var world = new World(maxPlayers: 10, BuildCollisionMap((5, 5)));
+            world.TryJoin(characterId: 1, "Bot", x: 550, y: 550, out Entity? entity, out _); // Zelle (5,5), blockiert
+
+            bool ok = world.SetDestination(entity!.Id, 900, 900);
+
+            Assert.True(ok); // gültiger Aufruf (Entity existiert), nur keine Bewegung ausgelöst.
             Assert.False(entity.IsMoving);
         }
     }

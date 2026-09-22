@@ -1,8 +1,10 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using LiteNetLib;
 using Lumiis.Data;
+using Lumiis.Data.Maps;
 using Lumiis.Server;
 using Lumiis.Server.Logging;
 using Lumiis.Server.Net;
@@ -37,7 +39,7 @@ namespace Lumiis.Tests.Integration
             public GameServer Server { get; }
             public TokenService TokenService { get; }
 
-            public ServerFixture(Func<long>? nowMs = null, Func<long>? tokenNowUnixSeconds = null)
+            public ServerFixture(Func<long>? nowMs = null, Func<long>? tokenNowUnixSeconds = null, CollisionMap? collisionMap = null)
             {
                 DbContextOptions<LumiisDbContext> options = new DbContextOptionsBuilder<LumiisDbContext>()
                     .UseInMemoryDatabase("gameserver-test-" + Guid.NewGuid())
@@ -51,7 +53,7 @@ namespace Lumiis.Tests.Integration
                     MaxPlayers = 10,
                     RejectGraceMs = 100 // echte Uhr, kleiner Wert - siehe M1-fixes.md Punkt 2
                 };
-                Server = new GameServer(config, new NullLogger(), TokenService, _dbFactory, nowMs);
+                Server = new GameServer(config, new NullLogger(), TokenService, _dbFactory, nowMs, collisionMap);
             }
 
             public (int CharacterId, string Token) CreateCharacter(string name, int? positionX = null, int? positionY = null, int? accountId = null)
@@ -751,6 +753,70 @@ namespace Lumiis.Tests.Integration
                 // Uhr über die Grace-Frist hinausdrehen - jetzt trennt der nächste Tick.
                 fakeNow = 100 + 1; // RejectGraceMs aus ServerFixture()
                 Assert.True(Pump(() => client.Disconnected, server, client));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        // ---- M3a: Kollision, mit der echten village-Karte (siehe docs/tasks/M3a-collision.md Abschnitt 3) ----
+
+        /// <summary>Sucht data/maps/village/collision.bin ausgehend vom tatsächlichen Testassembly-Verzeichnis
+        /// (AppContext.BaseDirectory, nicht abhängig davon, welches Arbeitsverzeichnis der Testrunner setzt) -
+        /// läuft die Verzeichnisse bis zum Repo-Root hoch.</summary>
+        private static string ResolveVillageCollisionMapPath()
+        {
+            DirectoryInfo? dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while (dir != null)
+            {
+                string candidate = Path.Combine(dir.FullName, "data", "maps", "village", "collision.bin");
+                if (File.Exists(candidate)) return candidate;
+                dir = dir.Parent;
+            }
+            throw new FileNotFoundException("data/maps/village/collision.bin nicht gefunden (ausgehend von " + AppContext.BaseDirectory + ").");
+        }
+
+        [Fact]
+        public void MoveIntoPlaceholderPond_StopsBeforeBlockedArea()
+        {
+            CollisionMap collisionMap = CollisionMap.LoadFromFile(
+                ResolveVillageCollisionMapPath(), GameConstants.MapWidth / 100, GameConstants.MapHeight / 100);
+
+            var fixture = new ServerFixture(collisionMap: collisionMap);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                // Startposition dicht vor dem linken Teichrand (Zelle 595,700 - der Teich beginnt bei Zeile
+                // 700 laut collision-source.png erst bei Zelle 600, siehe Ellipse 600,630-800,770). Bewusst
+                // NAH am Teich statt an der Kartenmitte: Pump() wartet real-zeitlich (PlayerSpeed 5 Einh./s),
+                // eine lange Strecke würde das feste 5s-Timeout von Pump() sprengen.
+                const int startX = 59500;
+                const int startY = 70000;
+                (int characterId, string token) = fixture.CreateCharacter("Alice", positionX: startX, positionY: startY);
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+
+                Assert.False(collisionMap.IsBlocked(startX / 100, startY / 100), "Testannahme verletzt: Startzelle (595,700) müsste laut Teich-Platzhalter begehbar sein.");
+
+                // Ziel: mitten in den Teich (Zelle 700,700 - Ellipsen-Zentrum, dieselbe Zeile wie der Start) -
+                // muss laut Karte blockiert sein, sonst würde dieser Test gar nichts über Kollision beweisen.
+                const int targetX = 70050;
+                const int targetY = 70000;
+                Assert.True(collisionMap.IsBlocked(targetX / 100, targetY / 100), "Testannahme verletzt: Zelle (700,700) müsste laut Teich-Platzhalter blockiert sein.");
+
+                client.Send(new MoveToPacket { X = targetX, Y = targetY });
+                Assert.True(Pump(() => client.Received.OfType<EntityStopPacket>().Any(), server, client));
+
+                EntityStopPacket stop = client.Received.OfType<EntityStopPacket>().Last();
+
+                Assert.False(collisionMap.IsBlocked(stop.X / 100, stop.Y / 100), $"EntityStop bei ({stop.X},{stop.Y}) liegt auf einer blockierten Zelle - sollte davor stehen bleiben.");
+                Assert.False(stop.X == targetX && stop.Y == targetY, "EntityStop kam exakt am Teich-Ziel an - Kollision hätte greifen müssen.");
             }
             finally
             {
