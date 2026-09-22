@@ -80,6 +80,19 @@ public class TokenServiceTests
         Assert.Equal(42, accountId);
     }
 
+    [Fact]
+    public void IssueWithExpiry_TokenAndExpiryMatch()
+    {
+        var clock = new FakeClock(1_000_000);
+        TokenService service = CreateService(clock);
+
+        (string token, long expiresAtUnix) = service.IssueWithExpiry(42);
+
+        Assert.Equal(1_000_000 + TokenService.ValiditySeconds, expiresAtUnix);
+        Assert.True(service.TryValidate(token, out int accountId));
+        Assert.Equal(42, accountId);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]

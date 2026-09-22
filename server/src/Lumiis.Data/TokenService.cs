@@ -30,11 +30,17 @@ public sealed class TokenService
         _nowUnixSeconds = nowUnixSeconds ?? (() => DateTimeOffset.UtcNow.ToUnixTimeSeconds());
     }
 
-    public string Issue(int accountId)
+    public string Issue(int accountId) => IssueWithExpiry(accountId).Token;
+
+    /// <summary>Wie Issue, gibt zusätzlich den Ablaufzeitpunkt zurück - für Lumiis.Auth (POST /login), damit
+    /// die Antwort exakt denselben Wert nennt, der auch im Token steckt (eine Uhrzeitquelle statt zwei
+    /// unabhängiger DateTimeOffset.UtcNow-Aufrufe, die theoretisch auseinanderlaufen könnten).</summary>
+    public (string Token, long ExpiresAtUnix) IssueWithExpiry(int accountId)
     {
-        var payload = new TokenPayload { Aid = accountId, Exp = _nowUnixSeconds() + ValiditySeconds };
+        long expiresAtUnix = _nowUnixSeconds() + ValiditySeconds;
+        var payload = new TokenPayload { Aid = accountId, Exp = expiresAtUnix };
         string payloadPart = Base64UrlEncode(JsonSerializer.SerializeToUtf8Bytes(payload));
-        return payloadPart + "." + ComputeSignature(payloadPart);
+        return (payloadPart + "." + ComputeSignature(payloadPart), expiresAtUnix);
     }
 
     /// <summary>Lehnt manipulierte Signatur, abgelaufenes Token und Kauderwelsch ab - wirft nie, egal was

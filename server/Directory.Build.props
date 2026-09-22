@@ -2,7 +2,13 @@
   <!-- Gilt für alle Projekte unter server/. Eine Stelle für die LiteNetLib-Version, damit
        Lumiis.Shared beim Unity-Kopierschritt dieselbe Version findet wie Server/Bot referenzieren,
        ohne dass Lumiis.Shared selbst eine Abhängigkeit auf LiteNetLib bekommt. -->
+  <!-- EfCoreVersion: zentral gepinnt, damit alle Projekte, die EF Core referenzieren (direkt oder
+       transitiv über Lumiis.Data), dieselbe Assembly-Version sehen - sonst wählt NuGet je Projekt
+       die niedrigste noch passende Version (z. B. Npgsql's eigene Untergrenze), was zu einer echten
+       Assembly-Versionskonflikt-Fehlermeldung (CS1705) führen kann, sobald ein Projekt EF Core nur
+       transitiv über eine ProjectReference bekommt. -->
   <PropertyGroup>
     <LiteNetLibVersion>2.1.4</LiteNetLibVersion>
+    <EfCoreVersion>10.0.12</EfCoreVersion>
   </PropertyGroup>
 </Project>

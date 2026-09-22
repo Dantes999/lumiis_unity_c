@@ -97,8 +97,9 @@ public sealed class LookCatalog
             throw new LookCatalogException($"looks.json: mindestens ein Look mit Slot {BodySlot} wird benötigt.");
     }
 
-    /// <summary>Übergangslösung bis M2 (dann kommt die Appearance aus der DB): weist deterministisch aus dem
-    /// Namen eine Appearance zu, per FNV-1a-Hash, nur mit gültigen IDs aus dem Katalog.</summary>
+    /// <summary>Übergangslösung bis M2b (dann übernimmt der eingeloggte Server-Join den Weg über
+    /// gespeicherte Charaktere): weist deterministisch aus dem Namen eine Appearance zu, per FNV-1a-Hash,
+    /// nur mit gültigen IDs aus dem Katalog.</summary>
     public Appearance CreateAppearanceForName(string name)
     {
         var appearance = new Appearance
@@ -112,6 +113,28 @@ public sealed class LookCatalog
             ShieldId = PickOptional(name, "Shield")
         };
         return appearance;
+    }
+
+    /// <summary>Für die automatische Charaktererstellung in Lumiis.Auth (POST /characters, M2a): erster
+    /// gültiger Eintrag je Slot statt Namens-Hash - keine Auswahl in M2a, siehe Aufgabe.</summary>
+    public Appearance CreateDefaultAppearance()
+    {
+        return new Appearance
+        {
+            BodyId = FirstOrZero(BodySlot),
+            HairStyleId = FirstOrZero("Hair"),
+            HairColorId = _data.HairColors.Count > 0 ? 1 : 0,
+            ArmorId = FirstOrZero("Armor"),
+            HelmetId = FirstOrZero(HelmetSlot),
+            WeaponId = FirstOrZero("Weapon"),
+            ShieldId = FirstOrZero("Shield")
+        };
+    }
+
+    private int FirstOrZero(string slot)
+    {
+        List<int>? ids = GetIds(slot);
+        return ids != null && ids.Count > 0 ? ids[0] : 0;
     }
 
     private int PickRequired(string name, string slot)

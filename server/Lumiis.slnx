@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Lumiis.Auth/Lumiis.Auth.csproj" />
     <Project Path="src/Lumiis.Bot/Lumiis.Bot.csproj" />
     <Project Path="src/Lumiis.Data/Lumiis.Data.csproj" />
     <Project Path="src/Lumiis.Server/Lumiis.Server.csproj" />

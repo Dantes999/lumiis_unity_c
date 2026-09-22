@@ -149,5 +149,35 @@ namespace Lumiis.Tests.Data
             Assert.True(appearance.ShieldId == 0 || appearance.ShieldId == 1);
             Assert.True(appearance.HairColorId >= 0 && appearance.HairColorId <= 2);
         }
+
+        [Fact]
+        public void CreateDefaultAppearance_PicksFirstEntryPerSlot()
+        {
+            const string json = @"{
+  ""settings"": { ""canvasPx"": 128, ""ppu"": 64 },
+  ""hairColors"": [""#111111"", ""#222222""],
+  ""looks"": [
+    { ""id"": 1, ""slot"": ""Body"", ""name"": ""Basis"" },
+    { ""id"": 5, ""slot"": ""Armor"", ""name"": ""Erste"" },
+    { ""id"": 9, ""slot"": ""Armor"", ""name"": ""Zweite"" }
+  ]
+}";
+            LookCatalog catalog = LookCatalog.LoadFromJson(json);
+            Appearance appearance = catalog.CreateDefaultAppearance();
+
+            Assert.Equal(1, appearance.BodyId);
+            Assert.Equal(5, appearance.ArmorId); // erster Eintrag im Katalog (Id 5), nicht der kleinste (Id 9 kleiner wäre falsch anzunehmen)
+            Assert.Equal(0, appearance.HairStyleId); // kein Hair-Eintrag im Katalog -> 0
+            Assert.Equal(1, appearance.HairColorId); // erste Haarfarbe
+        }
+
+        [Fact]
+        public void CreateDefaultAppearance_IsDeterministic()
+        {
+            LookCatalog catalog = TestLookCatalogs.CreateMinimal();
+            Appearance first = catalog.CreateDefaultAppearance();
+            Appearance second = catalog.CreateDefaultAppearance();
+            Assert.Equal(first, second);
+        }
     }
 }
