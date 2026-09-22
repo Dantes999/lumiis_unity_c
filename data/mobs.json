@@ -1,0 +1,6 @@
+{
+  "mobs": [
+    { "id": 1, "name": "Wildhund", "speedWire": 700, "wanderRadiusWire": 500, "wanderIntervalMinMs": 2000, "wanderIntervalMaxMs": 5000 },
+    { "id": 2, "name": "Waldschrat", "speedWire": 200, "wanderRadiusWire": 300, "wanderIntervalMinMs": 15000, "wanderIntervalMaxMs": 30000 }
+  ]
+}
