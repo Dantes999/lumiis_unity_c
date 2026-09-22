@@ -167,3 +167,22 @@ Joiner/Burst) bleiben als nützliche Regressionsabdeckung erhalten.
 - F3-F8 wechseln bei der eigenen Figur sichtbar Haarstil/-farbe/Rüstung/Helm/Waffe/Schild, ohne dass sich andere Spieler dadurch ändern (rein lokal).
 - Sortierung zweier sich überlappender, normal laufender Figuren im echten Spiel (nicht nur im F9-Testfeld): Ebenen der einen Figur mischen sich nicht mit denen der anderen, die weiter unten stehende Figur liegt vorn.
 - Zwei Clients gleichzeitig (Editor-Play plus `client/Builds/<plattform>/Lumiis`, siehe Abschnitt "Client"): beide sehen sich gegenseitig, der Build läuft ohne Fokus-Drosselung im Hintergrund weiter.
+
+### Noch zu prüfen (M2c: Login/Charakterauswahl, vom User)
+Voraussetzung: Postgres läuft (`docker compose up -d` nach `source tools/dev-env.sh`), Migration angewendet,
+Lumiis.Auth läuft (`dotnet run --project server/src/Lumiis.Auth`), Lumiis.Server läuft.
+
+- Unity öffnet `client/` ohne Compiler-Fehler in der Console (Batchmode-Check war bereits grün, Editor-Check zur Sicherheit trotzdem empfohlen).
+- Play drücken: Das neue Login-Fenster (UI Toolkit) erscheint zentriert, lesbar (heller Text auf dunklem Grund, Buttons erkennbar) - keine alte IMGUI-Login-Box mehr sichtbar.
+- Neuen Benutzernamen/Passwort eingeben (Passwort mind. 8 Zeichen), "Registrieren" klicken: führt automatisch weiter zur Charakterauswahl (leere Liste).
+- Neuen Charakternamen eingeben, "Erstellen" klicken: Charakter erscheint in der Liste, danach automatisch verbunden - die eigene Figur erscheint auf der Karte, das bekannte Debug-Overlay (Statuszeile, F1) wird sichtbar.
+- Spiel verlassen (z. B. Server-Prozess beenden oder Verbindung kappen): zurück zum Login-Fenster, Passwort-Feld leer, Benutzername noch ausgefüllt.
+- Unity-Fenster/Play-Modus neu starten: Benutzername ist vorausgefüllt (PlayerPrefs), Passwort nicht.
+- Mit demselben Konto erneut anmelden ("Anmelden" statt "Registrieren"): Charakterauswahl zeigt den zuvor erstellten Charakter, Auswahl verbindet direkt (keine erneute Charaktererstellung nötig).
+- Falsches Passwort eingeben: verständliche deutsche Fehlermeldung im UI ("Benutzername oder Passwort falsch."), kein stiller Hänger.
+- Bereits vergebenen Benutzernamen erneut registrieren: Fehlermeldung "Benutzername bereits vergeben.".
+- Auth-URL im Bereich "Erweitert" auf einen falschen Port ändern, anmelden versuchen: Fehlermeldung "Lumiis.Auth nicht erreichbar. ...", kein Absturz/Hänger.
+- Charakter erstellen, dessen Name bereits vergeben ist (z. B. von einem zweiten Testkonto): Fehlermeldung "Charaktername bereits vergeben.".
+- Zwei Unity-Instanzen (oder Unity + `Lumiis.Bot`) mit demselben Charakter gleichzeitig verbinden: die zweite bekommt "Dieser Charakter ist bereits online." im UI zu sehen, nicht nur im Log.
+- Server-Port im Bereich "Erweitert" auf einen falschen Wert ändern, einen Charakter wählen: Fehlermeldung zur fehlgeschlagenen Verbindung im UI (Charakterauswahl bleibt sichtbar, kein Hänger bei "Verbinde ...").
+- Nach erfolgreichem Join: Debug-Test-Panel (F2/F9/F3-F8 bzw. die Buttons rechts oben) funktioniert unverändert wie vor M2c.
