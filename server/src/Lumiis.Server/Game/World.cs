@@ -152,6 +152,41 @@ public sealed class World
         return (lastWalkableX, lastWalkableY);
     }
 
+    /// <summary>Für jede Entity: welche anderen Entities liegen innerhalb von radiusWire (quadrierte Distanz,
+    /// long-Arithmetik gegen Overflow bei bis zu GameConstants.MapWidth/Height pro Achse)? Reiner
+    /// Distanzvergleich, keine Sichtlinien-/Hindernisprüfung (kein Ziel für M3b). Eine Entity sieht sich
+    /// selbst nie. Der Radius ist inklusiv (Distanz == radiusWire gilt als sichtbar) - ein exaktes Treffen
+    /// der Grenze ist bei quadrierter Ganzzahl-Distanz selten, inklusiv vermeidet zumindest in diesem
+    /// seltenen Fall ein Flackern zwischen zwei Ticks mit identischer Distanz. Sichtbarkeit ist symmetrisch
+    /// (A sieht B genau dann, wenn B sieht A) - jedes Paar wird deshalb nur einmal verglichen.</summary>
+    public Dictionary<int, HashSet<int>> ComputeVisibility(int radiusWire)
+    {
+        var visible = new Dictionary<int, HashSet<int>>();
+        var entities = new List<Entity>(_entities.Values);
+        foreach (Entity entity in entities)
+            visible[entity.Id] = new HashSet<int>();
+
+        long radiusSq = (long)radiusWire * radiusWire;
+
+        for (int i = 0; i < entities.Count; i++)
+        {
+            for (int j = i + 1; j < entities.Count; j++)
+            {
+                Entity a = entities[i];
+                Entity b = entities[j];
+                long dx = a.IntX - b.IntX;
+                long dy = a.IntY - b.IntY;
+                if (dx * dx + dy * dy <= radiusSq)
+                {
+                    visible[a.Id].Add(b.Id);
+                    visible[b.Id].Add(a.Id);
+                }
+            }
+        }
+
+        return visible;
+    }
+
     /// <summary>Schreibt alle Bewegungen um deltaSeconds fort. Gibt die Entities zurück, die in diesem Tick exakt am Ziel angekommen sind.</summary>
     public List<Entity> Tick(double deltaSeconds)
     {
