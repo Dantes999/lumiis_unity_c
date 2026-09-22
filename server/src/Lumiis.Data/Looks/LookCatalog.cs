@@ -4,7 +4,7 @@ using System.IO;
 using System.Text.Json;
 using Lumiis.Shared.Net;
 
-namespace Lumiis.Server.Looks;
+namespace Lumiis.Data.Looks;
 
 /// <summary>Lädt und validiert data/looks.json. Fehler beim Laden bedeuten Abbruch beim Serverstart.</summary>
 public sealed class LookCatalog

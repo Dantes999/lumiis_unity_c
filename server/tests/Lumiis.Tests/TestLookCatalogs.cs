@@ -1,4 +1,4 @@
-using Lumiis.Server.Looks;
+using Lumiis.Data.Looks;
 
 namespace Lumiis.Tests
 {

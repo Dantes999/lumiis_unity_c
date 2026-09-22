@@ -1,8 +1,8 @@
-using Lumiis.Server.Looks;
+using Lumiis.Data.Looks;
 using Lumiis.Shared.Net;
 using Xunit;
 
-namespace Lumiis.Tests.Server
+namespace Lumiis.Tests.Data
 {
     public class LookCatalogTests
     {

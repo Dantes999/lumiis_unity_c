@@ -2,7 +2,7 @@
 using System.Threading;
 using Lumiis.Server;
 using Lumiis.Server.Logging;
-using Lumiis.Server.Looks;
+using Lumiis.Data.Looks;
 using Lumiis.Server.Net;
 
 ILogger logger = new ConsoleLogger();

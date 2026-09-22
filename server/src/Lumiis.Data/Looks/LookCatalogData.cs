@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Lumiis.Server.Looks;
+namespace Lumiis.Data.Looks;
 
 // Reine Deserialisierungs-DTOs für data/looks.json (System.Text.Json, case-insensitive).
 

@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace Lumiis.Server.Looks;
+namespace Lumiis.Data.Looks;
 
 /// <summary>FNV-1a-Hash (32-bit) über UTF-8-Bytes - deterministisch über Prozessgrenzen hinweg,
 /// anders als string.GetHashCode (pro Prozess gesalzen, daher für stabile Zuweisung ungeeignet).</summary>

@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Lumiis.Shared\Lumiis.Shared.csproj" />
+    <ProjectReference Include="..\Lumiis.Data\Lumiis.Data.csproj" />
   </ItemGroup>
 
   <ItemGroup>

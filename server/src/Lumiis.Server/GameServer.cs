@@ -7,7 +7,7 @@ using System.Threading;
 using LiteNetLib;
 using Lumiis.Server.Game;
 using Lumiis.Server.Logging;
-using Lumiis.Server.Looks;
+using Lumiis.Data.Looks;
 using Lumiis.Server.Net;
 using Lumiis.Shared;
 using Lumiis.Shared.Net;
