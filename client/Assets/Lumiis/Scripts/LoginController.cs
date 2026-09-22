@@ -1,44 +1,26 @@
-using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.Text;
-using System.Threading.Tasks;
-using Lumiis.Shared;
 using Lumiis.Shared.Net;
 using UnityEngine;
-using UnityEngine.Networking;
 using UnityEngine.UIElements;
 
 namespace Lumiis.Client
 {
-    /// <summary>Login/Registrierung/Charakterauswahl gegen Lumiis.Auth (HTTP), danach Verbindung zum
-    /// Spielserver mit Token+CharacterId (M2b-Protokoll). Eigenes UIDocument (code-first erzeugt, kein
-    /// Inspector-Verkabeln), schaltet zwischen Login.uxml und CharacterSelect.uxml um. Das bestehende
-    /// Debug-Test-Panel (GameClient) bleibt unverändert und wird erst nach erfolgreichem Join sichtbar,
-    /// weil GameClient seine eigene, von diesem Controller unabhängige InGame-Erkennung behält.</summary>
+    /// <summary>Reine UI-Verdrahtung für Login/Registrierung/Charakterauswahl - hält eine LoginFlow-Instanz,
+    /// verbindet Button-Klicks mit deren Methoden und zeigt LoginFlow.State/-ErrorMessage an. Jede
+    /// Entscheidungslogik (Validierung, Fehlertexte, Zustandswechsel) lebt in LoginFlow (siehe dort), nicht
+    /// hier - das macht sie ohne Unity per dotnet test prüfbar (Lumiis.Tests.csproj Compile-Include).
+    ///
+    /// Eigenes UIDocument (code-first erzeugt, kein Inspector-Verkabeln), schaltet zwischen Login.uxml und
+    /// CharacterSelect.uxml um. Das bestehende Debug-Test-Panel (GameClient) bleibt unverändert und wird erst
+    /// nach erfolgreichem Join sichtbar, weil GameClient seine eigene, von diesem Controller unabhängige
+    /// InGame-Erkennung behält.</summary>
     public sealed class LoginController : MonoBehaviour
     {
-        private enum State
-        {
-            LoggedOut,
-            LoggingIn,
-            CharacterSelect,
-            Connecting,
-            InGame
-        }
-
         private const string UsernamePrefsKey = "Lumiis.LastUsername";
-
-        // Clientseitige Vorprüfung, nur eine grobe Annäherung an die serverseitigen Regeln
-        // (Lumiis.Data.UsernameRules/PasswordHasher - server-only, nicht nach Unity kopiert, siehe
-        // CLAUDE.md-Architektur: Lumiis.Shared bleibt frei von Lumiis.Data). Verbindlich bleibt immer die
-        // Server-Prüfung; Charakternamen dagegen nutzen direkt Lumiis.Shared.NameRules (echte Regel, geteilt).
-        private const int MinUsernameLength = 3;
-        private const int MaxUsernameLength = 32;
-        private const int MinPasswordLength = 8;
 
         private NetClient _netClient;
         private GameClient _gameClient;
+        private LoginFlow _loginFlow;
 
         private UIDocument _uiDocument;
         private VisualElement _loginRoot;
@@ -61,14 +43,14 @@ namespace Lumiis.Client
         private Label _characterSelectStatusLabel;
         private Label _characterSelectErrorLabel;
 
-        private State _state = State.LoggedOut;
-        private string _token;
-        private List<CharacterDto> _characters = new List<CharacterDto>();
-
-        public void Initialize(NetClient netClient, GameClient gameClient)
+        /// <summary>authClient optional für PlayMode-Tests (siehe client/Assets/Lumiis/Tests/PlayMode) - im
+        /// normalen Spielbetrieb (Bootstrap.cs) bleibt der Parameter weg, dann kommt die echte
+        /// UnityWebRequestAuthClient gegen Lumiis.Auth zum Einsatz.</summary>
+        public void Initialize(NetClient netClient, GameClient gameClient, IAuthClient authClient = null)
         {
             _netClient = netClient;
             _gameClient = gameClient;
+            _loginFlow = new LoginFlow(authClient ?? new UnityWebRequestAuthClient());
 
             _netClient.PacketReceived += OnPacketReceived;
             _netClient.Disconnected += OnNetDisconnected;
@@ -88,7 +70,7 @@ namespace Lumiis.Client
         {
             yield return null;
             BuildUi();
-            ShowLogin();
+            ApplyLoginFlowState();
         }
 
         // ---- UI-Aufbau (code-first, kein Inspector-Verkabeln) ----
@@ -115,8 +97,8 @@ namespace Lumiis.Client
             _uiDocument.rootVisualElement.Add(_loginRoot);
             _uiDocument.rootVisualElement.Add(_characterSelectRoot);
             // Sofort auf den Anfangszustand (LoggedOut) einschränken, statt sich auf den direkt folgenden
-            // ShowLogin()-Aufruf des Callers zu verlassen - BuildUi() soll für sich allein schon nie zwei
-            // sichtbare Wurzeln gleichzeitig erzeugen.
+            // ApplyLoginFlowState()-Aufruf des Callers zu verlassen - BuildUi() soll für sich allein schon nie
+            // zwei sichtbare Wurzeln gleichzeitig erzeugen.
             _characterSelectRoot.style.display = DisplayStyle.None;
 
             _usernameField = _loginRoot.Q<TextField>("username-field");
@@ -144,24 +126,62 @@ namespace Lumiis.Client
             _logoutButton.clicked += OnLogoutButtonClicked;
         }
 
+        // ---- LoginFlow -> UI: einziger Ort, der State/ErrorMessage liest und den Bildschirm danach ausrichtet.
+        // Löst nebenbei den M2c-Fehler "Fehlermeldung wird sofort wieder gelöscht" strukturell: ShowLogin()/
+        // ShowCharacterSelect() fassen die Fehlertexte selbst nicht mehr an, hier wird immer erst umgeschaltet
+        // und danach exakt der aktuelle LoginFlow-Text gesetzt - keine Reihenfolge-Falle mehr möglich. ----
+
+        private void ApplyLoginFlowState()
+        {
+            switch (_loginFlow.State)
+            {
+                case LoginFlowState.LoggedOut:
+                    ShowLogin();
+                    _passwordField.value = "";
+                    SetLoginError(_loginFlow.LoginErrorMessage);
+                    break;
+
+                case LoginFlowState.LoggingIn:
+                    // Wird während eines laufenden await nie sichtbar neu gezeichnet (kein Polling), bleibt
+                    // hier nur der Vollständigkeit halber - Interactable/Statustext setzen die Button-Handler
+                    // selbst vor dem await.
+                    break;
+
+                case LoginFlowState.CharacterSelect:
+                    ShowCharacterSelect();
+                    SetCharacterSelectError(_loginFlow.CharacterSelectErrorMessage);
+                    PopulateCharacterList();
+                    if (!string.IsNullOrEmpty(_loginFlow.Token))
+                    {
+                        PlayerPrefs.SetString(UsernamePrefsKey, (_usernameField.value ?? "").Trim());
+                        PlayerPrefs.Save();
+                    }
+                    break;
+
+                case LoginFlowState.Connecting:
+                    BeginConnect();
+                    break;
+
+                case LoginFlowState.InGame:
+                    HideAll();
+                    break;
+            }
+        }
+
         private void ShowLogin()
         {
-            _state = State.LoggedOut;
             _loginRoot.style.display = DisplayStyle.Flex;
             _characterSelectRoot.style.display = DisplayStyle.None;
             SetLoginInteractable(true);
             _loginStatusLabel.text = "";
-            SetLoginError("");
         }
 
         private void ShowCharacterSelect()
         {
-            _state = State.CharacterSelect;
             _loginRoot.style.display = DisplayStyle.None;
             _characterSelectRoot.style.display = DisplayStyle.Flex;
             SetCharacterSelectInteractable(true);
             _characterSelectStatusLabel.text = "";
-            SetCharacterSelectError("");
         }
 
         private void HideAll()
@@ -174,250 +194,79 @@ namespace Lumiis.Client
 
         private async void OnLoginButtonClicked()
         {
-            string username = (_usernameField.value ?? "").Trim();
-            string password = _passwordField.value ?? "";
-            string validationError = ValidateCredentials(username, password);
-            if (validationError != null)
-            {
-                SetLoginError(validationError);
-                return;
-            }
-
-            _state = State.LoggingIn;
             SetLoginInteractable(false);
             SetLoginError("");
             _loginStatusLabel.text = "Melde an ...";
-
-            try
-            {
-                await PerformLoginAsync(username, password);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError("Login fehlgeschlagen: " + ex);
-                ShowLogin();
-                SetLoginError("Unerwarteter Fehler: " + ex.Message);
-            }
+            await _loginFlow.TryLoginAsync(NormalizedAuthUrl(), _usernameField.value, _passwordField.value);
+            ApplyLoginFlowState();
         }
 
         private async void OnRegisterButtonClicked()
         {
-            string username = (_usernameField.value ?? "").Trim();
-            string password = _passwordField.value ?? "";
-            string validationError = ValidateCredentials(username, password);
-            if (validationError != null)
-            {
-                SetLoginError(validationError);
-                return;
-            }
-
-            _state = State.LoggingIn;
             SetLoginInteractable(false);
             SetLoginError("");
             _loginStatusLabel.text = "Registriere ...";
-
-            try
-            {
-                string authUrl = NormalizedAuthUrl();
-                (bool success, int statusCode, string body) = await PostJsonAsync(
-                    authUrl + "register", JsonUtility.ToJson(new CredentialsDto(username, password)));
-
-                if (!success)
-                {
-                    ShowLogin();
-                    SetLoginError(DescribeNetworkFailure());
-                    return;
-                }
-
-                if (statusCode == 201)
-                {
-                    _loginStatusLabel.text = "Registriert, melde an ...";
-                    await PerformLoginAsync(username, password);
-                    return;
-                }
-
-                ShowLogin();
-                SetLoginError(DescribeHttpError(statusCode, body,
-                    conflictMessage: "Benutzername bereits vergeben.",
-                    invalidMessage: "Ungültiger Benutzername oder Passwort."));
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError("Registrierung fehlgeschlagen: " + ex);
-                ShowLogin();
-                SetLoginError("Unerwarteter Fehler: " + ex.Message);
-            }
-        }
-
-        private async Task PerformLoginAsync(string username, string password)
-        {
-            string authUrl = NormalizedAuthUrl();
-            (bool success, int statusCode, string body) = await PostJsonAsync(
-                authUrl + "login", JsonUtility.ToJson(new CredentialsDto(username, password)));
-
-            if (!success)
-            {
-                ShowLogin();
-                SetLoginError(DescribeNetworkFailure());
-                return;
-            }
-
-            if (statusCode != 200)
-            {
-                ShowLogin();
-                SetLoginError(DescribeHttpError(statusCode, body));
-                return;
-            }
-
-            LoginResponseDto response = JsonUtility.FromJson<LoginResponseDto>(body);
-            _token = response.token;
-
-            PlayerPrefs.SetString(UsernamePrefsKey, username);
-            PlayerPrefs.Save();
-
-            ShowCharacterSelect();
-            await RefreshCharacterListAsync();
+            await _loginFlow.TryRegisterAsync(NormalizedAuthUrl(), _usernameField.value, _passwordField.value);
+            ApplyLoginFlowState();
         }
 
         // ---- Charakterauswahl ----
 
-        private async Task RefreshCharacterListAsync()
-        {
-            _characterSelectStatusLabel.text = "Lade Charaktere ...";
-            string authUrl = NormalizedAuthUrl();
-            (bool success, int statusCode, string body) = await GetJsonAuthorizedAsync(authUrl + "characters");
-            _characterSelectStatusLabel.text = "";
-
-            if (!success)
-            {
-                SetCharacterSelectError(DescribeNetworkFailure());
-                return;
-            }
-
-            if (statusCode == 401)
-            {
-                _token = null;
-                ShowLogin();
-                SetLoginError("Sitzung abgelaufen, bitte erneut anmelden.");
-                return;
-            }
-
-            if (statusCode != 200)
-            {
-                SetCharacterSelectError(DescribeHttpError(statusCode, body));
-                return;
-            }
-
-            CharacterListResponseDto listResponse = JsonUtility.FromJson<CharacterListResponseDto>(body);
-            _characters = new List<CharacterDto>(listResponse.characters ?? Array.Empty<CharacterDto>());
-            PopulateCharacterList();
-        }
-
         private void PopulateCharacterList()
         {
             _characterListView.Clear();
-            foreach (CharacterDto character in _characters)
+            foreach (CharacterInfo character in _loginFlow.Characters)
             {
-                CharacterDto captured = character; // Schleifenvariable für den Closure einfangen.
-                var button = new Button(() => OnCharacterSelected(captured)) { text = captured.name };
+                CharacterInfo captured = character; // Schleifenvariable für den Closure einfangen.
+                var button = new Button(() => OnCharacterSelected(captured)) { text = captured.Name };
                 button.AddToClassList("character-button");
                 _characterListView.Add(button);
             }
         }
 
-        private void OnCharacterSelected(CharacterDto character)
+        private void OnCharacterSelected(CharacterInfo character)
         {
-            ConnectToServer(character.id, character.name);
+            _loginFlow.SelectCharacter(character);
+            ApplyLoginFlowState();
         }
 
         private async void OnCreateCharacterButtonClicked()
         {
-            string name = (_newCharacterNameField.value ?? "").Trim();
-            if (!NameRules.IsValid(name))
-            {
-                SetCharacterSelectError("Ungültiger Charaktername (" + NameRules.MinLength + "-" + NameRules.MaxLength
-                    + " Zeichen, nur ASCII-Buchstaben/Ziffern/_).");
-                return;
-            }
-
             SetCharacterSelectInteractable(false);
             SetCharacterSelectError("");
             _characterSelectStatusLabel.text = "Erstelle Charakter ...";
-
-            try
-            {
-                string authUrl = NormalizedAuthUrl();
-                (bool success, int statusCode, string body) = await PostJsonAuthorizedAsync(
-                    authUrl + "characters", JsonUtility.ToJson(new CreateCharacterRequestDto(name)));
-                _characterSelectStatusLabel.text = "";
-
-                if (!success)
-                {
-                    SetCharacterSelectError(DescribeNetworkFailure());
-                    SetCharacterSelectInteractable(true);
-                    return;
-                }
-
-                if (statusCode == 401)
-                {
-                    _token = null;
-                    ShowLogin();
-                    SetLoginError("Sitzung abgelaufen, bitte erneut anmelden.");
-                    return;
-                }
-
-                if (statusCode != 201)
-                {
-                    SetCharacterSelectError(DescribeHttpError(statusCode, body,
-                        conflictMessage: "Charaktername bereits vergeben.",
-                        invalidMessage: "Ungültiger Charaktername."));
-                    SetCharacterSelectInteractable(true);
-                    return;
-                }
-
-                CharacterDto created = JsonUtility.FromJson<CharacterDto>(body);
-                _newCharacterNameField.value = "";
-                ConnectToServer(created.id, created.name);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError("Charaktererstellung fehlgeschlagen: " + ex);
-                SetCharacterSelectError("Unerwarteter Fehler: " + ex.Message);
-                SetCharacterSelectInteractable(true);
-                _characterSelectStatusLabel.text = "";
-            }
+            await _loginFlow.CreateCharacterAsync(NormalizedAuthUrl(), _newCharacterNameField.value);
+            if (_loginFlow.State == LoginFlowState.Connecting) _newCharacterNameField.value = "";
+            ApplyLoginFlowState();
         }
 
         private void OnLogoutButtonClicked()
         {
-            _token = null;
-            _passwordField.value = "";
-            ShowLogin();
+            _loginFlow.Logout();
+            ApplyLoginFlowState();
         }
 
-        // ---- Verbindung zum Spielserver ----
+        // ---- Verbindung zum Spielserver (reines Transport-/UI-Wissen, siehe LoginFlow.CancelConnect) ----
 
-        private void ConnectToServer(int characterId, string characterName)
+        private void BeginConnect()
         {
             if (!int.TryParse(_serverPortField.value, out int port))
             {
-                SetCharacterSelectError("Ungültiger Server-Port.");
+                _loginFlow.CancelConnect("Ungültiger Server-Port.");
+                ApplyLoginFlowState();
                 return;
             }
 
-            _state = State.Connecting;
             SetCharacterSelectInteractable(false);
             SetCharacterSelectError("");
             _characterSelectStatusLabel.text = "Verbinde ...";
 
-            _gameClient.PrepareJoin(characterName);
-            bool started = _netClient.Connect(_serverHostField.value, port, _token, characterId);
+            _gameClient.PrepareJoin(_loginFlow.SelectedCharacterName);
+            bool started = _netClient.Connect(_serverHostField.value, port, _loginFlow.Token, _loginFlow.SelectedCharacterId);
             if (!started)
             {
-                _state = State.CharacterSelect;
-                SetCharacterSelectInteractable(true);
-                _characterSelectStatusLabel.text = "";
-                SetCharacterSelectError("Verbindung konnte nicht gestartet werden.");
+                _loginFlow.CancelConnect("Verbindung konnte nicht gestartet werden.");
+                ApplyLoginFlowState();
             }
         }
 
@@ -425,125 +274,22 @@ namespace Lumiis.Client
         {
             if (packet is JoinAcceptedPacket)
             {
-                _state = State.InGame;
-                HideAll();
+                _loginFlow.OnJoinAccepted();
+                ApplyLoginFlowState();
                 return;
             }
 
             if (packet is JoinRejectedPacket rejected)
             {
-                string message = DescribeJoinRejectReason(rejected.Reason);
-                bool sessionInvalid = rejected.Reason == JoinRejectReason.InvalidToken || rejected.Reason == JoinRejectReason.TokenExpired;
-
-                if (sessionInvalid)
-                {
-                    _token = null;
-                    ShowLogin();
-                    SetLoginError(message);
-                }
-                else
-                {
-                    ShowCharacterSelect();
-                    SetCharacterSelectError(message);
-                }
+                _loginFlow.OnJoinRejected(rejected.Reason);
+                ApplyLoginFlowState();
             }
         }
 
         private void OnNetDisconnected(string reason)
         {
-            if (_state == State.InGame)
-            {
-                _token = null;
-                _passwordField.value = "";
-                ShowLogin();
-                SetLoginError("Verbindung getrennt (" + reason + ").");
-                return;
-            }
-
-            if (_state == State.Connecting)
-            {
-                // Ein JoinRejected wäre schon vorher über OnPacketReceived behandelt worden und hätte den
-                // Zustand bereits auf CharacterSelect/LoggedOut zurückgesetzt - dieser Zweig läuft dann
-                // nicht mehr. Hier landet nur der Fall "Verbindung selbst kam nie zustande" (Server nicht
-                // erreichbar o. Ä.).
-                ShowCharacterSelect();
-                SetCharacterSelectError("Verbindung zum Server fehlgeschlagen (" + reason + ").");
-            }
-
-            // LoggedOut/LoggingIn/CharacterSelect: kein aktiver Verbindungsversuch betroffen, nichts zu tun.
-        }
-
-        // ---- Validierung ----
-
-        private static string ValidateCredentials(string username, string password)
-        {
-            if (username.Length < MinUsernameLength || username.Length > MaxUsernameLength || !IsAsciiWordChars(username))
-            {
-                return "Benutzername muss " + MinUsernameLength + "-" + MaxUsernameLength
-                    + " Zeichen lang sein (nur ASCII-Buchstaben/Ziffern/_).";
-            }
-            if (password.Length < MinPasswordLength)
-                return "Passwort muss mindestens " + MinPasswordLength + " Zeichen lang sein.";
-            return null;
-        }
-
-        private static bool IsAsciiWordChars(string value)
-        {
-            foreach (char c in value)
-            {
-                bool isAsciiLetter = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
-                bool isAsciiDigit = c >= '0' && c <= '9';
-                if (!isAsciiLetter && !isAsciiDigit && c != '_') return false;
-            }
-            return true;
-        }
-
-        // ---- Fehlertexte ----
-
-        private static string DescribeNetworkFailure()
-        {
-            return "Lumiis.Auth nicht erreichbar. Läuft der Dienst? (siehe \"Erweitert\" -> Auth-URL)";
-        }
-
-        private static string DescribeHttpError(int statusCode, string body,
-            string conflictMessage = "Bereits vergeben.", string invalidMessage = "Ungültige Eingabe.")
-        {
-            string serverMessage = TryGetErrorMessage(body);
-            switch (statusCode)
-            {
-                case 400: return invalidMessage + (serverMessage != null ? " (" + serverMessage + ")" : "");
-                case 401: return "Benutzername oder Passwort falsch.";
-                case 409: return conflictMessage + (serverMessage != null ? " (" + serverMessage + ")" : "");
-                default: return "Unerwarteter Fehler (" + statusCode + ")" + (serverMessage != null ? ": " + serverMessage : ".");
-            }
-        }
-
-        private static string TryGetErrorMessage(string body)
-        {
-            if (string.IsNullOrEmpty(body)) return null;
-            try
-            {
-                ErrorResponseDto error = JsonUtility.FromJson<ErrorResponseDto>(body);
-                return string.IsNullOrEmpty(error?.error) ? null : error.error;
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        private static string DescribeJoinRejectReason(JoinRejectReason reason)
-        {
-            switch (reason)
-            {
-                case JoinRejectReason.VersionMismatch: return "Protokollversion stimmt nicht überein - Client und Server sind nicht kompatibel.";
-                case JoinRejectReason.InvalidToken: return "Sitzung ungültig, bitte erneut anmelden.";
-                case JoinRejectReason.TokenExpired: return "Sitzung abgelaufen, bitte erneut anmelden.";
-                case JoinRejectReason.CharacterNotFound: return "Charakter nicht gefunden.";
-                case JoinRejectReason.CharacterAlreadyOnline: return "Dieser Charakter ist bereits online.";
-                case JoinRejectReason.ServerFull: return "Server ist voll.";
-                default: return reason.ToString();
-            }
+            _loginFlow.OnDisconnected(reason);
+            ApplyLoginFlowState();
         }
 
         // ---- UI-Hilfsfunktionen ----
@@ -580,109 +326,6 @@ namespace Lumiis.Client
             if (string.IsNullOrEmpty(url)) url = "http://127.0.0.1:5080";
             if (!url.EndsWith("/")) url += "/";
             return url;
-        }
-
-        // ---- HTTP (UnityWebRequest + TaskCompletionSource statt UnityEngine.Awaitable: SendWebRequest()
-        // liefert eine UnityWebRequestAsyncOperation - ob deren Awaiter-Unterstützung in dieser Unity-
-        // Version vollständig genug ist, um direkt await darauf zu nutzen, ließ sich ohne Play-Modus-Test
-        // nicht verifizieren. TaskCompletionSource ist Standard-.NET, versionsunabhängig, und der
-        // completed-Callback feuert ohnehin auf dem Hauptthread - unproblematisch für Folgezugriffe auf
-        // Unity-APIs direkt danach.) ----
-
-        private static Task<UnityWebRequest> SendAsync(UnityWebRequest request)
-        {
-            var tcs = new TaskCompletionSource<UnityWebRequest>();
-            UnityWebRequestAsyncOperation op = request.SendWebRequest();
-            op.completed += _ => tcs.SetResult(request);
-            return tcs.Task;
-        }
-
-        private async Task<(bool Success, int StatusCode, string Body)> PostJsonAsync(string url, string jsonBody, string bearerToken = null)
-        {
-            using var request = new UnityWebRequest(url, "POST");
-            byte[] bodyBytes = Encoding.UTF8.GetBytes(jsonBody);
-            request.uploadHandler = new UploadHandlerRaw(bodyBytes);
-            request.downloadHandler = new DownloadHandlerBuffer();
-            request.SetRequestHeader("Content-Type", "application/json");
-            if (bearerToken != null) request.SetRequestHeader("Authorization", "Bearer " + bearerToken);
-
-            await SendAsync(request);
-            return ToResult(request);
-        }
-
-        private Task<(bool Success, int StatusCode, string Body)> PostJsonAuthorizedAsync(string url, string jsonBody)
-        {
-            return PostJsonAsync(url, jsonBody, _token);
-        }
-
-        private async Task<(bool Success, int StatusCode, string Body)> GetJsonAuthorizedAsync(string url)
-        {
-            using var request = UnityWebRequest.Get(url);
-            request.SetRequestHeader("Authorization", "Bearer " + _token);
-
-            await SendAsync(request);
-            return ToResult(request);
-        }
-
-        private static (bool Success, int StatusCode, string Body) ToResult(UnityWebRequest request)
-        {
-            bool networkFailure = request.result == UnityWebRequest.Result.ConnectionError
-                || request.result == UnityWebRequest.Result.DataProcessingError;
-            return (!networkFailure, (int)request.responseCode, request.downloadHandler.text);
-        }
-
-        // ---- DTOs (JsonUtility: Feldnamen müssen exakt zur JSON-Antwort von Lumiis.Auth passen, siehe
-        // dessen Dtos.cs - camelCase, da System.Text.Json das in ASP.NET Core standardmäßig so serialisiert). ----
-
-        [Serializable]
-        private sealed class CredentialsDto
-        {
-            public string username;
-            public string password;
-
-            public CredentialsDto(string username, string password)
-            {
-                this.username = username;
-                this.password = password;
-            }
-        }
-
-        [Serializable]
-        private sealed class LoginResponseDto
-        {
-            public string token;
-            public long expiresAtUnix;
-            public CharacterDto[] characters;
-        }
-
-        [Serializable]
-        private sealed class CharacterDto
-        {
-            public int id;
-            public string name;
-        }
-
-        [Serializable]
-        private sealed class CharacterListResponseDto
-        {
-            public CharacterDto[] characters;
-        }
-
-        [Serializable]
-        private sealed class CreateCharacterRequestDto
-        {
-            public string name;
-
-            public CreateCharacterRequestDto(string name)
-            {
-                this.name = name;
-            }
-        }
-
-        [Serializable]
-        private sealed class ErrorResponseDto
-        {
-            public string error;
         }
     }
 }

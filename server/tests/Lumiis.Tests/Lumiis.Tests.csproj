@@ -28,10 +28,13 @@
     <ProjectReference Include="..\..\src\Lumiis.Auth\Lumiis.Auth.csproj" />
   </ItemGroup>
 
-  <!-- ClientWorld hat bewusst keine UnityEngine-Abhängigkeit (siehe Kommentar dort) - deshalb per
-       Compile-Include direkt testbar, ohne das Unity-Projekt oder eine Plugin-DLL anzufassen. -->
+  <!-- ClientWorld/LoginFlow/IAuthClient haben bewusst keine UnityEngine-Abhängigkeit (siehe Kommentare dort) -
+       deshalb per Compile-Include direkt testbar, ohne das Unity-Projekt oder eine Plugin-DLL anzufassen.
+       UnityWebRequestAuthClient/LoginController bleiben außen vor (brauchen UnityEngine.Networking/UIElements). -->
   <ItemGroup>
     <Compile Include="..\..\..\client\Assets\Lumiis\Scripts\ClientWorld.cs" Link="ClientCode\ClientWorld.cs" />
+    <Compile Include="..\..\..\client\Assets\Lumiis\Scripts\LoginFlow.cs" Link="ClientCode\LoginFlow.cs" />
+    <Compile Include="..\..\..\client\Assets\Lumiis\Scripts\IAuthClient.cs" Link="ClientCode\IAuthClient.cs" />
   </ItemGroup>
 
 </Project>
