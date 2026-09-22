@@ -73,7 +73,13 @@ Setup nach dem Klonen (auch auf dem zweiten Rechner):
 1. `cd server && dotnet build` - baut Lumiis.Shared und kopiert dabei Lumiis.Shared.dll sowie die netstandard2.1-Variante von LiteNetLib.dll nach `client/Assets/Plugins/Lumiis/` (git-ignoriert, entsteht bei jedem Build neu).
 2. Danach `client/` mit Unity Hub öffnen (6000.3.24f1). Beim ersten Öffnen importiert Unity die kopierten Plugin-DLLs und legt die zugehörigen .meta-Dateien an.
 
-Struktur (`client/Assets/Lumiis/Scripts/`, Namespace `Lumiis.Client`, code-first, kein Inspector-Verkabeln, kein asmdef):
+Struktur (`client/Assets/Lumiis/Scripts/`, Namespace `Lumiis.Client`, code-first, kein Inspector-Verkabeln, ein
+Assembly `Lumiis.Client` für den gesamten Client-Code (`Lumiis.Client.asmdef`, seit der Test-Infrastruktur -
+PlayMode-Tests brauchen Compile-Zeit-Zugriff auf die Haupt-Client-Assembly, das geht nur über ein eigenes
+asmdef statt der Standard-Assembly `Assembly-CSharp`; keine weitere Aufteilung in mehrere Assemblies). Die
+davon unabhängige Regel "keine veränderlichen statischen Zustände wegen Fast Enter Play Mode/CoreCLR" (siehe
+"Verbindliche Architektur") gilt unverändert weiter - das asmdef ändert nur die Compile-Grenze, nicht das
+Domain-Reload-Verhalten):
 - `Bootstrap.cs`: RuntimeInitializeOnLoadMethod (AfterSceneLoad), erzeugt Kamera und das Root-GameObject mit NetClient/GameClient/LoginController.
 - `NetClient.cs`: dünner LiteNetLib-Adapter (MonoBehaviour) - Connect(host, port, token, characterId)/JoinRequest (M2b-Protokoll: Token+CharacterId statt Name), PacketCodec.Decode, C#-Events für Connected/Disconnected/Paket.
 - `LoginController.cs`: Login/Registrierung/Charakterauswahl gegen Lumiis.Auth (HTTP, UnityWebRequest), eigenes UIDocument (UI Toolkit, code-first erzeugt - siehe `client/Assets/Resources/UI/`). Zustände LoggedOut -> LoggingIn -> CharacterSelect -> Connecting -> InGame -> (Disconnect) zurück zu LoggedOut. Ruft nach Charakterwahl `GameClient.PrepareJoin(characterName)` und `NetClient.Connect(...)` auf. Details siehe Abschnitt "Datenbank & Auth-Dienst".
