@@ -44,7 +44,10 @@ namespace Lumiis.Client
             texture.SetPixels32(pixels);
             texture.Apply();
 
-            return Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), pixelsPerUnit);
+            // FullRect explizit, da GameClient.CreateFloorAndBoundary drawMode Tiled setzt - das verlangt
+            // FullRect statt des sonst impliziten Tight (Warnung sonst zur Laufzeit).
+            return Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), pixelsPerUnit,
+                0, SpriteMeshType.FullRect);
         }
 
         /// <summary>Ein Ring (Kreisring), z. B. als Markierung unter den Füßen. Wird per SpriteRenderer.color eingefärbt.</summary>
