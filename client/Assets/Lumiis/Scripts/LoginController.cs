@@ -195,8 +195,8 @@ namespace Lumiis.Client
             catch (Exception ex)
             {
                 Debug.LogError("Login fehlgeschlagen: " + ex);
-                SetLoginError("Unerwarteter Fehler: " + ex.Message);
                 ShowLogin();
+                SetLoginError("Unerwarteter Fehler: " + ex.Message);
             }
         }
 
@@ -224,8 +224,8 @@ namespace Lumiis.Client
 
                 if (!success)
                 {
-                    SetLoginError(DescribeNetworkFailure());
                     ShowLogin();
+                    SetLoginError(DescribeNetworkFailure());
                     return;
                 }
 
@@ -236,16 +236,16 @@ namespace Lumiis.Client
                     return;
                 }
 
+                ShowLogin();
                 SetLoginError(DescribeHttpError(statusCode, body,
                     conflictMessage: "Benutzername bereits vergeben.",
                     invalidMessage: "Ungültiger Benutzername oder Passwort."));
-                ShowLogin();
             }
             catch (Exception ex)
             {
                 Debug.LogError("Registrierung fehlgeschlagen: " + ex);
-                SetLoginError("Unerwarteter Fehler: " + ex.Message);
                 ShowLogin();
+                SetLoginError("Unerwarteter Fehler: " + ex.Message);
             }
         }
 
@@ -257,15 +257,15 @@ namespace Lumiis.Client
 
             if (!success)
             {
-                SetLoginError(DescribeNetworkFailure());
                 ShowLogin();
+                SetLoginError(DescribeNetworkFailure());
                 return;
             }
 
             if (statusCode != 200)
             {
-                SetLoginError(DescribeHttpError(statusCode, body));
                 ShowLogin();
+                SetLoginError(DescribeHttpError(statusCode, body));
                 return;
             }
 
