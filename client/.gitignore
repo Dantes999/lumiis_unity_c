@@ -12,6 +12,9 @@
 /MemoryCaptures/
 /Recordings/
 
+# Cache der Unity-KI-Assistenten-Generatoren (com.unity.ai.*), entsteht bei jeder Nutzung neu.
+/GeneratedAssets/
+
 *.csproj
 *.sln
 *.slnx
