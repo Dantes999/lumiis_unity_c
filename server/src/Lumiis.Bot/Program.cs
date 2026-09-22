@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using Lumiis.Bot;
 
 string host = "127.0.0.1";
@@ -7,6 +8,7 @@ int port = 7777;
 int count = 1;
 string namePrefix = "Bot";
 int radius = 20;
+string authUrl = "http://localhost:5080";
 
 for (int i = 0; i < args.Length; i++)
 {
@@ -27,16 +29,25 @@ for (int i = 0; i < args.Length; i++)
         case "--radius":
             radius = int.Parse(args[++i]);
             break;
+        case "--auth-url":
+            authUrl = args[++i];
+            break;
         default:
             Console.WriteLine($"Unbekanntes Argument: {args[i]}");
             break;
     }
 }
 
+var authClient = new AuthClient(authUrl);
+Console.WriteLine($"{count} Bot(s) melden sich bei {authUrl} an ...");
+
 List<BotClient> bots = new List<BotClient>();
 for (int i = 1; i <= count; i++)
 {
-    BotClient bot = new BotClient($"{namePrefix}{i}", radius);
+    string name = $"{namePrefix}{i}";
+    (string token, int characterId) = await authClient.LoginOrRegisterAndEnsureCharacterAsync(name);
+
+    BotClient bot = new BotClient(name, radius, token, characterId);
     bot.Connect(host, port);
     bots.Add(bot);
 }

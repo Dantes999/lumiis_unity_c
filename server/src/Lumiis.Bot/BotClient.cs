@@ -10,6 +10,8 @@ public sealed class BotClient : INetEventListener
 {
     private readonly string _name;
     private readonly int _radiusUnits;
+    private readonly string _token;
+    private readonly int _characterId;
     private readonly NetManager _netManager;
     private readonly Random _random = new();
 
@@ -19,10 +21,12 @@ public sealed class BotClient : INetEventListener
     private int _spawnY;
     private DateTime _nextMoveAtUtc;
 
-    public BotClient(string name, int radiusUnits)
+    public BotClient(string name, int radiusUnits, string token, int characterId)
     {
         _name = name;
         _radiusUnits = radiusUnits;
+        _token = token;
+        _characterId = characterId;
         _netManager = new NetManager(this) { UpdateTime = 15 };
     }
 
@@ -76,8 +80,8 @@ public sealed class BotClient : INetEventListener
 
     public void OnPeerConnected(NetPeer peer)
     {
-        Console.WriteLine($"[{_name}] verbunden, sende JoinRequest");
-        Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Name = _name });
+        Console.WriteLine($"[{_name}] verbunden, sende JoinRequest (CharacterId={_characterId})");
+        Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = _token, CharacterId = _characterId });
     }
 
     public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
