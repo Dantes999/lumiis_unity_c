@@ -180,6 +180,7 @@ Aktuelle Aufgabe: keine - M3a ist fertig, für M3b gibt es noch keine Task-Datei
 - Lumiis.Auth: kein Passwort-Reset, keine E-Mail-Verifizierung. Läuft nur über HTTP (kein TLS) - für ein echtes Deploy vor einen TLS-terminierenden Reverse-Proxy stellen.
 - Positions-Speicherintervall (Lumiis.Server) fix bei 30s, keine Konfiguration (siehe `GameServer.PositionSaveIntervalMs`).
 - Kein Token-Refresh: die Session (LoginController, Lumiis.Data.TokenService) endet nach 30 Minuten fix, danach muss sich der Client neu anmelden (JoinRejectReason.TokenExpired bzw. 401 auf GET/POST /characters schicken automatisch zurück zu LoggedOut).
+- ResolveDefaultDataDir() existiert unabhängig in Lumiis.Server und Lumiis.Auth (Pfad-Kandidaten je nach typischem CWD beim Start). Bei künftigen data-dir-bezogenen Bugs beide Stellen prüfen, nicht nur eine. Eine gemeinsame Stelle (z. B. in Lumiis.Data) ist eine spätere Aufräumarbeit, kein aktueller Blocker.
 
 ## Status
 - M0 fertig. Shared: PacketWriter/PacketReader/PacketCodec, PacketId (JoinRequest, MoveTo), 23 Tests grün.
