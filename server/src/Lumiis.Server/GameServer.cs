@@ -178,7 +178,7 @@ public sealed class GameServer : INetEventListener
         double deltaSeconds = 1.0 / Protocol.TickRate;
         List<Entity> arrived = _world.Tick(deltaSeconds);
         foreach (Entity entity in arrived)
-            BroadcastToJoined(new EntityStopPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY });
+            SendToVisible(entity.Id, new EntityStopPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY });
 
         UpdateVisibility();
         EnqueueDuePositionSaves();
@@ -350,7 +350,15 @@ public sealed class GameServer : INetEventListener
                     _positionSaveChannel.Writer.TryWrite(new PositionSaveRequest(entity!.CharacterId, entity.IntX, entity.IntY));
 
                 _world.Remove(entityId);
-                BroadcastToJoined(new EntityDespawnPacket { EntityId = entityId });
+
+                // Nur an Verbindungen, die die Entity laut ihrem letzten VisibleEntityIds-Stand aktuell
+                // sehen - HashSet.Remove liefert genau das (true = war sichtbar) und räumt gleichzeitig auf.
+                foreach (ConnectionState other in _connections.Values)
+                {
+                    if (other.VisibleEntityIds.Remove(entityId))
+                        other.Peer.SendPacket(new EntityDespawnPacket { EntityId = entityId });
+                }
+
                 _logger.Info($"Entity {entityId} despawnt (Disconnect, {disconnectInfo.Reason})");
             }
         }
@@ -542,12 +550,18 @@ public sealed class GameServer : INetEventListener
 
         conn.Peer.SendPacket(new JoinAcceptedPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY, Appearance = entity.Appearance });
 
-        // Der Joiner bekommt alle vorhandenen Entities, laufende Bewegungen zusätzlich als EntityMove ab aktueller Position.
-        foreach (Entity other in _world.Entities)
-        {
-            if (other.Id == entity.Id) continue;
+        // Der Joiner bekommt nur die laut AOI-Radius ab seiner Startposition sichtbaren Entities (nicht mehr
+        // alle), laufende Bewegungen zusätzlich als EntityMove ab aktueller Position. VisibleEntityIds wird
+        // hier schon auf denselben Stand gebracht wie das Gesendete, damit der nächste UpdateVisibility-Tick
+        // dieselben Entities nicht nochmal als "neu sichtbar" meldet.
+        HashSet<int> visibleToJoiner = _world.ComputeVisibility(GameConstants.AoiRadiusWire)
+            .TryGetValue(entity.Id, out HashSet<int>? v) ? v : new HashSet<int>();
 
-            conn.Peer.SendPacket(new EntitySpawnPacket { EntityId = other.Id, Name = other.Name, X = other.IntX, Y = other.IntY, Appearance = other.Appearance });
+        foreach (int otherId in visibleToJoiner)
+        {
+            if (!_world.TryGet(otherId, out Entity? other)) continue; // sollte nicht vorkommen
+
+            conn.Peer.SendPacket(new EntitySpawnPacket { EntityId = other!.Id, Name = other.Name, X = other.IntX, Y = other.IntY, Appearance = other.Appearance });
             if (other.IsMoving)
             {
                 conn.Peer.SendPacket(new EntityMovePacket
@@ -563,9 +577,12 @@ public sealed class GameServer : INetEventListener
             }
         }
 
-        // TODO(M3): Sichtbarkeit/AOI - aktuell sehen alle Verbindungen alle Entities.
-        BroadcastToJoined(new EntitySpawnPacket { EntityId = entity.Id, Name = entity.Name, X = entity.IntX, Y = entity.IntY, Appearance = entity.Appearance }, exceptPeerId: conn.Peer.Id);
+        conn.VisibleEntityIds.UnionWith(visibleToJoiner);
 
+        // Andere Spieler bekommen den Joiner NICHT hier per Broadcast gemeldet: die Entity ist über
+        // World.TryJoin oben bereits Teil der World, der nächste UpdateVisibility-Tick erkennt sie für jede
+        // Verbindung im AOI-Radius als "neu sichtbar" und verschickt EntitySpawn ganz normal über den
+        // Tick-Diff (Abschnitt 3) - kein Sonderfall nötig.
         _logger.Info($"{entity.Name} (Entity {entity.Id}, Character {character.Id}) beigetreten");
     }
 
@@ -605,7 +622,7 @@ public sealed class GameServer : INetEventListener
         _world.SetDestination(entityId, moveTo.X, moveTo.Y);
         _world.TryGet(entityId, out Entity? entity);
 
-        BroadcastToJoined(new EntityMovePacket
+        SendToVisible(entityId, new EntityMovePacket
         {
             EntityId = entityId,
             StartX = entity!.IntX,
@@ -617,14 +634,19 @@ public sealed class GameServer : INetEventListener
         });
     }
 
-    private void BroadcastToJoined(IPacket packet, int? exceptPeerId = null)
+    /// <summary>Schickt ein Paket über eine bestimmte Entity (Move/Stop) an alle Verbindungen, die diese
+    /// Entity laut ihrem letzten VisibleEntityIds-Stand sehen (siehe UpdateVisibility) - PLUS immer an die
+    /// eigene Verbindung dieser Entity selbst: ComputeVisibility schließt die eigene Entity bewusst aus der
+    /// eigenen Sichtbarkeitsmenge aus (siehe dort), der Client rendert seine eigene Figur aber genauso über
+    /// EntityMove/EntityStop wie jede andere (keine Client-Prediction, siehe CLAUDE.md).</summary>
+    private void SendToVisible(int entityId, IPacket packet)
     {
         byte[] data = PacketCodec.Encode(packet);
         foreach (ConnectionState conn in _connections.Values)
         {
             if (conn.EntityId == null) continue;
-            if (exceptPeerId.HasValue && conn.Peer.Id == exceptPeerId.Value) continue;
-            conn.Peer.Send(data, DeliveryMethod.ReliableOrdered);
+            if (conn.EntityId == entityId || conn.VisibleEntityIds.Contains(entityId))
+                conn.Peer.Send(data, DeliveryMethod.ReliableOrdered);
         }
     }
 }
