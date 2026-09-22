@@ -22,6 +22,7 @@
     <ProjectReference Include="..\..\src\Lumiis.Shared\Lumiis.Shared.csproj" />
     <ProjectReference Include="..\..\src\Lumiis.Server\Lumiis.Server.csproj" />
     <ProjectReference Include="..\..\src\Lumiis.Bot\Lumiis.Bot.csproj" />
+    <ProjectReference Include="..\..\src\Lumiis.Data\Lumiis.Data.csproj" />
   </ItemGroup>
 
   <!-- ClientWorld hat bewusst keine UnityEngine-Abhängigkeit (siehe Kommentar dort) - deshalb per
