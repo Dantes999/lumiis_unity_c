@@ -10,6 +10,13 @@ namespace Lumiis.Shared.Net
         ServerFull = 6
     }
 
+    /// <summary>Unterscheidet Spieler- von Monster-Entities in EntitySpawn (siehe dort) - seit M3c.</summary>
+    public enum EntityKind : byte
+    {
+        Player = 0,
+        Monster = 1
+    }
+
     /// <summary>Der Client wurde aufgenommen und an der genannten Position gespawnt. Appearance ist die eigene
     /// Figur - der Client berechnet sie nie selbst, siehe CLAUDE.md-Konvention.</summary>
     public sealed class JoinAcceptedPacket : IPacket
@@ -62,8 +69,11 @@ namespace Lumiis.Shared.Net
         }
     }
 
-    /// <summary>Eine (neue oder bereits vorhandene) Entity erscheint für den Client - eine andere Figur,
-    /// öffentliche Daten inklusive Appearance.</summary>
+    /// <summary>Eine (neue oder bereits vorhandene) Entity erscheint für den Client - eine andere Figur oder
+    /// (seit M3c) ein Monster, öffentliche Daten inklusive Appearance. Bei Kind=Monster ist Appearance mit
+    /// neutralen/Default-Werten befüllt (keine Bedeutung, das Feld bleibt aber für beide Kinds im Paket, damit
+    /// der Client nicht zwei verschiedene Paketformen unterscheiden muss) und MobId zeigt auf data/mobs.json;
+    /// bei Kind=Player ist MobId ungenutzt/0.</summary>
     public sealed class EntitySpawnPacket : IPacket
     {
         public int EntityId;
@@ -71,6 +81,8 @@ namespace Lumiis.Shared.Net
         public int X;
         public int Y;
         public Appearance Appearance;
+        public EntityKind Kind;
+        public int MobId;
 
         public PacketId Id
         {
@@ -84,6 +96,8 @@ namespace Lumiis.Shared.Net
             writer.WriteInt32(X);
             writer.WriteInt32(Y);
             Appearance.Write(writer);
+            writer.WriteByte((byte)Kind);
+            writer.WriteInt32(MobId);
         }
 
         public void Read(PacketReader reader)
@@ -93,6 +107,8 @@ namespace Lumiis.Shared.Net
             X = reader.ReadInt32();
             Y = reader.ReadInt32();
             Appearance.Read(reader);
+            Kind = (EntityKind)reader.ReadByte();
+            MobId = reader.ReadInt32();
         }
     }
 

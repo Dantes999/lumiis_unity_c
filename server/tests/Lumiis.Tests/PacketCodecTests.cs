@@ -47,16 +47,31 @@ namespace Lumiis.Tests
         }
 
         [Fact]
-        public void EntitySpawn_RoundTrip()
+        public void EntitySpawn_RoundTrip_Player()
         {
             var appearance = new Appearance { BodyId = 1, HairStyleId = 3, HairColorId = 5, ArmorId = 2, HelmetId = 2, WeaponId = 0, ShieldId = 1 };
-            var original = new EntitySpawnPacket { EntityId = 7, Name = "Held_1", X = 100, Y = -200, Appearance = appearance };
+            var original = new EntitySpawnPacket { EntityId = 7, Name = "Held_1", X = 100, Y = -200, Appearance = appearance, Kind = EntityKind.Player, MobId = 0 };
             var decoded = Assert.IsType<EntitySpawnPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
             Assert.Equal(original.EntityId, decoded.EntityId);
             Assert.Equal(original.Name, decoded.Name);
             Assert.Equal(original.X, decoded.X);
             Assert.Equal(original.Y, decoded.Y);
             Assert.Equal(original.Appearance, decoded.Appearance);
+            Assert.Equal(EntityKind.Player, decoded.Kind);
+            Assert.Equal(0, decoded.MobId);
+        }
+
+        [Fact]
+        public void EntitySpawn_RoundTrip_Monster()
+        {
+            var original = new EntitySpawnPacket { EntityId = 12, Name = "Wildhund", X = 30000, Y = 30000, Appearance = default, Kind = EntityKind.Monster, MobId = 1 };
+            var decoded = Assert.IsType<EntitySpawnPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.EntityId, decoded.EntityId);
+            Assert.Equal(original.Name, decoded.Name);
+            Assert.Equal(original.X, decoded.X);
+            Assert.Equal(original.Y, decoded.Y);
+            Assert.Equal(EntityKind.Monster, decoded.Kind);
+            Assert.Equal(1, decoded.MobId);
         }
 
         [Fact]
