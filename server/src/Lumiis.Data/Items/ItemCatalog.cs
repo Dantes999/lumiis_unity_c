@@ -1,0 +1,142 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
+using Lumiis.Data.Looks;
+
+namespace Lumiis.Data.Items;
+
+/// <summary>Art eines Items (M5a) - Armor/Helmet/Weapon/Shield sind Ausrüstungs-Slots mit LookId+Boni,
+/// Consumable ist ein Verbrauchsgegenstand mit HealAmount.</summary>
+public enum ItemType
+{
+    Armor,
+    Helmet,
+    Weapon,
+    Shield,
+    Consumable
+}
+
+/// <summary>Ein Item aus data/items.json. LookId/AttackBonus/DefenseBonus nur bei Ausrüstungs-ItemTypes
+/// aussagekräftig, HealAmount nur bei Consumable.</summary>
+public sealed class ItemDefinition
+{
+    public int Id { get; }
+    public string Name { get; }
+    public ItemType ItemType { get; }
+    public int LookId { get; }
+    public int AttackBonus { get; }
+    public int DefenseBonus { get; }
+    public int HealAmount { get; }
+
+    public ItemDefinition(int id, string name, ItemType itemType, int lookId, int attackBonus, int defenseBonus, int healAmount)
+    {
+        Id = id;
+        Name = name;
+        ItemType = itemType;
+        LookId = lookId;
+        AttackBonus = attackBonus;
+        DefenseBonus = defenseBonus;
+        HealAmount = healAmount;
+    }
+
+    /// <summary>Nur bei Armor/Helmet/Weapon/Shield true - Consumables können nicht angelegt werden.</summary>
+    public bool IsEquipment => ItemType != ItemType.Consumable;
+}
+
+/// <summary>Lädt und validiert data/items.json. Fehler beim Laden bedeuten Abbruch beim Serverstart (analog zu
+/// MobCatalog/ClassCatalog). lookCatalog: jedes Ausrüstungs-Item muss einen bestehenden Look-Eintrag im
+/// passenden Slot referenzieren (analog zu SpawnCatalog, das MobCatalog/CollisionMap zur Validierung
+/// braucht).</summary>
+public sealed class ItemCatalog
+{
+    private readonly Dictionary<int, ItemDefinition> _byId;
+
+    private ItemCatalog(Dictionary<int, ItemDefinition> byId)
+    {
+        _byId = byId;
+    }
+
+    public static ItemCatalog LoadFromFile(string path, LookCatalog lookCatalog)
+    {
+        string json;
+        try
+        {
+            json = File.ReadAllText(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new ItemCatalogException($"items.json konnte nicht gelesen werden ({path}): {ex.Message}");
+        }
+
+        return LoadFromJson(json, lookCatalog);
+    }
+
+    public static ItemCatalog LoadFromJson(string json, LookCatalog lookCatalog)
+    {
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        ItemCatalogDto? data;
+        try
+        {
+            data = JsonSerializer.Deserialize<ItemCatalogDto>(json, options);
+        }
+        catch (JsonException ex)
+        {
+            throw new ItemCatalogException($"items.json ist kein gültiges JSON: {ex.Message}");
+        }
+
+        if (data == null)
+            throw new ItemCatalogException("items.json ist leer.");
+
+        var byId = new Dictionary<int, ItemDefinition>();
+        foreach (ItemEntryDto entry in data.Items)
+        {
+            if (byId.ContainsKey(entry.Id))
+                throw new ItemCatalogException($"items.json: doppelte Id {entry.Id}.");
+
+            if (string.IsNullOrWhiteSpace(entry.Name))
+                throw new ItemCatalogException($"items.json: Item {entry.Id} ohne Namen.");
+
+            if (!Enum.TryParse(entry.ItemType, ignoreCase: true, out ItemType itemType))
+            {
+                throw new ItemCatalogException(
+                    $"items.json: Item {entry.Id} ({entry.Name}) hat einen ungültigen itemType '{entry.ItemType}' " +
+                    "(erwartet: Armor/Helmet/Weapon/Shield/Consumable).");
+            }
+
+            if (itemType == ItemType.Consumable)
+            {
+                if (entry.HealAmount <= 0)
+                    throw new ItemCatalogException($"items.json: Item {entry.Id} ({entry.Name}) ist Consumable, hat aber healAmount <= 0.");
+            }
+            else
+            {
+                string slot = itemType.ToString(); // Enum-Namen entsprechen 1:1 den looks.json-Slot-Namen.
+                if (!lookCatalog.Exists(slot, entry.LookId))
+                {
+                    throw new ItemCatalogException(
+                        $"items.json: Item {entry.Id} ({entry.Name}) verweist auf unbekannte LookId {entry.LookId} im Slot {slot}.");
+                }
+            }
+
+            byId[entry.Id] = new ItemDefinition(entry.Id, entry.Name, itemType, entry.LookId, entry.AttackBonus, entry.DefenseBonus, entry.HealAmount);
+        }
+
+        if (byId.Count == 0)
+            throw new ItemCatalogException("items.json: mindestens ein Item wird benötigt.");
+
+        return new ItemCatalog(byId);
+    }
+
+    public bool TryGet(int itemId, out ItemDefinition definition)
+    {
+        return _byId.TryGetValue(itemId, out definition!);
+    }
+}
+
+public sealed class ItemCatalogException : Exception
+{
+    public ItemCatalogException(string message) : base(message)
+    {
+    }
+}

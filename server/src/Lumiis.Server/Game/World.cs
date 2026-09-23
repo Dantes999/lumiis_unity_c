@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Lumiis.Data.Items;
 using Lumiis.Data.Maps;
 using Lumiis.Shared;
 using Lumiis.Shared.Net;
@@ -26,6 +27,7 @@ public sealed class World
     private readonly Dictionary<int, int> _entityIdByCharacterId = new();
     private readonly Dictionary<int, PendingMonsterRespawn> _pendingMonsterRespawns = new();
     private readonly CollisionMap? _collisionMap;
+    private readonly ItemCatalog? _itemCatalog;
     private readonly Random _random;
     private int _nextEntityId = 1;
 
@@ -34,13 +36,18 @@ public sealed class World
     private const long PlayerRespawnDelayMs = 3000;
 
     /// <summary>collisionMap: null bedeutet "überall begehbar" (z. B. bestehende Tests ohne Kollisionsbezug) -
-    /// echte Karten liefern immer eine Instanz mit, siehe GameServer/Program.cs. random: injizierbare
-    /// Zufallsquelle für die Wander-KI (siehe RunWanderAi), Default eine echte, nicht-deterministische
+    /// echte Karten liefern immer eine Instanz mit, siehe GameServer/Program.cs. itemCatalog: null bedeutet
+    /// "keine Items" (z. B. bestehende Tests ohne Item-Bezug) - genau wie CollisionMap wird er für laufende
+    /// Abfragen gehalten (M5a: TryEquip/TryUnequip/TryUseConsumable müssen zur Laufzeit beliebige ItemIds aus
+    /// dem Inventar auflösen können, nicht nur einmalig beim Spawn/Join wie MobCatalog/ClassCatalog - siehe
+    /// docs/tasks/M5a-items-equipment.md Abschnitt 0). random: injizierbare Zufallsquelle für die Wander-KI
+    /// (siehe RunWanderAi) und Drops (siehe ApplyDamage/TryAttack), Default eine echte, nicht-deterministische
     /// Instanz - Tests übergeben eine geseedete Instanz für deterministisches Verhalten.</summary>
-    public World(int maxPlayers, CollisionMap? collisionMap = null, Random? random = null)
+    public World(int maxPlayers, CollisionMap? collisionMap = null, Random? random = null, ItemCatalog? itemCatalog = null)
     {
         MaxPlayers = maxPlayers;
         _collisionMap = collisionMap;
+        _itemCatalog = itemCatalog;
         _random = random ?? new Random();
     }
 
@@ -330,6 +337,150 @@ public sealed class World
             diedMonster.RespawnSeconds, diedMonster.MeleeRangeWire, diedMonster.AttackCooldownMs,
             diedMonster.Aggressive, diedMonster.AggroRangeWire, diedMonster.LeashRangeWire,
             nowMs + diedMonster.RespawnSeconds * 1000L);
+    }
+
+    // ---- M5a: Items, Inventar, Ausrüstung (kein Netzwerkbezug, siehe GameServer für die Paket-Seite) ----
+
+    /// <summary>Legt das Item aus inventorySlotIndex an: prüft Slot belegt und dass der ItemType zu einem
+    /// Ausrüstungs-Slot passt, tauscht dann Inventarplatz und Ausrüstungs-Slot (bisheriges Ausrüstungsitem
+    /// landet zurück im selben Inventarplatz, 0 falls vorher nichts ausgerüstet war) und berechnet
+    /// Attack/Defense neu.</summary>
+    public (bool Success, InventoryActionFailedReason Reason) TryEquip(int entityId, int inventorySlotIndex)
+    {
+        if (!_entities.TryGetValue(entityId, out Entity? entity)) return (false, InventoryActionFailedReason.InvalidSlot);
+        if (inventorySlotIndex < 0 || inventorySlotIndex >= entity.Inventory.Length) return (false, InventoryActionFailedReason.InvalidSlot);
+
+        int itemId = entity.Inventory[inventorySlotIndex];
+        if (itemId == 0) return (false, InventoryActionFailedReason.EmptySlot);
+
+        if (_itemCatalog == null || !_itemCatalog.TryGet(itemId, out ItemDefinition item))
+            return (false, InventoryActionFailedReason.InvalidSlot); // sollte nicht vorkommen - Items im Inventar stammen immer aus dem Katalog.
+
+        int previousEquippedItemId;
+        switch (item.ItemType)
+        {
+            case ItemType.Armor: previousEquippedItemId = entity.EquippedArmorItemId; entity.EquippedArmorItemId = itemId; break;
+            case ItemType.Helmet: previousEquippedItemId = entity.EquippedHelmetItemId; entity.EquippedHelmetItemId = itemId; break;
+            case ItemType.Weapon: previousEquippedItemId = entity.EquippedWeaponItemId; entity.EquippedWeaponItemId = itemId; break;
+            case ItemType.Shield: previousEquippedItemId = entity.EquippedShieldItemId; entity.EquippedShieldItemId = itemId; break;
+            default: return (false, InventoryActionFailedReason.WrongItemType); // Consumable kann nicht angelegt werden.
+        }
+
+        entity.Inventory[inventorySlotIndex] = previousEquippedItemId;
+        RecalculateCombatStats(entity);
+        return (true, default);
+    }
+
+    /// <summary>Legt das Item aus equipmentSlot ab: braucht einen freien Inventarplatz (erste freie Stelle),
+    /// sonst InventoryFull. Berechnet Attack/Defense neu.</summary>
+    public (bool Success, InventoryActionFailedReason Reason) TryUnequip(int entityId, EquipmentSlot equipmentSlot)
+    {
+        if (!_entities.TryGetValue(entityId, out Entity? entity)) return (false, InventoryActionFailedReason.EmptySlot);
+
+        int currentItemId = equipmentSlot switch
+        {
+            EquipmentSlot.Armor => entity.EquippedArmorItemId,
+            EquipmentSlot.Helmet => entity.EquippedHelmetItemId,
+            EquipmentSlot.Weapon => entity.EquippedWeaponItemId,
+            EquipmentSlot.Shield => entity.EquippedShieldItemId,
+            _ => 0
+        };
+        if (currentItemId == 0) return (false, InventoryActionFailedReason.EmptySlot);
+
+        int freeSlot = FindFirstFreeInventorySlot(entity);
+        if (freeSlot < 0) return (false, InventoryActionFailedReason.InventoryFull);
+
+        switch (equipmentSlot)
+        {
+            case EquipmentSlot.Armor: entity.EquippedArmorItemId = 0; break;
+            case EquipmentSlot.Helmet: entity.EquippedHelmetItemId = 0; break;
+            case EquipmentSlot.Weapon: entity.EquippedWeaponItemId = 0; break;
+            case EquipmentSlot.Shield: entity.EquippedShieldItemId = 0; break;
+        }
+
+        entity.Inventory[freeSlot] = currentItemId;
+        RecalculateCombatStats(entity);
+        return (true, default);
+    }
+
+    /// <summary>Benutzt das Item aus inventorySlotIndex: nur wenn ItemType=Consumable, heilt CurrentHp um
+    /// HealAmount (gedeckelt bei MaxHp) und entfernt das Item aus dem Slot. TargetAtFullHp, falls CurrentHp
+    /// bereits MaxHp ist - nowMs aktuell ungenutzt (keine Cooldown-/Zeitlogik für Consumables in M5a),
+    /// trotzdem übergeben für Konsistenz mit TryAttack und für eine spätere Erweiterung (z. B. Cooldown pro
+    /// Trank-Typ).</summary>
+    public (bool Success, InventoryActionFailedReason Reason) TryUseConsumable(int entityId, int inventorySlotIndex, long nowMs)
+    {
+        if (!_entities.TryGetValue(entityId, out Entity? entity)) return (false, InventoryActionFailedReason.InvalidSlot);
+        if (inventorySlotIndex < 0 || inventorySlotIndex >= entity.Inventory.Length) return (false, InventoryActionFailedReason.InvalidSlot);
+
+        int itemId = entity.Inventory[inventorySlotIndex];
+        if (itemId == 0) return (false, InventoryActionFailedReason.EmptySlot);
+
+        if (_itemCatalog == null || !_itemCatalog.TryGet(itemId, out ItemDefinition item))
+            return (false, InventoryActionFailedReason.InvalidSlot);
+
+        if (item.ItemType != ItemType.Consumable) return (false, InventoryActionFailedReason.NotConsumable);
+        if (entity.CurrentHp >= entity.MaxHp) return (false, InventoryActionFailedReason.TargetAtFullHp);
+
+        entity.CurrentHp = Math.Min(entity.MaxHp, entity.CurrentHp + item.HealAmount);
+        entity.Inventory[inventorySlotIndex] = 0;
+        return (true, default);
+    }
+
+    /// <summary>Legt itemId auf die erste freie Inventarstelle. Gibt false zurück, wenn kein Platz frei ist
+    /// (Inventar voll) - der Aufrufer entscheidet, wie er das meldet (siehe GameServer.HandleXxx bzw.
+    /// TryAttack für Monster-Drops).</summary>
+    public bool TryAddItemToInventory(int entityId, int itemId)
+    {
+        if (!_entities.TryGetValue(entityId, out Entity? entity)) return false;
+
+        int freeSlot = FindFirstFreeInventorySlot(entity);
+        if (freeSlot < 0) return false;
+
+        entity.Inventory[freeSlot] = itemId;
+        return true;
+    }
+
+    private static int FindFirstFreeInventorySlot(Entity entity)
+    {
+        for (int i = 0; i < entity.Inventory.Length; i++)
+        {
+            if (entity.Inventory[i] == 0) return i;
+        }
+        return -1;
+    }
+
+    /// <summary>Setzt Attack/Defense auf BaseAttack/BaseDefense plus die Summe der Boni aller vier
+    /// Ausrüstungs-Slots - nach jedem Equip/Unequip aufgerufen (M5a). Öffentlich, damit GameServer sie auch
+    /// direkt nach dem Join aufrufen kann, sobald die aus der DB geladene Ausrüstung auf die Entity
+    /// übertragen wurde (siehe GameServer.CompleteJoin).</summary>
+    public void RecalculateCombatStats(int entityId)
+    {
+        if (_entities.TryGetValue(entityId, out Entity? entity))
+            RecalculateCombatStats(entity);
+    }
+
+    private void RecalculateCombatStats(Entity entity)
+    {
+        int attackBonus = 0;
+        int defenseBonus = 0;
+
+        if (_itemCatalog != null)
+        {
+            int[] equippedItemIds = { entity.EquippedArmorItemId, entity.EquippedHelmetItemId, entity.EquippedWeaponItemId, entity.EquippedShieldItemId };
+            foreach (int equippedItemId in equippedItemIds)
+            {
+                if (equippedItemId == 0) continue;
+                if (_itemCatalog.TryGet(equippedItemId, out ItemDefinition item))
+                {
+                    attackBonus += item.AttackBonus;
+                    defenseBonus += item.DefenseBonus;
+                }
+            }
+        }
+
+        entity.Attack = entity.BaseAttack + attackBonus;
+        entity.Defense = entity.BaseDefense + defenseBonus;
     }
 
     /// <summary>Für jede Entity: welche anderen Entities liegen innerhalb von radiusWire (quadrierte Distanz,

@@ -90,8 +90,16 @@ public sealed class Entity
 
     public int MaxHp { get; }
     public int CurrentHp { get; set; }
-    public int Attack { get; }
-    public int Defense { get; }
+
+    /// <summary>Grundwerte ohne Ausrüstungs-Boni (M5a) - bei Spielern aus ClassCatalog beim Join, bei
+    /// Monstern identisch zu Attack/Defense (Monster rüsten nie etwas aus). Attack/Defense selbst sind seit
+    /// M5a mutable und werden nach jedem Equip/Unequip auf BaseAttack/BaseDefense plus die Summe aller
+    /// ausgerüsteten Item-Boni neu berechnet (siehe World.RecalculateCombatStats) - TryAttack liest weiterhin
+    /// nur Attack/Defense, unverändert.</summary>
+    public int BaseAttack { get; }
+    public int BaseDefense { get; }
+    public int Attack { get; set; }
+    public int Defense { get; set; }
 
     /// <summary>Nur bei Kind=Player aussagekräftig (aus ClassCatalog) - Monster greifen in M4a nicht an,
     /// bei Kind=Monster 0/ungenutzt.</summary>
@@ -135,6 +143,18 @@ public sealed class Entity
     /// geladen (siehe GameServer.CompleteJoin), von World.TryAttack bei Monstertod erhöht.</summary>
     public long Yang { get; set; }
 
+    /// <summary>Inventar (M5a) - 20 Plätze, 0 = leer (Item-IDs aus data/items.json). Nur bei Kind=Player
+    /// sinnvoll befüllt (siehe GameServer.CompleteJoin) - Monster haben ein leeres, ungenutztes Array.</summary>
+    public int[] Inventory { get; } = new int[20];
+
+    /// <summary>Ausgerüstete Items (M5a, Item-IDs aus data/items.json, 0 = Slot leer) - nur bei Kind=Player
+    /// relevant. Werden von World.TryEquip/TryUnequip gepflegt, beim Join zusätzlich aus der Character-Zeile
+    /// übernommen (siehe GameServer.CompleteJoin).</summary>
+    public int EquippedArmorItemId { get; set; }
+    public int EquippedHelmetItemId { get; set; }
+    public int EquippedWeaponItemId { get; set; }
+    public int EquippedShieldItemId { get; set; }
+
     private Entity(int id, EntityKind kind, int? characterId, int mobId, int? spawnPointId, int respawnSeconds, string name, int x, int y, int movementSpeed,
         int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs,
         int maxHp, int attack, int defense, int meleeRangeWire, int attackCooldownMs, int yangMin, int yangMax,
@@ -157,6 +177,8 @@ public sealed class Entity
         WanderIntervalMaxMs = wanderIntervalMaxMs;
         MaxHp = maxHp;
         CurrentHp = maxHp;
+        BaseAttack = attack;
+        BaseDefense = defense;
         Attack = attack;
         Defense = defense;
         MeleeRangeWire = meleeRangeWire;

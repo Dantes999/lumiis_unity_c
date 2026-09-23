@@ -113,6 +113,14 @@ public sealed class LookCatalog
         };
     }
 
+    /// <summary>M5a: existiert dieser LookId im angegebenen Slot? Für ItemCatalog - jedes Item mit
+    /// Ausrüstungs-Slot referenziert einen bestehenden Look-Eintrag statt einer eigenen Grafik.</summary>
+    public bool Exists(string slot, int id)
+    {
+        List<int>? ids = GetIds(slot);
+        return ids != null && ids.Contains(id);
+    }
+
     private int FirstOrZero(string slot)
     {
         List<int>? ids = GetIds(slot);
