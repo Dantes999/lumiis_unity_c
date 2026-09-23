@@ -133,10 +133,8 @@ public sealed class GameServer : INetEventListener
                 mobCatalog.TryGet(spawn.MobId, out MobDefinition mobDef); // Existenz bereits von SpawnCatalog.LoadFromFile geprüft.
                 _world.SpawnMonster(spawn.MobId, mobDef.Name, spawn.PositionX, spawn.PositionY, mobDef.SpeedWire,
                     mobDef.WanderRadiusWire, mobDef.WanderIntervalMinMs, mobDef.WanderIntervalMaxMs, _nowMs(),
-                    mobDef.MaxHp, mobDef.Attack, mobDef.Defense, mobDef.YangMin, mobDef.YangMax, spawnPointId: spawn.Id);
-                // TODO(M4b Abschnitt 2): spawn.RespawnSeconds noch nicht durchgereicht - World.SpawnMonster/
-                // Entity.RespawnSeconds existieren bereits (Abschnitt 1), die Verdrahtung hierher ist
-                // Netzwerk-Anbindung und folgt in Abschnitt 2.
+                    mobDef.MaxHp, mobDef.Attack, mobDef.Defense, mobDef.YangMin, mobDef.YangMax,
+                    spawnPointId: spawn.Id, respawnSeconds: spawn.RespawnSeconds);
             }
         }
 
@@ -231,10 +229,7 @@ public sealed class GameServer : INetEventListener
         }
 
         double deltaSeconds = 1.0 / Protocol.TickRate;
-        // RespawnedMonsters wird hier noch verworfen (Broadcast/Log folgt in Abschnitt 2 der Aufgabe, siehe
-        // docs/tasks/M4b-monster-respawn.md) - kann zu diesem Zeitpunkt ohnehin nie etwas enthalten, da
-        // Entity.RespawnSeconds beim Katalog-Spawn noch nicht gesetzt wird (siehe TODO oben im Konstruktor).
-        (List<Entity> arrived, List<Entity> startedWandering, List<Entity> respawned, List<Entity> _) = _world.Tick(deltaSeconds, _nowMs());
+        (List<Entity> arrived, List<Entity> startedWandering, List<Entity> respawned, List<Entity> respawnedMonsters) = _world.Tick(deltaSeconds, _nowMs());
         foreach (Entity entity in arrived)
             SendToVisible(entity.Id, new EntityStopPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY });
 
@@ -259,6 +254,14 @@ public sealed class GameServer : INetEventListener
                 ServerTick = _tick
             });
         }
+
+        // Monster-Respawn (M4b): kein eigener Broadcast nötig - die neue Entity ist ab jetzt Teil von World,
+        // der gleich folgende UpdateVisibility()-Diff erkennt sie für jede Verbindung in AOI-Reichweite als
+        // "neu sichtbar" und verschickt EntitySpawn ganz normal (derselbe Mechanismus wie beim Dev-Tools-
+        // Debug-Spawn und beim Katalog-Spawn eines neu beitretenden Spielers - kein Sonderfall). Hier nur
+        // geloggt.
+        foreach (Entity monster in respawnedMonsters)
+            _logger.Info($"Monster {monster.Name} (Entity {monster.Id}) an SpawnPoint {monster.SpawnPointId} respawnt");
 
         UpdateVisibility();
         EnqueueDuePositionSaves();
