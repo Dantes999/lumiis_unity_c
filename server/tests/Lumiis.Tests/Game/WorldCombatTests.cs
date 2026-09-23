@@ -197,7 +197,7 @@ namespace Lumiis.Tests.Game
             Entity player = JoinPlayer(world, 1, x: 10000, y: 10000, maxHp: 100);
             world.ApplyDamage(player, damage: 9999, nowMs: 1000);
 
-            (_, _, List<Entity> respawned) = world.Tick(deltaSeconds: 0.0, nowMs: 1000 + 3000);
+            (_, _, List<Entity> respawned, _) = world.Tick(deltaSeconds: 0.0, nowMs: 1000 + 3000);
 
             Assert.Contains(player, respawned);
             Assert.Equal(GameConstants.MapWidth / 2, player.IntX);
@@ -213,7 +213,7 @@ namespace Lumiis.Tests.Game
             Entity player = JoinPlayer(world, 1, x: 10000, y: 10000);
             world.ApplyDamage(player, damage: 9999, nowMs: 1000);
 
-            (_, _, List<Entity> respawned) = world.Tick(deltaSeconds: 0.0, nowMs: 1000 + 2999); // 1ms zu frueh
+            (_, _, List<Entity> respawned, _) = world.Tick(deltaSeconds: 0.0, nowMs: 1000 + 2999); // 1ms zu frueh
 
             Assert.Empty(respawned);
             Assert.Equal(0, player.CurrentHp);

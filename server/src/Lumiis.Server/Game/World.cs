@@ -12,8 +12,18 @@ namespace Lumiis.Server.Game;
 /// ebenso injiziert statt selbst geladen - World bleibt frei von Dateizugriffen.</summary>
 public sealed class World
 {
+    /// <summary>"Rezept" für die nächste Entity an einem SpawnPoint (M4b) - aus den Werten der zuletzt dort
+    /// gestorbenen Monster-Entity eingefroren (siehe ScheduleMonsterRespawn), damit World.Tick bei Fälligkeit
+    /// exakt denselben Mob-Typ mit denselben Werten über den normalen SpawnMonster-Weg neu erzeugen kann.
+    /// Höchstens ein Eintrag pro SpawnPointId gleichzeitig (ein SpawnPoint hat immer entweder eine lebende
+    /// Monster-Entity oder einen ausstehenden Respawn, nie beides).</summary>
+    private readonly record struct PendingMonsterRespawn(int MobId, string Name, int PositionX, int PositionY, int SpeedWire,
+        int WanderRadiusWire, int WanderIntervalMinMs, int WanderIntervalMaxMs,
+        int MaxHp, int Attack, int Defense, int YangMin, int YangMax, int RespawnSeconds, long DueAtMs);
+
     private readonly Dictionary<int, Entity> _entities = new();
     private readonly Dictionary<int, int> _entityIdByCharacterId = new();
+    private readonly Dictionary<int, PendingMonsterRespawn> _pendingMonsterRespawns = new();
     private readonly CollisionMap? _collisionMap;
     private readonly Random _random;
     private int _nextEntityId = 1;
@@ -85,18 +95,19 @@ public sealed class World
     /// GameServer-Konstruktor) - Defaults nur für bestehende Tests ohne Kampfbezug, siehe
     /// Entity.DefaultMaxHp-Kommentar. spawnPointId: null (Default) bedeutet "nicht an einen SpawnPoint
     /// gebunden" (Dev-Tools-Debug-Spawn, siehe Entity.SpawnPointId) - der reguläre Katalog-Spawn im
-    /// GameServer-Konstruktor übergibt hier immer die echte SpawnPoint.Id.</summary>
+    /// GameServer-Konstruktor übergibt hier immer die echte SpawnPoint.Id. respawnSeconds: nur bei gesetzter
+    /// spawnPointId aussagekräftig (siehe Entity.RespawnSeconds, M4b).</summary>
     public Entity SpawnMonster(int mobId, string name, int x, int y, int speedWire,
         int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs, long nowMs,
         int maxHp = Entity.DefaultMaxHp, int attack = Entity.DefaultAttack, int defense = Entity.DefaultDefense,
-        int yangMin = 0, int yangMax = 0, int? spawnPointId = null)
+        int yangMin = 0, int yangMax = 0, int? spawnPointId = null, int respawnSeconds = 0)
     {
         int clampedX = Math.Clamp(x, 0, GameConstants.MapWidth);
         int clampedY = Math.Clamp(y, 0, GameConstants.MapHeight);
 
         int id = _nextEntityId++;
         Entity entity = Entity.CreateMonster(id, mobId, spawnPointId, name, clampedX, clampedY, speedWire,
-            wanderRadiusWire, wanderIntervalMinMs, wanderIntervalMaxMs, maxHp, attack, defense, yangMin, yangMax);
+            wanderRadiusWire, wanderIntervalMinMs, wanderIntervalMaxMs, maxHp, attack, defense, yangMin, yangMax, respawnSeconds);
         entity.NextWanderAtMs = nowMs + _random.Next(wanderIntervalMinMs, wanderIntervalMaxMs + 1);
         _entities[id] = entity;
         return entity;
@@ -251,13 +262,15 @@ public sealed class World
     }
 
     /// <summary>Wendet Schaden auf eine beliebige Entity an und löst bei 0 Leben die passende Tod-Behandlung
-    /// aus: Monster werden sofort aus World entfernt (wie ein normaler Despawn, TODO(M4b): stattdessen nach
-    /// SpawnPoint.RespawnSeconds respawnen statt endgültig zu verschwinden) und zahlen eine zufällige
-    /// Yang-Spanne aus; Spieler werden NICHT entfernt (kein Despawn), sondern bekommen RespawnAtMs gesetzt
-    /// (siehe Tick) - CurrentHp bleibt bis dahin 0. Von TryAttack nach allen Prüfungen aufgerufen, zusätzlich
-    /// internal sichtbar: TryAttack lehnt Spieler-Ziele selbst ab (kein PvP in M4a), das Sterbe-/Respawn-
-    /// Verhalten für Spieler ist trotzdem generisch implementiert und muss direkt testbar sein (siehe
-    /// WorldTests) - für eine spätere Erweiterung (z. B. Monster, die Spieler angreifen) bereits vorbereitet.</summary>
+    /// aus: Monster werden sofort aus World entfernt (wie ein normaler Despawn) und zahlen eine zufällige
+    /// Yang-Spanne aus; hatte das Monster eine SpawnPointId (regulärer Katalog-Spawn, kein Dev-Tools-Debug-
+    /// Spawn), wird zusätzlich ein Respawn an genau diesem SpawnPoint terminiert (M4b, siehe
+    /// ScheduleMonsterRespawn/Tick). Spieler werden NICHT entfernt (kein Despawn), sondern bekommen
+    /// RespawnAtMs gesetzt (siehe Tick) - CurrentHp bleibt bis dahin 0. Von TryAttack nach allen Prüfungen
+    /// aufgerufen, zusätzlich internal sichtbar: TryAttack lehnt Spieler-Ziele selbst ab (kein PvP in M4a),
+    /// das Sterbe-/Respawn-Verhalten für Spieler ist trotzdem generisch implementiert und muss direkt testbar
+    /// sein (siehe WorldTests) - für eine spätere Erweiterung (z. B. Monster, die Spieler angreifen) bereits
+    /// vorbereitet.</summary>
     internal (int HpAfter, bool Died, long YangAwarded) ApplyDamage(Entity target, int damage, long nowMs)
     {
         int hpAfter = Math.Max(0, target.CurrentHp - damage);
@@ -271,6 +284,8 @@ public sealed class World
             if (target.Kind == EntityKind.Monster)
             {
                 yangAwarded = _random.Next(target.YangMin, target.YangMax + 1);
+                if (target.SpawnPointId is int spawnPointId)
+                    ScheduleMonsterRespawn(spawnPointId, target, nowMs);
                 Remove(target.Id);
             }
             else
@@ -281,6 +296,20 @@ public sealed class World
         }
 
         return (hpAfter, died, yangAwarded);
+    }
+
+    /// <summary>Friert die Werte der gerade gestorbenen Monster-Entity als "Rezept" für ihren Nachfolger ein
+    /// (M4b) - Position ist der SpawnPoint selbst (WanderAnchorX/Y, nicht die evtl. verwanderte aktuelle
+    /// Position), fällig bei nowMs + RespawnSeconds*1000. Überschreibt einen evtl. vorhandenen Eintrag für
+    /// denselben SpawnPoint nicht extra ab - kann laut Klassenkommentar zu PendingMonsterRespawn ohnehin nie
+    /// vorkommen (ein SpawnPoint hat nie gleichzeitig eine lebende Entity UND einen ausstehenden Respawn).</summary>
+    private void ScheduleMonsterRespawn(int spawnPointId, Entity diedMonster, long nowMs)
+    {
+        _pendingMonsterRespawns[spawnPointId] = new PendingMonsterRespawn(
+            diedMonster.MobId, diedMonster.Name, diedMonster.WanderAnchorX, diedMonster.WanderAnchorY, diedMonster.MovementSpeed,
+            diedMonster.WanderRadiusWire, diedMonster.WanderIntervalMinMs, diedMonster.WanderIntervalMaxMs,
+            diedMonster.MaxHp, diedMonster.Attack, diedMonster.Defense, diedMonster.YangMin, diedMonster.YangMax,
+            diedMonster.RespawnSeconds, nowMs + diedMonster.RespawnSeconds * 1000L);
     }
 
     /// <summary>Für jede Entity: welche anderen Entities liegen innerhalb von radiusWire (quadrierte Distanz,
@@ -320,14 +349,20 @@ public sealed class World
 
     /// <summary>Schreibt alle Bewegungen um deltaSeconds fort (Spieler-MoveTo UND laufende Monster-Wander-
     /// Bewegung, derselbe Mechanismus). Läuft danach die Wander-KI für fällige Monster (Reihenfolge
-    /// willkürlich, aber konsistent - siehe docs/tasks/M3c-monsters.md), zuletzt fällige Spieler-Respawns
+    /// willkürlich, aber konsistent - siehe docs/tasks/M3c-monsters.md), dann fällige Spieler-Respawns
     /// (M4a, siehe ApplyDamage): Position auf Kartenmitte, CurrentHp auf MaxHp, EntityKind/Appearance
-    /// unverändert. Gibt drei Listen zurück: Arrived (Entities, die in diesem Tick exakt am Ziel angekommen
-    /// sind - für EntityStop), StartedWandering (Monster, die in diesem Tick per RunWanderAi ein neues
-    /// Bewegungsziel bekommen haben - für EntityMove, analog zu HandleMoveTo bei Spielern, die aber über ein
-    /// echtes MoveToPacket ausgelöst werden statt über den Tick) und Respawned (Spieler, die in diesem Tick
-    /// respawnt sind - ebenfalls für EntityStop an der neuen Position, siehe GameServer).</summary>
-    public (List<Entity> Arrived, List<Entity> StartedWandering, List<Entity> Respawned) Tick(double deltaSeconds, long nowMs)
+    /// unverändert. Zuletzt fällige Monster-Respawns (M4b, siehe ScheduleMonsterRespawn): erzeugt über den
+    /// normalen SpawnMonster-Weg eine NEUE Entity mit neuer EntityId (anders als beim Spieler - die alte
+    /// wurde beim Tod schon entfernt, der Client hat längst EntityDespawn bekommen), räumt den SpawnPoint
+    /// danach wieder frei. Gibt vier Listen zurück: Arrived (Entities, die in diesem Tick exakt am Ziel
+    /// angekommen sind - für EntityStop), StartedWandering (Monster, die in diesem Tick per RunWanderAi ein
+    /// neues Bewegungsziel bekommen haben - für EntityMove, analog zu HandleMoveTo bei Spielern, die aber über
+    /// ein echtes MoveToPacket ausgelöst werden statt über den Tick), Respawned (Spieler, die in diesem Tick
+    /// respawnt sind - ebenfalls für EntityStop an der neuen Position, siehe GameServer) und
+    /// RespawnedMonsters (neu erschienene Monster - kein Sonderfall nötig, der normale AOI-Diff-Mechanismus
+    /// erkennt sie als "neu sichtbar" und verschickt EntitySpawn von selbst, siehe GameServer.UpdateVisibility;
+    /// die Liste dient GameServer nur zum Loggen).</summary>
+    public (List<Entity> Arrived, List<Entity> StartedWandering, List<Entity> Respawned, List<Entity> RespawnedMonsters) Tick(double deltaSeconds, long nowMs)
     {
         List<Entity> arrived = new();
         foreach (Entity entity in _entities.Values)
@@ -358,7 +393,29 @@ public sealed class World
             respawned.Add(entity);
         }
 
-        return (arrived, startedWandering, respawned);
+        List<Entity> respawnedMonsters = new();
+        if (_pendingMonsterRespawns.Count > 0)
+        {
+            List<int> dueSpawnPointIds = new();
+            foreach (KeyValuePair<int, PendingMonsterRespawn> kvp in _pendingMonsterRespawns)
+            {
+                if (nowMs >= kvp.Value.DueAtMs) dueSpawnPointIds.Add(kvp.Key);
+            }
+
+            foreach (int spawnPointId in dueSpawnPointIds)
+            {
+                PendingMonsterRespawn pending = _pendingMonsterRespawns[spawnPointId];
+                _pendingMonsterRespawns.Remove(spawnPointId);
+
+                Entity monster = SpawnMonster(pending.MobId, pending.Name, pending.PositionX, pending.PositionY, pending.SpeedWire,
+                    pending.WanderRadiusWire, pending.WanderIntervalMinMs, pending.WanderIntervalMaxMs, nowMs,
+                    pending.MaxHp, pending.Attack, pending.Defense, pending.YangMin, pending.YangMax,
+                    spawnPointId: spawnPointId, respawnSeconds: pending.RespawnSeconds);
+                respawnedMonsters.Add(monster);
+            }
+        }
+
+        return (arrived, startedWandering, respawned, respawnedMonsters);
     }
 
     /// <summary>Eine fällige Wander-Entscheidung für ein Monster: zufälliger Punkt innerhalb WanderRadiusWire

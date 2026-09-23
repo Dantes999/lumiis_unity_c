@@ -39,6 +39,13 @@ public sealed class Entity
     /// SpawnPointId.HasValue verlassen, nie auf Kind allein.</summary>
     public int? SpawnPointId { get; }
 
+    /// <summary>Nur bei Kind=Monster MIT gesetzter SpawnPointId aussagekräftig (aus SpawnPoint.RespawnSeconds,
+    /// siehe World.SpawnMonster/GameServer-Konstruktor) - Sekunden bis zum Respawn nach dem Tod (M4b). Wird
+    /// bei jedem Respawn an die neue Entity weitergereicht, damit derselbe SpawnPoint bei erneutem Tod wieder
+    /// korrekt respawnt (siehe World.ScheduleMonsterRespawn). 0/ungenutzt bei Spielern und bei per
+    /// Dev-Tools-Debug-Befehl gespawnten Monstern (SpawnPointId == null, respawnen nie).</summary>
+    public int RespawnSeconds { get; }
+
     /// <summary>Wird von GameServer direkt nach dem Join aus der geladenen Character-Zeile gesetzt. Bei
     /// Monstern mit Default-Werten befüllt (siehe EntitySpawnPacket-Kommentar), keine Bedeutung.</summary>
     public Appearance Appearance { get; set; }
@@ -111,7 +118,7 @@ public sealed class Entity
     /// geladen (siehe GameServer.CompleteJoin), von World.TryAttack bei Monstertod erhöht.</summary>
     public long Yang { get; set; }
 
-    private Entity(int id, EntityKind kind, int? characterId, int mobId, int? spawnPointId, string name, int x, int y, int movementSpeed,
+    private Entity(int id, EntityKind kind, int? characterId, int mobId, int? spawnPointId, int respawnSeconds, string name, int x, int y, int movementSpeed,
         int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs,
         int maxHp, int attack, int defense, int meleeRangeWire, int attackCooldownMs, int yangMin, int yangMax)
     {
@@ -120,6 +127,7 @@ public sealed class Entity
         CharacterId = characterId;
         MobId = mobId;
         SpawnPointId = spawnPointId;
+        RespawnSeconds = respawnSeconds;
         Name = name;
         X = x;
         Y = y;
@@ -142,7 +150,7 @@ public sealed class Entity
     public Entity(int id, int characterId, string name, int x, int y,
         int maxHp = DefaultMaxHp, int attack = DefaultAttack, int defense = DefaultDefense,
         int meleeRangeWire = DefaultMeleeRangeWire, int attackCooldownMs = DefaultAttackCooldownMs)
-        : this(id, EntityKind.Player, characterId, mobId: 0, spawnPointId: null, name, x, y, movementSpeed: GameConstants.PlayerSpeed,
+        : this(id, EntityKind.Player, characterId, mobId: 0, spawnPointId: null, respawnSeconds: 0, name, x, y, movementSpeed: GameConstants.PlayerSpeed,
             wanderRadiusWire: 0, wanderIntervalMinMs: 0, wanderIntervalMaxMs: 0,
             maxHp, attack, defense, meleeRangeWire, attackCooldownMs, yangMin: 0, yangMax: 0)
     {
@@ -150,12 +158,14 @@ public sealed class Entity
 
     /// <summary>spawnPointId: null bedeutet "nicht an einen SpawnPoint aus spawns.json gebunden" (Dev-Tools-
     /// Debug-Spawn, siehe SpawnPointId-Kommentar) - reguläre, aus der SpawnCatalog erzeugte Monster übergeben
-    /// hier immer die echte SpawnPoint.Id (siehe World.SpawnMonster/GameServer-Konstruktor).</summary>
+    /// hier immer die echte SpawnPoint.Id (siehe World.SpawnMonster/GameServer-Konstruktor).
+    /// respawnSeconds: nur bei gesetzter spawnPointId aussagekräftig (siehe RespawnSeconds-Kommentar).</summary>
     public static Entity CreateMonster(int id, int mobId, int? spawnPointId, string name, int x, int y, int speedWire,
         int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs,
-        int maxHp = DefaultMaxHp, int attack = DefaultAttack, int defense = DefaultDefense, int yangMin = 0, int yangMax = 0)
+        int maxHp = DefaultMaxHp, int attack = DefaultAttack, int defense = DefaultDefense, int yangMin = 0, int yangMax = 0,
+        int respawnSeconds = 0)
     {
-        return new Entity(id, EntityKind.Monster, characterId: null, mobId, spawnPointId, name, x, y, movementSpeed: speedWire,
+        return new Entity(id, EntityKind.Monster, characterId: null, mobId, spawnPointId, respawnSeconds, name, x, y, movementSpeed: speedWire,
             wanderRadiusWire, wanderIntervalMinMs, wanderIntervalMaxMs,
             maxHp, attack, defense, meleeRangeWire: 0, attackCooldownMs: 0, yangMin, yangMax);
     }
