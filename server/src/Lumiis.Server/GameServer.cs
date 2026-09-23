@@ -107,7 +107,8 @@ public sealed class GameServer : INetEventListener
             foreach (SpawnPoint spawn in spawnCatalog.Spawns)
             {
                 mobCatalog.TryGet(spawn.MobId, out MobDefinition mobDef); // Existenz bereits von SpawnCatalog.LoadFromFile geprüft.
-                _world.SpawnMonster(spawn.MobId, mobDef.Name, spawn.PositionX, spawn.PositionY);
+                _world.SpawnMonster(spawn.MobId, mobDef.Name, spawn.PositionX, spawn.PositionY, mobDef.SpeedWire,
+                    mobDef.WanderRadiusWire, mobDef.WanderIntervalMinMs, mobDef.WanderIntervalMaxMs, _nowMs());
             }
         }
 
@@ -189,9 +190,25 @@ public sealed class GameServer : INetEventListener
         }
 
         double deltaSeconds = 1.0 / Protocol.TickRate;
-        List<Entity> arrived = _world.Tick(deltaSeconds);
+        (List<Entity> arrived, List<Entity> startedWandering) = _world.Tick(deltaSeconds, _nowMs());
         foreach (Entity entity in arrived)
             SendToVisible(entity.Id, new EntityStopPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY });
+
+        // Wander-KI (World.Tick) hat fälligen Monstern ein neues Ziel gesetzt - dieselbe EntityMove-
+        // Benachrichtigung wie bei einem Spieler-MoveTo (HandleMoveTo), nur ohne eingehendes Paket als Auslöser.
+        foreach (Entity entity in startedWandering)
+        {
+            SendToVisible(entity.Id, new EntityMovePacket
+            {
+                EntityId = entity.Id,
+                StartX = entity.IntX,
+                StartY = entity.IntY,
+                TargetX = entity.TargetX,
+                TargetY = entity.TargetY,
+                Speed = entity.Speed,
+                ServerTick = _tick
+            });
+        }
 
         UpdateVisibility();
         EnqueueDuePositionSaves();

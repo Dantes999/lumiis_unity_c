@@ -158,7 +158,7 @@ namespace Lumiis.Tests.Game
             world.TryJoin(characterId: 1, "Bot", null, null, out Entity? entity, out _);
             world.SetDestination(entity!.Id, entity.IntX + 100, entity.IntY);
 
-            var arrived = world.Tick(10.0); // genug Zeit, um definitiv anzukommen
+            (var arrived, _) = world.Tick(10.0, nowMs: 0); // genug Zeit, um definitiv anzukommen
 
             Assert.Contains(entity, arrived);
             Assert.False(entity.IsMoving);

@@ -15,14 +15,18 @@ public sealed class World
     private readonly Dictionary<int, Entity> _entities = new();
     private readonly Dictionary<int, int> _entityIdByCharacterId = new();
     private readonly CollisionMap? _collisionMap;
+    private readonly Random _random;
     private int _nextEntityId = 1;
 
     /// <summary>collisionMap: null bedeutet "überall begehbar" (z. B. bestehende Tests ohne Kollisionsbezug) -
-    /// echte Karten liefern immer eine Instanz mit, siehe GameServer/Program.cs.</summary>
-    public World(int maxPlayers, CollisionMap? collisionMap = null)
+    /// echte Karten liefern immer eine Instanz mit, siehe GameServer/Program.cs. random: injizierbare
+    /// Zufallsquelle für die Wander-KI (siehe RunWanderAi), Default eine echte, nicht-deterministische
+    /// Instanz - Tests übergeben eine geseedete Instanz für deterministisches Verhalten.</summary>
+    public World(int maxPlayers, CollisionMap? collisionMap = null, Random? random = null)
     {
         MaxPlayers = maxPlayers;
         _collisionMap = collisionMap;
+        _random = random ?? new Random();
     }
 
     public int MaxPlayers { get; }
@@ -66,14 +70,18 @@ public sealed class World
     /// <summary>Legt eine Monster-Entity an (Serverstart, siehe GameServer/Program.cs) - EntityId aus
     /// demselben Zähler wie Spieler (siehe World-Klassenkommentar/_nextEntityId), kein Verbindungsbezug, kein
     /// Spielerlimit-Check. x/y kommen bereits geprüft aus SpawnCatalog (begehbare Zelle), werden hier trotzdem
-    /// defensiv auf die Kartengrenzen geklemmt, analog zu TryJoin.</summary>
-    public Entity SpawnMonster(int mobId, string name, int x, int y)
+    /// defensiv auf die Kartengrenzen geklemmt, analog zu TryJoin. nowMs: Wandzeit für die erste
+    /// Wander-Fälligkeit (zufällig zwischen wanderIntervalMinMs/MaxMs ab jetzt, siehe RunWanderAi).</summary>
+    public Entity SpawnMonster(int mobId, string name, int x, int y, int speedWire,
+        int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs, long nowMs)
     {
         int clampedX = Math.Clamp(x, 0, GameConstants.MapWidth);
         int clampedY = Math.Clamp(y, 0, GameConstants.MapHeight);
 
         int id = _nextEntityId++;
-        Entity entity = Entity.CreateMonster(id, mobId, name, clampedX, clampedY);
+        Entity entity = Entity.CreateMonster(id, mobId, name, clampedX, clampedY, speedWire,
+            wanderRadiusWire, wanderIntervalMinMs, wanderIntervalMaxMs);
+        entity.NextWanderAtMs = nowMs + _random.Next(wanderIntervalMinMs, wanderIntervalMaxMs + 1);
         _entities[id] = entity;
         return entity;
     }
@@ -104,7 +112,7 @@ public sealed class World
 
         if (_collisionMap == null)
         {
-            entity.MoveTo(clampedX, clampedY, GameConstants.PlayerSpeed);
+            entity.MoveTo(clampedX, clampedY, entity.MovementSpeed);
             return true;
         }
 
@@ -124,14 +132,14 @@ public sealed class World
         if (stopCellX == targetCellX && stopCellY == targetCellY)
         {
             // Ganzer Weg begehbar - Ziel exakt wie ohne Kollisionsprüfung, kein Zellen-Snapping.
-            entity.MoveTo(clampedX, clampedY, GameConstants.PlayerSpeed);
+            entity.MoveTo(clampedX, clampedY, entity.MovementSpeed);
             return true;
         }
 
         if (stopCellX == startCellX && stopCellY == startCellY)
             return true; // Schon die erste Zelle Richtung Ziel ist blockiert - keine Bewegung.
 
-        entity.MoveTo(stopCellX * 100 + 50, stopCellY * 100 + 50, GameConstants.PlayerSpeed);
+        entity.MoveTo(stopCellX * 100 + 50, stopCellY * 100 + 50, entity.MovementSpeed);
         return true;
     }
 
@@ -201,8 +209,14 @@ public sealed class World
         return visible;
     }
 
-    /// <summary>Schreibt alle Bewegungen um deltaSeconds fort. Gibt die Entities zurück, die in diesem Tick exakt am Ziel angekommen sind.</summary>
-    public List<Entity> Tick(double deltaSeconds)
+    /// <summary>Schreibt alle Bewegungen um deltaSeconds fort (Spieler-MoveTo UND laufende Monster-Wander-
+    /// Bewegung, derselbe Mechanismus). Läuft danach die Wander-KI für fällige Monster (Reihenfolge
+    /// willkürlich, aber konsistent - siehe docs/tasks/M3c-monsters.md). Gibt zwei Listen zurück: Arrived
+    /// (Entities, die in diesem Tick exakt am Ziel angekommen sind - für EntityStop) und StartedWandering
+    /// (Monster, die in diesem Tick per RunWanderAi ein neues Bewegungsziel bekommen haben - für EntityMove,
+    /// analog zu HandleMoveTo bei Spielern, die aber über ein echtes MoveToPacket ausgelöst werden statt über
+    /// den Tick).</summary>
+    public (List<Entity> Arrived, List<Entity> StartedWandering) Tick(double deltaSeconds, long nowMs)
     {
         List<Entity> arrived = new();
         foreach (Entity entity in _entities.Values)
@@ -210,6 +224,40 @@ public sealed class World
             if (entity.Tick(deltaSeconds))
                 arrived.Add(entity);
         }
-        return arrived;
+
+        List<Entity> startedWandering = new();
+        foreach (Entity entity in _entities.Values)
+        {
+            if (entity.Kind != EntityKind.Monster) continue;
+            if (nowMs < entity.NextWanderAtMs) continue;
+
+            if (RunWanderAi(entity, nowMs))
+                startedWandering.Add(entity);
+        }
+
+        return (arrived, startedWandering);
+    }
+
+    /// <summary>Eine fällige Wander-Entscheidung für ein Monster: zufälliger Punkt innerhalb WanderRadiusWire
+    /// um den Anker (Quadrat, nicht Kreis - gleiche einfache Herangehensweise wie BotTargetPicker für
+    /// Spieler-Bots), auf Kartengrenzen geklemmt. Ist die Zielzelle blockiert, wird dieser Zyklus
+    /// übersprungen (kein Retry-Loop) - die Bewegung selbst nutzt danach denselben SetDestination-Mechanismus
+    /// wie Spieler-MoveTo (inklusive Kollisions-Klemmung entlang der Linie aus M3a), keine neue
+    /// Bewegungslogik. Die nächste Fälligkeit wird immer neu bestimmt, unabhängig davon, ob diese Runde
+    /// übersprungen wurde. Gibt zurück, ob tatsächlich eine neue Bewegung gestartet wurde.</summary>
+    private bool RunWanderAi(Entity entity, long nowMs)
+    {
+        entity.NextWanderAtMs = nowMs + _random.Next(entity.WanderIntervalMinMs, entity.WanderIntervalMaxMs + 1);
+
+        int offsetX = _random.Next(-entity.WanderRadiusWire, entity.WanderRadiusWire + 1);
+        int offsetY = _random.Next(-entity.WanderRadiusWire, entity.WanderRadiusWire + 1);
+        int targetX = Math.Clamp(entity.WanderAnchorX + offsetX, 0, GameConstants.MapWidth);
+        int targetY = Math.Clamp(entity.WanderAnchorY + offsetY, 0, GameConstants.MapHeight);
+
+        if (_collisionMap != null && _collisionMap.IsBlocked(targetX / 100, targetY / 100))
+            return false;
+
+        SetDestination(entity.Id, targetX, targetY);
+        return true;
     }
 }

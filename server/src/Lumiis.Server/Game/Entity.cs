@@ -1,3 +1,4 @@
+using Lumiis.Shared;
 using Lumiis.Shared.Net;
 
 namespace Lumiis.Server.Game;
@@ -46,7 +47,24 @@ public sealed class Entity
     public int WanderAnchorX { get; }
     public int WanderAnchorY { get; }
 
-    private Entity(int id, EntityKind kind, int? characterId, int mobId, string name, int x, int y)
+    /// <summary>Nur bei Kind=Monster gesetzt (aus dem Mob-Typ, siehe MobCatalog/World.SpawnMonster) - bei
+    /// Kind=Player 0/ungenutzt.</summary>
+    public int WanderRadiusWire { get; }
+    public int WanderIntervalMinMs { get; }
+    public int WanderIntervalMaxMs { get; }
+
+    /// <summary>Wandzeit (siehe GameServer._nowMs), wann die nächste Wander-Zielwahl fällig ist (siehe
+    /// World.RunWanderAi) - von World gesetzt, nur bei Kind=Monster relevant.</summary>
+    public long NextWanderAtMs { get; set; }
+
+    /// <summary>Eigene Bewegungsgeschwindigkeit (1/100 Welteinheiten/s) - bei Kind=Player immer
+    /// GameConstants.PlayerSpeed, bei Kind=Monster aus dem Mob-Typ (mobs.json SpeedWire). World.SetDestination
+    /// nutzt das statt eines hartkodierten Werts, damit Spieler und Monster denselben Bewegungsmechanismus
+    /// mit jeweils eigener Geschwindigkeit teilen.</summary>
+    public int MovementSpeed { get; }
+
+    private Entity(int id, EntityKind kind, int? characterId, int mobId, string name, int x, int y, int movementSpeed,
+        int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs)
     {
         Id = id;
         Kind = kind;
@@ -55,18 +73,25 @@ public sealed class Entity
         Name = name;
         X = x;
         Y = y;
+        MovementSpeed = movementSpeed;
         WanderAnchorX = x;
         WanderAnchorY = y;
+        WanderRadiusWire = wanderRadiusWire;
+        WanderIntervalMinMs = wanderIntervalMinMs;
+        WanderIntervalMaxMs = wanderIntervalMaxMs;
     }
 
     public Entity(int id, int characterId, string name, int x, int y)
-        : this(id, EntityKind.Player, characterId, mobId: 0, name, x, y)
+        : this(id, EntityKind.Player, characterId, mobId: 0, name, x, y, movementSpeed: GameConstants.PlayerSpeed,
+            wanderRadiusWire: 0, wanderIntervalMinMs: 0, wanderIntervalMaxMs: 0)
     {
     }
 
-    public static Entity CreateMonster(int id, int mobId, string name, int x, int y)
+    public static Entity CreateMonster(int id, int mobId, string name, int x, int y, int speedWire,
+        int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs)
     {
-        return new Entity(id, EntityKind.Monster, characterId: null, mobId, name, x, y);
+        return new Entity(id, EntityKind.Monster, characterId: null, mobId, name, x, y, movementSpeed: speedWire,
+            wanderRadiusWire, wanderIntervalMinMs, wanderIntervalMaxMs);
     }
 
     public void MoveTo(int targetX, int targetY, int speed)
