@@ -14,8 +14,16 @@ public sealed class MobDefinition
     public int WanderRadiusWire { get; }
     public int WanderIntervalMinMs { get; }
     public int WanderIntervalMaxMs { get; }
+    public int MaxHp { get; }
+    public int Attack { get; }
+    public int Defense { get; }
 
-    public MobDefinition(int id, string name, int speedWire, int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs)
+    /// <summary>Yang-Spanne, die beim Tod dieses Mob-Typs ausgezahlt wird (M4a, siehe World.TryAttack).</summary>
+    public int YangMin { get; }
+    public int YangMax { get; }
+
+    public MobDefinition(int id, string name, int speedWire, int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs,
+        int maxHp, int attack, int defense, int yangMin, int yangMax)
     {
         Id = id;
         Name = name;
@@ -23,6 +31,11 @@ public sealed class MobDefinition
         WanderRadiusWire = wanderRadiusWire;
         WanderIntervalMinMs = wanderIntervalMinMs;
         WanderIntervalMaxMs = wanderIntervalMaxMs;
+        MaxHp = maxHp;
+        Attack = attack;
+        Defense = defense;
+        YangMin = yangMin;
+        YangMax = yangMax;
     }
 }
 
@@ -89,7 +102,23 @@ public sealed class MobCatalog
                     $"mobs.json: Mob {entry.Id} ({entry.Name}) hat ein ungültiges Wander-Intervall (min {entry.WanderIntervalMinMs}, max {entry.WanderIntervalMaxMs}).");
             }
 
-            byId[entry.Id] = new MobDefinition(entry.Id, entry.Name, entry.SpeedWire, entry.WanderRadiusWire, entry.WanderIntervalMinMs, entry.WanderIntervalMaxMs);
+            if (entry.MaxHp <= 0)
+                throw new MobCatalogException($"mobs.json: Mob {entry.Id} ({entry.Name}) hat maxHp <= 0.");
+
+            if (entry.Attack < 0)
+                throw new MobCatalogException($"mobs.json: Mob {entry.Id} ({entry.Name}) hat attack < 0.");
+
+            if (entry.Defense < 0)
+                throw new MobCatalogException($"mobs.json: Mob {entry.Id} ({entry.Name}) hat defense < 0.");
+
+            if (entry.YangMin < 0 || entry.YangMax < entry.YangMin)
+            {
+                throw new MobCatalogException(
+                    $"mobs.json: Mob {entry.Id} ({entry.Name}) hat eine ungültige Yang-Spanne (min {entry.YangMin}, max {entry.YangMax}).");
+            }
+
+            byId[entry.Id] = new MobDefinition(entry.Id, entry.Name, entry.SpeedWire, entry.WanderRadiusWire, entry.WanderIntervalMinMs, entry.WanderIntervalMaxMs,
+                entry.MaxHp, entry.Attack, entry.Defense, entry.YangMin, entry.YangMax);
         }
 
         if (byId.Count == 0)

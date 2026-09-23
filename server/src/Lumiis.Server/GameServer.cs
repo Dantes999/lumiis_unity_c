@@ -190,7 +190,10 @@ public sealed class GameServer : INetEventListener
         }
 
         double deltaSeconds = 1.0 / Protocol.TickRate;
-        (List<Entity> arrived, List<Entity> startedWandering) = _world.Tick(deltaSeconds, _nowMs());
+        // Respawned wird hier noch verworfen (Broadcast folgt in Abschnitt 5 der Aufgabe, siehe
+        // docs/tasks/M4a-combat-core.md) - kann zu diesem Zeitpunkt ohnehin nie etwas enthalten, da
+        // RespawnAtMs erst gesetzt wird, sobald World.TryAttack netzwerkseitig erreichbar ist.
+        (List<Entity> arrived, List<Entity> startedWandering, List<Entity> _) = _world.Tick(deltaSeconds, _nowMs());
         foreach (Entity entity in arrived)
             SendToVisible(entity.Id, new EntityStopPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY });
 

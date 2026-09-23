@@ -179,7 +179,7 @@ namespace Lumiis.Tests.Game
             world.TryJoin(characterId: 1, "Bot", null, null, out Entity? entity, out _);
             world.SetDestination(entity!.Id, entity.IntX + 100, entity.IntY);
 
-            (var arrived, _) = world.Tick(10.0, nowMs: 0); // genug Zeit, um definitiv anzukommen
+            (var arrived, _, _) = world.Tick(10.0, nowMs: 0); // genug Zeit, um definitiv anzukommen
 
             Assert.Contains(entity, arrived);
             Assert.False(entity.IsMoving);
@@ -363,7 +363,7 @@ namespace Lumiis.Tests.Game
             Entity monster = world.SpawnMonster(mobId: 1, "Wildhund", x: 50000, y: 50000, speedWire: 700,
                 wanderRadiusWire: 500, wanderIntervalMinMs: 1000, wanderIntervalMaxMs: 1000, nowMs: 0);
 
-            (_, System.Collections.Generic.List<Entity> startedWandering) = world.Tick(0.0, nowMs: 1000);
+            (_, System.Collections.Generic.List<Entity> startedWandering, _) = world.Tick(0.0, nowMs: 1000);
 
             Assert.Contains(monster, startedWandering);
             Assert.True(monster.IsMoving);
@@ -380,7 +380,7 @@ namespace Lumiis.Tests.Game
             Entity monster = world.SpawnMonster(mobId: 1, "Wildhund", x: 50000, y: 50000, speedWire: 700,
                 wanderRadiusWire: 500, wanderIntervalMinMs: 1000, wanderIntervalMaxMs: 1000, nowMs: 0);
 
-            (_, System.Collections.Generic.List<Entity> startedWandering) = world.Tick(0.0, nowMs: 1000);
+            (_, System.Collections.Generic.List<Entity> startedWandering, _) = world.Tick(0.0, nowMs: 1000);
 
             Assert.DoesNotContain(monster, startedWandering);
             Assert.False(monster.IsMoving);
@@ -420,7 +420,7 @@ namespace Lumiis.Tests.Game
             Entity monster = world.SpawnMonster(mobId: 1, "Wildhund", x: 50000, y: 50000, speedWire: 700,
                 wanderRadiusWire: 500, wanderIntervalMinMs: 5000, wanderIntervalMaxMs: 5000, nowMs: 0);
 
-            (_, System.Collections.Generic.List<Entity> startedWandering) = world.Tick(0.0, nowMs: 100);
+            (_, System.Collections.Generic.List<Entity> startedWandering, _) = world.Tick(0.0, nowMs: 100);
 
             Assert.Empty(startedWandering);
             Assert.False(monster.IsMoving);

@@ -12,6 +12,11 @@ internal sealed class MobEntryDto
     public int WanderRadiusWire { get; set; }
     public int WanderIntervalMinMs { get; set; }
     public int WanderIntervalMaxMs { get; set; }
+    public int MaxHp { get; set; }
+    public int Attack { get; set; }
+    public int Defense { get; set; }
+    public int YangMin { get; set; }
+    public int YangMax { get; set; }
 }
 
 internal sealed class MobCatalogDto

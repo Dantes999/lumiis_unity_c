@@ -7,8 +7,8 @@ namespace Lumiis.Tests.Data.Mobs
     {
         private const string ValidJson = @"{
   ""mobs"": [
-    { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 2000, ""wanderIntervalMaxMs"": 5000 },
-    { ""id"": 2, ""name"": ""Waldschrat"", ""speedWire"": 200, ""wanderRadiusWire"": 300, ""wanderIntervalMinMs"": 15000, ""wanderIntervalMaxMs"": 30000 }
+    { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 2000, ""wanderIntervalMaxMs"": 5000, ""maxHp"": 30, ""attack"": 5, ""defense"": 0, ""yangMin"": 5, ""yangMax"": 15 },
+    { ""id"": 2, ""name"": ""Waldschrat"", ""speedWire"": 200, ""wanderRadiusWire"": 300, ""wanderIntervalMinMs"": 15000, ""wanderIntervalMaxMs"": 30000, ""maxHp"": 60, ""attack"": 8, ""defense"": 3, ""yangMin"": 10, ""yangMax"": 25 }
   ]
 }";
 
@@ -40,8 +40,8 @@ namespace Lumiis.Tests.Data.Mobs
         {
             const string json = @"{
   ""mobs"": [
-    { ""id"": 1, ""name"": ""A"", ""speedWire"": 100, ""wanderRadiusWire"": 100, ""wanderIntervalMinMs"": 1000, ""wanderIntervalMaxMs"": 2000 },
-    { ""id"": 1, ""name"": ""B"", ""speedWire"": 100, ""wanderRadiusWire"": 100, ""wanderIntervalMinMs"": 1000, ""wanderIntervalMaxMs"": 2000 }
+    { ""id"": 1, ""name"": ""A"", ""speedWire"": 100, ""wanderRadiusWire"": 100, ""wanderIntervalMinMs"": 1000, ""wanderIntervalMaxMs"": 2000, ""maxHp"": 10, ""attack"": 1, ""defense"": 0, ""yangMin"": 1, ""yangMax"": 1 },
+    { ""id"": 1, ""name"": ""B"", ""speedWire"": 100, ""wanderRadiusWire"": 100, ""wanderIntervalMinMs"": 1000, ""wanderIntervalMaxMs"": 2000, ""maxHp"": 10, ""attack"": 1, ""defense"": 0, ""yangMin"": 1, ""yangMax"": 1 }
   ]
 }";
             var ex = Assert.Throws<MobCatalogException>(() => MobCatalog.LoadFromJson(json));

@@ -7,6 +7,16 @@ namespace Lumiis.Server.Game;
 /// Netzwerk.</summary>
 public sealed class Entity
 {
+    /// <summary>Default-Kampfwerte für Call-Sites ohne Kampfbezug (Bewegung/AOI/Positions-Speicherung-Tests,
+    /// die new Entity(...)/World.TryJoin/World.SpawnMonster ohne explizite Werte aufrufen) - reale Spieler
+    /// bekommen ihre Werte immer explizit aus der ClassCatalog (siehe GameServer.CompleteJoin), reale Monster
+    /// aus der MobCatalog (siehe World.SpawnMonster-Aufruf im GameServer-Konstruktor).</summary>
+    internal const int DefaultMaxHp = 100;
+    internal const int DefaultAttack = 10;
+    internal const int DefaultDefense = 0;
+    internal const int DefaultMeleeRangeWire = 150;
+    internal const int DefaultAttackCooldownMs = 1000;
+
     public int Id { get; }
 
     /// <summary>Die Datenbank-Id des Charakters (Lumiis.Data.Character) - World nutzt sie, um pro
@@ -63,8 +73,39 @@ public sealed class Entity
     /// mit jeweils eigener Geschwindigkeit teilen.</summary>
     public int MovementSpeed { get; }
 
+    public int MaxHp { get; }
+    public int CurrentHp { get; set; }
+    public int Attack { get; }
+    public int Defense { get; }
+
+    /// <summary>Nur bei Kind=Player aussagekräftig (aus ClassCatalog) - Monster greifen in M4a nicht an,
+    /// bei Kind=Monster 0/ungenutzt.</summary>
+    public int MeleeRangeWire { get; }
+    public int AttackCooldownMs { get; }
+
+    /// <summary>Wandzeit (siehe GameServer._nowMs), ab wann der nächste Angriff dieser Entity erlaubt ist -
+    /// von World.TryAttack gesetzt, nur bei Kind=Player relevant.</summary>
+    public long AttackReadyAtMs { get; set; }
+
+    /// <summary>Wandzeit, wann ein toter Spieler respawnt (0 = kein ausstehender Respawn) - siehe
+    /// World.Tick/World.ApplyDamage. Nur bei Kind=Player relevant, Monster werden bei 0 Leben stattdessen
+    /// sofort aus World entfernt (siehe World.ApplyDamage).</summary>
+    public long RespawnAtMs { get; set; }
+
+    public bool IsDead => CurrentHp <= 0;
+
+    /// <summary>Nur bei Kind=Monster gesetzt (aus dem Mob-Typ, siehe MobCatalog) - Yang-Spanne, die beim Tod
+    /// ausgezahlt wird (siehe World.ApplyDamage). Bei Kind=Player 0/ungenutzt.</summary>
+    public int YangMin { get; }
+    public int YangMax { get; }
+
+    /// <summary>Laufender Yang-Gesamtbetrag - nur bei Kind=Player relevant, beim Join aus Character.Yang
+    /// geladen (siehe GameServer.CompleteJoin), von World.TryAttack bei Monstertod erhöht.</summary>
+    public long Yang { get; set; }
+
     private Entity(int id, EntityKind kind, int? characterId, int mobId, string name, int x, int y, int movementSpeed,
-        int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs)
+        int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs,
+        int maxHp, int attack, int defense, int meleeRangeWire, int attackCooldownMs, int yangMin, int yangMax)
     {
         Id = id;
         Kind = kind;
@@ -79,19 +120,32 @@ public sealed class Entity
         WanderRadiusWire = wanderRadiusWire;
         WanderIntervalMinMs = wanderIntervalMinMs;
         WanderIntervalMaxMs = wanderIntervalMaxMs;
+        MaxHp = maxHp;
+        CurrentHp = maxHp;
+        Attack = attack;
+        Defense = defense;
+        MeleeRangeWire = meleeRangeWire;
+        AttackCooldownMs = attackCooldownMs;
+        YangMin = yangMin;
+        YangMax = yangMax;
     }
 
-    public Entity(int id, int characterId, string name, int x, int y)
+    public Entity(int id, int characterId, string name, int x, int y,
+        int maxHp = DefaultMaxHp, int attack = DefaultAttack, int defense = DefaultDefense,
+        int meleeRangeWire = DefaultMeleeRangeWire, int attackCooldownMs = DefaultAttackCooldownMs)
         : this(id, EntityKind.Player, characterId, mobId: 0, name, x, y, movementSpeed: GameConstants.PlayerSpeed,
-            wanderRadiusWire: 0, wanderIntervalMinMs: 0, wanderIntervalMaxMs: 0)
+            wanderRadiusWire: 0, wanderIntervalMinMs: 0, wanderIntervalMaxMs: 0,
+            maxHp, attack, defense, meleeRangeWire, attackCooldownMs, yangMin: 0, yangMax: 0)
     {
     }
 
     public static Entity CreateMonster(int id, int mobId, string name, int x, int y, int speedWire,
-        int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs)
+        int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs,
+        int maxHp = DefaultMaxHp, int attack = DefaultAttack, int defense = DefaultDefense, int yangMin = 0, int yangMax = 0)
     {
         return new Entity(id, EntityKind.Monster, characterId: null, mobId, name, x, y, movementSpeed: speedWire,
-            wanderRadiusWire, wanderIntervalMinMs, wanderIntervalMaxMs);
+            wanderRadiusWire, wanderIntervalMinMs, wanderIntervalMaxMs,
+            maxHp, attack, defense, meleeRangeWire: 0, attackCooldownMs: 0, yangMin, yangMax);
     }
 
     public void MoveTo(int targetX, int targetY, int speed)
@@ -100,6 +154,22 @@ public sealed class Entity
         TargetY = targetY;
         Speed = speed;
         IsMoving = true;
+    }
+
+    /// <summary>Setzt die Position hart, ohne Bewegung (Respawn, M4a) - kein Interpolationsziel, der Client
+    /// erhält dafür ein EntityStopPacket (siehe GameServer), keine neue Paketform nötig.</summary>
+    public void Teleport(int x, int y)
+    {
+        X = x;
+        Y = y;
+        IsMoving = false;
+    }
+
+    /// <summary>Bricht eine laufende Bewegung sofort ab (z. B. Spielertod mitten in der Bewegung), ohne die
+    /// Position zu verändern - der nächste Tick meldet sonst fälschlich "angekommen".</summary>
+    public void StopMoving()
+    {
+        IsMoving = false;
     }
 
     /// <summary>Schreibt die Bewegung um deltaSeconds fort. Gibt true zurück, wenn die Entity in diesem Tick exakt am Ziel angekommen ist (kein Überschießen).</summary>

@@ -18,6 +18,10 @@ public sealed class World
     private readonly Random _random;
     private int _nextEntityId = 1;
 
+    /// <summary>Fix, keine Konfiguration (siehe docs/tasks/M4a-combat-core.md Abschnitt 4) - 3s nach dem Tod
+    /// respawnt ein Spieler automatisch (siehe ApplyDamage/Tick).</summary>
+    private const long PlayerRespawnDelayMs = 3000;
+
     /// <summary>collisionMap: null bedeutet "überall begehbar" (z. B. bestehende Tests ohne Kollisionsbezug) -
     /// echte Karten liefern immer eine Instanz mit, siehe GameServer/Program.cs. random: injizierbare
     /// Zufallsquelle für die Wander-KI (siehe RunWanderAi), Default eine echte, nicht-deterministische
@@ -40,7 +44,12 @@ public sealed class World
     /// seit M2b0 über einen case-insensitiven Unique-Index in der DB global eindeutig (siehe
     /// LumiisDbContext) - eine zweite, rein speicherresidente Prüfung hier wäre redundant und könnte bei
     /// direkten DB-Änderungen sogar von der tatsächlichen Quelle der Wahrheit abweichen.</summary>
-    public bool TryJoin(int characterId, string name, int? x, int? y, out Entity? entity, out JoinRejectReason reason)
+    /// <summary>maxHp/attack/defense/meleeRangeWire/attackCooldownMs: Kampfwerte aus der ClassCatalog (M4a,
+    /// siehe GameServer.CompleteJoin) - Defaults nur für bestehende Tests ohne Kampfbezug, siehe
+    /// Entity.DefaultMaxHp-Kommentar.</summary>
+    public bool TryJoin(int characterId, string name, int? x, int? y, out Entity? entity, out JoinRejectReason reason,
+        int maxHp = Entity.DefaultMaxHp, int attack = Entity.DefaultAttack, int defense = Entity.DefaultDefense,
+        int meleeRangeWire = Entity.DefaultMeleeRangeWire, int attackCooldownMs = Entity.DefaultAttackCooldownMs)
     {
         entity = null;
         reason = default;
@@ -61,7 +70,7 @@ public sealed class World
         int spawnY = Math.Clamp(y ?? GameConstants.MapHeight / 2, 0, GameConstants.MapHeight);
 
         int id = _nextEntityId++;
-        entity = new Entity(id, characterId, name, spawnX, spawnY);
+        entity = new Entity(id, characterId, name, spawnX, spawnY, maxHp, attack, defense, meleeRangeWire, attackCooldownMs);
         _entities[id] = entity;
         _entityIdByCharacterId[characterId] = id;
         return true;
@@ -72,15 +81,20 @@ public sealed class World
     /// Spielerlimit-Check. x/y kommen bereits geprüft aus SpawnCatalog (begehbare Zelle), werden hier trotzdem
     /// defensiv auf die Kartengrenzen geklemmt, analog zu TryJoin. nowMs: Wandzeit für die erste
     /// Wander-Fälligkeit (zufällig zwischen wanderIntervalMinMs/MaxMs ab jetzt, siehe RunWanderAi).</summary>
+    /// <summary>maxHp/attack/defense/yangMin/yangMax: Kampfwerte aus der MobCatalog (M4a, siehe
+    /// GameServer-Konstruktor) - Defaults nur für bestehende Tests ohne Kampfbezug, siehe
+    /// Entity.DefaultMaxHp-Kommentar.</summary>
     public Entity SpawnMonster(int mobId, string name, int x, int y, int speedWire,
-        int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs, long nowMs)
+        int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs, long nowMs,
+        int maxHp = Entity.DefaultMaxHp, int attack = Entity.DefaultAttack, int defense = Entity.DefaultDefense,
+        int yangMin = 0, int yangMax = 0)
     {
         int clampedX = Math.Clamp(x, 0, GameConstants.MapWidth);
         int clampedY = Math.Clamp(y, 0, GameConstants.MapHeight);
 
         int id = _nextEntityId++;
         Entity entity = Entity.CreateMonster(id, mobId, name, clampedX, clampedY, speedWire,
-            wanderRadiusWire, wanderIntervalMinMs, wanderIntervalMaxMs);
+            wanderRadiusWire, wanderIntervalMinMs, wanderIntervalMaxMs, maxHp, attack, defense, yangMin, yangMax);
         entity.NextWanderAtMs = nowMs + _random.Next(wanderIntervalMinMs, wanderIntervalMaxMs + 1);
         _entities[id] = entity;
         return entity;
@@ -174,6 +188,81 @@ public sealed class World
         return (lastWalkableX, lastWalkableY);
     }
 
+    /// <summary>Serverautoritative Angriffsprüfung + -ausführung (M4a) - kein Netzwerkbezug, siehe
+    /// GameServer.HandleAttackRequest für die Netzwerk-Seite. Prüft in dieser Reihenfolge (siehe
+    /// docs/tasks/M4a-combat-core.md Abschnitt 4): Ziel existiert, Ziel lebt, Ziel ist kein Spieler (PvP in
+    /// M4a abgelehnt), Cooldown des Angreifers, Reichweite (quadrierte Distanz wie ComputeVisibility, gegen
+    /// MeleeRangeWire des Angreifers). attackerEntityId muss bereits als existierende, per Verbindung
+    /// gehaltene Entity geprüft sein (siehe GameServer.HandleAttackRequest) - der defensive TargetNotFound-
+    /// Fallback hier sollte nie greifen (es gäbe dafür auch keine Verbindung, an die AttackFailed ginge).</summary>
+    public AttackResult TryAttack(int attackerEntityId, int targetEntityId, long nowMs)
+    {
+        if (!_entities.TryGetValue(attackerEntityId, out Entity? attacker))
+            return AttackResult.Fail(AttackFailedReason.TargetNotFound);
+
+        if (!_entities.TryGetValue(targetEntityId, out Entity? target))
+            return AttackResult.Fail(AttackFailedReason.TargetNotFound);
+
+        if (target.IsDead)
+            return AttackResult.Fail(AttackFailedReason.TargetAlreadyDead);
+
+        if (target.Kind == EntityKind.Player)
+            return AttackResult.Fail(AttackFailedReason.TargetIsPlayer);
+
+        if (nowMs < attacker.AttackReadyAtMs)
+            return AttackResult.Fail(AttackFailedReason.OnCooldown);
+
+        long dx = attacker.IntX - target.IntX;
+        long dy = attacker.IntY - target.IntY;
+        long rangeSq = (long)attacker.MeleeRangeWire * attacker.MeleeRangeWire;
+        if (dx * dx + dy * dy > rangeSq)
+            return AttackResult.Fail(AttackFailedReason.OutOfRange);
+
+        attacker.AttackReadyAtMs = nowMs + attacker.AttackCooldownMs;
+
+        int targetMaxHp = target.MaxHp;
+        int damage = Math.Max(1, attacker.Attack - target.Defense);
+        (int targetHpAfter, bool died, long yangAwarded) = ApplyDamage(target, damage, nowMs);
+
+        if (yangAwarded > 0)
+            attacker.Yang += yangAwarded;
+
+        return AttackResult.Hit(damage, targetHpAfter, targetMaxHp, died, target.Kind, yangAwarded);
+    }
+
+    /// <summary>Wendet Schaden auf eine beliebige Entity an und löst bei 0 Leben die passende Tod-Behandlung
+    /// aus: Monster werden sofort aus World entfernt (wie ein normaler Despawn, TODO(M4b): stattdessen nach
+    /// SpawnPoint.RespawnSeconds respawnen statt endgültig zu verschwinden) und zahlen eine zufällige
+    /// Yang-Spanne aus; Spieler werden NICHT entfernt (kein Despawn), sondern bekommen RespawnAtMs gesetzt
+    /// (siehe Tick) - CurrentHp bleibt bis dahin 0. Von TryAttack nach allen Prüfungen aufgerufen, zusätzlich
+    /// internal sichtbar: TryAttack lehnt Spieler-Ziele selbst ab (kein PvP in M4a), das Sterbe-/Respawn-
+    /// Verhalten für Spieler ist trotzdem generisch implementiert und muss direkt testbar sein (siehe
+    /// WorldTests) - für eine spätere Erweiterung (z. B. Monster, die Spieler angreifen) bereits vorbereitet.</summary>
+    internal (int HpAfter, bool Died, long YangAwarded) ApplyDamage(Entity target, int damage, long nowMs)
+    {
+        int hpAfter = Math.Max(0, target.CurrentHp - damage);
+        target.CurrentHp = hpAfter;
+
+        bool died = hpAfter <= 0;
+        long yangAwarded = 0;
+
+        if (died)
+        {
+            if (target.Kind == EntityKind.Monster)
+            {
+                yangAwarded = _random.Next(target.YangMin, target.YangMax + 1);
+                Remove(target.Id);
+            }
+            else
+            {
+                target.StopMoving();
+                target.RespawnAtMs = nowMs + PlayerRespawnDelayMs;
+            }
+        }
+
+        return (hpAfter, died, yangAwarded);
+    }
+
     /// <summary>Für jede Entity: welche anderen Entities liegen innerhalb von radiusWire (quadrierte Distanz,
     /// long-Arithmetik gegen Overflow bei bis zu GameConstants.MapWidth/Height pro Achse)? Reiner
     /// Distanzvergleich, keine Sichtlinien-/Hindernisprüfung (kein Ziel für M3b). Eine Entity sieht sich
@@ -211,12 +300,14 @@ public sealed class World
 
     /// <summary>Schreibt alle Bewegungen um deltaSeconds fort (Spieler-MoveTo UND laufende Monster-Wander-
     /// Bewegung, derselbe Mechanismus). Läuft danach die Wander-KI für fällige Monster (Reihenfolge
-    /// willkürlich, aber konsistent - siehe docs/tasks/M3c-monsters.md). Gibt zwei Listen zurück: Arrived
-    /// (Entities, die in diesem Tick exakt am Ziel angekommen sind - für EntityStop) und StartedWandering
-    /// (Monster, die in diesem Tick per RunWanderAi ein neues Bewegungsziel bekommen haben - für EntityMove,
-    /// analog zu HandleMoveTo bei Spielern, die aber über ein echtes MoveToPacket ausgelöst werden statt über
-    /// den Tick).</summary>
-    public (List<Entity> Arrived, List<Entity> StartedWandering) Tick(double deltaSeconds, long nowMs)
+    /// willkürlich, aber konsistent - siehe docs/tasks/M3c-monsters.md), zuletzt fällige Spieler-Respawns
+    /// (M4a, siehe ApplyDamage): Position auf Kartenmitte, CurrentHp auf MaxHp, EntityKind/Appearance
+    /// unverändert. Gibt drei Listen zurück: Arrived (Entities, die in diesem Tick exakt am Ziel angekommen
+    /// sind - für EntityStop), StartedWandering (Monster, die in diesem Tick per RunWanderAi ein neues
+    /// Bewegungsziel bekommen haben - für EntityMove, analog zu HandleMoveTo bei Spielern, die aber über ein
+    /// echtes MoveToPacket ausgelöst werden statt über den Tick) und Respawned (Spieler, die in diesem Tick
+    /// respawnt sind - ebenfalls für EntityStop an der neuen Position, siehe GameServer).</summary>
+    public (List<Entity> Arrived, List<Entity> StartedWandering, List<Entity> Respawned) Tick(double deltaSeconds, long nowMs)
     {
         List<Entity> arrived = new();
         foreach (Entity entity in _entities.Values)
@@ -235,7 +326,19 @@ public sealed class World
                 startedWandering.Add(entity);
         }
 
-        return (arrived, startedWandering);
+        List<Entity> respawned = new();
+        foreach (Entity entity in _entities.Values)
+        {
+            if (entity.Kind != EntityKind.Player) continue;
+            if (entity.RespawnAtMs == 0 || nowMs < entity.RespawnAtMs) continue;
+
+            entity.Teleport(GameConstants.MapWidth / 2, GameConstants.MapHeight / 2);
+            entity.CurrentHp = entity.MaxHp;
+            entity.RespawnAtMs = 0;
+            respawned.Add(entity);
+        }
+
+        return (arrived, startedWandering, respawned);
     }
 
     /// <summary>Eine fällige Wander-Entscheidung für ein Monster: zufälliger Punkt innerhalb WanderRadiusWire

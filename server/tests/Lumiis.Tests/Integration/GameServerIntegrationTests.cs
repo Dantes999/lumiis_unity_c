@@ -1070,7 +1070,7 @@ namespace Lumiis.Tests.Integration
             // Kurzes Wander-Intervall (synthetisch, nicht die echten mobs.json-Werte) - haelt den Test schnell.
             MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
               ""mobs"": [
-                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 100, ""wanderIntervalMaxMs"": 200 }
+                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 100, ""wanderIntervalMaxMs"": 200, ""maxHp"": 30, ""attack"": 5, ""defense"": 0, ""yangMin"": 5, ""yangMax"": 15 }
               ]
             }");
             CollisionMap openMap = BuildOpenCollisionMap();
