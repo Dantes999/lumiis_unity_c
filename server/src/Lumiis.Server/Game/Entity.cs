@@ -31,6 +31,14 @@ public sealed class Entity
     /// <summary>Nur bei Kind=Monster aussagekräftig (Index in data/mobs.json), bei Kind=Player ungenutzt/0.</summary>
     public int MobId { get; }
 
+    /// <summary>Nur bei Kind=Monster gesetzt - die Id des SpawnPoint aus spawns.json, an dem dieses Monster
+    /// entstanden ist (siehe World.SpawnMonster/GameServer-Konstruktor). Null bei Spielern UND bei per
+    /// Dev-Tools-Debug-Befehl gespawnten Monstern (siehe GameServer.HandleDebugSpawnMonster) - Letztere sind
+    /// bewusst an KEINEN SpawnPoint gebunden, damit ihr Tod (M4b) keinen Respawn an einem SpawnPoint auslöst,
+    /// der eigentlich schon ein "echtes" Monster hat. M4b darf sich beim Respawn-Scheduling ausschließlich auf
+    /// SpawnPointId.HasValue verlassen, nie auf Kind allein.</summary>
+    public int? SpawnPointId { get; }
+
     /// <summary>Wird von GameServer direkt nach dem Join aus der geladenen Character-Zeile gesetzt. Bei
     /// Monstern mit Default-Werten befüllt (siehe EntitySpawnPacket-Kommentar), keine Bedeutung.</summary>
     public Appearance Appearance { get; set; }
@@ -103,7 +111,7 @@ public sealed class Entity
     /// geladen (siehe GameServer.CompleteJoin), von World.TryAttack bei Monstertod erhöht.</summary>
     public long Yang { get; set; }
 
-    private Entity(int id, EntityKind kind, int? characterId, int mobId, string name, int x, int y, int movementSpeed,
+    private Entity(int id, EntityKind kind, int? characterId, int mobId, int? spawnPointId, string name, int x, int y, int movementSpeed,
         int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs,
         int maxHp, int attack, int defense, int meleeRangeWire, int attackCooldownMs, int yangMin, int yangMax)
     {
@@ -111,6 +119,7 @@ public sealed class Entity
         Kind = kind;
         CharacterId = characterId;
         MobId = mobId;
+        SpawnPointId = spawnPointId;
         Name = name;
         X = x;
         Y = y;
@@ -133,17 +142,20 @@ public sealed class Entity
     public Entity(int id, int characterId, string name, int x, int y,
         int maxHp = DefaultMaxHp, int attack = DefaultAttack, int defense = DefaultDefense,
         int meleeRangeWire = DefaultMeleeRangeWire, int attackCooldownMs = DefaultAttackCooldownMs)
-        : this(id, EntityKind.Player, characterId, mobId: 0, name, x, y, movementSpeed: GameConstants.PlayerSpeed,
+        : this(id, EntityKind.Player, characterId, mobId: 0, spawnPointId: null, name, x, y, movementSpeed: GameConstants.PlayerSpeed,
             wanderRadiusWire: 0, wanderIntervalMinMs: 0, wanderIntervalMaxMs: 0,
             maxHp, attack, defense, meleeRangeWire, attackCooldownMs, yangMin: 0, yangMax: 0)
     {
     }
 
-    public static Entity CreateMonster(int id, int mobId, string name, int x, int y, int speedWire,
+    /// <summary>spawnPointId: null bedeutet "nicht an einen SpawnPoint aus spawns.json gebunden" (Dev-Tools-
+    /// Debug-Spawn, siehe SpawnPointId-Kommentar) - reguläre, aus der SpawnCatalog erzeugte Monster übergeben
+    /// hier immer die echte SpawnPoint.Id (siehe World.SpawnMonster/GameServer-Konstruktor).</summary>
+    public static Entity CreateMonster(int id, int mobId, int? spawnPointId, string name, int x, int y, int speedWire,
         int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs,
         int maxHp = DefaultMaxHp, int attack = DefaultAttack, int defense = DefaultDefense, int yangMin = 0, int yangMax = 0)
     {
-        return new Entity(id, EntityKind.Monster, characterId: null, mobId, name, x, y, movementSpeed: speedWire,
+        return new Entity(id, EntityKind.Monster, characterId: null, mobId, spawnPointId, name, x, y, movementSpeed: speedWire,
             wanderRadiusWire, wanderIntervalMinMs, wanderIntervalMaxMs,
             maxHp, attack, defense, meleeRangeWire: 0, attackCooldownMs: 0, yangMin, yangMax);
     }

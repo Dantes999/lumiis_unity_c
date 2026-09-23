@@ -61,6 +61,14 @@ namespace Lumiis.Client
             Send(new AttackRequestPacket { TargetEntityId = targetEntityId });
         }
 
+        /// <summary>Dev-Tools (siehe CLAUDE.md "Dev-Tools", GameClient-Debug-Panel) - nur wirksam, wenn der
+        /// Server mit --allow-debug-commands gestartet wurde, sonst still ohne Wirkung.</summary>
+        public void SendDebugSpawnMonster(int mobId)
+        {
+            if (_peer == null || !IsConnected) return;
+            Send(new DebugSpawnMonsterRequestPacket { MobId = mobId });
+        }
+
         private void Send(IPacket packet)
         {
             if (_peer == null) return;

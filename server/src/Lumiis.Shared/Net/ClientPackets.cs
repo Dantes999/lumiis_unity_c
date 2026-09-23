@@ -74,4 +74,26 @@ namespace Lumiis.Shared.Net
             TargetEntityId = reader.ReadInt32();
         }
     }
+
+    /// <summary>Dev-Tool (siehe CLAUDE.md "Dev-Tools"): spawnt ein Monster nahe der Absenderposition. Nur
+    /// wirksam, wenn der Server mit --allow-debug-commands gestartet wurde - sonst still verworfen.</summary>
+    public sealed class DebugSpawnMonsterRequestPacket : IPacket
+    {
+        public int MobId;
+
+        public PacketId Id
+        {
+            get { return PacketId.DebugSpawnMonsterRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteInt32(MobId);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            MobId = reader.ReadInt32();
+        }
+    }
 }

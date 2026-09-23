@@ -17,4 +17,8 @@ public sealed class ServerConfig
 
     /// <summary>Frist nach JoinRejected, bevor die Verbindung getrennt wird, damit das Paket noch ankommt, in ms (Default 1 s).</summary>
     public int RejectGraceMs = 1000;
+
+    /// <summary>Default aus - schaltet DebugSpawnMonsterRequestPacket frei (siehe CLAUDE.md "Dev-Tools").
+    /// Nur für die lokale Entwicklung gedacht, nie in einem "echten" Serverstart aktivieren.</summary>
+    public bool AllowDebugCommands = false;
 }

@@ -28,6 +28,13 @@ namespace Lumiis.Client
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private CharacterTestboard _testboard;
         private CharacterTestboard _sortingTestboard;
+
+        // Dev-Tools-Debug-Spawn (siehe CLAUDE.md "Dev-Tools"): fest hinterlegte Mob-Typen statt eines
+        // geladenen Katalogs - der Client kennt mobs.json bewusst nicht (siehe CLAUDE.md Abschnitt "Monster"),
+        // dieselbe kleine, feste MobId-Zuordnung wie MonsterShapeFor/MonsterColorFor, nur um einen Anzeigenamen
+        // ergänzt. Reine Dev-Bequemlichkeit, kein neuer Lade-Mechanismus für ein Dev-Only-Feature.
+        private static readonly (int MobId, string Name)[] DebugMobTypes = { (1, "Wildhund"), (2, "Waldschrat") };
+        private int _debugSpawnMobIndex;
 #endif
 
         // Login/Charakterauswahl übernimmt LoginController (UI Toolkit) - GameClient merkt sich nur, ob
@@ -256,7 +263,7 @@ namespace Lumiis.Client
         private void DrawDebugTestPanel()
         {
             const float w = 220f;
-            Rect area = new Rect(Screen.width - w - 10f, 10f, w, 300f);
+            Rect area = new Rect(Screen.width - w - 10f, 10f, w, 360f);
             GUILayout.BeginArea(area, GUI.skin.box);
 
             GUILayout.Label("Debug-Test (F-Tasten bleiben aktiv)");
@@ -277,7 +284,33 @@ namespace Lumiis.Client
                 DrawCycleRow("Schild", "Shield", appearance.ShieldId);
             }
 
+            DrawDebugSpawnRow();
+
             GUILayout.EndArea();
+        }
+
+        /// <summary>Dev-Tools (siehe CLAUDE.md "Dev-Tools"): Mob-Typ-Cycler + Spawnen-Knopf. Ohne
+        /// --allow-debug-commands am Server hat der Knopf sichtbar keine Wirkung (Paket wird dort still
+        /// verworfen, siehe GameServer.HandleDebugSpawnMonster) - der Client weiß nicht, ob die Option aktiv
+        /// ist, und muss das auch nicht wissen.</summary>
+        private void DrawDebugSpawnRow()
+        {
+            GUILayout.Space(6);
+            GUILayout.Label("Monster spawnen (Dev-Tools)");
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("<", GUILayout.Width(24))) CycleDebugSpawnMobIndex(-1);
+            GUILayout.Label(DebugMobTypes[_debugSpawnMobIndex].Name, GUILayout.Width(94));
+            if (GUILayout.Button(">", GUILayout.Width(24))) CycleDebugSpawnMobIndex(1);
+            GUILayout.EndHorizontal();
+
+            if (GUILayout.Button("Spawnen"))
+                _netClient.SendDebugSpawnMonster(DebugMobTypes[_debugSpawnMobIndex].MobId);
+        }
+
+        private void CycleDebugSpawnMobIndex(int direction)
+        {
+            _debugSpawnMobIndex = (_debugSpawnMobIndex + direction + DebugMobTypes.Length) % DebugMobTypes.Length;
         }
 
         private void DrawCycleRow(string label, string slot, int currentId)

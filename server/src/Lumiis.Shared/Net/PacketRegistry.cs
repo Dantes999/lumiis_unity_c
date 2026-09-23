@@ -9,6 +9,10 @@ namespace Lumiis.Shared.Net
         MoveTo = 2,
         AttackRequest = 3,
 
+        /// <summary>Nur wirksam, wenn der Server mit --allow-debug-commands gestartet wurde (siehe CLAUDE.md
+        /// "Dev-Tools") - sonst still verworfen, als gäbe es das Paket nicht.</summary>
+        DebugSpawnMonsterRequest = 4,
+
         // Server -> Client: ab 1000
         JoinAccepted = 1000,
         JoinRejected = 1001,
@@ -38,6 +42,7 @@ namespace Lumiis.Shared.Net
                 case PacketId.EntityMove: return new EntityMovePacket();
                 case PacketId.EntityStop: return new EntityStopPacket();
                 case PacketId.AttackRequest: return new AttackRequestPacket();
+                case PacketId.DebugSpawnMonsterRequest: return new DebugSpawnMonsterRequestPacket();
                 case PacketId.EntityDamaged: return new EntityDamagedPacket();
                 case PacketId.EntityDied: return new EntityDiedPacket();
                 case PacketId.AttackFailed: return new AttackFailedPacket();

@@ -27,6 +27,9 @@ for (int i = 0; i < args.Length; i++)
         case "--data-dir":
             explicitDataDir = args[++i];
             break;
+        case "--allow-debug-commands":
+            config.AllowDebugCommands = true;
+            break;
         default:
             logger.Warn($"Unbekanntes Argument: {args[i]}");
             break;

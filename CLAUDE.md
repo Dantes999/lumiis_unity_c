@@ -31,7 +31,7 @@ client/ (Unity-Projekt), server/ (Solution mit Shared, Server, Bot, Data, Auth, 
 
 ## Befehle
 - Build/Test: cd server && dotnet build && dotnet test (läuft ohne laufendes Postgres - die Lumiis.Auth-Tests nutzen EF-Core-InMemory, siehe Status M2a)
-- Server: dotnet run --project server/src/Lumiis.Server (--data-dir überschreibt den Basispfad für Spieldaten, Default "data" relativ zum Arbeitsverzeichnis - lädt data/maps/village/collision.bin, siehe Abschnitt "Kartenkollision")
+- Server: dotnet run --project server/src/Lumiis.Server (--data-dir überschreibt den Basispfad für Spieldaten, Default "data" relativ zum Arbeitsverzeichnis - lädt data/maps/village/collision.bin, siehe Abschnitt "Kartenkollision"; --allow-debug-commands NUR für lokale Entwicklung, siehe Abschnitt "Dev-Tools")
 - Bot: dotnet run --project server/src/Lumiis.Bot -- --count 3
 - Umgebungsvariablen laden: source tools/dev-env.sh (mit "source", NICHT ./ - sonst gelten die Variablen nur im Subprozess des Skripts). Davor nötig für docker compose, dotnet ef, dotnet run --project server/src/Lumiis.Auth UND (seit M2b) server/src/Lumiis.Server.
 - Postgres starten: docker compose up -d (Repo-Root, nach source tools/dev-env.sh)

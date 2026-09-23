@@ -81,6 +81,10 @@ public sealed class GameServer : INetEventListener
     private readonly TokenService _tokenService;
     private readonly Func<LumiisDbContext> _dbContextFactory;
     private readonly ClassCatalog? _classCatalog;
+
+    /// <summary>Nur für den Dev-Tools-Debug-Spawn gehalten (siehe HandleDebugSpawnMonster) - der reguläre
+    /// Katalog-Spawn im Konstruktor braucht die Referenz danach nicht mehr.</summary>
+    private readonly MobCatalog? _mobCatalog;
     private readonly NetManager _netManager;
     private readonly ILogger _logger;
     private readonly Func<long> _nowMs;
@@ -117,6 +121,7 @@ public sealed class GameServer : INetEventListener
         _tokenService = tokenService;
         _dbContextFactory = dbContextFactory;
         _classCatalog = classCatalog;
+        _mobCatalog = mobCatalog;
         _world = new World(config.MaxPlayers, collisionMap);
         _netManager = new NetManager(this) { UpdateTime = 15 };
         _nowMs = nowMs ?? DefaultNowMs;
@@ -128,7 +133,7 @@ public sealed class GameServer : INetEventListener
                 mobCatalog.TryGet(spawn.MobId, out MobDefinition mobDef); // Existenz bereits von SpawnCatalog.LoadFromFile geprüft.
                 _world.SpawnMonster(spawn.MobId, mobDef.Name, spawn.PositionX, spawn.PositionY, mobDef.SpeedWire,
                     mobDef.WanderRadiusWire, mobDef.WanderIntervalMinMs, mobDef.WanderIntervalMaxMs, _nowMs(),
-                    mobDef.MaxHp, mobDef.Attack, mobDef.Defense, mobDef.YangMin, mobDef.YangMax);
+                    mobDef.MaxHp, mobDef.Attack, mobDef.Defense, mobDef.YangMin, mobDef.YangMax, spawnPointId: spawn.Id);
             }
         }
 
@@ -541,6 +546,9 @@ public sealed class GameServer : INetEventListener
             case AttackRequestPacket attack:
                 HandleAttackRequest(conn, attack);
                 break;
+            case DebugSpawnMonsterRequestPacket debugSpawn:
+                HandleDebugSpawnMonster(conn, debugSpawn);
+                break;
             default:
                 _logger.Warn($"Unerwartetes Paket {packet.Id} von Verbindung {conn.Peer.Id}");
                 conn.Peer.Disconnect();
@@ -804,6 +812,43 @@ public sealed class GameServer : INetEventListener
         _logger.Info($"Entity {attackerId} trifft Entity {attack.TargetEntityId} ({result.Damage} Schaden)" +
             (result.TargetDied ? ", Ziel gestorben" : "") +
             (result.YangAwarded > 0 ? $", +{result.YangAwarded} Yang" : ""));
+    }
+
+    /// <summary>Dev-Tools (siehe CLAUDE.md "Dev-Tools"): nur wirksam, wenn der Server mit
+    /// --allow-debug-commands gestartet wurde - sonst wird das Paket still verworfen (geloggt, keine Antwort,
+    /// keine Disconnect), als gäbe es diesen Befehl nicht (siehe ServerConfig.AllowDebugCommands-Kommentar).
+    /// Bewusst kein AttackFailed-artiges Ablehnungspaket: der Client sendet dieses Paket ohnehin nur aus dem
+    /// #if UNITY_EDITOR || DEVELOPMENT_BUILD-Debug-Panel, ein Ablehnungspaket würde also nur einen neuen,
+    /// production-irrelevanten Protokollfall für ein Dev-Only-Feature erfordern. Spawnt bei aktivierter Option
+    /// ein Monster des angegebenen Mob-Typs nahe der Position des Absenders (World.FindNearbyWalkablePoint) -
+    /// OHNE SpawnPointId (siehe Entity.SpawnPointId-Kommentar): stirbt es, passiert exakt das, was auch sonst
+    /// beim Monstertod passiert (aktuell sofortiges Entfernen, kein Respawn-Scheduling, siehe M4a/M4b).</summary>
+    private void HandleDebugSpawnMonster(ConnectionState conn, DebugSpawnMonsterRequestPacket debugSpawn)
+    {
+        if (!_config.AllowDebugCommands)
+        {
+            _logger.Warn($"DebugSpawnMonsterRequest von Verbindung {conn.Peer.Id} ohne --allow-debug-commands ignoriert");
+            return;
+        }
+
+        if (conn.EntityId is not int senderId || !_world.TryGet(senderId, out Entity? sender))
+        {
+            _logger.Warn($"DebugSpawnMonsterRequest vor Join von Verbindung {conn.Peer.Id}");
+            return;
+        }
+
+        if (_mobCatalog == null || !_mobCatalog.TryGet(debugSpawn.MobId, out MobDefinition mobDef))
+        {
+            _logger.Warn($"DebugSpawnMonsterRequest mit unbekannter MobId {debugSpawn.MobId} von Verbindung {conn.Peer.Id}");
+            return;
+        }
+
+        (int x, int y) = _world.FindNearbyWalkablePoint(sender!.IntX, sender.IntY, offsetMin: 100, offsetMax: 300);
+        _world.SpawnMonster(debugSpawn.MobId, mobDef.Name, x, y, mobDef.SpeedWire,
+            mobDef.WanderRadiusWire, mobDef.WanderIntervalMinMs, mobDef.WanderIntervalMaxMs, _nowMs(),
+            mobDef.MaxHp, mobDef.Attack, mobDef.Defense, mobDef.YangMin, mobDef.YangMax); // spawnPointId bewusst weggelassen (Default null).
+
+        _logger.Info($"Dev-Tools: {mobDef.Name} bei ({x},{y}) gespawnt (angefordert von Entity {senderId})");
     }
 
     /// <summary>Benachrichtigt alle Verbindungen, die diese Entity laut ihrem letzten VisibleEntityIds-Stand

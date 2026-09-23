@@ -160,6 +160,14 @@ namespace Lumiis.Tests
         }
 
         [Fact]
+        public void DebugSpawnMonsterRequest_RoundTrip()
+        {
+            var original = new DebugSpawnMonsterRequestPacket { MobId = 2 };
+            var decoded = Assert.IsType<DebugSpawnMonsterRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.MobId, decoded.MobId);
+        }
+
+        [Fact]
         public void Decode_HonorsOffsetAndCount()
         {
             byte[] body = PacketCodec.Encode(new MoveToPacket { X = 1, Y = 2 });

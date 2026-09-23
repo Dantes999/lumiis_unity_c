@@ -83,21 +83,41 @@ public sealed class World
     /// Wander-Fälligkeit (zufällig zwischen wanderIntervalMinMs/MaxMs ab jetzt, siehe RunWanderAi).</summary>
     /// <summary>maxHp/attack/defense/yangMin/yangMax: Kampfwerte aus der MobCatalog (M4a, siehe
     /// GameServer-Konstruktor) - Defaults nur für bestehende Tests ohne Kampfbezug, siehe
-    /// Entity.DefaultMaxHp-Kommentar.</summary>
+    /// Entity.DefaultMaxHp-Kommentar. spawnPointId: null (Default) bedeutet "nicht an einen SpawnPoint
+    /// gebunden" (Dev-Tools-Debug-Spawn, siehe Entity.SpawnPointId) - der reguläre Katalog-Spawn im
+    /// GameServer-Konstruktor übergibt hier immer die echte SpawnPoint.Id.</summary>
     public Entity SpawnMonster(int mobId, string name, int x, int y, int speedWire,
         int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs, long nowMs,
         int maxHp = Entity.DefaultMaxHp, int attack = Entity.DefaultAttack, int defense = Entity.DefaultDefense,
-        int yangMin = 0, int yangMax = 0)
+        int yangMin = 0, int yangMax = 0, int? spawnPointId = null)
     {
         int clampedX = Math.Clamp(x, 0, GameConstants.MapWidth);
         int clampedY = Math.Clamp(y, 0, GameConstants.MapHeight);
 
         int id = _nextEntityId++;
-        Entity entity = Entity.CreateMonster(id, mobId, name, clampedX, clampedY, speedWire,
+        Entity entity = Entity.CreateMonster(id, mobId, spawnPointId, name, clampedX, clampedY, speedWire,
             wanderRadiusWire, wanderIntervalMinMs, wanderIntervalMaxMs, maxHp, attack, defense, yangMin, yangMax);
         entity.NextWanderAtMs = nowMs + _random.Next(wanderIntervalMinMs, wanderIntervalMaxMs + 1);
         _entities[id] = entity;
         return entity;
+    }
+
+    /// <summary>Dev-Tools-Debug-Spawn (siehe GameServer.HandleDebugSpawnMonster): ein Punkt in zufälliger
+    /// Richtung, offsetMin..offsetMax Wire-Einheiten von anchor entfernt, auf Kartengrenzen geklemmt. Ist die
+    /// Zielzelle blockiert, wird (wie bei RunWanderAi) kein Retry versucht - stattdessen anchor selbst
+    /// zurückgegeben (die Absenderposition ist per Definition begehbar, sonst könnte der Spieler dort nicht
+    /// stehen). Reine Debug-Bequemlichkeit, keine Präzisionsanforderung.</summary>
+    public (int X, int Y) FindNearbyWalkablePoint(int anchorX, int anchorY, int offsetMin, int offsetMax)
+    {
+        double angle = _random.NextDouble() * Math.PI * 2;
+        int distance = _random.Next(offsetMin, offsetMax + 1);
+        int targetX = Math.Clamp(anchorX + (int)Math.Round(Math.Cos(angle) * distance), 0, GameConstants.MapWidth);
+        int targetY = Math.Clamp(anchorY + (int)Math.Round(Math.Sin(angle) * distance), 0, GameConstants.MapHeight);
+
+        if (_collisionMap != null && _collisionMap.IsBlocked(targetX / 100, targetY / 100))
+            return (anchorX, anchorY);
+
+        return (targetX, targetY);
     }
 
     public bool Remove(int entityId)
