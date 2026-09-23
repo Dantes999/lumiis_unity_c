@@ -219,24 +219,19 @@ namespace Lumiis.Tests.Integration
                     Character character = db.Characters.Single(c => c.Id == characterId);
                     character.HairStyleId = 2;
                     character.HairColorId = 3;
-                    character.ArmorId = 4;
-                    character.HelmetId = 1;
-                    character.WeaponId = 2;
-                    character.ShieldId = 1;
                     db.SaveChanges();
                 }
 
                 client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
                 Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
 
+                // Ruestung/Helm/Waffe/Schild (M5a: jetzt ueber ItemCatalog aus EquippedXItemId aufgeloest,
+                // siehe Abschnitt 6) werden dort mit echten Items erneut abgedeckt - hier nur noch Koerper/
+                // Haare, die weiterhin direkt aus der Character-Zeile kommen.
                 Appearance appearance = client.Received.OfType<JoinAcceptedPacket>().First().Appearance;
                 Assert.Equal(1, appearance.BodyId);
                 Assert.Equal(2, appearance.HairStyleId);
                 Assert.Equal(3, appearance.HairColorId);
-                Assert.Equal(4, appearance.ArmorId);
-                Assert.Equal(1, appearance.HelmetId);
-                Assert.Equal(2, appearance.WeaponId);
-                Assert.Equal(1, appearance.ShieldId);
             }
             finally
             {

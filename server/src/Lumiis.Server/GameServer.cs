@@ -735,6 +735,9 @@ public sealed class GameServer : INetEventListener
         _logger.Info($"{entity.Name} (Entity {entity.Id}, Character {character.Id}) beigetreten");
     }
 
+    // TODO(M5a Abschnitt 6): Armor/Helmet/Weapon/Shield sollen ueber ItemCatalog aus den
+    // EquippedXItemId-Spalten aufgeloest werden (LookId nachschlagen) - noch 0/leer, bis ItemCatalog
+    // (Abschnitt 4) verdrahtet ist.
     private static Appearance ToAppearance(Character character)
     {
         return new Appearance
@@ -742,10 +745,10 @@ public sealed class GameServer : INetEventListener
             BodyId = character.BodyId,
             HairStyleId = character.HairStyleId,
             HairColorId = character.HairColorId,
-            ArmorId = character.ArmorId,
-            HelmetId = character.HelmetId,
-            WeaponId = character.WeaponId,
-            ShieldId = character.ShieldId
+            ArmorId = 0,
+            HelmetId = 0,
+            WeaponId = 0,
+            ShieldId = 0
         };
     }
 

@@ -6,6 +6,7 @@ public sealed class LumiisDbContext : DbContext
 {
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<Character> Characters => Set<Character>();
+    public DbSet<CharacterInventoryItem> CharacterInventoryItems => Set<CharacterInventoryItem>();
 
     public LumiisDbContext(DbContextOptions<LumiisDbContext> options) : base(options)
     {
@@ -32,6 +33,16 @@ public sealed class LumiisDbContext : DbContext
             entity.HasOne(c => c.Account)
                 .WithMany(a => a.Characters)
                 .HasForeignKey(c => c.AccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CharacterInventoryItem>(entity =>
+        {
+            entity.HasIndex(i => new { i.CharacterId, i.SlotIndex }).IsUnique();
+
+            entity.HasOne(i => i.Character)
+                .WithMany(c => c.InventoryItems)
+                .HasForeignKey(i => i.CharacterId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

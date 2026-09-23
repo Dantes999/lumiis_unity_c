@@ -8,6 +8,11 @@ namespace Lumiis.Auth;
 
 public static class AuthEndpoints
 {
+    /// <summary>M5a: Startwaffe für neu erstellte Charaktere - Id 1 in data/items.json ("Holzschwert").
+    /// Bewusst als Konstante statt per ItemCatalog aufgelöst (analog zu GameServer.DefaultClassName) - Lumiis.Auth
+    /// braucht dafür keinen vollen Item-Katalog, nur diese eine feste Id.</summary>
+    private const int StartingWeaponItemId = 1;
+
     public static void MapAuthEndpoints(this WebApplication app)
     {
         app.MapPost("/register", Register);
@@ -102,6 +107,9 @@ public static class AuthEndpoints
         if (taken)
             return Results.Json(new ErrorResponse("Charaktername bereits vergeben."), statusCode: StatusCodes.Status409Conflict);
 
+        // M5a: nur noch Koerper/Haare aus dem Look-Katalog - Ruestung/Helm/Schild kommen jetzt ausschliesslich
+        // ueber echte Items (leeres Inventar, kein automatisches Zuweisen mehr), die Waffe startet mit dem
+        // Holzschwert (siehe StartingWeaponItemId).
         Appearance appearance = lookCatalog.CreateDefaultAppearance();
         var character = new Character
         {
@@ -110,10 +118,7 @@ public static class AuthEndpoints
             BodyId = appearance.BodyId,
             HairStyleId = appearance.HairStyleId,
             HairColorId = appearance.HairColorId,
-            ArmorId = appearance.ArmorId,
-            HelmetId = appearance.HelmetId,
-            WeaponId = appearance.WeaponId,
-            ShieldId = appearance.ShieldId,
+            EquippedWeaponItemId = StartingWeaponItemId,
             CreatedAtUtc = DateTime.UtcNow
         };
         db.Characters.Add(character);

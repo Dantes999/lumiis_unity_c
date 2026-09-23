@@ -67,22 +67,28 @@ namespace Lumiis.Data.Migrations
                     b.Property<int>("AccountId")
                         .HasColumnType("integer");
 
-                    b.Property<int>("ArmorId")
-                        .HasColumnType("integer");
-
                     b.Property<int>("BodyId")
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("EquippedArmorItemId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("EquippedHelmetItemId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("EquippedShieldItemId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("EquippedWeaponItemId")
+                        .HasColumnType("integer");
+
                     b.Property<int>("HairColorId")
                         .HasColumnType("integer");
 
                     b.Property<int>("HairStyleId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("HelmetId")
                         .HasColumnType("integer");
 
                     b.Property<string>("Name")
@@ -100,12 +106,6 @@ namespace Lumiis.Data.Migrations
                     b.Property<int?>("PositionY")
                         .HasColumnType("integer");
 
-                    b.Property<int>("ShieldId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("WeaponId")
-                        .HasColumnType("integer");
-
                     b.Property<long>("Yang")
                         .HasColumnType("bigint");
 
@@ -119,6 +119,31 @@ namespace Lumiis.Data.Migrations
                     b.ToTable("Characters");
                 });
 
+            modelBuilder.Entity("Lumiis.Data.CharacterInventoryItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CharacterId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ItemId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SlotIndex")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CharacterId", "SlotIndex")
+                        .IsUnique();
+
+                    b.ToTable("CharacterInventoryItems");
+                });
+
             modelBuilder.Entity("Lumiis.Data.Character", b =>
                 {
                     b.HasOne("Lumiis.Data.Account", "Account")
@@ -130,9 +155,25 @@ namespace Lumiis.Data.Migrations
                     b.Navigation("Account");
                 });
 
+            modelBuilder.Entity("Lumiis.Data.CharacterInventoryItem", b =>
+                {
+                    b.HasOne("Lumiis.Data.Character", "Character")
+                        .WithMany("InventoryItems")
+                        .HasForeignKey("CharacterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Character");
+                });
+
             modelBuilder.Entity("Lumiis.Data.Account", b =>
                 {
                     b.Navigation("Characters");
+                });
+
+            modelBuilder.Entity("Lumiis.Data.Character", b =>
+                {
+                    b.Navigation("InventoryItems");
                 });
 #pragma warning restore 612, 618
         }
