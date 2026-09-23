@@ -4,6 +4,10 @@
     { "id": 2, "mobId": 1, "positionX": 65000, "positionY": 20000, "respawnSeconds": 30 },
     { "id": 3, "mobId": 1, "positionX": 20000, "positionY": 70000, "respawnSeconds": 30 },
     { "id": 4, "mobId": 2, "positionX": 45000, "positionY": 45000, "respawnSeconds": 60 },
-    { "id": 5, "mobId": 2, "positionX": 85000, "positionY": 60000, "respawnSeconds": 60 }
+    { "id": 5, "mobId": 2, "positionX": 85000, "positionY": 60000, "respawnSeconds": 60 },
+    { "id": 6, "mobId": 1, "positionX": 49700, "positionY": 50300, "respawnSeconds": 30 },
+    { "id": 7, "mobId": 2, "positionX": 50300, "positionY": 49700, "respawnSeconds": 60 },
+    { "id": 8, "mobId": 1, "positionX": 49650, "positionY": 49650, "respawnSeconds": 30 },
+    { "id": 9, "mobId": 2, "positionX": 50350, "positionY": 50350, "respawnSeconds": 60 }
   ]
 }
