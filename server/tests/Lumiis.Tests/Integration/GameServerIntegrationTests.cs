@@ -1271,5 +1271,66 @@ namespace Lumiis.Tests.Integration
                 server.Stop();
             }
         }
+
+        // ---- M4b: Monster-Respawn (siehe docs/tasks/M4b-monster-respawn.md) ----
+
+        [Fact]
+        public void KillingSpawnPointMonster_RespawnsAtSameLocationAfterConfiguredDelay()
+        {
+            MobCatalog mobCatalog = BuildSingleWildhundMobCatalog();
+            CollisionMap openMap = BuildOpenCollisionMap();
+            // Kurze RespawnSeconds (synthetisch, nicht die echten Daten aus data/) - haelt den Test schnell,
+            // echte Uhr (siehe ServerFixture ohne nowMs-Override).
+            SpawnCatalog spawnCatalog = SpawnCatalog.LoadFromJson(@"{
+              ""spawns"": [ { ""id"": 1, ""mobId"": 1, ""positionX"": 50000, ""positionY"": 50000, ""respawnSeconds"": 2 } ]
+            }", mobCatalog, openMap);
+
+            var fixture = new ServerFixture(collisionMap: openMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice", positionX: 50000, positionY: 50000);
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+
+                Assert.True(Pump(() => client.Received.OfType<EntitySpawnPacket>().Any(s => s.Kind == EntityKind.Monster), server, client));
+                int firstMonsterId = client.Received.OfType<EntitySpawnPacket>().First(s => s.Kind == EntityKind.Monster).EntityId;
+
+                // Wiederholt angreifen (Cooldown, siehe M4a-Testmuster) bis das Monster stirbt.
+                DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+                bool died = false;
+                while (DateTime.UtcNow < deadline && !died)
+                {
+                    client.Send(new AttackRequestPacket { TargetEntityId = firstMonsterId });
+                    server.Update();
+                    client.Poll();
+                    died = client.Received.OfType<EntityDiedPacket>().Any(d => d.EntityId == firstMonsterId);
+                    Thread.Sleep(15);
+                }
+                Assert.True(died);
+                Assert.True(Pump(() => client.Received.OfType<EntityDespawnPacket>().Any(d => d.EntityId == firstMonsterId), server, client));
+
+                // Jetzt ueber die (kurze, synthetische) Respawn-Zeit hinweg warten.
+                Assert.True(Pump(() =>
+                    client.Received.OfType<EntitySpawnPacket>().Any(s => s.Kind == EntityKind.Monster && s.EntityId != firstMonsterId),
+                    server, client));
+
+                EntitySpawnPacket respawn = client.Received.OfType<EntitySpawnPacket>()
+                    .First(s => s.Kind == EntityKind.Monster && s.EntityId != firstMonsterId);
+                Assert.Equal(1, respawn.MobId);
+                Assert.Equal("Wildhund", respawn.Name);
+                Assert.Equal(50000, respawn.X);
+                Assert.Equal(50000, respawn.Y);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
     }
 }

@@ -218,5 +218,78 @@ namespace Lumiis.Tests.Game
             Assert.Empty(respawned);
             Assert.Equal(0, player.CurrentHp);
         }
+
+        // ---- M4b: Monster-Respawn (siehe docs/tasks/M4b-monster-respawn.md) ----
+
+        [Fact]
+        public void SpawnPointMonster_DiesAndRespawnsAfterRespawnSeconds_AtSamePositionWithFullHp()
+        {
+            var world = new World(maxPlayers: 10, collisionMap: null, random: new Random(1));
+            Entity monster = world.SpawnMonster(mobId: 1, "Wildhund", x: 50000, y: 50000, speedWire: 700,
+                wanderRadiusWire: 500, wanderIntervalMinMs: 999999, wanderIntervalMaxMs: 999999, nowMs: 0,
+                maxHp: 30, attack: 5, defense: 0, yangMin: 5, yangMax: 15, spawnPointId: 1, respawnSeconds: 30);
+
+            world.ApplyDamage(monster, damage: 999, nowMs: 0);
+
+            Assert.False(world.TryGet(monster.Id, out _)); // sofort entfernt, wie bisher (M4a)
+            Assert.Empty(world.Entities);
+
+            (_, _, _, List<Entity> tooEarly) = world.Tick(0.0, nowMs: 29_999); // 1ms zu frueh
+            Assert.Empty(tooEarly);
+            Assert.Empty(world.Entities);
+
+            (_, _, _, List<Entity> respawnedMonsters) = world.Tick(0.0, nowMs: 30_000);
+
+            Assert.Single(respawnedMonsters);
+            Entity respawned = respawnedMonsters[0];
+            Assert.NotEqual(monster.Id, respawned.Id); // neue EntityId, nicht die alte wiederbelebt
+            Assert.Equal(1, respawned.MobId);
+            Assert.Equal("Wildhund", respawned.Name);
+            Assert.Equal(50000, respawned.IntX);
+            Assert.Equal(50000, respawned.IntY);
+            Assert.Equal(30, respawned.MaxHp);
+            Assert.Equal(30, respawned.CurrentHp); // volles Leben
+            Assert.Equal(1, respawned.SpawnPointId); // Zyklus bleibt an denselben SpawnPoint gebunden
+        }
+
+        [Fact]
+        public void DebugSpawnedMonster_Dies_NeverRespawns()
+        {
+            // Kein spawnPointId uebergeben -> Dev-Tools-Debug-Spawn (siehe Entity.SpawnPointId).
+            var world = new World(maxPlayers: 10, collisionMap: null, random: new Random(1));
+            Entity monster = world.SpawnMonster(mobId: 1, "Wildhund", x: 50000, y: 50000, speedWire: 700,
+                wanderRadiusWire: 500, wanderIntervalMinMs: 999999, wanderIntervalMaxMs: 999999, nowMs: 0,
+                maxHp: 30, attack: 5, defense: 0, yangMin: 5, yangMax: 15);
+
+            world.ApplyDamage(monster, damage: 999, nowMs: 0);
+            Assert.Empty(world.Entities);
+
+            (_, _, _, List<Entity> respawnedMonsters) = world.Tick(0.0, nowMs: 1_000_000); // beliebig viel Zeit
+            Assert.Empty(respawnedMonsters);
+            Assert.Empty(world.Entities);
+        }
+
+        [Fact]
+        public void TwoSpawnPoints_RespawnIndependentlyWithTheirOwnRespawnSeconds()
+        {
+            var world = new World(maxPlayers: 10, collisionMap: null, random: new Random(1));
+            Entity monsterA = world.SpawnMonster(mobId: 1, "Wildhund", x: 30000, y: 30000, speedWire: 700,
+                wanderRadiusWire: 500, wanderIntervalMinMs: 999999, wanderIntervalMaxMs: 999999, nowMs: 0,
+                maxHp: 30, attack: 5, defense: 0, yangMin: 5, yangMax: 15, spawnPointId: 1, respawnSeconds: 10);
+            Entity monsterB = world.SpawnMonster(mobId: 2, "Waldschrat", x: 60000, y: 60000, speedWire: 200,
+                wanderRadiusWire: 300, wanderIntervalMinMs: 999999, wanderIntervalMaxMs: 999999, nowMs: 0,
+                maxHp: 60, attack: 8, defense: 3, yangMin: 10, yangMax: 25, spawnPointId: 2, respawnSeconds: 20);
+
+            world.ApplyDamage(monsterA, damage: 999, nowMs: 0);
+            world.ApplyDamage(monsterB, damage: 999, nowMs: 0);
+
+            (_, _, _, List<Entity> at10s) = world.Tick(0.0, nowMs: 10_000);
+            Assert.Single(at10s);
+            Assert.Equal(1, at10s[0].SpawnPointId);
+
+            (_, _, _, List<Entity> at20s) = world.Tick(0.0, nowMs: 20_000);
+            Assert.Single(at20s);
+            Assert.Equal(2, at20s[0].SpawnPointId);
+        }
     }
 }
