@@ -22,8 +22,23 @@ public sealed class MobDefinition
     public int YangMin { get; }
     public int YangMax { get; }
 
+    /// <summary>M4c: Kampfwerte für Monster als Angreifer, analog zum Spieler-Krieger aus classes.json.</summary>
+    public int MeleeRangeWire { get; }
+    public int AttackCooldownMs { get; }
+
+    /// <summary>M4c: greift dieser Mob-Typ von sich aus an, sobald ein Spieler in AggroRangeWire kommt?
+    /// AggroRangeWire ist nur bei Aggressive=true aussagekräftig. Passive Mobs (Aggressive=false) erfassen ein
+    /// Ziel ausschließlich reaktiv nach einem Treffer (siehe World.TryAttack).</summary>
+    public bool Aggressive { get; }
+    public int AggroRangeWire { get; }
+
+    /// <summary>M4c: Distanz vom Wander-Anker, ab der ein verfolgtes Ziel aufgegeben wird (siehe
+    /// World-Tick-Monster-KI).</summary>
+    public int LeashRangeWire { get; }
+
     public MobDefinition(int id, string name, int speedWire, int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs,
-        int maxHp, int attack, int defense, int yangMin, int yangMax)
+        int maxHp, int attack, int defense, int yangMin, int yangMax,
+        int meleeRangeWire, int attackCooldownMs, bool aggressive, int aggroRangeWire, int leashRangeWire)
     {
         Id = id;
         Name = name;
@@ -36,6 +51,11 @@ public sealed class MobDefinition
         Defense = defense;
         YangMin = yangMin;
         YangMax = yangMax;
+        MeleeRangeWire = meleeRangeWire;
+        AttackCooldownMs = attackCooldownMs;
+        Aggressive = aggressive;
+        AggroRangeWire = aggroRangeWire;
+        LeashRangeWire = leashRangeWire;
     }
 }
 
@@ -117,8 +137,21 @@ public sealed class MobCatalog
                     $"mobs.json: Mob {entry.Id} ({entry.Name}) hat eine ungültige Yang-Spanne (min {entry.YangMin}, max {entry.YangMax}).");
             }
 
+            if (entry.MeleeRangeWire <= 0)
+                throw new MobCatalogException($"mobs.json: Mob {entry.Id} ({entry.Name}) hat meleeRangeWire <= 0.");
+
+            if (entry.AttackCooldownMs <= 0)
+                throw new MobCatalogException($"mobs.json: Mob {entry.Id} ({entry.Name}) hat attackCooldownMs <= 0.");
+
+            if (entry.AggroRangeWire < 0)
+                throw new MobCatalogException($"mobs.json: Mob {entry.Id} ({entry.Name}) hat aggroRangeWire < 0.");
+
+            if (entry.LeashRangeWire <= 0)
+                throw new MobCatalogException($"mobs.json: Mob {entry.Id} ({entry.Name}) hat leashRangeWire <= 0.");
+
             byId[entry.Id] = new MobDefinition(entry.Id, entry.Name, entry.SpeedWire, entry.WanderRadiusWire, entry.WanderIntervalMinMs, entry.WanderIntervalMaxMs,
-                entry.MaxHp, entry.Attack, entry.Defense, entry.YangMin, entry.YangMax);
+                entry.MaxHp, entry.Attack, entry.Defense, entry.YangMin, entry.YangMax,
+                entry.MeleeRangeWire, entry.AttackCooldownMs, entry.Aggressive, entry.AggroRangeWire, entry.LeashRangeWire);
         }
 
         if (byId.Count == 0)

@@ -17,6 +17,11 @@ internal sealed class MobEntryDto
     public int Defense { get; set; }
     public int YangMin { get; set; }
     public int YangMax { get; set; }
+    public int MeleeRangeWire { get; set; }
+    public int AttackCooldownMs { get; set; }
+    public bool Aggressive { get; set; }
+    public int AggroRangeWire { get; set; }
+    public int LeashRangeWire { get; set; }
 }
 
 internal sealed class MobCatalogDto

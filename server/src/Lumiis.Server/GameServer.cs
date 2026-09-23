@@ -229,7 +229,12 @@ public sealed class GameServer : INetEventListener
         }
 
         double deltaSeconds = 1.0 / Protocol.TickRate;
-        (List<Entity> arrived, List<Entity> startedWandering, List<Entity> respawned, List<Entity> respawnedMonsters) = _world.Tick(deltaSeconds, _nowMs());
+        // MonsterAttacks wird hier noch verworfen (Broadcast folgt in Abschnitt 5 der Aufgabe, siehe
+        // docs/tasks/M4c-monster-aggro.md) - kann zu diesem Zeitpunkt ohnehin nie etwas enthalten, da noch
+        // kein Monster ein Ziel bekommt (Aggro-Suche/reaktive Zielerfassung sind bereits in World, aber
+        // AttackCooldownMs/MeleeRangeWire der Katalog-Monster sind hier mangels Verdrahtung weiterhin 0/
+        // Default - siehe TODO unten im Konstruktor).
+        (List<Entity> arrived, List<Entity> startedWandering, List<Entity> respawned, List<Entity> respawnedMonsters, List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> _) = _world.Tick(deltaSeconds, _nowMs());
         foreach (Entity entity in arrived)
             SendToVisible(entity.Id, new EntityStopPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY });
 

@@ -19,7 +19,8 @@ public sealed class World
     /// Monster-Entity oder einen ausstehenden Respawn, nie beides).</summary>
     private readonly record struct PendingMonsterRespawn(int MobId, string Name, int PositionX, int PositionY, int SpeedWire,
         int WanderRadiusWire, int WanderIntervalMinMs, int WanderIntervalMaxMs,
-        int MaxHp, int Attack, int Defense, int YangMin, int YangMax, int RespawnSeconds, long DueAtMs);
+        int MaxHp, int Attack, int Defense, int YangMin, int YangMax, int RespawnSeconds,
+        int MeleeRangeWire, int AttackCooldownMs, bool Aggressive, int AggroRangeWire, int LeashRangeWire, long DueAtMs);
 
     private readonly Dictionary<int, Entity> _entities = new();
     private readonly Dictionary<int, int> _entityIdByCharacterId = new();
@@ -96,18 +97,22 @@ public sealed class World
     /// Entity.DefaultMaxHp-Kommentar. spawnPointId: null (Default) bedeutet "nicht an einen SpawnPoint
     /// gebunden" (Dev-Tools-Debug-Spawn, siehe Entity.SpawnPointId) - der reguläre Katalog-Spawn im
     /// GameServer-Konstruktor übergibt hier immer die echte SpawnPoint.Id. respawnSeconds: nur bei gesetzter
-    /// spawnPointId aussagekräftig (siehe Entity.RespawnSeconds, M4b).</summary>
+    /// spawnPointId aussagekräftig (siehe Entity.RespawnSeconds, M4b). meleeRangeWire/attackCooldownMs/
+    /// aggressive/aggroRangeWire/leashRangeWire: Kampf-/Aggro-Werte aus der MobCatalog (M4c).</summary>
     public Entity SpawnMonster(int mobId, string name, int x, int y, int speedWire,
         int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs, long nowMs,
         int maxHp = Entity.DefaultMaxHp, int attack = Entity.DefaultAttack, int defense = Entity.DefaultDefense,
-        int yangMin = 0, int yangMax = 0, int? spawnPointId = null, int respawnSeconds = 0)
+        int yangMin = 0, int yangMax = 0, int? spawnPointId = null, int respawnSeconds = 0,
+        int meleeRangeWire = Entity.DefaultMeleeRangeWire, int attackCooldownMs = Entity.DefaultAttackCooldownMs,
+        bool aggressive = false, int aggroRangeWire = 0, int leashRangeWire = 0)
     {
         int clampedX = Math.Clamp(x, 0, GameConstants.MapWidth);
         int clampedY = Math.Clamp(y, 0, GameConstants.MapHeight);
 
         int id = _nextEntityId++;
         Entity entity = Entity.CreateMonster(id, mobId, spawnPointId, name, clampedX, clampedY, speedWire,
-            wanderRadiusWire, wanderIntervalMinMs, wanderIntervalMaxMs, maxHp, attack, defense, yangMin, yangMax, respawnSeconds);
+            wanderRadiusWire, wanderIntervalMinMs, wanderIntervalMaxMs, maxHp, attack, defense, yangMin, yangMax, respawnSeconds,
+            meleeRangeWire, attackCooldownMs, aggressive, aggroRangeWire, leashRangeWire);
         entity.NextWanderAtMs = nowMs + _random.Next(wanderIntervalMinMs, wanderIntervalMaxMs + 1);
         _entities[id] = entity;
         return entity;
@@ -219,13 +224,19 @@ public sealed class World
         return (lastWalkableX, lastWalkableY);
     }
 
-    /// <summary>Serverautoritative Angriffsprüfung + -ausführung (M4a) - kein Netzwerkbezug, siehe
-    /// GameServer.HandleAttackRequest für die Netzwerk-Seite. Prüft in dieser Reihenfolge (siehe
-    /// docs/tasks/M4a-combat-core.md Abschnitt 4): Ziel existiert, Ziel lebt, Ziel ist kein Spieler (PvP in
-    /// M4a abgelehnt), Cooldown des Angreifers, Reichweite (quadrierte Distanz wie ComputeVisibility, gegen
-    /// MeleeRangeWire des Angreifers). attackerEntityId muss bereits als existierende, per Verbindung
-    /// gehaltene Entity geprüft sein (siehe GameServer.HandleAttackRequest) - der defensive TargetNotFound-
-    /// Fallback hier sollte nie greifen (es gäbe dafür auch keine Verbindung, an die AttackFailed ginge).</summary>
+    /// <summary>Serverautoritative Angriffsprüfung + -ausführung (M4a, seit M4c auch für Monster als
+    /// Angreifer verallgemeinert - siehe docs/tasks/M4c-monster-aggro.md Abschnitt 0a) - kein Netzwerkbezug,
+    /// siehe GameServer.HandleAttackRequest (Spieler-initiiert) bzw. die Monster-KI in Tick
+    /// (Monster-initiiert) für die jeweilige Netzwerk-/Aufrufer-Seite. Prüft in dieser Reihenfolge (siehe
+    /// docs/tasks/M4a-combat-core.md Abschnitt 4): Ziel existiert, Ziel lebt, Angreifer und Ziel sind
+    /// unterschiedlichen Kinds (blockt Spieler-vs-Spieler UND Monster-vs-Monster - Letzteres löst mein
+    /// eigener KI-Code nie aus, aber konzeptionell konsistent; ersetzt den ursprünglichen "Ziel ist kein
+    /// Spieler"-Check aus M4a, der implizit "Angreifer ist immer ein Spieler" annahm), Cooldown des
+    /// Angreifers, Reichweite (quadrierte Distanz wie ComputeVisibility, gegen MeleeRangeWire des Angreifers -
+    /// bei Spielern aus ClassCatalog, bei Monstern seit M4c aus MobCatalog statt hartkodiert 0).
+    /// attackerEntityId muss bereits als existierende Entity geprüft sein (bei Spieler-initiierten Angriffen
+    /// die per Verbindung gehaltene eigene Entity, siehe GameServer.HandleAttackRequest) - der defensive
+    /// TargetNotFound-Fallback hier sollte nie greifen.</summary>
     public AttackResult TryAttack(int attackerEntityId, int targetEntityId, long nowMs)
     {
         if (!_entities.TryGetValue(attackerEntityId, out Entity? attacker))
@@ -237,7 +248,7 @@ public sealed class World
         if (target.IsDead)
             return AttackResult.Fail(AttackFailedReason.TargetAlreadyDead);
 
-        if (target.Kind == EntityKind.Player)
+        if (attacker.Kind == target.Kind)
             return AttackResult.Fail(AttackFailedReason.TargetIsPlayer);
 
         if (nowMs < attacker.AttackReadyAtMs)
@@ -309,7 +320,9 @@ public sealed class World
             diedMonster.MobId, diedMonster.Name, diedMonster.WanderAnchorX, diedMonster.WanderAnchorY, diedMonster.MovementSpeed,
             diedMonster.WanderRadiusWire, diedMonster.WanderIntervalMinMs, diedMonster.WanderIntervalMaxMs,
             diedMonster.MaxHp, diedMonster.Attack, diedMonster.Defense, diedMonster.YangMin, diedMonster.YangMax,
-            diedMonster.RespawnSeconds, nowMs + diedMonster.RespawnSeconds * 1000L);
+            diedMonster.RespawnSeconds, diedMonster.MeleeRangeWire, diedMonster.AttackCooldownMs,
+            diedMonster.Aggressive, diedMonster.AggroRangeWire, diedMonster.LeashRangeWire,
+            nowMs + diedMonster.RespawnSeconds * 1000L);
     }
 
     /// <summary>Für jede Entity: welche anderen Entities liegen innerhalb von radiusWire (quadrierte Distanz,
@@ -347,22 +360,27 @@ public sealed class World
         return visible;
     }
 
-    /// <summary>Schreibt alle Bewegungen um deltaSeconds fort (Spieler-MoveTo UND laufende Monster-Wander-
-    /// Bewegung, derselbe Mechanismus). Läuft danach die Wander-KI für fällige Monster (Reihenfolge
-    /// willkürlich, aber konsistent - siehe docs/tasks/M3c-monsters.md), dann fällige Spieler-Respawns
-    /// (M4a, siehe ApplyDamage): Position auf Kartenmitte, CurrentHp auf MaxHp, EntityKind/Appearance
-    /// unverändert. Zuletzt fällige Monster-Respawns (M4b, siehe ScheduleMonsterRespawn): erzeugt über den
-    /// normalen SpawnMonster-Weg eine NEUE Entity mit neuer EntityId (anders als beim Spieler - die alte
-    /// wurde beim Tod schon entfernt, der Client hat längst EntityDespawn bekommen), räumt den SpawnPoint
-    /// danach wieder frei. Gibt vier Listen zurück: Arrived (Entities, die in diesem Tick exakt am Ziel
-    /// angekommen sind - für EntityStop), StartedWandering (Monster, die in diesem Tick per RunWanderAi ein
-    /// neues Bewegungsziel bekommen haben - für EntityMove, analog zu HandleMoveTo bei Spielern, die aber über
+    /// <summary>Schreibt alle Bewegungen um deltaSeconds fort (Spieler-MoveTo UND laufende Monster-Bewegung,
+    /// derselbe Mechanismus). Läuft danach die Monster-KI für jedes Monster (M3c Wander plus M4c
+    /// Zielerfassung/Verfolgung/Leine/Angriff, siehe RunMonsterAi - ein Monster ist entweder am Wandern ODER
+    /// verfolgt/bekämpft ein Ziel, nie beides gleichzeitig), dann fällige Spieler-Respawns (M4a, siehe
+    /// ApplyDamage): Position auf Kartenmitte, CurrentHp auf MaxHp, EntityKind/Appearance unverändert. Zuletzt
+    /// fällige Monster-Respawns (M4b, siehe ScheduleMonsterRespawn): erzeugt über den normalen SpawnMonster-
+    /// Weg eine NEUE Entity mit neuer EntityId (anders als beim Spieler - die alte wurde beim Tod schon
+    /// entfernt, der Client hat längst EntityDespawn bekommen), räumt den SpawnPoint danach wieder frei. Gibt
+    /// fünf Listen zurück: Arrived (Entities, die in diesem Tick exakt am Ziel angekommen sind - für
+    /// EntityStop), StartedWandering (trotz des aus M3c stammenden Namens seit M4c für JEDE neue/fortgesetzte
+    /// KI-gesteuerte Bewegung eines Monsters genutzt - Wander-Start, Leine-Rückkehr-Start UND laufende
+    /// Zielverfolgung, siehe RunMonsterAi - für EntityMove, analog zu HandleMoveTo bei Spielern, die aber über
     /// ein echtes MoveToPacket ausgelöst werden statt über den Tick), Respawned (Spieler, die in diesem Tick
-    /// respawnt sind - ebenfalls für EntityStop an der neuen Position, siehe GameServer) und
-    /// RespawnedMonsters (neu erschienene Monster - kein Sonderfall nötig, der normale AOI-Diff-Mechanismus
-    /// erkennt sie als "neu sichtbar" und verschickt EntitySpawn von selbst, siehe GameServer.UpdateVisibility;
-    /// die Liste dient GameServer nur zum Loggen).</summary>
-    public (List<Entity> Arrived, List<Entity> StartedWandering, List<Entity> Respawned, List<Entity> RespawnedMonsters) Tick(double deltaSeconds, long nowMs)
+    /// respawnt sind - ebenfalls für EntityStop an der neuen Position, siehe GameServer), RespawnedMonsters
+    /// (neu erschienene Monster - kein Sonderfall nötig, der normale AOI-Diff-Mechanismus erkennt sie als "neu
+    /// sichtbar" und verschickt EntitySpawn von selbst, siehe GameServer.UpdateVisibility; die Liste dient
+    /// GameServer nur zum Loggen) und MonsterAttacks (M4c: erfolgreiche Monster-initiierte Angriffe gegen
+    /// Spieler - AttackerEntityId/TargetEntityId/Result, damit GameServer dieselben Pakete verschicken kann
+    /// wie bei einem spielerinitiierten Angriff, siehe GameServer.BroadcastAttackResult).</summary>
+    public (List<Entity> Arrived, List<Entity> StartedWandering, List<Entity> Respawned, List<Entity> RespawnedMonsters,
+        List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> MonsterAttacks) Tick(double deltaSeconds, long nowMs)
     {
         List<Entity> arrived = new();
         foreach (Entity entity in _entities.Values)
@@ -372,13 +390,11 @@ public sealed class World
         }
 
         List<Entity> startedWandering = new();
+        List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> monsterAttacks = new();
         foreach (Entity entity in _entities.Values)
         {
             if (entity.Kind != EntityKind.Monster) continue;
-            if (nowMs < entity.NextWanderAtMs) continue;
-
-            if (RunWanderAi(entity, nowMs))
-                startedWandering.Add(entity);
+            RunMonsterAi(entity, nowMs, startedWandering, monsterAttacks);
         }
 
         List<Entity> respawned = new();
@@ -410,12 +426,110 @@ public sealed class World
                 Entity monster = SpawnMonster(pending.MobId, pending.Name, pending.PositionX, pending.PositionY, pending.SpeedWire,
                     pending.WanderRadiusWire, pending.WanderIntervalMinMs, pending.WanderIntervalMaxMs, nowMs,
                     pending.MaxHp, pending.Attack, pending.Defense, pending.YangMin, pending.YangMax,
-                    spawnPointId: spawnPointId, respawnSeconds: pending.RespawnSeconds);
+                    spawnPointId: spawnPointId, respawnSeconds: pending.RespawnSeconds,
+                    meleeRangeWire: pending.MeleeRangeWire, attackCooldownMs: pending.AttackCooldownMs,
+                    aggressive: pending.Aggressive, aggroRangeWire: pending.AggroRangeWire, leashRangeWire: pending.LeashRangeWire);
                 respawnedMonsters.Add(monster);
             }
         }
 
-        return (arrived, startedWandering, respawned, respawnedMonsters);
+        return (arrived, startedWandering, respawned, respawnedMonsters, monsterAttacks);
+    }
+
+    /// <summary>Monster-KI für ein einzelnes Monster (M3c Wander, M4c Zielerfassung/Verfolgung/Leine/Angriff).
+    /// Ohne aktuelles Ziel: aggressive Mobs suchen den nächstgelegenen lebenden Spieler innerhalb
+    /// AggroRangeWire (quadrierte Distanz wie AOI/TryAttack) und setzen ihn bei Fund als Ziel; passive Mobs
+    /// erfassen ihr Ziel ausschließlich reaktiv nach einem Treffer (siehe TryAttack) - hier passiert für sie
+    /// nichts. Ohne Ziel (weiterhin) läuft die normale Wander-Fälligkeitsprüfung wie bisher. MIT Ziel: zuerst
+    /// prüfen, ob der Zielspieler noch existiert/lebt (sonst Ziel fallen lassen, zurück zum Wander-Zustand -
+    /// kein SetDestination hier, die nächste reguläre Wander-Fälligkeit übernimmt), dann die Leine (Distanz
+    /// vom Anker zum AKTUELLEN Standort DES MONSTERS, nicht zum Spieler) - jenseits davon Ziel fallen lassen
+    /// und einmalig Richtung Anker lossetzen. Sonst: innerhalb MeleeRangeWire -> angreifen falls Cooldown
+    /// bereit (über TryAttack, derselbe Mechanismus wie beim Spieler-Angriff - nur bei Erfolg in
+    /// monsterAttacks aufgenommen, damit GameServer die Pakete verschickt); außerhalb -> Bewegungsziel JEDEN
+    /// Tick neu auf die aktuelle Position des Zielspielers setzen (bewusst - das Ziel bewegt sich live weiter,
+    /// siehe docs/tasks/M4c-monster-aggro.md Abschnitt 3), dafür in jedem Chase-Tick in startedWandering
+    /// aufgenommen (siehe Tick-Kommentar zur erweiterten Bedeutung dieser Liste).</summary>
+    private void RunMonsterAi(Entity entity, long nowMs,
+        List<Entity> startedWandering, List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> monsterAttacks)
+    {
+        if (entity.TargetEntityId is int currentTargetId)
+        {
+            if (!_entities.TryGetValue(currentTargetId, out Entity? targetPlayer) || targetPlayer.IsDead)
+            {
+                entity.TargetEntityId = null;
+                return;
+            }
+
+            long dxAnchor = entity.IntX - entity.WanderAnchorX;
+            long dyAnchor = entity.IntY - entity.WanderAnchorY;
+            long leashSq = (long)entity.LeashRangeWire * entity.LeashRangeWire;
+            if (dxAnchor * dxAnchor + dyAnchor * dyAnchor > leashSq)
+            {
+                entity.TargetEntityId = null;
+                SetDestination(entity.Id, entity.WanderAnchorX, entity.WanderAnchorY);
+                startedWandering.Add(entity);
+                return;
+            }
+
+            long dxTarget = entity.IntX - targetPlayer.IntX;
+            long dyTarget = entity.IntY - targetPlayer.IntY;
+            long meleeSq = (long)entity.MeleeRangeWire * entity.MeleeRangeWire;
+            if (dxTarget * dxTarget + dyTarget * dyTarget <= meleeSq)
+            {
+                if (nowMs >= entity.AttackReadyAtMs)
+                {
+                    AttackResult result = TryAttack(entity.Id, targetPlayer.Id, nowMs);
+                    if (result.Success)
+                        monsterAttacks.Add((entity.Id, targetPlayer.Id, result));
+                }
+                return;
+            }
+
+            SetDestination(entity.Id, targetPlayer.IntX, targetPlayer.IntY);
+            startedWandering.Add(entity);
+            return;
+        }
+
+        if (entity.Aggressive)
+        {
+            Entity? nearestPlayer = FindNearestLivingPlayerWithinRange(entity, entity.AggroRangeWire);
+            if (nearestPlayer != null)
+            {
+                entity.TargetEntityId = nearestPlayer.Id;
+                return; // Verfolgung beginnt im naechsten Tick (40ms Verzoegerung, nicht wahrnehmbar)
+            }
+        }
+
+        if (nowMs < entity.NextWanderAtMs) return;
+        if (RunWanderAi(entity, nowMs))
+            startedWandering.Add(entity);
+    }
+
+    /// <summary>Nächstgelegener lebender Spieler innerhalb rangeWire um monster (quadrierte Distanz, wie
+    /// ComputeVisibility/TryAttack) - null, wenn keiner in Reichweite ist. O(n) über alle Entities, analog zur
+    /// bewussten O(n²)-Entscheidung bei ComputeVisibility (siehe dort) - bei unserer Spielergrößenordnung
+    /// vernachlässigbar, keine räumliche Indexstruktur nötig.</summary>
+    private Entity? FindNearestLivingPlayerWithinRange(Entity monster, int rangeWire)
+    {
+        long rangeSq = (long)rangeWire * rangeWire;
+        Entity? nearest = null;
+        long nearestDistSq = long.MaxValue;
+
+        foreach (Entity candidate in _entities.Values)
+        {
+            if (candidate.Kind != EntityKind.Player || candidate.IsDead) continue;
+
+            long dx = monster.IntX - candidate.IntX;
+            long dy = monster.IntY - candidate.IntY;
+            long distSq = dx * dx + dy * dy;
+            if (distSq > rangeSq || distSq >= nearestDistSq) continue;
+
+            nearestDistSq = distSq;
+            nearest = candidate;
+        }
+
+        return nearest;
     }
 
     /// <summary>Eine fällige Wander-Entscheidung für ein Monster: zufälliger Punkt innerhalb WanderRadiusWire

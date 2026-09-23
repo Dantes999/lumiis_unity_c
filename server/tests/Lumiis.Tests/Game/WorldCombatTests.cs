@@ -197,7 +197,7 @@ namespace Lumiis.Tests.Game
             Entity player = JoinPlayer(world, 1, x: 10000, y: 10000, maxHp: 100);
             world.ApplyDamage(player, damage: 9999, nowMs: 1000);
 
-            (_, _, List<Entity> respawned, _) = world.Tick(deltaSeconds: 0.0, nowMs: 1000 + 3000);
+            (_, _, List<Entity> respawned, _, _) = world.Tick(deltaSeconds: 0.0, nowMs: 1000 + 3000);
 
             Assert.Contains(player, respawned);
             Assert.Equal(GameConstants.MapWidth / 2, player.IntX);
@@ -213,7 +213,7 @@ namespace Lumiis.Tests.Game
             Entity player = JoinPlayer(world, 1, x: 10000, y: 10000);
             world.ApplyDamage(player, damage: 9999, nowMs: 1000);
 
-            (_, _, List<Entity> respawned, _) = world.Tick(deltaSeconds: 0.0, nowMs: 1000 + 2999); // 1ms zu frueh
+            (_, _, List<Entity> respawned, _, _) = world.Tick(deltaSeconds: 0.0, nowMs: 1000 + 2999); // 1ms zu frueh
 
             Assert.Empty(respawned);
             Assert.Equal(0, player.CurrentHp);
@@ -234,11 +234,11 @@ namespace Lumiis.Tests.Game
             Assert.False(world.TryGet(monster.Id, out _)); // sofort entfernt, wie bisher (M4a)
             Assert.Empty(world.Entities);
 
-            (_, _, _, List<Entity> tooEarly) = world.Tick(0.0, nowMs: 29_999); // 1ms zu frueh
+            (_, _, _, List<Entity> tooEarly, _) = world.Tick(0.0, nowMs: 29_999); // 1ms zu frueh
             Assert.Empty(tooEarly);
             Assert.Empty(world.Entities);
 
-            (_, _, _, List<Entity> respawnedMonsters) = world.Tick(0.0, nowMs: 30_000);
+            (_, _, _, List<Entity> respawnedMonsters, _) = world.Tick(0.0, nowMs: 30_000);
 
             Assert.Single(respawnedMonsters);
             Entity respawned = respawnedMonsters[0];
@@ -264,7 +264,7 @@ namespace Lumiis.Tests.Game
             world.ApplyDamage(monster, damage: 999, nowMs: 0);
             Assert.Empty(world.Entities);
 
-            (_, _, _, List<Entity> respawnedMonsters) = world.Tick(0.0, nowMs: 1_000_000); // beliebig viel Zeit
+            (_, _, _, List<Entity> respawnedMonsters, _) = world.Tick(0.0, nowMs: 1_000_000); // beliebig viel Zeit
             Assert.Empty(respawnedMonsters);
             Assert.Empty(world.Entities);
         }
@@ -283,11 +283,11 @@ namespace Lumiis.Tests.Game
             world.ApplyDamage(monsterA, damage: 999, nowMs: 0);
             world.ApplyDamage(monsterB, damage: 999, nowMs: 0);
 
-            (_, _, _, List<Entity> at10s) = world.Tick(0.0, nowMs: 10_000);
+            (_, _, _, List<Entity> at10s, _) = world.Tick(0.0, nowMs: 10_000);
             Assert.Single(at10s);
             Assert.Equal(1, at10s[0].SpawnPointId);
 
-            (_, _, _, List<Entity> at20s) = world.Tick(0.0, nowMs: 20_000);
+            (_, _, _, List<Entity> at20s, _) = world.Tick(0.0, nowMs: 20_000);
             Assert.Single(at20s);
             Assert.Equal(2, at20s[0].SpawnPointId);
         }

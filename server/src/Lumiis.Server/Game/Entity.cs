@@ -107,6 +107,23 @@ public sealed class Entity
     /// sofort aus World entfernt (siehe World.ApplyDamage).</summary>
     public long RespawnAtMs { get; set; }
 
+    /// <summary>M4c: greift dieser Mob-Typ von sich aus an, sobald ein Spieler in AggroRangeWire kommt (siehe
+    /// World-Tick-Monster-KI)? AggroRangeWire nur bei Aggressive=true aussagekräftig. Passive Mobs
+    /// (Aggressive=false) erfassen ein Ziel nur reaktiv nach einem Treffer (siehe TryAttack). Nur bei
+    /// Kind=Monster gesetzt.</summary>
+    public bool Aggressive { get; }
+    public int AggroRangeWire { get; }
+
+    /// <summary>M4c: Distanz vom WanderAnchor, ab der ein verfolgtes Ziel aufgegeben wird (siehe
+    /// World-Tick-Monster-KI). Nur bei Kind=Monster gesetzt.</summary>
+    public int LeashRangeWire { get; }
+
+    /// <summary>M4c: aktuell verfolgtes/angegriffenes Ziel (immer eine Spieler-EntityId) - null bedeutet "kein
+    /// Ziel, normale Wander-KI aktiv" (siehe World.RunWanderAi). Nur bei Kind=Monster gesetzt. Ersetzt für die
+    /// Dauer eines aktiven Ziels die normale Wander-Zufallsbewegung - dasselbe nullable-Feld-Muster wie
+    /// SpawnPointId/CharacterId, kein paralleler Zustandscontainer (siehe World-Tick-Monster-KI-Kommentar).</summary>
+    public int? TargetEntityId { get; set; }
+
     public bool IsDead => CurrentHp <= 0;
 
     /// <summary>Nur bei Kind=Monster gesetzt (aus dem Mob-Typ, siehe MobCatalog) - Yang-Spanne, die beim Tod
@@ -120,7 +137,8 @@ public sealed class Entity
 
     private Entity(int id, EntityKind kind, int? characterId, int mobId, int? spawnPointId, int respawnSeconds, string name, int x, int y, int movementSpeed,
         int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs,
-        int maxHp, int attack, int defense, int meleeRangeWire, int attackCooldownMs, int yangMin, int yangMax)
+        int maxHp, int attack, int defense, int meleeRangeWire, int attackCooldownMs, int yangMin, int yangMax,
+        bool aggressive, int aggroRangeWire, int leashRangeWire)
     {
         Id = id;
         Kind = kind;
@@ -145,6 +163,9 @@ public sealed class Entity
         AttackCooldownMs = attackCooldownMs;
         YangMin = yangMin;
         YangMax = yangMax;
+        Aggressive = aggressive;
+        AggroRangeWire = aggroRangeWire;
+        LeashRangeWire = leashRangeWire;
     }
 
     public Entity(int id, int characterId, string name, int x, int y,
@@ -152,22 +173,27 @@ public sealed class Entity
         int meleeRangeWire = DefaultMeleeRangeWire, int attackCooldownMs = DefaultAttackCooldownMs)
         : this(id, EntityKind.Player, characterId, mobId: 0, spawnPointId: null, respawnSeconds: 0, name, x, y, movementSpeed: GameConstants.PlayerSpeed,
             wanderRadiusWire: 0, wanderIntervalMinMs: 0, wanderIntervalMaxMs: 0,
-            maxHp, attack, defense, meleeRangeWire, attackCooldownMs, yangMin: 0, yangMax: 0)
+            maxHp, attack, defense, meleeRangeWire, attackCooldownMs, yangMin: 0, yangMax: 0,
+            aggressive: false, aggroRangeWire: 0, leashRangeWire: 0)
     {
     }
 
     /// <summary>spawnPointId: null bedeutet "nicht an einen SpawnPoint aus spawns.json gebunden" (Dev-Tools-
     /// Debug-Spawn, siehe SpawnPointId-Kommentar) - reguläre, aus der SpawnCatalog erzeugte Monster übergeben
     /// hier immer die echte SpawnPoint.Id (siehe World.SpawnMonster/GameServer-Konstruktor).
-    /// respawnSeconds: nur bei gesetzter spawnPointId aussagekräftig (siehe RespawnSeconds-Kommentar).</summary>
+    /// respawnSeconds: nur bei gesetzter spawnPointId aussagekräftig (siehe RespawnSeconds-Kommentar).
+    /// meleeRangeWire/attackCooldownMs/aggressive/aggroRangeWire/leashRangeWire: aus dem Mob-Typ (M4c, siehe
+    /// MobCatalog) - Defaults nur für bestehende Tests ohne Kampf-/Aggro-Bezug.</summary>
     public static Entity CreateMonster(int id, int mobId, int? spawnPointId, string name, int x, int y, int speedWire,
         int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs,
         int maxHp = DefaultMaxHp, int attack = DefaultAttack, int defense = DefaultDefense, int yangMin = 0, int yangMax = 0,
-        int respawnSeconds = 0)
+        int respawnSeconds = 0, int meleeRangeWire = DefaultMeleeRangeWire, int attackCooldownMs = DefaultAttackCooldownMs,
+        bool aggressive = false, int aggroRangeWire = 0, int leashRangeWire = 0)
     {
         return new Entity(id, EntityKind.Monster, characterId: null, mobId, spawnPointId, respawnSeconds, name, x, y, movementSpeed: speedWire,
             wanderRadiusWire, wanderIntervalMinMs, wanderIntervalMaxMs,
-            maxHp, attack, defense, meleeRangeWire: 0, attackCooldownMs: 0, yangMin, yangMax);
+            maxHp, attack, defense, meleeRangeWire, attackCooldownMs, yangMin, yangMax,
+            aggressive, aggroRangeWire, leashRangeWire);
     }
 
     public void MoveTo(int targetX, int targetY, int speed)
