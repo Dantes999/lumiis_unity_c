@@ -1,0 +1,5 @@
+{
+  "classes": [
+    { "name": "Krieger", "maxHp": 100, "attack": 15, "defense": 5, "meleeRangeWire": 150, "attackCooldownMs": 800 }
+  ]
+}
