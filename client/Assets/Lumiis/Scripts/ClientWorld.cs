@@ -25,6 +25,11 @@ namespace Lumiis.Client
         public int Speed;
         public double MoveStartTime;
 
+        /// <summary>-1 = noch unbekannt (M4a: JoinAccepted/EntitySpawn tragen kein Leben, der Client erfährt
+        /// es erst reaktiv über das erste EntityDamagedPacket für diese Entity, siehe HandleEntityDamaged).</summary>
+        public int CurrentHp = -1;
+        public int MaxHp = -1;
+
         public int IntX
         {
             get { return (int)Math.Round(X); }
@@ -125,6 +130,24 @@ namespace Lumiis.Client
             entity.IsMoving = false;
             entity.X = x;
             entity.Y = y;
+        }
+
+        /// <summary>M4a: aktualisiert das bekannte Leben einer getroffenen Entity (Debug-Overlay, siehe
+        /// GameClient) - unbekannte Entity-Id ist kein Fehler (z. B. Paket für eine Entity, die in derselben
+        /// Tick-Runde bereits despawnt wurde), anders als bei Move/Stop keine Warnung nötig.</summary>
+        public void HandleEntityDamaged(int targetEntityId, int hpAfter, int maxHp)
+        {
+            if (!_entities.TryGetValue(targetEntityId, out ClientEntity entity)) return;
+            entity.CurrentHp = hpAfter;
+            entity.MaxHp = maxHp;
+        }
+
+        /// <summary>M4a: EntityDamaged geht dem hier immer voraus (siehe GameServer.HandleAttackRequest), das
+        /// hier ist nur eine defensive Absicherung des angezeigten Werts.</summary>
+        public void HandleEntityDied(int entityId)
+        {
+            if (!_entities.TryGetValue(entityId, out ClientEntity entity)) return;
+            entity.CurrentHp = 0;
         }
 
         /// <summary>Aktualisiert die interpolierte Position aller bewegten Entities für den gegebenen Zeitpunkt (Sekunden, Client-Uhr).</summary>

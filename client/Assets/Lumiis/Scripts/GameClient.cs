@@ -37,6 +37,12 @@ namespace Lumiis.Client
         private string _statusMessage = "";
         private bool _debugOverlayVisible = true;
 
+        // ---- Kampf (M4a, Debug-Overlay-Text - siehe DrawStatusLine/DrawTargetLine) ----
+        private int _targetEntityId = -1;
+        private string _lastAttackFailedMessage = "";
+        private long _yangTotal;
+        private bool _isDead;
+
         private const float MinZoom = 3f;
         private const float MaxZoom = 300f;
         private const float ZoomStep = 1f;
@@ -322,16 +328,40 @@ namespace Lumiis.Client
         private void HandleClickInput()
         {
             if (Mouse.current == null) return;
-            if (!Mouse.current.leftButton.wasPressedThisFrame) return;
 
-            Vector2 screenPos = Mouse.current.position.ReadValue();
+            if (Mouse.current.leftButton.wasPressedThisFrame)
+            {
+                Vector3 worldPos = ScreenToWorldPoint(Mouse.current.position.ReadValue());
+                int wireX = Mathf.RoundToInt(worldPos.x * 100f);
+                int wireY = Mathf.RoundToInt(worldPos.y * 100f);
+                _netClient.SendMoveTo(wireX, wireY); // Klemmung an Kartengrenzen macht der Server.
+            }
+
+            if (Mouse.current.rightButton.wasPressedThisFrame)
+                HandleRightClickAttack();
+        }
+
+        /// <summary>M4a: Rechtsklick auf ein sichtbares Monster sendet AttackRequestPacket - Bounds-Check auf
+        /// der MonsterView reicht (siehe MonsterView.ContainsWorldPoint), kein echtes Collider-System nötig.
+        /// Nur Monster sind Ziele (Spieler-Views werden absichtlich nicht geprüft - PvP wird vom Server
+        /// ohnehin abgelehnt, siehe CLAUDE.md Abschnitt "Kampf").</summary>
+        private void HandleRightClickAttack()
+        {
+            Vector3 worldPos = ScreenToWorldPoint(Mouse.current.position.ReadValue());
+            foreach (KeyValuePair<int, MonsterView> kvp in _monsterViews)
+            {
+                if (kvp.Value == null || !kvp.Value.ContainsWorldPoint(worldPos)) continue;
+                _targetEntityId = kvp.Key;
+                _netClient.SendAttack(kvp.Key);
+                return;
+            }
+        }
+
+        private Vector3 ScreenToWorldPoint(Vector2 screenPos)
+        {
             // z = Abstand Kamera -> Weltebene z=0 (Kamera steht bei negativem z, siehe Bootstrap).
             float distanceToWorldPlane = -_camera.transform.position.z;
-            Vector3 worldPos = _camera.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y, distanceToWorldPlane));
-
-            int wireX = Mathf.RoundToInt(worldPos.x * 100f);
-            int wireY = Mathf.RoundToInt(worldPos.y * 100f);
-            _netClient.SendMoveTo(wireX, wireY); // Klemmung an Kartengrenzen macht der Server.
+            return _camera.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y, distanceToWorldPlane));
         }
 
         // ---- Netzwerk-Events ----
@@ -340,6 +370,10 @@ namespace Lumiis.Client
         {
             CleanupEntities();
             _inGame = false;
+            _targetEntityId = -1;
+            _lastAttackFailedMessage = "";
+            _yangTotal = 0;
+            _isDead = false;
         }
 
         private void OnPacketReceived(IPacket packet)
@@ -388,6 +422,52 @@ namespace Lumiis.Client
             if (stop != null)
             {
                 _world.HandleEntityStop(stop.EntityId, stop.X, stop.Y);
+                // Eine dead player kann sich nicht bewegen - jeder Stop nach dem eigenen Tod ist also der
+                // Respawn (Kartenmitte, siehe World.Tick/GameServer). Kein eigenes "Respawned"-Paket nötig,
+                // siehe CLAUDE.md Abschnitt "Kampf".
+                if (_isDead && stop.EntityId == _world.LocalEntityId) _isDead = false;
+                return;
+            }
+
+            EntityDamagedPacket damaged = packet as EntityDamagedPacket;
+            if (damaged != null)
+            {
+                _world.HandleEntityDamaged(damaged.TargetEntityId, damaged.TargetHpAfter, damaged.TargetMaxHp);
+                return;
+            }
+
+            EntityDiedPacket died = packet as EntityDiedPacket;
+            if (died != null)
+            {
+                _world.HandleEntityDied(died.EntityId);
+                if (died.EntityId == _world.LocalEntityId) _isDead = true;
+                return;
+            }
+
+            AttackFailedPacket attackFailed = packet as AttackFailedPacket;
+            if (attackFailed != null)
+            {
+                _lastAttackFailedMessage = AttackFailedReasonText(attackFailed.Reason);
+                return;
+            }
+
+            YangChangedPacket yangChanged = packet as YangChangedPacket;
+            if (yangChanged != null)
+            {
+                _yangTotal = yangChanged.NewTotal;
+            }
+        }
+
+        private static string AttackFailedReasonText(AttackFailedReason reason)
+        {
+            switch (reason)
+            {
+                case AttackFailedReason.TargetNotFound: return "Ziel nicht gefunden.";
+                case AttackFailedReason.TargetAlreadyDead: return "Ziel ist bereits tot.";
+                case AttackFailedReason.OutOfRange: return "Ziel außer Reichweite.";
+                case AttackFailedReason.OnCooldown: return "Angriff noch im Abklingen.";
+                case AttackFailedReason.TargetIsPlayer: return "Spieler können nicht angegriffen werden.";
+                default: return "Angriff fehlgeschlagen.";
             }
         }
 
@@ -444,6 +524,8 @@ namespace Lumiis.Client
 
         private void OnEntityDespawned(int entityId)
         {
+            if (entityId == _targetEntityId) _targetEntityId = -1;
+
             if (_monsterViews.TryGetValue(entityId, out MonsterView monsterView))
             {
                 if (monsterView != null) Destroy(monsterView.gameObject);
@@ -520,6 +602,7 @@ namespace Lumiis.Client
             if (_debugOverlayVisible)
             {
                 DrawStatusLine();
+                DrawCombatLine();
                 DrawEntityList();
                 DrawEntityLabels();
             }
@@ -540,6 +623,26 @@ namespace Lumiis.Client
             GUI.Label(new Rect(10, 10, 700, 20), text);
         }
 
+        /// <summary>M4a: eigenes Leben, Ziel (Name+Leben, falls anvisiert), Yang-Betrag, ggf. eine kurze
+        /// Fehlermeldung oder die Todesmeldung - alles reiner Debug-Text (siehe CLAUDE.md Abschnitt "Kampf",
+        /// "KEINE echten Health-Bars").</summary>
+        private void DrawCombatLine()
+        {
+            string ownHp = "-";
+            if (_world.LocalEntityId >= 0 && _world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity local) && local.CurrentHp >= 0)
+                ownHp = local.CurrentHp + "/" + local.MaxHp;
+
+            string targetText = "-";
+            if (_targetEntityId >= 0 && _world.Entities.TryGetValue(_targetEntityId, out ClientEntity target))
+                targetText = target.Name + " (" + (target.CurrentHp >= 0 ? target.CurrentHp + "/" + target.MaxHp : "-") + ")";
+
+            string text = "Leben: " + ownHp + " | Ziel: " + targetText + " | Yang: " + _yangTotal;
+            if (_isDead) text += " | Du bist gestorben, Respawn in Kürze...";
+            else if (!string.IsNullOrEmpty(_lastAttackFailedMessage)) text += " | " + _lastAttackFailedMessage;
+
+            GUI.Label(new Rect(10, 32, 700, 20), text);
+        }
+
         /// <summary>Liste aller Entities, nach Entfernung zum lokalen Spieler sortiert, maximal MaxDebugEntityRows Zeilen.
         /// Die Gesamtzahl bleibt unabhängig davon in DrawStatusLine sichtbar.</summary>
         private void DrawEntityList()
@@ -550,7 +653,7 @@ namespace Lumiis.Client
             List<ClientEntity> sorted = new List<ClientEntity>(_world.Entities.Values);
             sorted.Sort((a, b) => DistanceToLocal(local, a).CompareTo(DistanceToLocal(local, b)));
 
-            float y = 32f;
+            float y = 54f;
             int shown = 0;
             foreach (ClientEntity entity in sorted)
             {

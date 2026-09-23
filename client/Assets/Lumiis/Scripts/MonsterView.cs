@@ -22,5 +22,12 @@ namespace Lumiis.Client
         {
             transform.position = new Vector3((float)worldX, (float)worldY, 0f);
         }
+
+        /// <summary>Bounds-Check statt echtem Collider-System (M4a, Rechtsklick-Angriff - siehe
+        /// GameClient.HandleClickInput) - reicht für Platzhalter-Formen.</summary>
+        public bool ContainsWorldPoint(Vector3 worldPos)
+        {
+            return _renderer != null && _renderer.bounds.Contains(worldPos);
+        }
     }
 }
