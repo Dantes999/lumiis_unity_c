@@ -35,6 +35,27 @@ namespace Lumiis.Tests.Game
             return CollisionMap.LoadFromBytes(bytes, width, height);
         }
 
+        /// <summary>Wie BuildCollisionMap, aber ausnahmslos jede Zelle blockiert - für Wander-KI-Tests, bei
+        /// denen der zufällig gezogene Zielpunkt garantiert (unabhängig vom Zufallswert) blockiert sein soll.</summary>
+        private static CollisionMap BuildFullyBlockedCollisionMap()
+        {
+            const int width = 1000;
+            const int height = 1000;
+            int cellCount = width * height;
+            byte[] packed = new byte[(cellCount + 7) / 8];
+            for (int i = 0; i < packed.Length; i++) packed[i] = 0xFF;
+
+            byte[] header = new byte[12];
+            Encoding.ASCII.GetBytes("LCM1").CopyTo(header, 0);
+            BitConverter.GetBytes(width).CopyTo(header, 4);
+            BitConverter.GetBytes(height).CopyTo(header, 8);
+
+            byte[] bytes = new byte[header.Length + packed.Length];
+            header.CopyTo(bytes, 0);
+            packed.CopyTo(bytes, header.Length);
+            return CollisionMap.LoadFromBytes(bytes, width, height);
+        }
+
         [Fact]
         public void TryJoin_NullPosition_SpawnsAtMapCenter()
         {
@@ -330,6 +351,79 @@ namespace Lumiis.Tests.Game
             var visibility = world.ComputeVisibility(GameConstants.AoiRadiusWire);
 
             Assert.Empty(visibility);
+        }
+
+        // ---- M3c: Wander-KI (siehe docs/tasks/M3c-monsters.md Abschnitt 7) ----
+
+        [Fact]
+        public void Tick_DueMonster_PicksTargetWithinWanderRadiusOfAnchor()
+        {
+            // Min==Max: NextWanderAtMs ist deterministisch nowMs+1000, unabhängig vom Zufallswert.
+            var world = new World(maxPlayers: 10, collisionMap: null, random: new Random(42));
+            Entity monster = world.SpawnMonster(mobId: 1, "Wildhund", x: 50000, y: 50000, speedWire: 700,
+                wanderRadiusWire: 500, wanderIntervalMinMs: 1000, wanderIntervalMaxMs: 1000, nowMs: 0);
+
+            (_, System.Collections.Generic.List<Entity> startedWandering) = world.Tick(0.0, nowMs: 1000);
+
+            Assert.Contains(monster, startedWandering);
+            Assert.True(monster.IsMoving);
+            Assert.InRange(monster.TargetX, 50000 - 500, 50000 + 500);
+            Assert.InRange(monster.TargetY, 50000 - 500, 50000 + 500);
+        }
+
+        [Fact]
+        public void Tick_DueMonsterWithBlockedTarget_SkipsMovementWithoutCrashing()
+        {
+            // Jede Zelle blockiert - der zufällig gezogene Zielpunkt ist garantiert blockiert, egal welcher
+            // Random-Wert gezogen wird.
+            var world = new World(maxPlayers: 10, BuildFullyBlockedCollisionMap(), random: new Random(1));
+            Entity monster = world.SpawnMonster(mobId: 1, "Wildhund", x: 50000, y: 50000, speedWire: 700,
+                wanderRadiusWire: 500, wanderIntervalMinMs: 1000, wanderIntervalMaxMs: 1000, nowMs: 0);
+
+            (_, System.Collections.Generic.List<Entity> startedWandering) = world.Tick(0.0, nowMs: 1000);
+
+            Assert.DoesNotContain(monster, startedWandering);
+            Assert.False(monster.IsMoving);
+        }
+
+        [Fact]
+        public void Tick_DueMonster_ReschedulesNextWanderWithinConfiguredInterval()
+        {
+            var world = new World(maxPlayers: 10, collisionMap: null, random: new Random(7));
+            Entity monster = world.SpawnMonster(mobId: 2, "Waldschrat", x: 50000, y: 50000, speedWire: 200,
+                wanderRadiusWire: 300, wanderIntervalMinMs: 2000, wanderIntervalMaxMs: 5000, nowMs: 0);
+            long dueAt = monster.NextWanderAtMs;
+
+            world.Tick(0.0, nowMs: dueAt);
+
+            Assert.InRange(monster.NextWanderAtMs, dueAt + 2000, dueAt + 5000);
+        }
+
+        [Fact]
+        public void Tick_MonsterWithBlockedTarget_StillReschedulesNextWander()
+        {
+            // "kein Retry-Loop" bedeutet: übersprungen wird nur die Bewegung, nicht die nächste Fälligkeit.
+            var world = new World(maxPlayers: 10, BuildFullyBlockedCollisionMap(), random: new Random(3));
+            Entity monster = world.SpawnMonster(mobId: 1, "Wildhund", x: 50000, y: 50000, speedWire: 700,
+                wanderRadiusWire: 500, wanderIntervalMinMs: 1000, wanderIntervalMaxMs: 1000, nowMs: 0);
+            long dueAt = monster.NextWanderAtMs;
+
+            world.Tick(0.0, nowMs: dueAt);
+
+            Assert.Equal(dueAt + 1000, monster.NextWanderAtMs);
+        }
+
+        [Fact]
+        public void Tick_MonsterNotYetDue_DoesNotWander()
+        {
+            var world = new World(maxPlayers: 10, collisionMap: null, random: new Random(9));
+            Entity monster = world.SpawnMonster(mobId: 1, "Wildhund", x: 50000, y: 50000, speedWire: 700,
+                wanderRadiusWire: 500, wanderIntervalMinMs: 5000, wanderIntervalMaxMs: 5000, nowMs: 0);
+
+            (_, System.Collections.Generic.List<Entity> startedWandering) = world.Tick(0.0, nowMs: 100);
+
+            Assert.Empty(startedWandering);
+            Assert.False(monster.IsMoving);
         }
     }
 }

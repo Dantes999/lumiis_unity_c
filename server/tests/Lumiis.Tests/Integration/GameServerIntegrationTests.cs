@@ -5,6 +5,7 @@ using System.Threading;
 using LiteNetLib;
 using Lumiis.Data;
 using Lumiis.Data.Maps;
+using Lumiis.Data.Mobs;
 using Lumiis.Server;
 using Lumiis.Server.Logging;
 using Lumiis.Server.Net;
@@ -39,7 +40,8 @@ namespace Lumiis.Tests.Integration
             public GameServer Server { get; }
             public TokenService TokenService { get; }
 
-            public ServerFixture(Func<long>? nowMs = null, Func<long>? tokenNowUnixSeconds = null, CollisionMap? collisionMap = null)
+            public ServerFixture(Func<long>? nowMs = null, Func<long>? tokenNowUnixSeconds = null, CollisionMap? collisionMap = null,
+                MobCatalog? mobCatalog = null, SpawnCatalog? spawnCatalog = null)
             {
                 DbContextOptions<LumiisDbContext> options = new DbContextOptionsBuilder<LumiisDbContext>()
                     .UseInMemoryDatabase("gameserver-test-" + Guid.NewGuid())
@@ -53,7 +55,7 @@ namespace Lumiis.Tests.Integration
                     MaxPlayers = 10,
                     RejectGraceMs = 100 // echte Uhr, kleiner Wert - siehe M1-fixes.md Punkt 2
                 };
-                Server = new GameServer(config, new NullLogger(), TokenService, _dbFactory, nowMs, collisionMap);
+                Server = new GameServer(config, new NullLogger(), TokenService, _dbFactory, nowMs, collisionMap, mobCatalog, spawnCatalog);
             }
 
             public (int CharacterId, string Token) CreateCharacter(string name, int? positionX = null, int? positionY = null, int? accountId = null)
@@ -1035,6 +1037,69 @@ namespace Lumiis.Tests.Integration
                 // Negativ-Prüfung mit echtem Timeout, nicht nur "kein Fehler aufgetreten".
                 PumpForDuration(TimeSpan.FromMilliseconds(400), server, farObserver);
                 Assert.DoesNotContain(farObserver.Received.OfType<EntityDespawnPacket>(), d => d.EntityId == targetEntityId);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        // ---- M3c: Monster (siehe docs/tasks/M3c-monsters.md Abschnitt 7) ----
+
+        /// <summary>Offene 1000x1000-Zellen-CollisionMap (deckt GameConstants.MapWidth/Height exakt ab) - für
+        /// diesen Test reicht eine synthetische Karte, das echte collision.bin/village-Zusammenspiel prüft
+        /// bereits der M3a-Integrationstest.</summary>
+        private static CollisionMap BuildOpenCollisionMap()
+        {
+            const int width = 1000;
+            const int height = 1000;
+            byte[] header = new byte[12];
+            System.Text.Encoding.ASCII.GetBytes("LCM1").CopyTo(header, 0);
+            BitConverter.GetBytes(width).CopyTo(header, 4);
+            BitConverter.GetBytes(height).CopyTo(header, 8);
+            byte[] packed = new byte[(width * height + 7) / 8];
+            byte[] bytes = new byte[header.Length + packed.Length];
+            header.CopyTo(bytes, 0);
+            packed.CopyTo(bytes, header.Length);
+            return CollisionMap.LoadFromBytes(bytes, width, height);
+        }
+
+        [Fact]
+        public void BotNearSpawnPoint_SeesMonsterSpawnAndEventualMovement()
+        {
+            // Kurzes Wander-Intervall (synthetisch, nicht die echten mobs.json-Werte) - haelt den Test schnell.
+            MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
+              ""mobs"": [
+                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 100, ""wanderIntervalMaxMs"": 200 }
+              ]
+            }");
+            CollisionMap openMap = BuildOpenCollisionMap();
+            SpawnCatalog spawnCatalog = SpawnCatalog.LoadFromJson(@"{
+              ""spawns"": [ { ""id"": 1, ""mobId"": 1, ""positionX"": 50000, ""positionY"": 50000, ""respawnSeconds"": 30 } ]
+            }", mobCatalog, openMap);
+
+            var fixture = new ServerFixture(collisionMap: openMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                // Dieselbe Position wie der Spawn-Punkt - garantiert innerhalb des AOI-Radius.
+                (int characterId, string token) = fixture.CreateCharacter("Alice", positionX: 50000, positionY: 50000);
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+
+                Assert.True(Pump(() => client.Received.OfType<EntitySpawnPacket>().Any(s => s.Kind == EntityKind.Monster), server, client));
+                EntitySpawnPacket monsterSpawn = client.Received.OfType<EntitySpawnPacket>().First(s => s.Kind == EntityKind.Monster);
+                Assert.Equal(1, monsterSpawn.MobId);
+                Assert.Equal("Wildhund", monsterSpawn.Name);
+
+                Assert.True(Pump(
+                    () => client.Received.OfType<EntityMovePacket>().Any(m => m.EntityId == monsterSpawn.EntityId),
+                    server, client));
             }
             finally
             {
