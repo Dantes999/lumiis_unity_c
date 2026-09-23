@@ -134,7 +134,9 @@ public sealed class GameServer : INetEventListener
                 _world.SpawnMonster(spawn.MobId, mobDef.Name, spawn.PositionX, spawn.PositionY, mobDef.SpeedWire,
                     mobDef.WanderRadiusWire, mobDef.WanderIntervalMinMs, mobDef.WanderIntervalMaxMs, _nowMs(),
                     mobDef.MaxHp, mobDef.Attack, mobDef.Defense, mobDef.YangMin, mobDef.YangMax,
-                    spawnPointId: spawn.Id, respawnSeconds: spawn.RespawnSeconds);
+                    spawnPointId: spawn.Id, respawnSeconds: spawn.RespawnSeconds,
+                    meleeRangeWire: mobDef.MeleeRangeWire, attackCooldownMs: mobDef.AttackCooldownMs,
+                    aggressive: mobDef.Aggressive, aggroRangeWire: mobDef.AggroRangeWire, leashRangeWire: mobDef.LeashRangeWire);
             }
         }
 
@@ -229,12 +231,8 @@ public sealed class GameServer : INetEventListener
         }
 
         double deltaSeconds = 1.0 / Protocol.TickRate;
-        // MonsterAttacks wird hier noch verworfen (Broadcast folgt in Abschnitt 5 der Aufgabe, siehe
-        // docs/tasks/M4c-monster-aggro.md) - kann zu diesem Zeitpunkt ohnehin nie etwas enthalten, da noch
-        // kein Monster ein Ziel bekommt (Aggro-Suche/reaktive Zielerfassung sind bereits in World, aber
-        // AttackCooldownMs/MeleeRangeWire der Katalog-Monster sind hier mangels Verdrahtung weiterhin 0/
-        // Default - siehe TODO unten im Konstruktor).
-        (List<Entity> arrived, List<Entity> startedWandering, List<Entity> respawned, List<Entity> respawnedMonsters, List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> _) = _world.Tick(deltaSeconds, _nowMs());
+        (List<Entity> arrived, List<Entity> startedWandering, List<Entity> respawned, List<Entity> respawnedMonsters,
+            List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> monsterAttacks) = _world.Tick(deltaSeconds, _nowMs());
         foreach (Entity entity in arrived)
             SendToVisible(entity.Id, new EntityStopPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY });
 
@@ -267,6 +265,19 @@ public sealed class GameServer : INetEventListener
         // geloggt.
         foreach (Entity monster in respawnedMonsters)
             _logger.Info($"Monster {monster.Name} (Entity {monster.Id}) an SpawnPoint {monster.SpawnPointId} respawnt");
+
+        // Monster-initiierte Angriffe (M4c, siehe World.RunMonsterAi) - dieselben Pakete wie bei einem
+        // spielerinitiierten Angriff (siehe HandleAttackRequest/BroadcastAttackResult), nur ohne Yang-
+        // Gutschrift (YangAwarded ist bei einem Monster als Angreifer laut World.ApplyDamage immer 0 - nur
+        // ein sterbendes MONSTER zahlt Yang aus, hier ist das Ziel immer ein Spieler) und ohne AttackFailed
+        // (es gibt keine Verbindung des Angreifers, an die das ginge - fehlgeschlagene Versuche filtert
+        // World.RunMonsterAi bereits vor der Aufnahme in die Liste heraus).
+        foreach ((int attackerEntityId, int targetEntityId, AttackResult result) in monsterAttacks)
+        {
+            BroadcastAttackResult(attackerEntityId, targetEntityId, result);
+            _logger.Info($"Entity {attackerEntityId} trifft Entity {targetEntityId} ({result.Damage} Schaden)" +
+                (result.TargetDied ? ", Ziel gestorben" : ""));
+        }
 
         UpdateVisibility();
         EnqueueDuePositionSaves();
@@ -772,15 +783,41 @@ public sealed class GameServer : INetEventListener
         });
     }
 
-    /// <summary>AttackRequestPacket-Handler (M4a): ruft World.TryAttack auf und übersetzt das Ergebnis in
-    /// Pakete. Erfolg: EntityDamagedPacket an alle AOI-Beobachter des Ziels - der Angreifer ist dank
-    /// Nahkampfreichweite (MeleeRangeWire) &lt; AOI-Radius (siehe World.TryAttack-Reichweitenprüfung) immer
-    /// selbst unter diesen Beobachtern, kein Sonderfall nötig (siehe SendToVisible-Kommentar, das gilt
-    /// zusätzlich auch für die eigene Entity). Bei Tod zusätzlich EntityDiedPacket, bei Monstertod danach
-    /// EntityDespawnPacket (World hat das Monster in TryAttack/ApplyDamage bereits aus World entfernt - hier
-    /// nur noch die Netzwerk-Seite, wie beim Disconnect-Despawn). Bei Yang-Gewinn YangChangedPacket NUR an
-    /// den Angreifer, plus asynchrones Speichern (eigener Channel, siehe YangSaveRequest). Fehlschlag:
-    /// AttackFailedPacket NUR an den Angreifer, geloggt, Verbindung bleibt bestehen.</summary>
+    /// <summary>Netzwerk-Seite eines erfolgreichen Angriffs (M4a Spieler->Monster, seit M4c auch
+    /// Monster->Spieler, siehe World.RunMonsterAi) - unabhängig davon, wer angegriffen hat: EntityDamagedPacket
+    /// an alle AOI-Beobachter des Ziels - der Angreifer ist dank Nahkampfreichweite (MeleeRangeWire) &lt;
+    /// AOI-Radius (siehe World.TryAttack-Reichweitenprüfung) immer selbst unter diesen Beobachtern, kein
+    /// Sonderfall nötig (siehe SendToVisible-Kommentar, das gilt zusätzlich auch für die eigene Entity). Bei
+    /// Tod zusätzlich EntityDiedPacket, bei Monstertod danach EntityDespawnPacket (World hat das Monster in
+    /// TryAttack/ApplyDamage bereits aus World entfernt - hier nur noch die Netzwerk-Seite, wie beim
+    /// Disconnect-Despawn); bei Spielertod kein Despawn (siehe World.ApplyDamage/Tick - M4a-Respawn-
+    /// Mechanismus unverändert). KEIN Yang-Handling hier - das braucht die Verbindung des Angreifers
+    /// (Peer/CharacterId), die es bei einem Monster als Angreifer nicht gibt; bleibt deshalb Sache von
+    /// HandleAttackRequest (ohnehin nur relevant, wenn ein Spieler ein Monster tötet).</summary>
+    private void BroadcastAttackResult(int attackerEntityId, int targetEntityId, AttackResult result)
+    {
+        SendToVisible(targetEntityId, new EntityDamagedPacket
+        {
+            AttackerEntityId = attackerEntityId,
+            TargetEntityId = targetEntityId,
+            Damage = result.Damage,
+            TargetHpAfter = result.TargetHpAfter,
+            TargetMaxHp = result.TargetMaxHp
+        });
+
+        if (result.TargetDied)
+        {
+            SendToVisible(targetEntityId, new EntityDiedPacket { EntityId = targetEntityId });
+
+            if (result.TargetKind == EntityKind.Monster)
+                BroadcastDespawn(targetEntityId);
+        }
+    }
+
+    /// <summary>AttackRequestPacket-Handler (M4a): ruft World.TryAttack auf und übersetzt das Ergebnis über
+    /// BroadcastAttackResult in Pakete. Zusätzlich bei Yang-Gewinn YangChangedPacket NUR an den Angreifer,
+    /// plus asynchrones Speichern (eigener Channel, siehe YangSaveRequest). Fehlschlag: AttackFailedPacket
+    /// NUR an den Angreifer, geloggt, Verbindung bleibt bestehen.</summary>
     private void HandleAttackRequest(ConnectionState conn, AttackRequestPacket attack)
     {
         if (conn.EntityId is not int attackerId)
@@ -799,22 +836,7 @@ public sealed class GameServer : INetEventListener
             return;
         }
 
-        SendToVisible(attack.TargetEntityId, new EntityDamagedPacket
-        {
-            AttackerEntityId = attackerId,
-            TargetEntityId = attack.TargetEntityId,
-            Damage = result.Damage,
-            TargetHpAfter = result.TargetHpAfter,
-            TargetMaxHp = result.TargetMaxHp
-        });
-
-        if (result.TargetDied)
-        {
-            SendToVisible(attack.TargetEntityId, new EntityDiedPacket { EntityId = attack.TargetEntityId });
-
-            if (result.TargetKind == EntityKind.Monster)
-                BroadcastDespawn(attack.TargetEntityId);
-        }
+        BroadcastAttackResult(attackerId, attack.TargetEntityId, result);
 
         if (result.YangAwarded > 0 && _world.TryGet(attackerId, out Entity? attackerEntity))
         {
