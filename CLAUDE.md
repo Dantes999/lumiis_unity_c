@@ -174,20 +174,46 @@ Blickrichtung, keine Animation) - ein `SpriteRenderer` mit einer je MobId unters
 schon aufgelöst vom Server (`Entity.Name`), Form/Farbe werden rein anhand der MobId zugeordnet.
 
 ## Kampf
-Seit M4a kann ein Spieler ein sichtbares Monster angreifen (Rechtsklick). Schaden = `max(1, Angreifer.Attack -
-Ziel.Defense)`, serverautoritativ in `World.TryAttack` (kein Netzwerkbezug, wie AOI/Wander-KI ohne
-LiteNetLib/Sockets testbar). Prüfreihenfolge: Ziel existiert -> Ziel lebt -> Ziel ist kein Spieler (PvP
-abgelehnt) -> Cooldown des Angreifers -> Reichweite (quadrierte Distanz wie `ComputeVisibility`, gegen
-`MeleeRangeWire` des Angreifers - immer kleiner als `AoiRadiusWire`, der Angreifer ist deshalb automatisch
-unter den AOI-Beobachtern des Ziels, kein Sonderfall in `GameServer.SendToVisible`).
+Seit M4a kann ein Spieler ein sichtbares Monster angreifen (Rechtsklick), seit M4c greifen Monster
+umgekehrt auch Spieler an (Aggro/Gegenwehr, siehe unten). Schaden = `max(1, Angreifer.Attack - Ziel.Defense)`,
+serverautoritativ in `World.TryAttack` (kein Netzwerkbezug, wie AOI/Wander-KI ohne LiteNetLib/Sockets
+testbar) - seit M4c für beide Angriffsrichtungen verallgemeinert, siehe unten. Prüfreihenfolge: Ziel
+existiert -> Ziel lebt -> Angreifer und Ziel sind unterschiedlichen Kinds (blockt Spieler-vs-Spieler PvP UND
+Monster-vs-Monster) -> Cooldown des Angreifers -> Reichweite (quadrierte Distanz wie `ComputeVisibility`,
+gegen `MeleeRangeWire` des Angreifers - immer kleiner als `AoiRadiusWire`, der Angreifer ist deshalb
+automatisch unter den AOI-Beobachtern des Ziels, kein Sonderfall in `GameServer.SendToVisible`).
 
 Datenformat: `data/classes.json` (Spielerklassen - aktuell nur "Krieger": MaxHp/Attack/Defense/
 MeleeRangeWire/AttackCooldownMs, geladen/validiert über `ClassCatalog`, `Lumiis.Data.Classes`, analog zu
-MobCatalog/LookCatalog) und `data/mobs.json` (um MaxHp/Attack/Defense/YangMin/YangMax pro Mob-Typ erweitert).
-Leben/Angriff/Verteidigung sind reine Server-Konstanten aus diesen Dateien, keine DB-Spalten - `Character`
-bekommt in M4a nur `Yang` (long, Default 0) dazu. Alpha-Umfang kennt nur eine Klasse, die Klasse wird deshalb
-über einen festen Namen aufgelöst (`GameServer.DefaultClassName`) statt über eine eigene `ClassId`-Spalte -
-sobald es mehrere Klassen gibt, braucht `Character` eine echte Spalte dafür.
+MobCatalog/LookCatalog) und `data/mobs.json` (um MaxHp/Attack/Defense/YangMin/YangMax pro Mob-Typ erweitert,
+seit M4c zusätzlich MeleeRangeWire/AttackCooldownMs analog zu classes.json sowie Aggressive/AggroRangeWire/
+LeashRangeWire, siehe unten). Leben/Angriff/Verteidigung sind reine Server-Konstanten aus diesen Dateien,
+keine DB-Spalten - `Character` bekommt in M4a nur `Yang` (long, Default 0) dazu. Alpha-Umfang kennt nur eine
+Klasse, die Klasse wird deshalb über einen festen Namen aufgelöst (`GameServer.DefaultClassName`) statt über
+eine eigene `ClassId`-Spalte - sobald es mehrere Klassen gibt, braucht `Character` eine echte Spalte dafür.
+
+Monster-Aggro/Verfolgung/Leine (M4c): jedes Monster hat höchstens ein aktives Ziel (`Entity.TargetEntityId`,
+`int?`, `null` = kein Ziel - dasselbe Nullable-Feld-Muster wie `SpawnPointId`/`CharacterId`, kein paralleler
+Zustandscontainer). Aggressive Mobs (`MobDefinition.Aggressive`, z. B. Wildhund) suchen pro Tick ohne Ziel den
+nächstgelegenen lebenden Spieler innerhalb `AggroRangeWire` (`World.FindNearestLivingPlayerWithinRange`,
+quadrierte Distanz wie AOI/TryAttack) und erfassen ihn automatisch. Passive Mobs (z. B. Waldschrat,
+`AggroRangeWire` unbenutzt) greifen nie von sich aus an, erfassen aber reaktiv den Angreifer als Ziel, sobald
+sie getroffen werden (`World.TryAttack`, gilt unabhängig davon, ob der Mob aggressiv ist). Solange ein Ziel
+aktiv ist, pausiert die normale Wander-Zufallsbewegung (`World.RunMonsterAi`, ersetzt die reine
+Wander-Prüfung aus M3c): außerhalb `MeleeRangeWire` läuft das Monster **jeden Tick neu** auf die aktuelle
+Position des Zielspielers zu (`SetDestination`, gleiche Kollisions-Klemmung wie überall - das erzeugt
+bewusst ein `EntityMovePacket` pro Tick während der Verfolgung, ein bekannter Bandbreiten-Kompromiss fürs
+MVP, siehe "Bekannte Lücken"); innerhalb `MeleeRangeWire` greift es an, sobald sein Cooldown bereit ist
+(derselbe `TryAttack`-Mechanismus wie beim Spieler-Angriff). Entfernt sich der Zielspieler weiter als
+`LeashRangeWire` vom `WanderAnchor` des Monsters (nicht vom Spieler - Distanz zählt vom AKTUELLEN
+Monster-Standort), gibt das Monster auf, bewegt sich einmalig zurück zum Anker und fällt danach in den
+normalen Wander-Zustand zurück; verschwindet das Ziel (Tod oder Verbindungsabbruch), passiert dasselbe ohne
+Rückweg-Bewegung. Ein Wander-Anker existiert für JEDES Monster (auch Dev-Tools-Debug-Spawns - `WanderAnchorX/Y`
+wird immer aus der Spawn-Position gesetzt, unabhängig von `SpawnPointId`), die Leine funktioniert also auch
+für sie. Netzwerkseitig kein Sonderfall: `GameServer.BroadcastAttackResult` verschickt für einen
+monster-initiierten Treffer dieselben Pakete (EntityDamaged/EntityDied/Despawn-bei-Monstertod) wie für einen
+spieler-initiierten - nur ohne Yang-Handling (das braucht die Verbindung des Angreifers, die es bei einem
+Monster nicht gibt, und Yang wird ohnehin nur beim Tod eines MONSTERS ausgezahlt).
 
 Monstertod: sofortiges Entfernen aus `World` (wie ein normaler Despawn) und eine zufällige Yang-Auszahlung
 (zwischen `YangMin`/`YangMax`, injizierbare Zufallsquelle) an den tötenden Spieler. Hatte das Monster eine
@@ -203,23 +229,31 @@ Debug-gespawnte Monster (`SpawnPointId == null`) respawnen dagegen nie. Spielert
 `RespawnAtMs` wird gesetzt (`nowMs + 3000`, fix), `CurrentHp` bleibt 0
 bis `World.Tick` die Fälligkeit erkennt und den Spieler an die Kartenmitte mit vollem Leben zurücksetzt
 (`Entity.Teleport`, kein neues Paket - der Client bekommt dafür ein `EntityStopPacket` an der neuen Position,
-das bedeutet ohnehin "hart an dieser Position, keine Bewegung", exakt die Teleport-Semantik). Die generische
-Sterbe-/Respawn-Logik für Spieler ist trotzdem implementiert und direkt getestet, obwohl PvP in M4a jeden
-regulären Weg dorthin ablehnt - Vorbereitung für eine spätere Erweiterung (z. B. Monster, die Spieler
-angreifen).
+das bedeutet ohnehin "hart an dieser Position, keine Bewegung", exakt die Teleport-Semantik). Diese
+Sterbe-/Respawn-Logik wurde in M4a bewusst generisch (nicht spieler-vs-monster-spezifisch) implementiert und
+direkt getestet, obwohl PvP-Spielertod damals wegen des reinen Spieler-Angriffs-Checks unerreichbar war -
+genau dafür vorbereitet: seit M4c ist Monster-vs-Spieler der erste echte, im normalen Spielbetrieb
+erreichbare Weg dorthin, ohne dass an der Respawn-Logik selbst etwas geändert werden musste.
 
 Yang wird asynchron gespeichert wie die Position in M2b (eigener bounded Channel + Hintergrund-Task,
 `GameServer`), aber mit einem eigenen Auslöser: sofort bei jeder Änderung statt periodisch alle 30s, da
 Yang-Änderungen seltene Einzelereignisse sind (Monster-Kills), nicht kontinuierlich wie Bewegung.
 
-Neue Pakete (Protocol.Version 5): `AttackRequestPacket` (Client->Server, TargetEntityId), `EntityDamagedPacket`/
-`EntityDiedPacket`/`YangChangedPacket` (Server->Client, YangChanged nur an den Empfänger) sowie
-`AttackFailedPacket` (nur an den Angreifer, Reason-Enum TargetNotFound/TargetAlreadyDead/OutOfRange/
-OnCooldown/TargetIsPlayer).
+Pakete seit M4a (Protocol.Version seit Dev-Tools bei 6, siehe Abschnitt "Dev-Tools" - M4c selbst hat das
+Protokoll nicht geändert, siehe Abschnitt-0b-Review): `AttackRequestPacket` (Client->Server, TargetEntityId),
+`EntityDamagedPacket`/`EntityDiedPacket`/`YangChangedPacket` (Server->Client, YangChanged nur an den
+Empfänger) sowie `AttackFailedPacket` (nur an den Angreifer, Reason-Enum TargetNotFound/TargetAlreadyDead/
+OutOfRange/OnCooldown/TargetIsPlayer - Letzterer trotz des Namens weiterhin korrekt: er wird nur bei
+Spieler-vs-Spieler-Versuchen ausgelöst, siehe oben). `AttackerEntityId`/`TargetEntityId` in
+`EntityDamagedPacket`/`EntityDiedPacket` sind bewusst kind-neutrale `int`-EntityIds ohne eigene
+Kind-Unterscheidung - funktionieren seit M4c unverändert für beide Angriffsrichtungen.
 
-Bewusst NICHT in M4 (M4a+M4b zusammen): XP/Level, PvP, echte Health-Bars (Debug-Overlay-Text reicht, siehe
-`GameClient.DrawCombatLine` - eigenes Leben, anvisiertes Ziel, Yang-Betrag, deutsche Kurzmeldungen),
-Rate-Limit gegen Angriffsspam (gleiche bestehende Lücke wie bei MoveTo, siehe "Bekannte Lücken").
+Bewusst NICHT in M4 (M4a+M4b+M4c zusammen, M4 damit komplett fertig): XP/Level, PvP (Spieler-vs-Spieler
+bleibt abgelehnt), echte Health-Bars (Debug-Overlay-Text reicht, siehe `GameClient.DrawCombatLine` - eigenes
+Leben, anvisiertes Ziel, Yang-Betrag, deutsche Kurzmeldungen), Rate-Limit gegen Angriffsspam (gleiche
+bestehende Lücke wie bei MoveTo, siehe "Bekannte Lücken") sowie Drosselung der Verfolgungs-EntityMove-Pakete
+(M4c erzeugt bewusst jeden Tick eines pro aktiv verfolgendem Monster, siehe oben - für die Alpha-Spielergröße
+("am Anfang wenige Spieler", siehe Projektbriefing) akzeptiert, spätere Optimierung möglich).
 
 ## Client
 Setup nach dem Klonen (auch auf dem zweiten Rechner):
@@ -287,7 +321,7 @@ einen Respawn an einem (evtl. schon belegten) SpawnPoint aus.
 Map 1 (Startdorf + Feld), Krieger, Level 1-25, Monster/Bosse/Lumiis-Steine, Items/Drops/Shop, Chat, Gruppe. NICHT: Quests/Lua, Reittiere, Kostüme, Drachenseelen, Gildenkrieg, weitere Reiche.
 
 ## Meilensteine
-M0 Fundament (fertig) | M1 Walking Skeleton (fertig, inkl. M1b Unity-Client, M1c Sichtbarkeit/Testing, M1c-layered-characters Paper-Doll-Charaktere) | M2 Account & Charakter (komplett fertig): M2a Datenbank & Auth-Dienst, M2b Server-Join über Account/Token/Charakter, M2c Unity-Login-UI (UI Toolkit) | M3 Welt (Grid, AOI, Mobs) komplett fertig: M3a Kartenkollision, M3b Sichtbarkeitsbereich (kein Grid - siehe Abschnitt "Sichtbarkeitsbereich (AOI)"), M3c Monster (Spawns, Wander-KI, AOI-Integration - siehe Abschnitt "Monster") | M4 Kampf komplett fertig: M4a Kampf-Grundlagen, M4b Monster-Respawn (siehe Abschnitt "Kampf") | M5 Items (offen) | M6 Metin-Kern | M7 Sozial | M8 Alpha-Betrieb.
+M0 Fundament (fertig) | M1 Walking Skeleton (fertig, inkl. M1b Unity-Client, M1c Sichtbarkeit/Testing, M1c-layered-characters Paper-Doll-Charaktere) | M2 Account & Charakter (komplett fertig): M2a Datenbank & Auth-Dienst, M2b Server-Join über Account/Token/Charakter, M2c Unity-Login-UI (UI Toolkit) | M3 Welt (Grid, AOI, Mobs) komplett fertig: M3a Kartenkollision, M3b Sichtbarkeitsbereich (kein Grid - siehe Abschnitt "Sichtbarkeitsbereich (AOI)"), M3c Monster (Spawns, Wander-KI, AOI-Integration - siehe Abschnitt "Monster") | M4 Kampf komplett fertig (inkl. Gegenwehr): M4a Kampf-Grundlagen, M4b Monster-Respawn, M4c Monster-Aggro/Verfolgung/Leine (siehe Abschnitt "Kampf") | M5 Items (offen) | M6 Metin-Kern | M7 Sozial | M8 Alpha-Betrieb.
 Aktuelle Aufgabe: keine - M4 (inkl. aller Unteraufgaben) ist fertig, für M5 gibt es noch keine Task-Datei unter docs/tasks/.
 
 ## Arbeitsweise
@@ -309,6 +343,7 @@ Aktuelle Aufgabe: keine - M4 (inkl. aller Unteraufgaben) ist fertig, für M5 gib
 - Positions-Speicherintervall (Lumiis.Server) fix bei 30s, keine Konfiguration (siehe `GameServer.PositionSaveIntervalMs`).
 - Kein Token-Refresh: die Session (LoginController, Lumiis.Data.TokenService) endet nach 30 Minuten fix, danach muss sich der Client neu anmelden (JoinRejectReason.TokenExpired bzw. 401 auf GET/POST /characters schicken automatisch zurück zu LoggedOut).
 - ResolveDefaultDataDir() existiert unabhängig in Lumiis.Server und Lumiis.Auth (Pfad-Kandidaten je nach typischem CWD beim Start). Bei künftigen data-dir-bezogenen Bugs beide Stellen prüfen, nicht nur eine. Eine gemeinsame Stelle (z. B. in Lumiis.Data) ist eine spätere Aufräumarbeit, kein aktueller Blocker.
+- Verfolgungs-EntityMove-Pakete (M4c): ein aktiv ein Ziel verfolgendes Monster erzeugt jeden Tick (25x/s) ein neues EntityMovePacket an alle AOI-Beobachter (siehe Abschnitt "Kampf") - kein Throttling/Diffing, ähnlich der Rate-Limit-Lücke oben. Für die aktuelle Spielergröße unkritisch, bei mehr gleichzeitig verfolgenden Monstern eine spätere Optimierung.
 
 ## Status
 - M0 fertig. Shared: PacketWriter/PacketReader/PacketCodec, PacketId (JoinRequest, MoveTo), 23 Tests grün.
@@ -332,6 +367,7 @@ Aktuelle Aufgabe: keine - M4 (inkl. aller Unteraufgaben) ist fertig, für M5 gib
 - M4a (Kampf-Grundlagen, docs/tasks/M4a-combat-core.md) fertig, in 7 Commits (0 Review nur berichtet, kein Commit): (1) `data/classes.json` (Krieger) neu, `data/mobs.json` um MaxHp/Attack/Defense/YangMin/YangMax erweitert - reine Datendateien, `MobCatalog` liest die neuen Felder noch nicht. (2) `Character.Yang` (long, Default 0), Migration `AddCharacterYang` gegen echtes Postgres verifiziert; `Lumiis.Auth` unverändert (Yang startet automatisch bei 0). (3) Shared: `AttackRequestPacket`, `EntityDamagedPacket`/`EntityDiedPacket`/`AttackFailedPacket` (Reason-Enum)/`YangChangedPacket`, Protocol.Version 5, Round-trip-Tests. (4) `ClassCatalog` (`Lumiis.Data.Classes`, analog zu MobCatalog) neu; `MobCatalog` um die Kampfwerte erweitert und validiert (bestehende Test-Fixtures entsprechend ergänzt); `Entity` bekommt CurrentHp/MaxHp/Attack/Defense/MeleeRangeWire/AttackCooldownMs/AttackReadyAtMs/RespawnAtMs/YangMin/YangMax/Yang sowie `Teleport()`/`StopMoving()`, neue `Entity.DefaultXxx`-Konstanten als Fallback für kampfferne Tests (TryJoin/SpawnMonster/CreateMonster bekommen optionale Kampfwert-Parameter, bestehende Aufrufe bleiben unverändert kompatibel); `World.TryAttack`/`World.ApplyDamage` (siehe Abschnitt "Kampf" für die Prüfreihenfolge/Formel), `World.Tick` verarbeitet fällige Spieler-Respawns und liefert sie als dritte Tupel-Liste zurück. (5) `GameServer.HandleAttackRequest` verdrahtet `World.TryAttack` mit den Paketen; `BroadcastDespawn` aus `OnPeerDisconnected` extrahiert und für Monstertod wiederverwendet (Abschnitt-0-Fund: der bestehende Despawn-Mechanismus war schon kind-agnostisch, keine "Monster despawnen nie"-Annahme zu brechen); neuer, eigener Yang-Save-Channel (gleiches Bounded/DropOldest-Muster wie Positionen, aber sofortiger statt periodischer Auslöser); Spieler-Respawn nutzt `EntityStopPacket` (kein neues Paket nötig); `CompleteJoin` löst die Klasse über `ClassCatalog` auf (Alpha: nur "Krieger") und lädt `Character.Yang` in die Entity; `Program.cs` lädt `data/classes.json` fail-fast. (6) Client: `NetClient.SendAttack`, `MonsterView.ContainsWorldPoint` (Bounds-Check statt Collider-System) - Rechtsklick auf ein sichtbares Monster; `ClientWorld` bekommt `CurrentHp`/`MaxHp` auf `ClientEntity` (-1 = unbekannt, reaktiv über das erste EntityDamaged) und `HandleEntityDamaged`/`HandleEntityDied`; neue Debug-Overlay-Zeile (eigenes Leben, anvisiertes Ziel, Yang, deutsche AttackFailed-Kurzmeldung bzw. Todesmeldung - erkannt am ersten EntityStop für die eigene Entity nach EntityDied, kein eigenes Respawn-Paket). Keine neue Grafik, keine echten Health-Bars. (7) `ClassCatalogTests`, `WorldCombatTests` (Schaden/Mindestschaden/alle fünf Ablehnungsgründe einzeln inkl. Beleg der Prüfreihenfolge "Ziel lebt" vor "kein Spieler"/Monstertod+Yang/Spielertod+Respawn), ein Integrationstest (echtes LiteNetLib: Angreifer tötet ein per SpawnCatalog geladenes Monster in mehreren Treffern, EntityDamaged bei Angreifer UND einem zusätzlichen Beobachter, EntityDied dann EntityDespawn bei beiden, YangChanged nur beim Angreifer). (8) Diese Doku-Aktualisierung. 294 Tests grün, 3x stabil, Batchmode-Compile-Check 0 Fehler. Manuell mit echtem Auth+Server+Bot noch zu verifizieren (siehe Checkliste unten).
 - Dev-Tools (docs/tasks/dev-tools-debug-spawn.md, kein eigener Meilenstein) fertig, in 4 Commits: (1) 4 zusätzliche Spawn-Punkte (Ids 6-9, Mix Wildhund/Waldschrat) 300-500 Wire-Einheiten um die Kartenmitte, gegen collision-source.png/echten Serverstart als begehbar verifiziert. (2) `ServerConfig.AllowDebugCommands` (`--allow-debug-commands`, Default aus); Shared `DebugSpawnMonsterRequestPacket`, Protocol.Version 6; `GameServer.HandleDebugSpawnMonster` verwirft das Paket ohne die Option still (kein Ablehnungspaket, nur Log - Dev-Only-Befehl soll "wie nicht vorhanden" wirken), spawnt sonst über `World.FindNearbyWalkablePoint` (neu: zufälliger 100-300-Wire-Versatz, Rückfall auf Absenderposition bei blockierter Zielzelle) ein Monster nahe dem Absender; `Entity.SpawnPointId` (neu, nullable) unterscheidet Katalog-Spawns (echte SpawnPoint.Id) von Debug-Spawns (null) - Vorbereitung für M4b, keine Kollision mit künftigem Respawn-pro-SpawnPoint; Client-Debug-Panel bekommt einen "Monster spawnen"-Bereich (Mob-Typ-Cycler aus einer fest hinterlegten kleinen Liste, keine neue mobs.json-Ladefunktion im Client); CLAUDE.md-Befehle-Zeile um den Flag ergänzt. (3) 7 neue Tests (SpawnCatalog lädt die echte erweiterte spawns.json; SpawnMonster setzt/lässt SpawnPointId korrekt; FindNearbyWalkablePoint im Bereich bzw. Rückfall bei Vollblockade; 2 Integrationstests - ohne Option keine Wirkung, mit Option spawnt und ist normal angreifbar). (4) Diese Doku-Aktualisierung (neuer Abschnitt "Dev-Tools"). 302 Tests grün, 5x stabil, Batchmode-Compile-Check 0 Fehler.
 - M4b (Monster-Respawn, docs/tasks/M4b-monster-respawn.md) fertig, in 4 Commits (0 Review nur berichtet, kein Commit): (1) `Entity.RespawnSeconds` (nur bei Kind=Monster mit gesetzter SpawnPointId aussagekräftig, aus SpawnPoint.RespawnSeconds - wird bei jedem Respawn an die neue Entity weitergereicht, damit der Zyklus weiterläuft); `World.ApplyDamage` terminiert bei Monstertod MIT SpawnPointId zusätzlich zum bisherigen sofortigen Entfernen einen Respawn (neues privates `ScheduleMonsterRespawn` friert MobId/Name/Position/Kampfwerte/RespawnSeconds als "Rezept" in einem neuen `Dictionary<SpawnPointId, PendingMonsterRespawn>` ein - höchstens ein Eintrag pro SpawnPoint, da nie gleichzeitig lebende Entity UND ausstehender Respawn); `World.Tick` erzeugt bei Fälligkeit über den normalen `SpawnMonster`-Weg eine NEUE Entity mit neuer EntityId (nicht die alte wiederbelebt, anders als beim Spieler-Respawn - die alte wurde beim Tod schon entfernt, der Client hat längst EntityDespawn bekommen), vierte Tupel-Liste `RespawnedMonsters`. Debug-gespawnte Monster (SpawnPointId == null) unverändert ohne Respawn. (2) `GameServer`-Konstruktor reicht `spawn.RespawnSeconds` jetzt durch (vorher immer 0/unbenutzt); RunTick verarbeitet die neue Liste - kein eigener Broadcast nötig (bestätigt: derselbe automatische AOI-Diff-Mechanismus wie bei jeder neu erschienenen Entity, kein Sonderfall), nur eine Log-Zeile ergänzt. (3) 7 neue Tests (3 Unit: Spawn-Punkt-Monster respawnt exakt nach RespawnSeconds mit neuer EntityId/voller Leben/gleicher SpawnPointId, Debug-Monster respawnt nie, zwei SpawnPoints respawnen unabhängig mit eigenen RespawnSeconds-Werten; 1 Integrationstest: Bot tötet ein Spawn-Punkt-Monster mit kurzer synthetischer RespawnSeconds=2, bekommt nach der Wartezeit EntitySpawn für die neue Entity an derselben Position). (4) Diese Doku-Aktualisierung (Abschnitte "Monster"/"Kampf" um Respawn-Verhalten ergänzt, Meilensteine/Status - M4 damit komplett fertig, M5 offen). 306 Tests grün, 5x stabil.
+- M4c (Monster-Aggro/Verfolgung/Leine, docs/tasks/M4c-monster-aggro.md) fertig, in 7 Commits (0 Review nur berichtet, kein Commit): (1) 6 zusätzliche Spawn-Punkte (Ids 10-15) 200-400 Wire-Einheiten um die Kartenmitte. (2) `data/mobs.json` um MeleeRangeWire/AttackCooldownMs (analog classes.json, Monster hatten bisher hartverdrahtet 0/0 - konnten nie angreifen) sowie Aggressive/AggroRangeWire/LeashRangeWire erweitert; Wildhund aggressiv (kleiner AggroRangeWire, etwas größere Leine, kurzer Cooldown/kurze Reichweite), Waldschrat passiv (AggroRangeWire unbenutzt, etwas kürzere Leine, längerer Cooldown/etwas größere Reichweite). (3) `MobCatalog` liest/validiert die neuen Felder; `Entity` bekommt Aggressive/AggroRangeWire/LeashRangeWire sowie `TargetEntityId` (`int?`, dasselbe Nullable-Feld-Muster wie SpawnPointId/CharacterId - Abschnitt-0d-Empfehlung, kein paralleler Zustandscontainer); `CreateMonster`/`SpawnMonster` bekommen echte MeleeRangeWire/AttackCooldownMs; `PendingMonsterRespawn` (M4b) friert die neuen Werte für respawnte Monster mit ein. `World.TryAttack` verallgemeinert (Abschnitt-0a-Empfehlung): "Ziel ist Spieler" durch "Angreifer und Ziel gleichen Kinds" ersetzt (blockt weiterhin Spieler-vs-Spieler, erlaubt jetzt Monster-vs-Spieler), `AttackFailedReason.TargetIsPlayer` unverändert (bleibt für den einzig erreichbaren Fall korrekt). Neues `World.RunMonsterAi` (ersetzt die reine Wander-Prüfung): Zielsuche für aggressive Mobs ohne Ziel (`FindNearestLivingPlayerWithinRange`), mit Ziel Existenz-/Lebend-Prüfung, Leine (Distanz vom Anker zum AKTUELLEN Monster-Standort), Nahkampf-Angriff via TryAttack oder Verfolgung (Bewegungsziel jeden Tick neu auf die aktuelle Spielerposition, wie gefordert) - pausiert die normale Wander-Bewegung, solange ein Ziel aktiv ist; `Tick` liefert zusätzlich `MonsterAttacks` zurück. (4) `World.TryAttack`: getroffenes Monster ohne Ziel merkt sich reaktiv den Angreifer (gilt für aggressive UND passive Mobs). (5) `GameServer`-Konstruktor reicht die neuen mobDef-Werte jetzt durch; Paketversand aus `HandleAttackRequest` in neues, gemeinsames `BroadcastAttackResult` extrahiert (ohne Yang-Handling, das bleibt bei `HandleAttackRequest` - Monster als Angreifer haben keine Verbindung und YangAwarded ist bei ihnen immer 0); `RunTick` verarbeitet `MonsterAttacks` über denselben Helfer. (6) 10 neue Unit-Tests (`WorldMonsterAiTests` - Aggro-Erfassung/-Ignoranz, Passivität, reaktive Zielerfassung, Cooldown-Rhythmus im Nahkampf, Verfolgung außerhalb Nahkampf, Leinen-Rückkehr, Zielverlust bei Tod/Trennung, Spielertod nutzt bestehenden M4a-Respawn) plus 2 Integrationstests (Bot bleibt neben aggressivem Wildhund stehen und wird angegriffen, ohne selbst anzugreifen; Bot trifft passiven Waldschrat einmal und wird danach angegriffen, ohne erneut anzugreifen). (7) Diese Doku-Aktualisierung (Abschnitt "Kampf" um Aggro/Verfolgung/Leine ergänzt, veraltete Protocol.Version-Angabe korrigiert, neue Bekannte-Lücke zur Verfolgungs-Paketfrequenz, Meilensteine/Status - M4 komplett inkl. Gegenwehr fertig, M5 offen). 318 Tests grün, 5x stabil.
 
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client
 War kein Codefehler. User hat den Test mit fokussiertem Unity-Fenster wiederholt (Server, Unity Play, dann Bots
