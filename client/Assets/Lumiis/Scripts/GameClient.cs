@@ -15,8 +15,14 @@ namespace Lumiis.Client
         private readonly ClientWorld _world = new ClientWorld();
         private readonly Dictionary<int, CharacterView> _views = new Dictionary<int, CharacterView>();
         private readonly Dictionary<int, CharacterAnimator> _animators = new Dictionary<int, CharacterAnimator>();
+        // Monster (seit M3c): eigene, viel einfachere View statt CharacterView (kein Paper-Doll, keine
+        // Blickrichtung/Animation) - deshalb ein eigenes, kleineres Dictionary statt _views/_animators
+        // mitzubenutzen (siehe MonsterView-Klassenkommentar).
+        private readonly Dictionary<int, MonsterView> _monsterViews = new Dictionary<int, MonsterView>();
         private Sprite _squareSprite;
         private Sprite _localMarkerSprite;
+        private Sprite _monsterCircleSprite;
+        private Sprite _monsterTriangleSprite;
         private LookCatalogClient _lookCatalog;
         private CachingSpriteProvider _spriteProvider;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -50,6 +56,8 @@ namespace Lumiis.Client
             _camera = camera;
             _squareSprite = PlaceholderSprites.CreateSquare();
             _localMarkerSprite = PlaceholderSprites.CreateRing();
+            _monsterCircleSprite = PlaceholderSprites.CreateCircle();
+            _monsterTriangleSprite = PlaceholderSprites.CreateTriangle();
 
             try
             {
@@ -92,6 +100,13 @@ namespace Lumiis.Client
                     if (_animators.TryGetValue(kvp.Key, out CharacterAnimator animator))
                         animator.Animate(entity.IsMoving);
                 }
+            }
+
+            foreach (KeyValuePair<int, MonsterView> kvp in _monsterViews)
+            {
+                ClientEntity entity;
+                if (_world.Entities.TryGetValue(kvp.Key, out entity))
+                    kvp.Value.SetWorldPosition(entity.X / 100.0, entity.Y / 100.0);
             }
 
             if (_inGame) HandleClickInput();
@@ -345,8 +360,8 @@ namespace Lumiis.Client
             EntitySpawnPacket spawn = packet as EntitySpawnPacket;
             if (spawn != null)
             {
-                Debug.Log("EntitySpawn: Id=" + spawn.EntityId + " Name=" + spawn.Name + " Pos=(" + (spawn.X / 100.0) + "," + (spawn.Y / 100.0) + ")");
-                _world.HandleEntitySpawn(spawn.EntityId, spawn.Name, spawn.X, spawn.Y, spawn.Appearance);
+                Debug.Log("EntitySpawn: Id=" + spawn.EntityId + " Kind=" + spawn.Kind + " Name=" + spawn.Name + " Pos=(" + (spawn.X / 100.0) + "," + (spawn.Y / 100.0) + ")");
+                _world.HandleEntitySpawn(spawn.EntityId, spawn.Name, spawn.Kind, spawn.MobId, spawn.X, spawn.Y, spawn.Appearance);
                 return;
             }
 
@@ -380,6 +395,16 @@ namespace Lumiis.Client
 
         private void OnEntitySpawned(ClientEntity entity)
         {
+            if (entity.Kind == EntityKind.Monster)
+            {
+                var monsterGo = new GameObject("Monster_" + entity.Id + "_" + entity.Name);
+                var monsterView = monsterGo.AddComponent<MonsterView>();
+                monsterView.Initialize(MonsterShapeFor(entity.MobId), MonsterColorFor(entity.MobId));
+                monsterView.SetWorldPosition(entity.X / 100.0, entity.Y / 100.0);
+                _monsterViews[entity.Id] = monsterView;
+                return;
+            }
+
             var go = new GameObject("Entity_" + entity.Id + "_" + entity.Name);
             var view = go.AddComponent<CharacterView>();
             view.Initialize(entity.Id, entity.Name, _spriteProvider, _lookCatalog);
@@ -401,8 +426,30 @@ namespace Lumiis.Client
             }
         }
 
+        // Platzhalter-Zuordnung Form/Farbe je MobId (siehe data/mobs.json: 1=Wildhund, 2=Waldschrat) - der
+        // Client kennt mobs.json bewusst nicht (Appearance-Feld im Paket bleibt bei Monstern ohnehin ohne
+        // Bedeutung, siehe EntitySpawnPacket-Kommentar), deshalb eine feste, kleine Zuordnung statt eines
+        // eigenen Katalogs. Unbekannte MobIds fallen auf Kreis/Grau zurück.
+        private Sprite MonsterShapeFor(int mobId) => mobId == 2 ? _monsterTriangleSprite : _monsterCircleSprite;
+
+        private static Color MonsterColorFor(int mobId)
+        {
+            return mobId switch
+            {
+                1 => new Color(0.55f, 0.35f, 0.2f), // Wildhund: braun
+                2 => new Color(0.3f, 0.5f, 0.25f),  // Waldschrat: grün
+                _ => Color.gray
+            };
+        }
+
         private void OnEntityDespawned(int entityId)
         {
+            if (_monsterViews.TryGetValue(entityId, out MonsterView monsterView))
+            {
+                if (monsterView != null) Destroy(monsterView.gameObject);
+                _monsterViews.Remove(entityId);
+            }
+
             if (_views.TryGetValue(entityId, out CharacterView view))
             {
                 if (view != null) Destroy(view.gameObject);
@@ -422,6 +469,11 @@ namespace Lumiis.Client
                 if (view != null) Destroy(view.gameObject);
             _views.Clear();
             _animators.Clear();
+
+            foreach (MonsterView monsterView in _monsterViews.Values)
+                if (monsterView != null) Destroy(monsterView.gameObject);
+            _monsterViews.Clear();
+
             _world.Reset();
         }
 
@@ -505,7 +557,8 @@ namespace Lumiis.Client
                 if (shown >= MaxDebugEntityRows) break;
 
                 double distance = DistanceToLocal(local, entity);
-                string line = "#" + entity.Id + " " + entity.Name
+                string kindLabel = entity.Kind == EntityKind.Monster ? "Monster" : "Spieler";
+                string line = "#" + entity.Id + " [" + kindLabel + "] " + entity.Name
                     + "  (" + (entity.X / 100.0).ToString("0.0") + ", " + (entity.Y / 100.0).ToString("0.0") + ")"
                     + "  " + distance.ToString("0.0") + " Einh.";
                 GUI.Label(new Rect(10, y, 400, 18), line);

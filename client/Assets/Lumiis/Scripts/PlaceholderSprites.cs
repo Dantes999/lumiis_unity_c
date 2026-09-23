@@ -80,5 +80,66 @@ namespace Lumiis.Client
 
             return Sprite.Create(texture, new Rect(0, 0, pixelSize, pixelSize), new Vector2(0.5f, 0.5f), pixelsPerUnit);
         }
+
+        /// <summary>Eine ausgefüllte Kreisscheibe, z. B. als Monster-Platzhalter (seit M3c). Wird per
+        /// SpriteRenderer.color eingefärbt.</summary>
+        public static Sprite CreateCircle(int pixelSize = 24, int pixelsPerUnit = 24)
+        {
+            var texture = new Texture2D(pixelSize, pixelSize, TextureFormat.RGBA32, false);
+            texture.filterMode = FilterMode.Bilinear;
+
+            Color32 clear = new Color32(0, 0, 0, 0);
+            Color32 white = new Color32(255, 255, 255, 255);
+            Color32[] pixels = new Color32[pixelSize * pixelSize];
+
+            float center = pixelSize / 2f;
+            float radius = pixelSize / 2f;
+
+            for (int y = 0; y < pixelSize; y++)
+            {
+                for (int x = 0; x < pixelSize; x++)
+                {
+                    float dx = x + 0.5f - center;
+                    float dy = y + 0.5f - center;
+                    pixels[y * pixelSize + x] = (Mathf.Sqrt(dx * dx + dy * dy) <= radius) ? white : clear;
+                }
+            }
+
+            texture.SetPixels32(pixels);
+            texture.Apply();
+
+            return Sprite.Create(texture, new Rect(0, 0, pixelSize, pixelSize), new Vector2(0.5f, 0.5f), pixelsPerUnit);
+        }
+
+        /// <summary>Ein gleichschenkliges Dreieck (Spitze oben, Basis unten), z. B. als Monster-Platzhalter
+        /// (seit M3c). Einfache Halbraumtests pro Zeile statt Barycentric-Koordinaten - für eine grobe
+        /// Platzhalterform ausreichend und leichter lesbar. Wird per SpriteRenderer.color eingefärbt.</summary>
+        public static Sprite CreateTriangle(int pixelSize = 24, int pixelsPerUnit = 24)
+        {
+            var texture = new Texture2D(pixelSize, pixelSize, TextureFormat.RGBA32, false);
+            texture.filterMode = FilterMode.Bilinear;
+
+            Color32 clear = new Color32(0, 0, 0, 0);
+            Color32 white = new Color32(255, 255, 255, 255);
+            Color32[] pixels = new Color32[pixelSize * pixelSize];
+
+            float center = pixelSize / 2f;
+
+            for (int y = 0; y < pixelSize; y++)
+            {
+                float t = y / (float)(pixelSize - 1); // 0 oben (Spitze), 1 unten (Basis)
+                float halfWidthAtY = t * (pixelSize / 2f);
+                for (int x = 0; x < pixelSize; x++)
+                {
+                    bool inside = Mathf.Abs(x + 0.5f - center) <= halfWidthAtY;
+                    pixels[y * pixelSize + x] = inside ? white : clear;
+                }
+            }
+
+            texture.SetPixels32(pixels);
+            texture.Apply();
+
+            return Sprite.Create(texture, new Rect(0, 0, pixelSize, pixelSize), new Vector2(0.5f, 0.5f), pixelsPerUnit);
+        }
     }
 }
