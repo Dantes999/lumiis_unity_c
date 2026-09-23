@@ -10,6 +10,7 @@ using System.Threading.Channels;
 using System.Threading.Tasks;
 using LiteNetLib;
 using Lumiis.Data;
+using Lumiis.Data.Classes;
 using Lumiis.Data.Maps;
 using Lumiis.Data.Mobs;
 using Lumiis.Server.Game;
@@ -55,11 +56,21 @@ public sealed class GameServer : INetEventListener
     /// RunPositionSaveConsumerAsync).</summary>
     private readonly record struct PositionSaveRequest(int CharacterId, int X, int Y);
 
+    /// <summary>Ein zu speichernder Yang-Gesamtbetrag (M4a), per Channel an den Hintergrund-Task übergeben
+    /// (siehe RunYangSaveConsumerAsync) - eigener Channel statt Wiederverwendung des Positions-Channels
+    /// (unterschiedlicher Auslöser: sofort bei jeder Änderung statt periodisch, siehe HandleAttackRequest).</summary>
+    private readonly record struct YangSaveRequest(int CharacterId, long NewTotal);
+
     private const int MaxConsecutiveFailedTicks = 50;
 
     /// <summary>Fix, keine Konfiguration (siehe CLAUDE.md "Bekannte Lücken") - alle 30s wird die Position
     /// jedes verbundenen Spielers gespeichert, zusätzlich sofort bei Disconnect.</summary>
     private const long PositionSaveIntervalMs = 30_000;
+
+    /// <summary>Alpha-Umfang kennt nur eine Klasse (siehe CLAUDE.md) - keine eigene ClassId-Spalte auf
+    /// Character, die Klasse wird deshalb fest über den Namen aufgelöst (siehe CompleteJoin). Sobald es
+    /// mehrere Klassen gibt, braucht Character eine echte ClassId-Spalte statt dieser Konstante.</summary>
+    private const string DefaultClassName = "Krieger";
 
     // Monotone Standard-Uhr, geteilt über alle Instanzen (läuft seit Prozessstart, nie negativ).
     private static readonly Stopwatch DefaultClock = Stopwatch.StartNew();
@@ -69,14 +80,17 @@ public sealed class GameServer : INetEventListener
     private readonly World _world;
     private readonly TokenService _tokenService;
     private readonly Func<LumiisDbContext> _dbContextFactory;
+    private readonly ClassCatalog? _classCatalog;
     private readonly NetManager _netManager;
     private readonly ILogger _logger;
     private readonly Func<long> _nowMs;
     private readonly Dictionary<int, ConnectionState> _connections = new();
     private readonly ConcurrentQueue<JoinLookupResult> _pendingJoinResults = new();
     private readonly Channel<PositionSaveRequest> _positionSaveChannel;
+    private readonly Channel<YangSaveRequest> _yangSaveChannel;
     private readonly CancellationTokenSource _positionSaveCts = new();
     private Task? _positionSaveConsumerTask;
+    private Task? _yangSaveConsumerTask;
     private uint _tick;
     private int _consecutiveFailedTicks;
 
@@ -90,14 +104,19 @@ public sealed class GameServer : INetEventListener
     /// beim echten Serverstart immer eine Instanz aus data/maps/village/collision.bin (siehe CLAUDE.md).
     /// mobCatalog/spawnCatalog: null bedeutet "keine Monster" (z. B. bestehende Tests ohne Monster-Bezug) -
     /// Program.cs lädt beim echten Serverstart immer beide. Monster werden hier einmalig beim Serverstart
-    /// angelegt (kein aktiver Respawn in M3c, siehe docs/tasks/M3c-monsters.md).</summary>
+    /// angelegt (kein aktiver Respawn in M3c, siehe docs/tasks/M3c-monsters.md).
+    /// classCatalog: null bedeutet "Spieler bekommen Entity.DefaultXxx-Kampfwerte" (z. B. bestehende Tests
+    /// ohne Kampfbezug, siehe CompleteJoin) - Program.cs lädt beim echten Serverstart immer eine Instanz aus
+    /// data/classes.json (M4a).</summary>
     public GameServer(ServerConfig config, ILogger logger, TokenService tokenService, Func<LumiisDbContext> dbContextFactory,
-        Func<long>? nowMs = null, CollisionMap? collisionMap = null, MobCatalog? mobCatalog = null, SpawnCatalog? spawnCatalog = null)
+        Func<long>? nowMs = null, CollisionMap? collisionMap = null, MobCatalog? mobCatalog = null, SpawnCatalog? spawnCatalog = null,
+        ClassCatalog? classCatalog = null)
     {
         _config = config;
         _logger = logger;
         _tokenService = tokenService;
         _dbContextFactory = dbContextFactory;
+        _classCatalog = classCatalog;
         _world = new World(config.MaxPlayers, collisionMap);
         _netManager = new NetManager(this) { UpdateTime = 15 };
         _nowMs = nowMs ?? DefaultNowMs;
@@ -108,7 +127,8 @@ public sealed class GameServer : INetEventListener
             {
                 mobCatalog.TryGet(spawn.MobId, out MobDefinition mobDef); // Existenz bereits von SpawnCatalog.LoadFromFile geprüft.
                 _world.SpawnMonster(spawn.MobId, mobDef.Name, spawn.PositionX, spawn.PositionY, mobDef.SpeedWire,
-                    mobDef.WanderRadiusWire, mobDef.WanderIntervalMinMs, mobDef.WanderIntervalMaxMs, _nowMs());
+                    mobDef.WanderRadiusWire, mobDef.WanderIntervalMinMs, mobDef.WanderIntervalMaxMs, _nowMs(),
+                    mobDef.MaxHp, mobDef.Attack, mobDef.Defense, mobDef.YangMin, mobDef.YangMax);
             }
         }
 
@@ -126,6 +146,17 @@ public sealed class GameServer : INetEventListener
             SingleReader = true,
             SingleWriter = true
         });
+
+        // Gleicher Mechanismus wie _positionSaveChannel, aber eigener Channel (siehe YangSaveRequest-
+        // Kommentar): NewTotal ist immer der volle, aktuelle Stand (kein Delta) - DropOldest verwirft
+        // höchstens einen Zwischenstand, der zuletzt geschriebene Wert konvergiert trotzdem immer zum
+        // korrekten Endstand, genau wie bei Positionen.
+        _yangSaveChannel = Channel.CreateBounded<YangSaveRequest>(new BoundedChannelOptions(config.MaxPlayers)
+        {
+            FullMode = BoundedChannelFullMode.DropOldest,
+            SingleReader = true,
+            SingleWriter = true
+        });
     }
 
     /// <summary>Tatsächlich gebundener Port (nach Start relevant, falls ServerConfig.Port 0 war).</summary>
@@ -135,6 +166,7 @@ public sealed class GameServer : INetEventListener
     {
         _netManager.Start(_config.Port);
         _positionSaveConsumerTask = Task.Run(() => RunPositionSaveConsumerAsync(_positionSaveCts.Token));
+        _yangSaveConsumerTask = Task.Run(() => RunYangSaveConsumerAsync(_positionSaveCts.Token));
         _logger.Info($"Server gestartet auf Port {_netManager.LocalPort} (max. {_config.MaxPlayers} Spieler)");
     }
 
@@ -142,6 +174,7 @@ public sealed class GameServer : INetEventListener
     {
         _netManager.Stop();
         _positionSaveChannel.Writer.TryComplete();
+        _yangSaveChannel.Writer.TryComplete();
         _positionSaveCts.Cancel();
         _logger.Info("Server gestoppt");
     }
@@ -190,11 +223,14 @@ public sealed class GameServer : INetEventListener
         }
 
         double deltaSeconds = 1.0 / Protocol.TickRate;
-        // Respawned wird hier noch verworfen (Broadcast folgt in Abschnitt 5 der Aufgabe, siehe
-        // docs/tasks/M4a-combat-core.md) - kann zu diesem Zeitpunkt ohnehin nie etwas enthalten, da
-        // RespawnAtMs erst gesetzt wird, sobald World.TryAttack netzwerkseitig erreichbar ist.
-        (List<Entity> arrived, List<Entity> startedWandering, List<Entity> _) = _world.Tick(deltaSeconds, _nowMs());
+        (List<Entity> arrived, List<Entity> startedWandering, List<Entity> respawned) = _world.Tick(deltaSeconds, _nowMs());
         foreach (Entity entity in arrived)
+            SendToVisible(entity.Id, new EntityStopPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY });
+
+        // Spieler-Respawn (M4a): kein neues Paket nötig - EntityStopPacket bedeutet "an dieser Position zum
+        // Stillstand gekommen" und der Client setzt die Position beim Empfang hart, exakt die
+        // Teleport-Semantik (siehe docs/tasks/M4a-combat-core.md Abschnitt 5).
+        foreach (Entity entity in respawned)
             SendToVisible(entity.Id, new EntityStopPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY });
 
         // Wander-KI (World.Tick) hat fälligen Monstern ein neues Ziel gesetzt - dieselbe EntityMove-
@@ -316,6 +352,37 @@ public sealed class GameServer : INetEventListener
         }
     }
 
+    /// <summary>Läuft auf einem Threadpool-Thread, NIE auf dem Game-Loop-Thread (M4a, siehe HandleAttackRequest).
+    /// Fehler werden geloggt, bringen den Server nicht zum Absturz - eine einzelne fehlgeschlagene
+    /// Yang-Speicherung ist nicht kritisch, der nächste Kill für diesen Charakter versucht es erneut mit dem
+    /// dann aktuellen (höheren) Stand.</summary>
+    private async Task RunYangSaveConsumerAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await foreach (YangSaveRequest request in _yangSaveChannel.Reader.ReadAllAsync(cancellationToken))
+            {
+                try
+                {
+                    await using LumiisDbContext db = _dbContextFactory();
+                    Character? character = await db.Characters.FindAsync(new object[] { request.CharacterId }, cancellationToken);
+                    if (character == null) continue; // Charakter inzwischen gelöscht o. Ä. - kein Fehler, einfach überspringen.
+
+                    character.Yang = request.NewTotal;
+                    await db.SaveChangesAsync(cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"Fehler beim Speichern von Yang für Charakter {request.CharacterId}: {ex}");
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Erwarteter Abbruch beim Stop() - kein Fehler.
+        }
+    }
+
     /// <summary>Fester 25-Hz-Loop (Stopwatch, Catch-up begrenzt), bis der Token abgebrochen wird.</summary>
     public void Run(CancellationToken cancellationToken)
     {
@@ -386,14 +453,7 @@ public sealed class GameServer : INetEventListener
                     _positionSaveChannel.Writer.TryWrite(new PositionSaveRequest(entity.CharacterId.Value, entity.IntX, entity.IntY));
 
                 _world.Remove(entityId);
-
-                // Nur an Verbindungen, die die Entity laut ihrem letzten VisibleEntityIds-Stand aktuell
-                // sehen - HashSet.Remove liefert genau das (true = war sichtbar) und räumt gleichzeitig auf.
-                foreach (ConnectionState other in _connections.Values)
-                {
-                    if (other.VisibleEntityIds.Remove(entityId))
-                        other.Peer.SendPacket(new EntityDespawnPacket { EntityId = entityId });
-                }
+                BroadcastDespawn(entityId);
 
                 _logger.Info($"Entity {entityId} despawnt (Disconnect, {disconnectInfo.Reason})");
             }
@@ -477,6 +537,9 @@ public sealed class GameServer : INetEventListener
                 break;
             case MoveToPacket moveTo:
                 HandleMoveTo(conn, moveTo);
+                break;
+            case AttackRequestPacket attack:
+                HandleAttackRequest(conn, attack);
                 break;
             default:
                 _logger.Warn($"Unerwartetes Paket {packet.Id} von Verbindung {conn.Peer.Id}");
@@ -574,7 +637,23 @@ public sealed class GameServer : INetEventListener
 
     private void CompleteJoin(ConnectionState conn, Character character)
     {
-        if (!_world.TryJoin(character.Id, character.Name, character.PositionX, character.PositionY, out Entity? entity, out JoinRejectReason reason))
+        // Alpha-Umfang kennt nur "Krieger" (siehe DefaultClassName-Kommentar) - classCatalog==null oder ein
+        // fehlender Eintrag (sollte bei korrekt validierter classes.json nie vorkommen) fällt auf
+        // Entity.DefaultXxx zurück, genau wie TryJoin es ohne die optionalen Parameter täte.
+        bool joined;
+        Entity? entity;
+        JoinRejectReason reason;
+        if (_classCatalog != null && _classCatalog.TryGet(DefaultClassName, out ClassDefinition classDef))
+        {
+            joined = _world.TryJoin(character.Id, character.Name, character.PositionX, character.PositionY, out entity, out reason,
+                classDef.MaxHp, classDef.Attack, classDef.Defense, classDef.MeleeRangeWire, classDef.AttackCooldownMs);
+        }
+        else
+        {
+            joined = _world.TryJoin(character.Id, character.Name, character.PositionX, character.PositionY, out entity, out reason);
+        }
+
+        if (!joined)
         {
             RejectJoin(conn, reason);
             return;
@@ -582,6 +661,7 @@ public sealed class GameServer : INetEventListener
 
         conn.EntityId = entity!.Id;
         entity.Appearance = ToAppearance(character);
+        entity.Yang = character.Yang;
         entity.LastSaveAtMs = _nowMs(); // Position kommt gerade erst aus der DB - kein sofortiger Save nötig.
 
         conn.Peer.SendPacket(new JoinAcceptedPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY, Appearance = entity.Appearance });
@@ -668,6 +748,75 @@ public sealed class GameServer : INetEventListener
             Speed = entity.Speed,
             ServerTick = _tick
         });
+    }
+
+    /// <summary>AttackRequestPacket-Handler (M4a): ruft World.TryAttack auf und übersetzt das Ergebnis in
+    /// Pakete. Erfolg: EntityDamagedPacket an alle AOI-Beobachter des Ziels - der Angreifer ist dank
+    /// Nahkampfreichweite (MeleeRangeWire) &lt; AOI-Radius (siehe World.TryAttack-Reichweitenprüfung) immer
+    /// selbst unter diesen Beobachtern, kein Sonderfall nötig (siehe SendToVisible-Kommentar, das gilt
+    /// zusätzlich auch für die eigene Entity). Bei Tod zusätzlich EntityDiedPacket, bei Monstertod danach
+    /// EntityDespawnPacket (World hat das Monster in TryAttack/ApplyDamage bereits aus World entfernt - hier
+    /// nur noch die Netzwerk-Seite, wie beim Disconnect-Despawn). Bei Yang-Gewinn YangChangedPacket NUR an
+    /// den Angreifer, plus asynchrones Speichern (eigener Channel, siehe YangSaveRequest). Fehlschlag:
+    /// AttackFailedPacket NUR an den Angreifer, geloggt, Verbindung bleibt bestehen.</summary>
+    private void HandleAttackRequest(ConnectionState conn, AttackRequestPacket attack)
+    {
+        if (conn.EntityId is not int attackerId)
+        {
+            _logger.Warn($"AttackRequest vor Join von Verbindung {conn.Peer.Id}");
+            conn.Peer.Disconnect();
+            return;
+        }
+
+        AttackResult result = _world.TryAttack(attackerId, attack.TargetEntityId, _nowMs());
+
+        if (!result.Success)
+        {
+            conn.Peer.SendPacket(new AttackFailedPacket { Reason = result.Reason });
+            _logger.Info($"Angriff von Entity {attackerId} auf Entity {attack.TargetEntityId} abgelehnt ({result.Reason})");
+            return;
+        }
+
+        SendToVisible(attack.TargetEntityId, new EntityDamagedPacket
+        {
+            AttackerEntityId = attackerId,
+            TargetEntityId = attack.TargetEntityId,
+            Damage = result.Damage,
+            TargetHpAfter = result.TargetHpAfter,
+            TargetMaxHp = result.TargetMaxHp
+        });
+
+        if (result.TargetDied)
+        {
+            SendToVisible(attack.TargetEntityId, new EntityDiedPacket { EntityId = attack.TargetEntityId });
+
+            if (result.TargetKind == EntityKind.Monster)
+                BroadcastDespawn(attack.TargetEntityId);
+        }
+
+        if (result.YangAwarded > 0 && _world.TryGet(attackerId, out Entity? attackerEntity))
+        {
+            conn.Peer.SendPacket(new YangChangedPacket { NewTotal = attackerEntity!.Yang });
+            if (attackerEntity.CharacterId is int characterId)
+                _yangSaveChannel.Writer.TryWrite(new YangSaveRequest(characterId, attackerEntity.Yang));
+        }
+
+        _logger.Info($"Entity {attackerId} trifft Entity {attack.TargetEntityId} ({result.Damage} Schaden)" +
+            (result.TargetDied ? ", Ziel gestorben" : "") +
+            (result.YangAwarded > 0 ? $", +{result.YangAwarded} Yang" : ""));
+    }
+
+    /// <summary>Benachrichtigt alle Verbindungen, die diese Entity laut ihrem letzten VisibleEntityIds-Stand
+    /// aktuell sehen, über ihr Verschwinden - und räumt die Buchhaltung gleich mit auf (HashSet.Remove liefert
+    /// beides in einem Aufruf). Setzt voraus, dass die Entity bereits aus World entfernt wurde (siehe
+    /// OnPeerDisconnected/World.ApplyDamage bei Monstertod) - kümmert sich nur um die Netzwerk-Seite.</summary>
+    private void BroadcastDespawn(int entityId)
+    {
+        foreach (ConnectionState conn in _connections.Values)
+        {
+            if (conn.VisibleEntityIds.Remove(entityId))
+                conn.Peer.SendPacket(new EntityDespawnPacket { EntityId = entityId });
+        }
     }
 
     /// <summary>Schickt ein Paket über eine bestimmte Entity (Move/Stop) an alle Verbindungen, die diese

@@ -1,5 +1,6 @@
 ﻿using System.Threading;
 using Lumiis.Data;
+using Lumiis.Data.Classes;
 using Lumiis.Data.Maps;
 using Lumiis.Data.Mobs;
 using Lumiis.Server;
@@ -64,6 +65,17 @@ catch (Exception ex)
     return 1;
 }
 
+ClassCatalog classCatalog;
+try
+{
+    classCatalog = ClassCatalog.LoadFromFile(Path.Combine(config.DataDir, "classes.json"));
+}
+catch (Exception ex)
+{
+    logger.Error($"Serverstart fehlgeschlagen (Klassen-Daten): {ex.Message}");
+    return 1;
+}
+
 // Dieselben Variablen, dieselbe Fail-Fast-Regel wie Lumiis.Auth (siehe CLAUDE.md): fehlt eine, bricht der
 // Start mit klarer Meldung ab. Keine eigene Migration hier (bleibt Sache von Auth in Development).
 string connectionString;
@@ -92,7 +104,7 @@ Console.CancelKeyPress += (_, eventArgs) =>
     cts.Cancel();
 };
 
-GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, collisionMap: collisionMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog);
+GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, collisionMap: collisionMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog, classCatalog: classCatalog);
 
 try
 {
