@@ -1332,5 +1332,98 @@ namespace Lumiis.Tests.Integration
                 server.Stop();
             }
         }
+
+        // ---- M4c: Monster-Aggro (siehe docs/tasks/M4c-monster-aggro.md) ----
+
+        [Fact]
+        public void PlayerNearAggressiveWildhund_GetsAttackedWithoutAttacking()
+        {
+            MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
+              ""mobs"": [
+                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 30, ""attack"": 5, ""defense"": 0, ""yangMin"": 5, ""yangMax"": 15, ""meleeRangeWire"": 130, ""attackCooldownMs"": 300, ""aggressive"": true, ""aggroRangeWire"": 400, ""leashRangeWire"": 700 }
+              ]
+            }");
+            CollisionMap openMap = BuildOpenCollisionMap();
+            SpawnCatalog spawnCatalog = SpawnCatalog.LoadFromJson(@"{
+              ""spawns"": [ { ""id"": 1, ""mobId"": 1, ""positionX"": 50000, ""positionY"": 50000, ""respawnSeconds"": 30 } ]
+            }", mobCatalog, openMap);
+
+            var fixture = new ServerFixture(collisionMap: openMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice", positionX: 50000, positionY: 50000);
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+                int myEntityId = client.Received.OfType<JoinAcceptedPacket>().First().EntityId;
+
+                Assert.True(Pump(() => client.Received.OfType<EntitySpawnPacket>().Any(s => s.Kind == EntityKind.Monster), server, client));
+                int wildhundId = client.Received.OfType<EntitySpawnPacket>().First(s => s.Kind == EntityKind.Monster).EntityId;
+
+                // Client sendet bewusst NIE ein AttackRequestPacket - der Wildhund muss von sich aus angreifen.
+                Assert.True(Pump(() =>
+                    client.Received.OfType<EntityDamagedPacket>().Any(d => d.AttackerEntityId == wildhundId && d.TargetEntityId == myEntityId),
+                    server, client));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void PlayerAttacksPassiveWaldschratOnce_ThenGetsAttackedBackWithoutAttackingAgain()
+        {
+            MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
+              ""mobs"": [
+                { ""id"": 2, ""name"": ""Waldschrat"", ""speedWire"": 200, ""wanderRadiusWire"": 300, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 60, ""attack"": 8, ""defense"": 3, ""yangMin"": 10, ""yangMax"": 25, ""meleeRangeWire"": 150, ""attackCooldownMs"": 300, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 600 }
+              ]
+            }");
+            CollisionMap openMap = BuildOpenCollisionMap();
+            SpawnCatalog spawnCatalog = SpawnCatalog.LoadFromJson(@"{
+              ""spawns"": [ { ""id"": 1, ""mobId"": 2, ""positionX"": 50000, ""positionY"": 50000, ""respawnSeconds"": 60 } ]
+            }", mobCatalog, openMap);
+            // Langer eigener Cooldown stellt sicher, dass ein spaeterer Treffer beim Client wirklich vom
+            // Waldschrat kommt - der Client selbst koennte in diesem Zeitraum gar nicht erneut treffen.
+            ClassCatalog classCatalog = ClassCatalog.LoadFromJson(@"{
+              ""classes"": [ { ""name"": ""Krieger"", ""maxHp"": 100, ""attack"": 15, ""defense"": 0, ""meleeRangeWire"": 150, ""attackCooldownMs"": 5000 } ]
+            }");
+
+            var fixture = new ServerFixture(collisionMap: openMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog, classCatalog: classCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice", positionX: 50000, positionY: 50000);
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+                int myEntityId = client.Received.OfType<JoinAcceptedPacket>().First().EntityId;
+
+                Assert.True(Pump(() => client.Received.OfType<EntitySpawnPacket>().Any(s => s.Kind == EntityKind.Monster), server, client));
+                int waldschratId = client.Received.OfType<EntitySpawnPacket>().First(s => s.Kind == EntityKind.Monster).EntityId;
+
+                // Genau EIN Angriff - danach nie wieder.
+                client.Send(new AttackRequestPacket { TargetEntityId = waldschratId });
+                Assert.True(Pump(() => client.Received.OfType<EntityDamagedPacket>().Any(d => d.AttackerEntityId == myEntityId), server, client));
+
+                // Client greift bewusst nicht erneut an - der Waldschrat muss jetzt von sich aus zurueckschlagen.
+                Assert.True(Pump(() =>
+                    client.Received.OfType<EntityDamagedPacket>().Any(d => d.AttackerEntityId == waldschratId && d.TargetEntityId == myEntityId),
+                    server, client));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
     }
 }
