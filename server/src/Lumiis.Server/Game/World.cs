@@ -262,6 +262,13 @@ public sealed class World
 
         attacker.AttackReadyAtMs = nowMs + attacker.AttackCooldownMs;
 
+        // Reaktive Zielerfassung (M4c): ein getroffenes Monster ohne eigenes Ziel merkt sich den Angreifer -
+        // gilt für aggressive UND passive Mobs gleichermaßen (ein Wildhund, der von hinten angegriffen wird,
+        // dreht sich natürlich auch um). target.Kind == Monster schließt die umgekehrte Richtung (Spieler
+        // wird von einem Monster getroffen) hier automatisch aus, kein Sonderfall nötig.
+        if (target.Kind == EntityKind.Monster && target.TargetEntityId == null)
+            target.TargetEntityId = attackerEntityId;
+
         int targetMaxHp = target.MaxHp;
         int damage = Math.Max(1, attacker.Attack - target.Defense);
         (int targetHpAfter, bool died, long yangAwarded) = ApplyDamage(target, damage, nowMs);
