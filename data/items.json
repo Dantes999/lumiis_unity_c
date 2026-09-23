@@ -1,0 +1,12 @@
+{
+  "items": [
+    { "id": 1, "name": "Holzschwert", "itemType": "Weapon", "lookId": 2, "attackBonus": 2, "defenseBonus": 0 },
+    { "id": 2, "name": "Eisenschwert", "itemType": "Weapon", "lookId": 2, "attackBonus": 6, "defenseBonus": 0 },
+    { "id": 3, "name": "Kriegsaxt", "itemType": "Weapon", "lookId": 3, "attackBonus": 8, "defenseBonus": 0 },
+    { "id": 4, "name": "Lederruestung", "itemType": "Armor", "lookId": 2, "attackBonus": 0, "defenseBonus": 3 },
+    { "id": 5, "name": "Kettenhemd", "itemType": "Armor", "lookId": 3, "attackBonus": 0, "defenseBonus": 6 },
+    { "id": 6, "name": "Lederkappe", "itemType": "Helmet", "lookId": 1, "attackBonus": 0, "defenseBonus": 2 },
+    { "id": 7, "name": "Rundschild", "itemType": "Shield", "lookId": 1, "attackBonus": 0, "defenseBonus": 3 },
+    { "id": 8, "name": "Heiltrank", "itemType": "Consumable", "healAmount": 30 }
+  ]
+}
