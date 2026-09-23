@@ -96,4 +96,79 @@ namespace Lumiis.Shared.Net
             MobId = reader.ReadInt32();
         }
     }
+
+    /// <summary>Welcher der vier Ausrüstungs-Slots (M5a) - siehe UnequipItemRequestPacket.</summary>
+    public enum EquipmentSlot : byte
+    {
+        Armor = 1,
+        Helmet = 2,
+        Weapon = 3,
+        Shield = 4
+    }
+
+    /// <summary>Der Client will das Item aus dem angegebenen Inventarplatz anlegen (M5a). Der Server prüft
+    /// alles serverautoritativ erneut (Slot belegt, passender ItemType) - siehe World.TryEquip.</summary>
+    public sealed class EquipItemRequestPacket : IPacket
+    {
+        public int InventorySlotIndex;
+
+        public PacketId Id
+        {
+            get { return PacketId.EquipItemRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteInt32(InventorySlotIndex);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            InventorySlotIndex = reader.ReadInt32();
+        }
+    }
+
+    /// <summary>Der Client will das Item aus dem angegebenen Ausrüstungs-Slot ablegen (M5a) - landet auf der
+    /// ersten freien Inventarstelle, siehe World.TryUnequip.</summary>
+    public sealed class UnequipItemRequestPacket : IPacket
+    {
+        public EquipmentSlot EquipmentSlot;
+
+        public PacketId Id
+        {
+            get { return PacketId.UnequipItemRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteByte((byte)EquipmentSlot);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            EquipmentSlot = (EquipmentSlot)reader.ReadByte();
+        }
+    }
+
+    /// <summary>Der Client will das Item aus dem angegebenen Inventarplatz benutzen (M5a, z. B. Heiltrank) -
+    /// siehe World.TryUseConsumable.</summary>
+    public sealed class UseConsumableRequestPacket : IPacket
+    {
+        public int InventorySlotIndex;
+
+        public PacketId Id
+        {
+            get { return PacketId.UseConsumableRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteInt32(InventorySlotIndex);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            InventorySlotIndex = reader.ReadInt32();
+        }
+    }
 }

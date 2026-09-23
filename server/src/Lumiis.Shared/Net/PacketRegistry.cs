@@ -13,6 +13,10 @@ namespace Lumiis.Shared.Net
         /// "Dev-Tools") - sonst still verworfen, als gäbe es das Paket nicht.</summary>
         DebugSpawnMonsterRequest = 4,
 
+        EquipItemRequest = 5,
+        UnequipItemRequest = 6,
+        UseConsumableRequest = 7,
+
         // Server -> Client: ab 1000
         JoinAccepted = 1000,
         JoinRejected = 1001,
@@ -24,6 +28,8 @@ namespace Lumiis.Shared.Net
         EntityDied = 1007,
         AttackFailed = 1008,
         YangChanged = 1009,
+        InventorySync = 1010,
+        InventoryActionFailed = 1011,
     }
 
     /// <summary>Jede neue PacketId braucht hier eine Zeile (ein Test prüft das).</summary>
@@ -47,6 +53,11 @@ namespace Lumiis.Shared.Net
                 case PacketId.EntityDied: return new EntityDiedPacket();
                 case PacketId.AttackFailed: return new AttackFailedPacket();
                 case PacketId.YangChanged: return new YangChangedPacket();
+                case PacketId.EquipItemRequest: return new EquipItemRequestPacket();
+                case PacketId.UnequipItemRequest: return new UnequipItemRequestPacket();
+                case PacketId.UseConsumableRequest: return new UseConsumableRequestPacket();
+                case PacketId.InventorySync: return new InventorySyncPacket();
+                case PacketId.InventoryActionFailed: return new InventoryActionFailedPacket();
                 default: return null;
             }
         }

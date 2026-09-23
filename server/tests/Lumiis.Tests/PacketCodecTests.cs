@@ -168,6 +168,66 @@ namespace Lumiis.Tests
         }
 
         [Fact]
+        public void EquipItemRequest_RoundTrip()
+        {
+            var original = new EquipItemRequestPacket { InventorySlotIndex = 7 };
+            var decoded = Assert.IsType<EquipItemRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.InventorySlotIndex, decoded.InventorySlotIndex);
+        }
+
+        [Fact]
+        public void UnequipItemRequest_RoundTrip()
+        {
+            var original = new UnequipItemRequestPacket { EquipmentSlot = EquipmentSlot.Weapon };
+            var decoded = Assert.IsType<UnequipItemRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.EquipmentSlot, decoded.EquipmentSlot);
+        }
+
+        [Fact]
+        public void UseConsumableRequest_RoundTrip()
+        {
+            var original = new UseConsumableRequestPacket { InventorySlotIndex = 3 };
+            var decoded = Assert.IsType<UseConsumableRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.InventorySlotIndex, decoded.InventorySlotIndex);
+        }
+
+        [Fact]
+        public void InventorySync_RoundTrip()
+        {
+            var original = new InventorySyncPacket
+            {
+                Slots = new System.Collections.Generic.List<(int SlotIndex, int ItemId)> { (0, 1), (5, 8), (19, 3) },
+                EquippedArmorItemId = 4,
+                EquippedHelmetItemId = 0,
+                EquippedWeaponItemId = 1,
+                EquippedShieldItemId = 7
+            };
+            var decoded = Assert.IsType<InventorySyncPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.Slots, decoded.Slots);
+            Assert.Equal(original.EquippedArmorItemId, decoded.EquippedArmorItemId);
+            Assert.Equal(original.EquippedHelmetItemId, decoded.EquippedHelmetItemId);
+            Assert.Equal(original.EquippedWeaponItemId, decoded.EquippedWeaponItemId);
+            Assert.Equal(original.EquippedShieldItemId, decoded.EquippedShieldItemId);
+        }
+
+        [Fact]
+        public void InventorySync_RoundTrip_EmptySlots()
+        {
+            var original = new InventorySyncPacket { EquippedWeaponItemId = 1 };
+            var decoded = Assert.IsType<InventorySyncPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Empty(decoded.Slots);
+            Assert.Equal(1, decoded.EquippedWeaponItemId);
+        }
+
+        [Fact]
+        public void InventoryActionFailed_RoundTrip()
+        {
+            var original = new InventoryActionFailedPacket { Reason = InventoryActionFailedReason.InventoryFull };
+            var decoded = Assert.IsType<InventoryActionFailedPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.Reason, decoded.Reason);
+        }
+
+        [Fact]
         public void Decode_HonorsOffsetAndCount()
         {
             byte[] body = PacketCodec.Encode(new MoveToPacket { X = 1, Y = 2 });

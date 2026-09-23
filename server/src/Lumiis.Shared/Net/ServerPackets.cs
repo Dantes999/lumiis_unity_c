@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Lumiis.Shared.Net
 {
     public enum JoinRejectReason : byte
@@ -305,6 +307,89 @@ namespace Lumiis.Shared.Net
         public void Read(PacketReader reader)
         {
             NewTotal = reader.ReadInt64();
+        }
+    }
+
+    /// <summary>Voller Inventar-/Ausrüstungs-Zustand (M5a) - nur an den Empfänger, bei Join und nach jeder
+    /// Änderung neu verschickt (voller Resync statt Delta, das Inventar ist mit maximal 20 Plätzen klein
+    /// genug dafür). Slots enthält nur belegte Plätze (SlotIndex, ItemId) - ein fehlender SlotIndex bedeutet
+    /// leer, genau wie 0 bei den vier Equipped-Feldern.</summary>
+    public sealed class InventorySyncPacket : IPacket
+    {
+        public List<(int SlotIndex, int ItemId)> Slots = new List<(int SlotIndex, int ItemId)>();
+        public int EquippedArmorItemId;
+        public int EquippedHelmetItemId;
+        public int EquippedWeaponItemId;
+        public int EquippedShieldItemId;
+
+        public PacketId Id
+        {
+            get { return PacketId.InventorySync; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteByte((byte)Slots.Count);
+            foreach ((int slotIndex, int itemId) in Slots)
+            {
+                writer.WriteByte((byte)slotIndex);
+                writer.WriteInt32(itemId);
+            }
+            writer.WriteInt32(EquippedArmorItemId);
+            writer.WriteInt32(EquippedHelmetItemId);
+            writer.WriteInt32(EquippedWeaponItemId);
+            writer.WriteInt32(EquippedShieldItemId);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            int count = reader.ReadByte();
+            Slots = new List<(int SlotIndex, int ItemId)>(count);
+            for (int i = 0; i < count; i++)
+            {
+                int slotIndex = reader.ReadByte();
+                int itemId = reader.ReadInt32();
+                Slots.Add((slotIndex, itemId));
+            }
+            EquippedArmorItemId = reader.ReadInt32();
+            EquippedHelmetItemId = reader.ReadInt32();
+            EquippedWeaponItemId = reader.ReadInt32();
+            EquippedShieldItemId = reader.ReadInt32();
+        }
+    }
+
+    /// <summary>Grund, warum ein Inventar-/Ausrüstungs-Request abgelehnt wurde (M5a) - siehe
+    /// InventoryActionFailedPacket/World.TryEquip/TryUnequip/TryUseConsumable. InventoryFull wird zusätzlich
+    /// (als reine Info, kein harter Fehler) verschickt, wenn ein Monster-Drop mangels freiem Platz verloren
+    /// geht - siehe World.TryAttack.</summary>
+    public enum InventoryActionFailedReason : byte
+    {
+        InvalidSlot = 1,
+        EmptySlot = 2,
+        WrongItemType = 3,
+        NotConsumable = 4,
+        InventoryFull = 5,
+        TargetAtFullHp = 6
+    }
+
+    /// <summary>Ein Inventar-/Ausrüstungs-Request wurde abgelehnt - nur an den Anfragenden.</summary>
+    public sealed class InventoryActionFailedPacket : IPacket
+    {
+        public InventoryActionFailedReason Reason;
+
+        public PacketId Id
+        {
+            get { return PacketId.InventoryActionFailed; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteByte((byte)Reason);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            Reason = (InventoryActionFailedReason)reader.ReadByte();
         }
     }
 }
