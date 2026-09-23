@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using LiteNetLib;
 using Lumiis.Data;
+using Lumiis.Data.Classes;
 using Lumiis.Data.Maps;
 using Lumiis.Data.Mobs;
 using Lumiis.Server;
@@ -41,7 +42,7 @@ namespace Lumiis.Tests.Integration
             public TokenService TokenService { get; }
 
             public ServerFixture(Func<long>? nowMs = null, Func<long>? tokenNowUnixSeconds = null, CollisionMap? collisionMap = null,
-                MobCatalog? mobCatalog = null, SpawnCatalog? spawnCatalog = null)
+                MobCatalog? mobCatalog = null, SpawnCatalog? spawnCatalog = null, ClassCatalog? classCatalog = null)
             {
                 DbContextOptions<LumiisDbContext> options = new DbContextOptionsBuilder<LumiisDbContext>()
                     .UseInMemoryDatabase("gameserver-test-" + Guid.NewGuid())
@@ -55,7 +56,7 @@ namespace Lumiis.Tests.Integration
                     MaxPlayers = 10,
                     RejectGraceMs = 100 // echte Uhr, kleiner Wert - siehe M1-fixes.md Punkt 2
                 };
-                Server = new GameServer(config, new NullLogger(), TokenService, _dbFactory, nowMs, collisionMap, mobCatalog, spawnCatalog);
+                Server = new GameServer(config, new NullLogger(), TokenService, _dbFactory, nowMs, collisionMap, mobCatalog, spawnCatalog, classCatalog);
             }
 
             public (int CharacterId, string Token) CreateCharacter(string name, int? positionX = null, int? positionY = null, int? accountId = null)
@@ -1100,6 +1101,85 @@ namespace Lumiis.Tests.Integration
                 Assert.True(Pump(
                     () => client.Received.OfType<EntityMovePacket>().Any(m => m.EntityId == monsterSpawn.EntityId),
                     server, client));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        // ---- M4a: Kampf ----
+
+        [Fact]
+        public void AttackerKillsMonster_ObserverSeesDamageAndDespawn_YangOnlyToAttacker()
+        {
+            // Kurzer Cooldown und niedriges MobHp (synthetisch, nicht die echten Daten aus data/) - haelt den
+            // Test schnell, erzwingt aber trotzdem mehrere Treffer (40 HP / 15 Schaden pro Treffer = 3 Treffer).
+            MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
+              ""mobs"": [
+                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 40, ""attack"": 5, ""defense"": 0, ""yangMin"": 5, ""yangMax"": 15 }
+              ]
+            }");
+            CollisionMap openMap = BuildOpenCollisionMap();
+            SpawnCatalog spawnCatalog = SpawnCatalog.LoadFromJson(@"{
+              ""spawns"": [ { ""id"": 1, ""mobId"": 1, ""positionX"": 50000, ""positionY"": 50000, ""respawnSeconds"": 30 } ]
+            }", mobCatalog, openMap);
+            ClassCatalog classCatalog = ClassCatalog.LoadFromJson(@"{
+              ""classes"": [ { ""name"": ""Krieger"", ""maxHp"": 100, ""attack"": 15, ""defense"": 0, ""meleeRangeWire"": 150, ""attackCooldownMs"": 50 } ]
+            }");
+
+            var fixture = new ServerFixture(collisionMap: openMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog, classCatalog: classCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var attacker = new TestClient();
+                using var observer = new TestClient();
+                attacker.Connect(server.ListenPort);
+                observer.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, attacker, observer));
+
+                // Angreifer direkt auf dem Spawn-Punkt (innerhalb Nahkampfreichweite), Beobachter 500 Einheiten
+                // entfernt - außerhalb der Nahkampfreichweite (150), aber innerhalb des AOI-Radius (1500).
+                (int attackerCharId, string attackerToken) = fixture.CreateCharacter("Attacker", positionX: 50000, positionY: 50000);
+                (int observerCharId, string observerToken) = fixture.CreateCharacter("Observer", positionX: 50500, positionY: 50000);
+                attacker.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = attackerToken, CharacterId = attackerCharId });
+                observer.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = observerToken, CharacterId = observerCharId });
+                Assert.True(Pump(() => attacker.Received.OfType<JoinAcceptedPacket>().Any() && observer.Received.OfType<JoinAcceptedPacket>().Any(),
+                    server, attacker, observer));
+
+                Assert.True(Pump(() => attacker.Received.OfType<EntitySpawnPacket>().Any(s => s.Kind == EntityKind.Monster), server, attacker, observer));
+                int monsterId = attacker.Received.OfType<EntitySpawnPacket>().First(s => s.Kind == EntityKind.Monster).EntityId;
+
+                // Wiederholt angreifen (Cooldown macht einzelne Versuche fehlschlagen, das ist erwartet und
+                // wird hier nicht geprüft) bis das Monster stirbt.
+                DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+                bool monsterDied = false;
+                while (DateTime.UtcNow < deadline && !monsterDied)
+                {
+                    attacker.Send(new AttackRequestPacket { TargetEntityId = monsterId });
+                    server.Update();
+                    attacker.Poll();
+                    observer.Poll();
+                    monsterDied = attacker.Received.OfType<EntityDiedPacket>().Any(d => d.EntityId == monsterId);
+                    Thread.Sleep(15);
+                }
+                Assert.True(monsterDied);
+
+                // Schaden kam bei beiden an (Angreifer UND Beobachter, siehe AOI), mehrfach (3 Treffer erwartet).
+                Assert.True(attacker.Received.OfType<EntityDamagedPacket>().Count(d => d.TargetEntityId == monsterId) >= 3);
+                Assert.Contains(observer.Received.OfType<EntityDamagedPacket>(), d => d.TargetEntityId == monsterId);
+
+                // Tod dann Despawn kamen bei beiden an.
+                Assert.Contains(observer.Received.OfType<EntityDiedPacket>(), d => d.EntityId == monsterId);
+                Assert.True(Pump(() => attacker.Received.OfType<EntityDespawnPacket>().Any(d => d.EntityId == monsterId)
+                    && observer.Received.OfType<EntityDespawnPacket>().Any(d => d.EntityId == monsterId), server, attacker, observer));
+
+                // Yang nur beim Angreifer, im erwarteten Bereich - nur der Todesschlag zahlt aus (yangMin..yangMax).
+                Assert.True(attacker.Received.OfType<YangChangedPacket>().Any());
+                long lastYang = attacker.Received.OfType<YangChangedPacket>().Last().NewTotal;
+                Assert.InRange(lastYang, 5, 15);
+                Assert.Empty(observer.Received.OfType<YangChangedPacket>());
             }
             finally
             {
