@@ -116,6 +116,50 @@ namespace Lumiis.Tests
         }
 
         [Fact]
+        public void AttackRequest_RoundTrip()
+        {
+            var original = new AttackRequestPacket { TargetEntityId = 9 };
+            var decoded = Assert.IsType<AttackRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.TargetEntityId, decoded.TargetEntityId);
+        }
+
+        [Fact]
+        public void EntityDamaged_RoundTrip()
+        {
+            var original = new EntityDamagedPacket { AttackerEntityId = 1, TargetEntityId = 2, Damage = 12, TargetHpAfter = 18, TargetMaxHp = 30 };
+            var decoded = Assert.IsType<EntityDamagedPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.AttackerEntityId, decoded.AttackerEntityId);
+            Assert.Equal(original.TargetEntityId, decoded.TargetEntityId);
+            Assert.Equal(original.Damage, decoded.Damage);
+            Assert.Equal(original.TargetHpAfter, decoded.TargetHpAfter);
+            Assert.Equal(original.TargetMaxHp, decoded.TargetMaxHp);
+        }
+
+        [Fact]
+        public void EntityDied_RoundTrip()
+        {
+            var original = new EntityDiedPacket { EntityId = 5 };
+            var decoded = Assert.IsType<EntityDiedPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.EntityId, decoded.EntityId);
+        }
+
+        [Fact]
+        public void AttackFailed_RoundTrip()
+        {
+            var original = new AttackFailedPacket { Reason = AttackFailedReason.OutOfRange };
+            var decoded = Assert.IsType<AttackFailedPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.Reason, decoded.Reason);
+        }
+
+        [Fact]
+        public void YangChanged_RoundTrip()
+        {
+            var original = new YangChangedPacket { NewTotal = 123456789L };
+            var decoded = Assert.IsType<YangChangedPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.NewTotal, decoded.NewTotal);
+        }
+
+        [Fact]
         public void Decode_HonorsOffsetAndCount()
         {
             byte[] body = PacketCodec.Encode(new MoveToPacket { X = 1, Y = 2 });

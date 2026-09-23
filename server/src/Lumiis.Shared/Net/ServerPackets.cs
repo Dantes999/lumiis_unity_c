@@ -198,4 +198,113 @@ namespace Lumiis.Shared.Net
             Y = reader.ReadInt32();
         }
     }
+
+    /// <summary>Grund, warum ein AttackRequestPacket abgelehnt wurde - siehe AttackFailedPacket/World.TryAttack.</summary>
+    public enum AttackFailedReason : byte
+    {
+        TargetNotFound = 1,
+        TargetAlreadyDead = 2,
+        OutOfRange = 3,
+        OnCooldown = 4,
+        TargetIsPlayer = 5
+    }
+
+    /// <summary>Eine Entity wurde getroffen (M4a) - an alle AOI-Beobachter des Ziels (inklusive Angreifer,
+    /// siehe GameServer.SendToVisible).</summary>
+    public sealed class EntityDamagedPacket : IPacket
+    {
+        public int AttackerEntityId;
+        public int TargetEntityId;
+        public int Damage;
+        public int TargetHpAfter;
+        public int TargetMaxHp;
+
+        public PacketId Id
+        {
+            get { return PacketId.EntityDamaged; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteInt32(AttackerEntityId);
+            writer.WriteInt32(TargetEntityId);
+            writer.WriteInt32(Damage);
+            writer.WriteInt32(TargetHpAfter);
+            writer.WriteInt32(TargetMaxHp);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            AttackerEntityId = reader.ReadInt32();
+            TargetEntityId = reader.ReadInt32();
+            Damage = reader.ReadInt32();
+            TargetHpAfter = reader.ReadInt32();
+            TargetMaxHp = reader.ReadInt32();
+        }
+    }
+
+    /// <summary>Eine Entity ist gestorben (M4a) - an alle AOI-Beobachter. Bei Monstern folgt danach sofort
+    /// ein EntityDespawnPacket (kein Respawn in M4a), bei Spielern nicht (siehe World-Klassenkommentar zum
+    /// Spielertod - die Entity bleibt in World, nur CurrentHp bleibt 0 bis zum Respawn).</summary>
+    public sealed class EntityDiedPacket : IPacket
+    {
+        public int EntityId;
+
+        public PacketId Id
+        {
+            get { return PacketId.EntityDied; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteInt32(EntityId);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            EntityId = reader.ReadInt32();
+        }
+    }
+
+    /// <summary>Ein AttackRequestPacket wurde abgelehnt - nur an den Angreifer.</summary>
+    public sealed class AttackFailedPacket : IPacket
+    {
+        public AttackFailedReason Reason;
+
+        public PacketId Id
+        {
+            get { return PacketId.AttackFailed; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteByte((byte)Reason);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            Reason = (AttackFailedReason)reader.ReadByte();
+        }
+    }
+
+    /// <summary>Der aktuelle Yang-Gesamtbetrag hat sich geändert (M4a) - nur an den Empfänger.</summary>
+    public sealed class YangChangedPacket : IPacket
+    {
+        public long NewTotal;
+
+        public PacketId Id
+        {
+            get { return PacketId.YangChanged; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteInt64(NewTotal);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            NewTotal = reader.ReadInt64();
+        }
+    }
 }

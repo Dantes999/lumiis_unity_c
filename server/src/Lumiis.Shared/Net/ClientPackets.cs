@@ -52,4 +52,26 @@ namespace Lumiis.Shared.Net
             Y = reader.ReadInt32();
         }
     }
+
+    /// <summary>Der Client greift eine sichtbare Entity an (M4a). Der Server prüft alles serverautoritativ
+    /// erneut (Existenz, Leben, PvP, Cooldown, Reichweite) - siehe World.TryAttack.</summary>
+    public sealed class AttackRequestPacket : IPacket
+    {
+        public int TargetEntityId;
+
+        public PacketId Id
+        {
+            get { return PacketId.AttackRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteInt32(TargetEntityId);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            TargetEntityId = reader.ReadInt32();
+        }
+    }
 }

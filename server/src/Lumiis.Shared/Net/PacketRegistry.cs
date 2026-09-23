@@ -7,6 +7,7 @@ namespace Lumiis.Shared.Net
         // Client -> Server: 1..999
         JoinRequest = 1,
         MoveTo = 2,
+        AttackRequest = 3,
 
         // Server -> Client: ab 1000
         JoinAccepted = 1000,
@@ -15,6 +16,10 @@ namespace Lumiis.Shared.Net
         EntityDespawn = 1003,
         EntityMove = 1004,
         EntityStop = 1005,
+        EntityDamaged = 1006,
+        EntityDied = 1007,
+        AttackFailed = 1008,
+        YangChanged = 1009,
     }
 
     /// <summary>Jede neue PacketId braucht hier eine Zeile (ein Test prüft das).</summary>
@@ -32,6 +37,11 @@ namespace Lumiis.Shared.Net
                 case PacketId.EntityDespawn: return new EntityDespawnPacket();
                 case PacketId.EntityMove: return new EntityMovePacket();
                 case PacketId.EntityStop: return new EntityStopPacket();
+                case PacketId.AttackRequest: return new AttackRequestPacket();
+                case PacketId.EntityDamaged: return new EntityDamagedPacket();
+                case PacketId.EntityDied: return new EntityDiedPacket();
+                case PacketId.AttackFailed: return new AttackFailedPacket();
+                case PacketId.YangChanged: return new YangChangedPacket();
                 default: return null;
             }
         }
