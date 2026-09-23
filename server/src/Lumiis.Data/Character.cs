@@ -22,5 +22,8 @@ public sealed class Character
     public int? PositionX { get; set; }
     public int? PositionY { get; set; }
 
+    /// <summary>Kampf-Ertrag (M4a) - Default 0 bei Erstellung, siehe AuthEndpoints.CreateCharacter.</summary>
+    public long Yang { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
 }

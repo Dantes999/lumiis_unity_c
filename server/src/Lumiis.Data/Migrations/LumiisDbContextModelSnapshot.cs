@@ -106,6 +106,9 @@ namespace Lumiis.Data.Migrations
                     b.Property<int>("WeaponId")
                         .HasColumnType("integer");
 
+                    b.Property<long>("Yang")
+                        .HasColumnType("bigint");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AccountId");
