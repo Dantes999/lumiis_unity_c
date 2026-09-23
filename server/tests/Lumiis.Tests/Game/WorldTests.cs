@@ -425,5 +425,51 @@ namespace Lumiis.Tests.Game
             Assert.Empty(startedWandering);
             Assert.False(monster.IsMoving);
         }
+
+        // ---- Dev-Tools: Debug-Spawn (siehe docs/tasks/dev-tools-debug-spawn.md) ----
+
+        [Fact]
+        public void SpawnMonster_WithSpawnPointId_SetsEntitySpawnPointId()
+        {
+            var world = new World(maxPlayers: 10);
+            Entity monster = world.SpawnMonster(mobId: 1, "Wildhund", x: 50000, y: 50000, speedWire: 700,
+                wanderRadiusWire: 500, wanderIntervalMinMs: 1000, wanderIntervalMaxMs: 1000, nowMs: 0, spawnPointId: 6);
+
+            Assert.Equal(6, monster.SpawnPointId);
+        }
+
+        [Fact]
+        public void SpawnMonster_WithoutSpawnPointId_LeavesEntitySpawnPointIdNull()
+        {
+            // Dev-Tools-Debug-Spawn (kein SpawnPoint aus spawns.json) - Default, wenn spawnPointId nicht
+            // explizit übergeben wird (siehe GameServer.HandleDebugSpawnMonster).
+            var world = new World(maxPlayers: 10);
+            Entity monster = world.SpawnMonster(mobId: 1, "Wildhund", x: 50000, y: 50000, speedWire: 700,
+                wanderRadiusWire: 500, wanderIntervalMinMs: 1000, wanderIntervalMaxMs: 1000, nowMs: 0);
+
+            Assert.Null(monster.SpawnPointId);
+        }
+
+        [Fact]
+        public void FindNearbyWalkablePoint_OpenMap_ReturnsPointWithinOffsetRange()
+        {
+            var world = new World(maxPlayers: 10, collisionMap: null, random: new Random(1));
+
+            (int x, int y) = world.FindNearbyWalkablePoint(50000, 50000, offsetMin: 100, offsetMax: 300);
+
+            double distance = Math.Sqrt(Math.Pow(x - 50000, 2) + Math.Pow(y - 50000, 2));
+            Assert.InRange(distance, 90, 310); // etwas Toleranz für Rundung
+        }
+
+        [Fact]
+        public void FindNearbyWalkablePoint_EverythingBlocked_FallsBackToAnchor()
+        {
+            var world = new World(maxPlayers: 10, BuildFullyBlockedCollisionMap(), random: new Random(1));
+
+            (int x, int y) = world.FindNearbyWalkablePoint(50000, 50000, offsetMin: 100, offsetMax: 300);
+
+            Assert.Equal(50000, x);
+            Assert.Equal(50000, y);
+        }
     }
 }

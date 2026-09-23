@@ -42,7 +42,7 @@ namespace Lumiis.Tests.Integration
             public TokenService TokenService { get; }
 
             public ServerFixture(Func<long>? nowMs = null, Func<long>? tokenNowUnixSeconds = null, CollisionMap? collisionMap = null,
-                MobCatalog? mobCatalog = null, SpawnCatalog? spawnCatalog = null, ClassCatalog? classCatalog = null)
+                MobCatalog? mobCatalog = null, SpawnCatalog? spawnCatalog = null, ClassCatalog? classCatalog = null, bool allowDebugCommands = false)
             {
                 DbContextOptions<LumiisDbContext> options = new DbContextOptionsBuilder<LumiisDbContext>()
                     .UseInMemoryDatabase("gameserver-test-" + Guid.NewGuid())
@@ -54,7 +54,8 @@ namespace Lumiis.Tests.Integration
                 {
                     Port = 0, // freier Port, vom OS vergeben
                     MaxPlayers = 10,
-                    RejectGraceMs = 100 // echte Uhr, kleiner Wert - siehe M1-fixes.md Punkt 2
+                    RejectGraceMs = 100, // echte Uhr, kleiner Wert - siehe M1-fixes.md Punkt 2
+                    AllowDebugCommands = allowDebugCommands
                 };
                 Server = new GameServer(config, new NullLogger(), TokenService, _dbFactory, nowMs, collisionMap, mobCatalog, spawnCatalog, classCatalog);
             }
@@ -1180,6 +1181,90 @@ namespace Lumiis.Tests.Integration
                 long lastYang = attacker.Received.OfType<YangChangedPacket>().Last().NewTotal;
                 Assert.InRange(lastYang, 5, 15);
                 Assert.Empty(observer.Received.OfType<YangChangedPacket>());
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        // ---- Dev-Tools: Debug-Spawn (siehe docs/tasks/dev-tools-debug-spawn.md) ----
+
+        private static MobCatalog BuildSingleWildhundMobCatalog()
+        {
+            return MobCatalog.LoadFromJson(@"{
+              ""mobs"": [
+                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 30, ""attack"": 5, ""defense"": 0, ""yangMin"": 5, ""yangMax"": 15 }
+              ]
+            }");
+        }
+
+        [Fact]
+        public void DebugSpawnMonsterRequest_WithoutAllowDebugCommands_HasNoEffect()
+        {
+            MobCatalog mobCatalog = BuildSingleWildhundMobCatalog();
+            CollisionMap openMap = BuildOpenCollisionMap();
+
+            var fixture = new ServerFixture(collisionMap: openMap, mobCatalog: mobCatalog, allowDebugCommands: false);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice", positionX: 50000, positionY: 50000);
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+
+                client.Send(new DebugSpawnMonsterRequestPacket { MobId = 1 });
+                PumpForDuration(TimeSpan.FromMilliseconds(500), server, client);
+
+                Assert.DoesNotContain(client.Received, p => p is EntitySpawnPacket spawn && spawn.Kind == EntityKind.Monster);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void DebugSpawnMonsterRequest_WithAllowDebugCommands_SpawnsAttackableMonsterNearSender()
+        {
+            MobCatalog mobCatalog = BuildSingleWildhundMobCatalog();
+            CollisionMap openMap = BuildOpenCollisionMap();
+
+            var fixture = new ServerFixture(collisionMap: openMap, mobCatalog: mobCatalog, allowDebugCommands: true);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice", positionX: 50000, positionY: 50000);
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+
+                client.Send(new DebugSpawnMonsterRequestPacket { MobId = 1 });
+                Assert.True(Pump(() => client.Received.OfType<EntitySpawnPacket>().Any(s => s.Kind == EntityKind.Monster), server, client));
+
+                EntitySpawnPacket monsterSpawn = client.Received.OfType<EntitySpawnPacket>().First(s => s.Kind == EntityKind.Monster);
+                long dx = monsterSpawn.X - 50000;
+                long dy = monsterSpawn.Y - 50000;
+                double distance = Math.Sqrt(dx * dx + dy * dy);
+                Assert.InRange(distance, 0, 350); // 100-300 Wire-Einheiten Versatz, etwas Toleranz fuer Rundung
+
+                // Normal angreifbar - bestehende TryAttack-Logik unveraendert, kein Sonderfall fuer
+                // Debug-Monster. EntityDamaged (falls zufaellig in Reichweite) oder AttackFailed (sonst,
+                // z. B. OutOfRange) belegen beide, dass der normale Kampf-Pfad greift statt stillzuschweigen.
+                client.Send(new AttackRequestPacket { TargetEntityId = monsterSpawn.EntityId });
+                Assert.True(Pump(() =>
+                    client.Received.OfType<EntityDamagedPacket>().Any(d => d.TargetEntityId == monsterSpawn.EntityId) ||
+                    client.Received.OfType<AttackFailedPacket>().Any(),
+                    server, client));
             }
             finally
             {

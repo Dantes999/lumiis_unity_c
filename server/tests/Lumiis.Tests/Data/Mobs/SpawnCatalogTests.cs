@@ -1,7 +1,9 @@
 using System;
+using System.IO;
 using System.Text;
 using Lumiis.Data.Maps;
 using Lumiis.Data.Mobs;
+using Lumiis.Shared;
 using Xunit;
 
 namespace Lumiis.Tests.Data.Mobs
@@ -98,6 +100,38 @@ namespace Lumiis.Tests.Data.Mobs
   ]
 }";
             Assert.Throws<SpawnCatalogException>(() => SpawnCatalog.LoadFromJson(json, mobCatalog, collisionMap));
+        }
+
+        // ---- Dev-Tools: erweiterte, echte spawns.json (siehe docs/tasks/dev-tools-debug-spawn.md) ----
+
+        /// <summary>Sucht data/ ausgehend vom tatsächlichen Testassembly-Verzeichnis (AppContext.BaseDirectory) -
+        /// läuft die Verzeichnisse bis zum Repo-Root hoch, analog zu GameServerIntegrationTests.ResolveVillageCollisionMapPath.</summary>
+        private static string ResolveDataDir()
+        {
+            DirectoryInfo? dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while (dir != null)
+            {
+                string candidate = Path.Combine(dir.FullName, "data");
+                if (File.Exists(Path.Combine(candidate, "mobs.json"))) return candidate;
+                dir = dir.Parent;
+            }
+            throw new FileNotFoundException("data/mobs.json nicht gefunden (ausgehend von " + AppContext.BaseDirectory + ").");
+        }
+
+        [Fact]
+        public void LoadFromFile_RealVillageSpawns_LoadsWithoutErrorIncludingDevToolsSpawnPoints()
+        {
+            string dataDir = ResolveDataDir();
+            CollisionMap collisionMap = CollisionMap.LoadFromFile(
+                Path.Combine(dataDir, "maps", "village", "collision.bin"), GameConstants.MapWidth / 100, GameConstants.MapHeight / 100);
+            MobCatalog mobCatalog = MobCatalog.LoadFromFile(Path.Combine(dataDir, "mobs.json"));
+
+            SpawnCatalog catalog = SpawnCatalog.LoadFromFile(
+                Path.Combine(dataDir, "maps", "village", "spawns.json"), mobCatalog, collisionMap);
+
+            Assert.True(catalog.Spawns.Count >= 9); // 5 urspruengliche + 4 neue (Dev-Tools Abschnitt 1)
+            Assert.Contains(catalog.Spawns, s => s.Id == 6);
+            Assert.Contains(catalog.Spawns, s => s.Id == 9);
         }
     }
 }
