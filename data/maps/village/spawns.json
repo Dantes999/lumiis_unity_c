@@ -8,6 +8,12 @@
     { "id": 6, "mobId": 1, "positionX": 49700, "positionY": 50300, "respawnSeconds": 30 },
     { "id": 7, "mobId": 2, "positionX": 50300, "positionY": 49700, "respawnSeconds": 60 },
     { "id": 8, "mobId": 1, "positionX": 49650, "positionY": 49650, "respawnSeconds": 30 },
-    { "id": 9, "mobId": 2, "positionX": 50350, "positionY": 50350, "respawnSeconds": 60 }
+    { "id": 9, "mobId": 2, "positionX": 50350, "positionY": 50350, "respawnSeconds": 60 },
+    { "id": 10, "mobId": 1, "positionX": 50200, "positionY": 50000, "respawnSeconds": 30 },
+    { "id": 11, "mobId": 2, "positionX": 49800, "positionY": 50000, "respawnSeconds": 60 },
+    { "id": 12, "mobId": 1, "positionX": 50000, "positionY": 50200, "respawnSeconds": 30 },
+    { "id": 13, "mobId": 2, "positionX": 50000, "positionY": 49800, "respawnSeconds": 60 },
+    { "id": 14, "mobId": 1, "positionX": 50280, "positionY": 49720, "respawnSeconds": 30 },
+    { "id": 15, "mobId": 2, "positionX": 49720, "positionY": 50280, "respawnSeconds": 60 }
   ]
 }
