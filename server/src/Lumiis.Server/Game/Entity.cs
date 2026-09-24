@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Lumiis.Shared;
 using Lumiis.Shared.Net;
 
@@ -139,6 +140,11 @@ public sealed class Entity
     public int YangMin { get; }
     public int YangMax { get; }
 
+    /// <summary>M5a: mögliche Drops beim Tod dieses Monsters (ItemId, ChancePercent), aus dem Mob-Typ (siehe
+    /// MobCatalog.MobDrop) - bewusst als rohe Tupel-Liste statt eines Lumiis.Data-Typs, damit Entity frei von
+    /// Lumiis.Data-Referenzen bleibt (wie WanderRadiusWire usw.). Leer bei Kind=Player.</summary>
+    public IReadOnlyList<(int ItemId, int ChancePercent)> Drops { get; }
+
     /// <summary>Laufender Yang-Gesamtbetrag - nur bei Kind=Player relevant, beim Join aus Character.Yang
     /// geladen (siehe GameServer.CompleteJoin), von World.TryAttack bei Monstertod erhöht.</summary>
     public long Yang { get; set; }
@@ -158,7 +164,7 @@ public sealed class Entity
     private Entity(int id, EntityKind kind, int? characterId, int mobId, int? spawnPointId, int respawnSeconds, string name, int x, int y, int movementSpeed,
         int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs,
         int maxHp, int attack, int defense, int meleeRangeWire, int attackCooldownMs, int yangMin, int yangMax,
-        bool aggressive, int aggroRangeWire, int leashRangeWire)
+        bool aggressive, int aggroRangeWire, int leashRangeWire, IReadOnlyList<(int ItemId, int ChancePercent)> drops)
     {
         Id = id;
         Kind = kind;
@@ -188,6 +194,7 @@ public sealed class Entity
         Aggressive = aggressive;
         AggroRangeWire = aggroRangeWire;
         LeashRangeWire = leashRangeWire;
+        Drops = drops;
     }
 
     public Entity(int id, int characterId, string name, int x, int y,
@@ -196,7 +203,7 @@ public sealed class Entity
         : this(id, EntityKind.Player, characterId, mobId: 0, spawnPointId: null, respawnSeconds: 0, name, x, y, movementSpeed: GameConstants.PlayerSpeed,
             wanderRadiusWire: 0, wanderIntervalMinMs: 0, wanderIntervalMaxMs: 0,
             maxHp, attack, defense, meleeRangeWire, attackCooldownMs, yangMin: 0, yangMax: 0,
-            aggressive: false, aggroRangeWire: 0, leashRangeWire: 0)
+            aggressive: false, aggroRangeWire: 0, leashRangeWire: 0, drops: System.Array.Empty<(int, int)>())
     {
     }
 
@@ -205,17 +212,19 @@ public sealed class Entity
     /// hier immer die echte SpawnPoint.Id (siehe World.SpawnMonster/GameServer-Konstruktor).
     /// respawnSeconds: nur bei gesetzter spawnPointId aussagekräftig (siehe RespawnSeconds-Kommentar).
     /// meleeRangeWire/attackCooldownMs/aggressive/aggroRangeWire/leashRangeWire: aus dem Mob-Typ (M4c, siehe
-    /// MobCatalog) - Defaults nur für bestehende Tests ohne Kampf-/Aggro-Bezug.</summary>
+    /// MobCatalog) - Defaults nur für bestehende Tests ohne Kampf-/Aggro-Bezug. drops: mögliche Drops beim
+    /// Tod (M5a, siehe MobCatalog.MobDrop) - Default leer.</summary>
     public static Entity CreateMonster(int id, int mobId, int? spawnPointId, string name, int x, int y, int speedWire,
         int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs,
         int maxHp = DefaultMaxHp, int attack = DefaultAttack, int defense = DefaultDefense, int yangMin = 0, int yangMax = 0,
         int respawnSeconds = 0, int meleeRangeWire = DefaultMeleeRangeWire, int attackCooldownMs = DefaultAttackCooldownMs,
-        bool aggressive = false, int aggroRangeWire = 0, int leashRangeWire = 0)
+        bool aggressive = false, int aggroRangeWire = 0, int leashRangeWire = 0,
+        IReadOnlyList<(int ItemId, int ChancePercent)>? drops = null)
     {
         return new Entity(id, EntityKind.Monster, characterId: null, mobId, spawnPointId, respawnSeconds, name, x, y, movementSpeed: speedWire,
             wanderRadiusWire, wanderIntervalMinMs, wanderIntervalMaxMs,
             maxHp, attack, defense, meleeRangeWire, attackCooldownMs, yangMin, yangMax,
-            aggressive, aggroRangeWire, leashRangeWire);
+            aggressive, aggroRangeWire, leashRangeWire, drops ?? System.Array.Empty<(int, int)>());
     }
 
     public void MoveTo(int targetX, int targetY, int speed)

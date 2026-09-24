@@ -22,6 +22,15 @@ internal sealed class MobEntryDto
     public bool Aggressive { get; set; }
     public int AggroRangeWire { get; set; }
     public int LeashRangeWire { get; set; }
+
+    /// <summary>M5a: Drops bei Monstertod, siehe MobDrop.</summary>
+    public List<MobDropDto> Drops { get; set; } = new();
+}
+
+internal sealed class MobDropDto
+{
+    public int ItemId { get; set; }
+    public int ChancePercent { get; set; }
 }
 
 internal sealed class MobCatalogDto

@@ -136,7 +136,8 @@ public sealed class GameServer : INetEventListener
                     mobDef.MaxHp, mobDef.Attack, mobDef.Defense, mobDef.YangMin, mobDef.YangMax,
                     spawnPointId: spawn.Id, respawnSeconds: spawn.RespawnSeconds,
                     meleeRangeWire: mobDef.MeleeRangeWire, attackCooldownMs: mobDef.AttackCooldownMs,
-                    aggressive: mobDef.Aggressive, aggroRangeWire: mobDef.AggroRangeWire, leashRangeWire: mobDef.LeashRangeWire);
+                    aggressive: mobDef.Aggressive, aggroRangeWire: mobDef.AggroRangeWire, leashRangeWire: mobDef.LeashRangeWire,
+                    drops: mobDef.Drops.Select(d => (d.ItemId, d.ChancePercent)).ToList());
             }
         }
 
@@ -848,9 +849,44 @@ public sealed class GameServer : INetEventListener
                 _yangSaveChannel.Writer.TryWrite(new YangSaveRequest(characterId, attackerEntity.Yang));
         }
 
+        // M5a: Drops (siehe World.TryAttack) - bei Erfolg InventorySyncPacket an den Angreifer selbst (das
+        // Inventar hat sich geändert), bei vollem Inventar zusätzlich/stattdessen InventoryActionFailedPacket
+        // NUR als Info (kein harter Fehler, der Kill oben bleibt gültig). Persistenz (siehe docs/tasks/
+        // M5a-items-equipment.md Abschnitt 0b, eigener InventorySaveRequest-Channel) folgt in Abschnitt 6.
+        if (result.DroppedItemIds.Count > 0 && _world.TryGet(attackerId, out Entity? looter))
+            conn.Peer.SendPacket(BuildInventorySyncPacket(looter!));
+
+        if (result.ItemLostToFullInventory)
+            conn.Peer.SendPacket(new InventoryActionFailedPacket { Reason = InventoryActionFailedReason.InventoryFull });
+
         _logger.Info($"Entity {attackerId} trifft Entity {attack.TargetEntityId} ({result.Damage} Schaden)" +
             (result.TargetDied ? ", Ziel gestorben" : "") +
-            (result.YangAwarded > 0 ? $", +{result.YangAwarded} Yang" : ""));
+            (result.YangAwarded > 0 ? $", +{result.YangAwarded} Yang" : "") +
+            (result.DroppedItemIds.Count > 0 ? $", Drop(s): {string.Join(",", result.DroppedItemIds)}" : "") +
+            (result.ItemLostToFullInventory ? ", Drop verloren (Inventar voll)" : ""));
+    }
+
+    /// <summary>Baut ein volles InventorySyncPacket aus dem aktuellen Entity-Zustand (M5a) - Resync, kein
+    /// Delta (siehe docs/tasks/M5a-items-equipment.md Abschnitt 3), wiederverwendet von HandleAttackRequest
+    /// (Drops) sowie den Equip/Unequip/UseConsumable-Handlern (Abschnitt 6).</summary>
+    private static InventorySyncPacket BuildInventorySyncPacket(Entity entity)
+    {
+        var packet = new InventorySyncPacket
+        {
+            EquippedArmorItemId = entity.EquippedArmorItemId,
+            EquippedHelmetItemId = entity.EquippedHelmetItemId,
+            EquippedWeaponItemId = entity.EquippedWeaponItemId,
+            EquippedShieldItemId = entity.EquippedShieldItemId
+        };
+
+        for (int slotIndex = 0; slotIndex < entity.Inventory.Length; slotIndex++)
+        {
+            int itemId = entity.Inventory[slotIndex];
+            if (itemId != 0)
+                packet.Slots.Add((slotIndex, itemId));
+        }
+
+        return packet;
     }
 
     /// <summary>Dev-Tools (siehe CLAUDE.md "Dev-Tools"): nur wirksam, wenn der Server mit
@@ -885,7 +921,8 @@ public sealed class GameServer : INetEventListener
         (int x, int y) = _world.FindNearbyWalkablePoint(sender!.IntX, sender.IntY, offsetMin: 100, offsetMax: 300);
         _world.SpawnMonster(debugSpawn.MobId, mobDef.Name, x, y, mobDef.SpeedWire,
             mobDef.WanderRadiusWire, mobDef.WanderIntervalMinMs, mobDef.WanderIntervalMaxMs, _nowMs(),
-            mobDef.MaxHp, mobDef.Attack, mobDef.Defense, mobDef.YangMin, mobDef.YangMax); // spawnPointId bewusst weggelassen (Default null).
+            mobDef.MaxHp, mobDef.Attack, mobDef.Defense, mobDef.YangMin, mobDef.YangMax, // spawnPointId bewusst weggelassen (Default null).
+            drops: mobDef.Drops.Select(d => (d.ItemId, d.ChancePercent)).ToList());
 
         _logger.Info($"Dev-Tools: {mobDef.Name} bei ({x},{y}) gespawnt (angefordert von Entity {senderId})");
     }

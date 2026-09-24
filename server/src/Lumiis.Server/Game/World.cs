@@ -21,7 +21,8 @@ public sealed class World
     private readonly record struct PendingMonsterRespawn(int MobId, string Name, int PositionX, int PositionY, int SpeedWire,
         int WanderRadiusWire, int WanderIntervalMinMs, int WanderIntervalMaxMs,
         int MaxHp, int Attack, int Defense, int YangMin, int YangMax, int RespawnSeconds,
-        int MeleeRangeWire, int AttackCooldownMs, bool Aggressive, int AggroRangeWire, int LeashRangeWire, long DueAtMs);
+        int MeleeRangeWire, int AttackCooldownMs, bool Aggressive, int AggroRangeWire, int LeashRangeWire,
+        IReadOnlyList<(int ItemId, int ChancePercent)> Drops, long DueAtMs);
 
     private readonly Dictionary<int, Entity> _entities = new();
     private readonly Dictionary<int, int> _entityIdByCharacterId = new();
@@ -105,13 +106,15 @@ public sealed class World
     /// gebunden" (Dev-Tools-Debug-Spawn, siehe Entity.SpawnPointId) - der reguläre Katalog-Spawn im
     /// GameServer-Konstruktor übergibt hier immer die echte SpawnPoint.Id. respawnSeconds: nur bei gesetzter
     /// spawnPointId aussagekräftig (siehe Entity.RespawnSeconds, M4b). meleeRangeWire/attackCooldownMs/
-    /// aggressive/aggroRangeWire/leashRangeWire: Kampf-/Aggro-Werte aus der MobCatalog (M4c).</summary>
+    /// aggressive/aggroRangeWire/leashRangeWire: Kampf-/Aggro-Werte aus der MobCatalog (M4c). drops: mögliche
+    /// Drops beim Tod (M5a, siehe Entity.Drops) - Default leer.</summary>
     public Entity SpawnMonster(int mobId, string name, int x, int y, int speedWire,
         int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs, long nowMs,
         int maxHp = Entity.DefaultMaxHp, int attack = Entity.DefaultAttack, int defense = Entity.DefaultDefense,
         int yangMin = 0, int yangMax = 0, int? spawnPointId = null, int respawnSeconds = 0,
         int meleeRangeWire = Entity.DefaultMeleeRangeWire, int attackCooldownMs = Entity.DefaultAttackCooldownMs,
-        bool aggressive = false, int aggroRangeWire = 0, int leashRangeWire = 0)
+        bool aggressive = false, int aggroRangeWire = 0, int leashRangeWire = 0,
+        IReadOnlyList<(int ItemId, int ChancePercent)>? drops = null)
     {
         int clampedX = Math.Clamp(x, 0, GameConstants.MapWidth);
         int clampedY = Math.Clamp(y, 0, GameConstants.MapHeight);
@@ -119,7 +122,7 @@ public sealed class World
         int id = _nextEntityId++;
         Entity entity = Entity.CreateMonster(id, mobId, spawnPointId, name, clampedX, clampedY, speedWire,
             wanderRadiusWire, wanderIntervalMinMs, wanderIntervalMaxMs, maxHp, attack, defense, yangMin, yangMax, respawnSeconds,
-            meleeRangeWire, attackCooldownMs, aggressive, aggroRangeWire, leashRangeWire);
+            meleeRangeWire, attackCooldownMs, aggressive, aggroRangeWire, leashRangeWire, drops);
         entity.NextWanderAtMs = nowMs + _random.Next(wanderIntervalMinMs, wanderIntervalMaxMs + 1);
         _entities[id] = entity;
         return entity;
@@ -278,12 +281,37 @@ public sealed class World
 
         int targetMaxHp = target.MaxHp;
         int damage = Math.Max(1, attacker.Attack - target.Defense);
+        IReadOnlyList<(int ItemId, int ChancePercent)> targetDrops = target.Drops;
         (int targetHpAfter, bool died, long yangAwarded) = ApplyDamage(target, damage, nowMs);
 
         if (yangAwarded > 0)
             attacker.Yang += yangAwarded;
 
-        return AttackResult.Hit(damage, targetHpAfter, targetMaxHp, died, target.Kind, yangAwarded);
+        // M5a: Drops nach Yang, nur bei totem Monster (target ist nach ApplyDamage evtl. schon aus World
+        // entfernt - deshalb targetDrops vorher gesichert statt target.Drops erneut zu lesen). Jeder Eintrag
+        // unabhängig gewürfelt (_random.Next(100) in [0,99]: chancePercent=0 kann nie treffen, 100 immer).
+        List<int>? droppedItemIds = null;
+        bool itemLostToFullInventory = false;
+        if (died && target.Kind == EntityKind.Monster && targetDrops.Count > 0)
+        {
+            foreach ((int itemId, int chancePercent) in targetDrops)
+            {
+                if (_random.Next(100) >= chancePercent)
+                    continue;
+
+                if (TryAddItemToInventory(attackerEntityId, itemId))
+                {
+                    droppedItemIds ??= new List<int>();
+                    droppedItemIds.Add(itemId);
+                }
+                else
+                {
+                    itemLostToFullInventory = true;
+                }
+            }
+        }
+
+        return AttackResult.Hit(damage, targetHpAfter, targetMaxHp, died, target.Kind, yangAwarded, droppedItemIds, itemLostToFullInventory);
     }
 
     /// <summary>Wendet Schaden auf eine beliebige Entity an und löst bei 0 Leben die passende Tod-Behandlung
@@ -335,7 +363,7 @@ public sealed class World
             diedMonster.WanderRadiusWire, diedMonster.WanderIntervalMinMs, diedMonster.WanderIntervalMaxMs,
             diedMonster.MaxHp, diedMonster.Attack, diedMonster.Defense, diedMonster.YangMin, diedMonster.YangMax,
             diedMonster.RespawnSeconds, diedMonster.MeleeRangeWire, diedMonster.AttackCooldownMs,
-            diedMonster.Aggressive, diedMonster.AggroRangeWire, diedMonster.LeashRangeWire,
+            diedMonster.Aggressive, diedMonster.AggroRangeWire, diedMonster.LeashRangeWire, diedMonster.Drops,
             nowMs + diedMonster.RespawnSeconds * 1000L);
     }
 
@@ -586,7 +614,8 @@ public sealed class World
                     pending.MaxHp, pending.Attack, pending.Defense, pending.YangMin, pending.YangMax,
                     spawnPointId: spawnPointId, respawnSeconds: pending.RespawnSeconds,
                     meleeRangeWire: pending.MeleeRangeWire, attackCooldownMs: pending.AttackCooldownMs,
-                    aggressive: pending.Aggressive, aggroRangeWire: pending.AggroRangeWire, leashRangeWire: pending.LeashRangeWire);
+                    aggressive: pending.Aggressive, aggroRangeWire: pending.AggroRangeWire, leashRangeWire: pending.LeashRangeWire,
+                    drops: pending.Drops);
                 respawnedMonsters.Add(monster);
             }
         }

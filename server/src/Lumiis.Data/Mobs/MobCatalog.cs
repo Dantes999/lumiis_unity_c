@@ -5,6 +5,21 @@ using System.Text.Json;
 
 namespace Lumiis.Data.Mobs;
 
+/// <summary>Ein möglicher Drop beim Tod eines Mob-Typs (M5a) - ItemId referenziert data/items.json (kein
+/// Katalog-Querverweis beim Laden, siehe MobCatalog.LoadFromJson), ChancePercent 0-100, jeder Eintrag
+/// unabhängig gewürfelt (siehe World.TryAttack).</summary>
+public readonly struct MobDrop
+{
+    public int ItemId { get; }
+    public int ChancePercent { get; }
+
+    public MobDrop(int itemId, int chancePercent)
+    {
+        ItemId = itemId;
+        ChancePercent = chancePercent;
+    }
+}
+
 /// <summary>Ein Mob-Typ aus data/mobs.json (Platzhalterdaten, siehe CLAUDE.md Abschnitt "Monster").</summary>
 public sealed class MobDefinition
 {
@@ -36,9 +51,14 @@ public sealed class MobDefinition
     /// World-Tick-Monster-KI).</summary>
     public int LeashRangeWire { get; }
 
+    /// <summary>M5a: mögliche Drops beim Tod dieses Mob-Typs (siehe World.TryAttack). Leer, wenn keine
+    /// definiert sind.</summary>
+    public IReadOnlyList<MobDrop> Drops { get; }
+
     public MobDefinition(int id, string name, int speedWire, int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs,
         int maxHp, int attack, int defense, int yangMin, int yangMax,
-        int meleeRangeWire, int attackCooldownMs, bool aggressive, int aggroRangeWire, int leashRangeWire)
+        int meleeRangeWire, int attackCooldownMs, bool aggressive, int aggroRangeWire, int leashRangeWire,
+        IReadOnlyList<MobDrop> drops)
     {
         Id = id;
         Name = name;
@@ -56,6 +76,7 @@ public sealed class MobDefinition
         Aggressive = aggressive;
         AggroRangeWire = aggroRangeWire;
         LeashRangeWire = leashRangeWire;
+        Drops = drops;
     }
 }
 
@@ -149,9 +170,24 @@ public sealed class MobCatalog
             if (entry.LeashRangeWire <= 0)
                 throw new MobCatalogException($"mobs.json: Mob {entry.Id} ({entry.Name}) hat leashRangeWire <= 0.");
 
+            var drops = new List<MobDrop>();
+            foreach (MobDropDto dropEntry in entry.Drops)
+            {
+                if (dropEntry.ItemId <= 0)
+                    throw new MobCatalogException($"mobs.json: Mob {entry.Id} ({entry.Name}) hat einen Drop mit itemId <= 0.");
+
+                if (dropEntry.ChancePercent < 0 || dropEntry.ChancePercent > 100)
+                {
+                    throw new MobCatalogException(
+                        $"mobs.json: Mob {entry.Id} ({entry.Name}) hat einen Drop (ItemId {dropEntry.ItemId}) mit chancePercent außerhalb 0-100 ({dropEntry.ChancePercent}).");
+                }
+
+                drops.Add(new MobDrop(dropEntry.ItemId, dropEntry.ChancePercent));
+            }
+
             byId[entry.Id] = new MobDefinition(entry.Id, entry.Name, entry.SpeedWire, entry.WanderRadiusWire, entry.WanderIntervalMinMs, entry.WanderIntervalMaxMs,
                 entry.MaxHp, entry.Attack, entry.Defense, entry.YangMin, entry.YangMax,
-                entry.MeleeRangeWire, entry.AttackCooldownMs, entry.Aggressive, entry.AggroRangeWire, entry.LeashRangeWire);
+                entry.MeleeRangeWire, entry.AttackCooldownMs, entry.Aggressive, entry.AggroRangeWire, entry.LeashRangeWire, drops);
         }
 
         if (byId.Count == 0)
