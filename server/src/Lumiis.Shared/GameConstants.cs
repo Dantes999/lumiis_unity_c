@@ -15,5 +15,10 @@ namespace Lumiis.Shared
         /// <summary>Sichtbarkeitsradius (AOI) in 1/100 Welteinheiten (entspricht 15 Einheiten) - spätere
         /// Justierung erwartet, siehe CLAUDE.md Abschnitt "Sichtbarkeitsbereich (AOI)".</summary>
         public const int AoiRadiusWire = 1500;
+
+        /// <summary>Anzahl Inventar-Plätze pro Charakter (M5a, siehe CLAUDE.md Abschnitt "Items und
+        /// Inventar") - Entity.Inventory (Server) und InventorySyncPacket.Slots (Wire, SlotIndex als byte)
+        /// sowie das Debug-Panel (Client) richten sich alle danach.</summary>
+        public const int InventorySize = 20;
     }
 }

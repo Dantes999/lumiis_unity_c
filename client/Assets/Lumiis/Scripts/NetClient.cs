@@ -69,6 +69,28 @@ namespace Lumiis.Client
             Send(new DebugSpawnMonsterRequestPacket { MobId = mobId });
         }
 
+        /// <summary>M5a: Klick auf einen belegten Ausrüstungs-Item-Slot im Debug-Panel (siehe
+        /// GameClient.DrawInventoryPanel) - der Server prüft alles erneut (Slot belegt, ItemType passt).</summary>
+        public void SendEquipItem(int inventorySlotIndex)
+        {
+            if (_peer == null || !IsConnected) return;
+            Send(new EquipItemRequestPacket { InventorySlotIndex = inventorySlotIndex });
+        }
+
+        /// <summary>M5a: Ablegen-Knopf im Debug-Panel (siehe GameClient.DrawEquipmentPanel).</summary>
+        public void SendUnequipItem(EquipmentSlot equipmentSlot)
+        {
+            if (_peer == null || !IsConnected) return;
+            Send(new UnequipItemRequestPacket { EquipmentSlot = equipmentSlot });
+        }
+
+        /// <summary>M5a: Klick auf einen belegten Consumable-Slot im Debug-Panel.</summary>
+        public void SendUseConsumable(int inventorySlotIndex)
+        {
+            if (_peer == null || !IsConnected) return;
+            Send(new UseConsumableRequestPacket { InventorySlotIndex = inventorySlotIndex });
+        }
+
         private void Send(IPacket packet)
         {
             if (_peer == null) return;

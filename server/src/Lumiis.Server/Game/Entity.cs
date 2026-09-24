@@ -151,7 +151,7 @@ public sealed class Entity
 
     /// <summary>Inventar (M5a) - 20 Plätze, 0 = leer (Item-IDs aus data/items.json). Nur bei Kind=Player
     /// sinnvoll befüllt (siehe GameServer.CompleteJoin) - Monster haben ein leeres, ungenutztes Array.</summary>
-    public int[] Inventory { get; } = new int[20];
+    public int[] Inventory { get; } = new int[GameConstants.InventorySize];
 
     /// <summary>Ausgerüstete Items (M5a, Item-IDs aus data/items.json, 0 = Slot leer) - nur bei Kind=Player
     /// relevant. Werden von World.TryEquip/TryUnequip gepflegt, beim Join zusätzlich aus der Character-Zeile

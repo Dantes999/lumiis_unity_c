@@ -14,6 +14,7 @@
       <LiteNetLibDll>$(NuGetPackageRoot)litenetlib/$(LiteNetLibVersion)/lib/netstandard2.1/LiteNetLib.dll</LiteNetLibDll>
       <UnityDataDir>$(MSBuildThisFileDirectory)../../../client/Assets/StreamingAssets/lumiis-data/</UnityDataDir>
       <LooksJsonSource>$(MSBuildThisFileDirectory)../../../data/looks.json</LooksJsonSource>
+      <ItemsJsonSource>$(MSBuildThisFileDirectory)../../../data/items.json</ItemsJsonSource>
     </PropertyGroup>
     <ItemGroup>
       <UnityPluginFiles Include="$(TargetPath)" />
@@ -21,6 +22,7 @@
     </ItemGroup>
     <ItemGroup>
       <UnityDataFiles Include="$(LooksJsonSource)" Condition="Exists('$(LooksJsonSource)')" />
+      <UnityDataFiles Include="$(ItemsJsonSource)" Condition="Exists('$(ItemsJsonSource)')" />
     </ItemGroup>
     <Copy SourceFiles="@(UnityPluginFiles)" DestinationFolder="$(UnityPluginsDir)" SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(UnityDataFiles)" DestinationFolder="$(UnityDataDir)" SkipUnchangedFiles="true" />

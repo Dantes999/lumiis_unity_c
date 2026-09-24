@@ -24,10 +24,12 @@ namespace Lumiis.Client
         private Sprite _monsterCircleSprite;
         private Sprite _monsterTriangleSprite;
         private LookCatalogClient _lookCatalog;
+        private ItemCatalogClient _itemCatalog;
         private CachingSpriteProvider _spriteProvider;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private CharacterTestboard _testboard;
         private CharacterTestboard _sortingTestboard;
+        private Vector2 _debugPanelScroll;
 
         // Dev-Tools-Debug-Spawn (siehe CLAUDE.md "Dev-Tools"): fest hinterlegte Mob-Typen statt eines
         // geladenen Katalogs - der Client kennt mobs.json bewusst nicht (siehe CLAUDE.md Abschnitt "Monster"),
@@ -49,6 +51,16 @@ namespace Lumiis.Client
         private string _lastAttackFailedMessage = "";
         private long _yangTotal;
         private bool _isDead;
+
+        // ---- Inventar/Ausrüstung (M5a, Debug-Panel-Stil - siehe DrawInventoryPanel/DrawEquipmentPanel) ----
+        // Voller Resync bei Join und nach jeder Änderung (siehe InventorySyncPacket) - rein lokaler Cache für
+        // die Debug-UI, keine eigene ClientWorld-Anbindung nötig (analog zu _yangTotal/_targetEntityId).
+        private readonly List<(int SlotIndex, int ItemId)> _inventorySlots = new List<(int, int)>();
+        private int _equippedArmorItemId;
+        private int _equippedHelmetItemId;
+        private int _equippedWeaponItemId;
+        private int _equippedShieldItemId;
+        private string _lastInventoryActionFailedMessage = "";
 
         private const float MinZoom = 3f;
         private const float MaxZoom = 300f;
@@ -83,6 +95,17 @@ namespace Lumiis.Client
                 throw;
             }
             _spriteProvider = new CachingSpriteProvider(new PlaceholderSpriteProvider(_lookCatalog.CanvasPx, _lookCatalog.Ppu));
+
+            try
+            {
+                _itemCatalog = ItemCatalogClient.LoadFromStreamingAssets();
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError("items.json konnte nicht geladen werden (Assets/StreamingAssets/lumiis-data/items.json). "
+                    + "Wurde 'cd server && dotnet build' vor dem Öffnen von Unity ausgeführt? " + ex);
+                throw;
+            }
 
             _world.EntitySpawned += OnEntitySpawned;
             _world.EntityDespawned += OnEntityDespawned;
@@ -262,9 +285,11 @@ namespace Lumiis.Client
 
         private void DrawDebugTestPanel()
         {
-            const float w = 220f;
-            Rect area = new Rect(Screen.width - w - 10f, 10f, w, 360f);
+            const float w = 240f;
+            float h = Mathf.Min(700f, Screen.height - 20f);
+            Rect area = new Rect(Screen.width - w - 10f, 10f, w, h);
             GUILayout.BeginArea(area, GUI.skin.box);
+            _debugPanelScroll = GUILayout.BeginScrollView(_debugPanelScroll);
 
             GUILayout.Label("Debug-Test (F-Tasten bleiben aktiv)");
 
@@ -285,8 +310,76 @@ namespace Lumiis.Client
             }
 
             DrawDebugSpawnRow();
+            DrawEquipmentPanel();
+            DrawInventoryPanel();
 
+            GUILayout.EndScrollView();
             GUILayout.EndArea();
+        }
+
+        /// <summary>M5a: die vier Ausrüstungs-Slots mit aktuellem Item-Namen (oder "leer") plus
+        /// Ablegen-Knopf. Item-Namen kommen aus ItemCatalogClient (items.json, StreamingAssets), aufgelöst
+        /// über die vom Server per InventorySyncPacket verschickten EquippedXItemId-Werte.</summary>
+        private void DrawEquipmentPanel()
+        {
+            GUILayout.Space(6);
+            GUILayout.Label("Ausrüstung");
+            DrawEquipmentRow("Ruestung", EquipmentSlot.Armor, _equippedArmorItemId);
+            DrawEquipmentRow("Helm", EquipmentSlot.Helmet, _equippedHelmetItemId);
+            DrawEquipmentRow("Waffe", EquipmentSlot.Weapon, _equippedWeaponItemId);
+            DrawEquipmentRow("Schild", EquipmentSlot.Shield, _equippedShieldItemId);
+        }
+
+        private void DrawEquipmentRow(string label, EquipmentSlot slot, int equippedItemId)
+        {
+            GUILayout.BeginHorizontal();
+            string itemName = equippedItemId == 0 ? "leer" : _itemCatalog.DisplayName(equippedItemId);
+            GUILayout.Label(label + ": " + itemName, GUILayout.Width(150));
+            GUI.enabled = equippedItemId != 0;
+            if (GUILayout.Button("Ablegen", GUILayout.Width(60)))
+                _netClient.SendUnequipItem(slot);
+            GUI.enabled = true;
+            GUILayout.EndHorizontal();
+        }
+
+        /// <summary>M5a: 20 Zeilen (Slot-Nummer + Item-Name oder "leer"). Klick auf einen belegten Slot löst
+        /// die Kontextaktion je ItemType aus: Consumable -> benutzen, sonst (Ausrüstungs-Item) -> anlegen -
+        /// der Server prüft ItemType/Slot-Passung ohnehin erneut (siehe World.TryEquip).</summary>
+        private void DrawInventoryPanel()
+        {
+            GUILayout.Space(6);
+            GUILayout.Label("Inventar");
+
+            for (int slotIndex = 0; slotIndex < GameConstants.InventorySize; slotIndex++)
+            {
+                int itemId = FindItemInSlot(slotIndex);
+                GUILayout.BeginHorizontal();
+                string text = slotIndex + ": " + (itemId == 0 ? "leer" : _itemCatalog.DisplayName(itemId));
+                GUI.enabled = itemId != 0;
+                if (GUILayout.Button(text, GUILayout.Width(210)))
+                    HandleInventorySlotClick(slotIndex, itemId);
+                GUI.enabled = true;
+                GUILayout.EndHorizontal();
+            }
+        }
+
+        private int FindItemInSlot(int slotIndex)
+        {
+            foreach ((int SlotIndex, int ItemId) entry in _inventorySlots)
+            {
+                if (entry.SlotIndex == slotIndex) return entry.ItemId;
+            }
+            return 0;
+        }
+
+        private void HandleInventorySlotClick(int slotIndex, int itemId)
+        {
+            if (itemId == 0) return;
+
+            if (_itemCatalog.TryGet(itemId, out ItemEntryJson entry) && entry.itemType == "Consumable")
+                _netClient.SendUseConsumable(slotIndex);
+            else
+                _netClient.SendEquipItem(slotIndex);
         }
 
         /// <summary>Dev-Tools (siehe CLAUDE.md "Dev-Tools"): Mob-Typ-Cycler + Spawnen-Knopf. Ohne
@@ -407,6 +500,12 @@ namespace Lumiis.Client
             _lastAttackFailedMessage = "";
             _yangTotal = 0;
             _isDead = false;
+            _inventorySlots.Clear();
+            _equippedArmorItemId = 0;
+            _equippedHelmetItemId = 0;
+            _equippedWeaponItemId = 0;
+            _equippedShieldItemId = 0;
+            _lastInventoryActionFailedMessage = "";
         }
 
         private void OnPacketReceived(IPacket packet)
@@ -488,6 +587,49 @@ namespace Lumiis.Client
             if (yangChanged != null)
             {
                 _yangTotal = yangChanged.NewTotal;
+                return;
+            }
+
+            InventorySyncPacket inventorySync = packet as InventorySyncPacket;
+            if (inventorySync != null)
+            {
+                _inventorySlots.Clear();
+                _inventorySlots.AddRange(inventorySync.Slots);
+                _equippedArmorItemId = inventorySync.EquippedArmorItemId;
+                _equippedHelmetItemId = inventorySync.EquippedHelmetItemId;
+                _equippedWeaponItemId = inventorySync.EquippedWeaponItemId;
+                _equippedShieldItemId = inventorySync.EquippedShieldItemId;
+                return;
+            }
+
+            InventoryActionFailedPacket inventoryFailed = packet as InventoryActionFailedPacket;
+            if (inventoryFailed != null)
+            {
+                _lastInventoryActionFailedMessage = InventoryActionFailedReasonText(inventoryFailed.Reason);
+                return;
+            }
+
+            AppearanceChangedPacket appearanceChanged = packet as AppearanceChangedPacket;
+            if (appearanceChanged != null)
+            {
+                if (_world.Entities.TryGetValue(appearanceChanged.EntityId, out ClientEntity entity))
+                    entity.Appearance = appearanceChanged.Appearance;
+                if (_views.TryGetValue(appearanceChanged.EntityId, out CharacterView view))
+                    view.SetAppearance(appearanceChanged.Appearance);
+            }
+        }
+
+        private static string InventoryActionFailedReasonText(InventoryActionFailedReason reason)
+        {
+            switch (reason)
+            {
+                case InventoryActionFailedReason.InvalidSlot: return "Ungültiger Inventarplatz.";
+                case InventoryActionFailedReason.EmptySlot: return "Inventarplatz ist leer.";
+                case InventoryActionFailedReason.WrongItemType: return "Dieser Gegenstand kann nicht angelegt werden.";
+                case InventoryActionFailedReason.NotConsumable: return "Dieser Gegenstand kann nicht benutzt werden.";
+                case InventoryActionFailedReason.InventoryFull: return "Inventar ist voll.";
+                case InventoryActionFailedReason.TargetAtFullHp: return "Leben bereits voll.";
+                default: return "Aktion fehlgeschlagen.";
             }
         }
 
@@ -672,6 +814,7 @@ namespace Lumiis.Client
             string text = "Leben: " + ownHp + " | Ziel: " + targetText + " | Yang: " + _yangTotal;
             if (_isDead) text += " | Du bist gestorben, Respawn in Kürze...";
             else if (!string.IsNullOrEmpty(_lastAttackFailedMessage)) text += " | " + _lastAttackFailedMessage;
+            if (!string.IsNullOrEmpty(_lastInventoryActionFailedMessage)) text += " | " + _lastInventoryActionFailedMessage;
 
             GUI.Label(new Rect(10, 32, 700, 20), text);
         }
