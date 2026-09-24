@@ -392,4 +392,29 @@ namespace Lumiis.Shared.Net
             Reason = (InventoryActionFailedReason)reader.ReadByte();
         }
     }
+
+    /// <summary>Das Aussehen einer Entity hat sich geändert (M5a, Equip/Unequip) - an alle AOI-Beobachter
+    /// inklusive der Entity selbst, siehe PacketId.AppearanceChanged-Kommentar.</summary>
+    public sealed class AppearanceChangedPacket : IPacket
+    {
+        public int EntityId;
+        public Appearance Appearance;
+
+        public PacketId Id
+        {
+            get { return PacketId.AppearanceChanged; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteInt32(EntityId);
+            Appearance.Write(writer);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            EntityId = reader.ReadInt32();
+            Appearance.Read(reader);
+        }
+    }
 }

@@ -1,6 +1,8 @@
 ﻿using System.Threading;
 using Lumiis.Data;
 using Lumiis.Data.Classes;
+using Lumiis.Data.Items;
+using Lumiis.Data.Looks;
 using Lumiis.Data.Maps;
 using Lumiis.Data.Mobs;
 using Lumiis.Server;
@@ -79,6 +81,22 @@ catch (Exception ex)
     return 1;
 }
 
+// looks.json wird nur zur Validierung von items.json gebraucht (jedes Ausrüstungs-Item braucht eine
+// existierende LookId im passenden Slot, siehe ItemCatalog.LoadFromJson) - der Server selbst löst Looks
+// seit M2b nicht mehr aus einem Katalog auf (Appearance kommt aus der DB-Zeile bzw. seit M5a zusätzlich
+// über ItemCatalog aus den EquippedXItemId-Spalten, siehe GameServer.ToAppearance).
+ItemCatalog itemCatalog;
+try
+{
+    LookCatalog lookCatalog = LookCatalog.LoadFromFile(Path.Combine(config.DataDir, "looks.json"));
+    itemCatalog = ItemCatalog.LoadFromFile(Path.Combine(config.DataDir, "items.json"), lookCatalog);
+}
+catch (Exception ex)
+{
+    logger.Error($"Serverstart fehlgeschlagen (Item-Daten): {ex.Message}");
+    return 1;
+}
+
 // Dieselben Variablen, dieselbe Fail-Fast-Regel wie Lumiis.Auth (siehe CLAUDE.md): fehlt eine, bricht der
 // Start mit klarer Meldung ab. Keine eigene Migration hier (bleibt Sache von Auth in Development).
 string connectionString;
@@ -107,7 +125,7 @@ Console.CancelKeyPress += (_, eventArgs) =>
     cts.Cancel();
 };
 
-GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, collisionMap: collisionMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog, classCatalog: classCatalog);
+GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, collisionMap: collisionMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog, classCatalog: classCatalog, itemCatalog: itemCatalog);
 
 try
 {

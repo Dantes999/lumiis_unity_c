@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using LiteNetLib;
 using Lumiis.Data;
 using Lumiis.Data.Classes;
+using Lumiis.Data.Items;
 using Lumiis.Data.Maps;
 using Lumiis.Data.Mobs;
 using Lumiis.Server.Game;
@@ -61,6 +62,15 @@ public sealed class GameServer : INetEventListener
     /// (unterschiedlicher Auslöser: sofort bei jeder Änderung statt periodisch, siehe HandleAttackRequest).</summary>
     private readonly record struct YangSaveRequest(int CharacterId, long NewTotal);
 
+    /// <summary>Ein voller Inventar-/Ausrüstungs-Zustand (M5a), per Channel an den Hintergrund-Task übergeben
+    /// (siehe RunInventorySaveConsumerAsync) - eigener Channel statt Wiederverwendung von Position/Yang
+    /// (siehe docs/tasks/M5a-items-equipment.md Abschnitt 0b): immer der volle Snapshot (alle belegten
+    /// Slots + alle vier Equipped-Ids), kein Delta - DropOldest bleibt dadurch sicher, genau wie bei Yang
+    /// konvergiert der zuletzt geschriebene Stand immer zum korrekten Endstand, ein übersprungener
+    /// Zwischenstand ist unkritisch.</summary>
+    private readonly record struct InventorySaveRequest(int CharacterId, List<(int SlotIndex, int ItemId)> Slots,
+        int EquippedArmorItemId, int EquippedHelmetItemId, int EquippedWeaponItemId, int EquippedShieldItemId);
+
     private const int MaxConsecutiveFailedTicks = 50;
 
     /// <summary>Fix, keine Konfiguration (siehe CLAUDE.md "Bekannte Lücken") - alle 30s wird die Position
@@ -85,6 +95,10 @@ public sealed class GameServer : INetEventListener
     /// <summary>Nur für den Dev-Tools-Debug-Spawn gehalten (siehe HandleDebugSpawnMonster) - der reguläre
     /// Katalog-Spawn im Konstruktor braucht die Referenz danach nicht mehr.</summary>
     private readonly MobCatalog? _mobCatalog;
+
+    /// <summary>An World durchgereicht (siehe World-Konstruktor) UND hier für ToAppearance/CompleteJoin
+    /// gehalten (Equipped-ItemId -> LookId auflösen, M5a).</summary>
+    private readonly ItemCatalog? _itemCatalog;
     private readonly NetManager _netManager;
     private readonly ILogger _logger;
     private readonly Func<long> _nowMs;
@@ -92,9 +106,11 @@ public sealed class GameServer : INetEventListener
     private readonly ConcurrentQueue<JoinLookupResult> _pendingJoinResults = new();
     private readonly Channel<PositionSaveRequest> _positionSaveChannel;
     private readonly Channel<YangSaveRequest> _yangSaveChannel;
+    private readonly Channel<InventorySaveRequest> _inventorySaveChannel;
     private readonly CancellationTokenSource _positionSaveCts = new();
     private Task? _positionSaveConsumerTask;
     private Task? _yangSaveConsumerTask;
+    private Task? _inventorySaveConsumerTask;
     private uint _tick;
     private int _consecutiveFailedTicks;
 
@@ -111,10 +127,13 @@ public sealed class GameServer : INetEventListener
     /// angelegt (kein aktiver Respawn in M3c, siehe docs/tasks/M3c-monsters.md).
     /// classCatalog: null bedeutet "Spieler bekommen Entity.DefaultXxx-Kampfwerte" (z. B. bestehende Tests
     /// ohne Kampfbezug, siehe CompleteJoin) - Program.cs lädt beim echten Serverstart immer eine Instanz aus
-    /// data/classes.json (M4a).</summary>
+    /// data/classes.json (M4a). itemCatalog: null bedeutet "keine Items" (z. B. bestehende Tests ohne
+    /// Item-Bezug) - Ausrüstung wird dann als LookId 0 (leer) dargestellt und Equip/Unequip/UseConsumable
+    /// schlagen defensiv fehl (siehe World.TryEquip etc.). Program.cs lädt beim echten Serverstart immer eine
+    /// Instanz aus data/items.json (M5a).</summary>
     public GameServer(ServerConfig config, ILogger logger, TokenService tokenService, Func<LumiisDbContext> dbContextFactory,
         Func<long>? nowMs = null, CollisionMap? collisionMap = null, MobCatalog? mobCatalog = null, SpawnCatalog? spawnCatalog = null,
-        ClassCatalog? classCatalog = null)
+        ClassCatalog? classCatalog = null, ItemCatalog? itemCatalog = null)
     {
         _config = config;
         _logger = logger;
@@ -122,7 +141,8 @@ public sealed class GameServer : INetEventListener
         _dbContextFactory = dbContextFactory;
         _classCatalog = classCatalog;
         _mobCatalog = mobCatalog;
-        _world = new World(config.MaxPlayers, collisionMap);
+        _itemCatalog = itemCatalog;
+        _world = new World(config.MaxPlayers, collisionMap, itemCatalog: itemCatalog);
         _netManager = new NetManager(this) { UpdateTime = 15 };
         _nowMs = nowMs ?? DefaultNowMs;
 
@@ -166,6 +186,15 @@ public sealed class GameServer : INetEventListener
             SingleReader = true,
             SingleWriter = true
         });
+
+        // Gleicher Mechanismus, eigener Channel (siehe InventorySaveRequest-Kommentar) - immer ein voller
+        // Snapshot, DropOldest bleibt sicher.
+        _inventorySaveChannel = Channel.CreateBounded<InventorySaveRequest>(new BoundedChannelOptions(config.MaxPlayers)
+        {
+            FullMode = BoundedChannelFullMode.DropOldest,
+            SingleReader = true,
+            SingleWriter = true
+        });
     }
 
     /// <summary>Tatsächlich gebundener Port (nach Start relevant, falls ServerConfig.Port 0 war).</summary>
@@ -176,6 +205,7 @@ public sealed class GameServer : INetEventListener
         _netManager.Start(_config.Port);
         _positionSaveConsumerTask = Task.Run(() => RunPositionSaveConsumerAsync(_positionSaveCts.Token));
         _yangSaveConsumerTask = Task.Run(() => RunYangSaveConsumerAsync(_positionSaveCts.Token));
+        _inventorySaveConsumerTask = Task.Run(() => RunInventorySaveConsumerAsync(_positionSaveCts.Token));
         _logger.Info($"Server gestartet auf Port {_netManager.LocalPort} (max. {_config.MaxPlayers} Spieler)");
     }
 
@@ -184,6 +214,7 @@ public sealed class GameServer : INetEventListener
         _netManager.Stop();
         _positionSaveChannel.Writer.TryComplete();
         _yangSaveChannel.Writer.TryComplete();
+        _inventorySaveChannel.Writer.TryComplete();
         _positionSaveCts.Cancel();
         _logger.Info("Server gestoppt");
     }
@@ -414,6 +445,47 @@ public sealed class GameServer : INetEventListener
         }
     }
 
+    /// <summary>Läuft auf einem Threadpool-Thread, NIE auf dem Game-Loop-Thread (M5a). Ersetzt alle
+    /// CharacterInventoryItem-Zeilen des Charakters durch den übergebenen vollen Snapshot (kein Delta,
+    /// siehe InventorySaveRequest) und schreibt die vier Equipped-Spalten - eine Transaktion pro Save über
+    /// SaveChangesAsync. Fehler werden geloggt, bringen den Server nicht zum Absturz - der nächste Save für
+    /// diesen Charakter (nächste Inventaränderung) versucht es erneut mit dem dann aktuellen Stand.</summary>
+    private async Task RunInventorySaveConsumerAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await foreach (InventorySaveRequest request in _inventorySaveChannel.Reader.ReadAllAsync(cancellationToken))
+            {
+                try
+                {
+                    await using LumiisDbContext db = _dbContextFactory();
+                    Character? character = await db.Characters.Include(c => c.InventoryItems)
+                        .SingleOrDefaultAsync(c => c.Id == request.CharacterId, cancellationToken);
+                    if (character == null) continue; // Charakter inzwischen gelöscht o. Ä. - kein Fehler, einfach überspringen.
+
+                    character.EquippedArmorItemId = request.EquippedArmorItemId == 0 ? null : request.EquippedArmorItemId;
+                    character.EquippedHelmetItemId = request.EquippedHelmetItemId == 0 ? null : request.EquippedHelmetItemId;
+                    character.EquippedWeaponItemId = request.EquippedWeaponItemId == 0 ? null : request.EquippedWeaponItemId;
+                    character.EquippedShieldItemId = request.EquippedShieldItemId == 0 ? null : request.EquippedShieldItemId;
+
+                    db.CharacterInventoryItems.RemoveRange(character.InventoryItems);
+                    foreach ((int slotIndex, int itemId) in request.Slots)
+                        character.InventoryItems.Add(new CharacterInventoryItem { CharacterId = request.CharacterId, SlotIndex = slotIndex, ItemId = itemId });
+
+                    await db.SaveChangesAsync(cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"Fehler beim Speichern des Inventars für Charakter {request.CharacterId}: {ex}");
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Erwarteter Abbruch beim Stop() - kein Fehler.
+        }
+    }
+
     /// <summary>Fester 25-Hz-Loop (Stopwatch, Catch-up begrenzt), bis der Token abgebrochen wird.</summary>
     public void Run(CancellationToken cancellationToken)
     {
@@ -575,6 +647,15 @@ public sealed class GameServer : INetEventListener
             case DebugSpawnMonsterRequestPacket debugSpawn:
                 HandleDebugSpawnMonster(conn, debugSpawn);
                 break;
+            case EquipItemRequestPacket equip:
+                HandleEquipItemRequest(conn, equip);
+                break;
+            case UnequipItemRequestPacket unequip:
+                HandleUnequipItemRequest(conn, unequip);
+                break;
+            case UseConsumableRequestPacket useConsumable:
+                HandleUseConsumableRequest(conn, useConsumable);
+                break;
             default:
                 _logger.Warn($"Unerwartetes Paket {packet.Id} von Verbindung {conn.Peer.Id}");
                 conn.Peer.Disconnect();
@@ -694,11 +775,27 @@ public sealed class GameServer : INetEventListener
         }
 
         conn.EntityId = entity!.Id;
-        entity.Appearance = ToAppearance(character);
         entity.Yang = character.Yang;
         entity.LastSaveAtMs = _nowMs(); // Position kommt gerade erst aus der DB - kein sofortiger Save nötig.
 
+        // M5a: Ausrüstung + Inventar aus der Character-Zeile auf die Entity übertragen, BEVOR Appearance
+        // aufgelöst wird (ToAppearance liest die Entity-Felder, nicht mehr die DB-Spalten direkt) und BEVOR
+        // Attack/Defense neu berechnet werden (die Startwaffe/etwaige Ausrüstung muss sofort wirken, nicht
+        // erst nach dem ersten Equip).
+        entity.EquippedArmorItemId = character.EquippedArmorItemId ?? 0;
+        entity.EquippedHelmetItemId = character.EquippedHelmetItemId ?? 0;
+        entity.EquippedWeaponItemId = character.EquippedWeaponItemId ?? 0;
+        entity.EquippedShieldItemId = character.EquippedShieldItemId ?? 0;
+        foreach (CharacterInventoryItem inventoryItem in character.InventoryItems)
+        {
+            if (inventoryItem.SlotIndex >= 0 && inventoryItem.SlotIndex < entity.Inventory.Length)
+                entity.Inventory[inventoryItem.SlotIndex] = inventoryItem.ItemId;
+        }
+        _world.RecalculateCombatStats(entity.Id);
+        entity.Appearance = ToAppearance(character);
+
         conn.Peer.SendPacket(new JoinAcceptedPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY, Appearance = entity.Appearance });
+        conn.Peer.SendPacket(BuildInventorySyncPacket(entity));
 
         // Der Joiner bekommt nur die laut AOI-Radius ab seiner Startposition sichtbaren Entities (nicht mehr
         // alle), laufende Bewegungen zusätzlich als EntityMove ab aktueller Position. VisibleEntityIds wird
@@ -736,21 +833,47 @@ public sealed class GameServer : INetEventListener
         _logger.Info($"{entity.Name} (Entity {entity.Id}, Character {character.Id}) beigetreten");
     }
 
-    // TODO(M5a Abschnitt 6): Armor/Helmet/Weapon/Shield sollen ueber ItemCatalog aus den
-    // EquippedXItemId-Spalten aufgeloest werden (LookId nachschlagen) - noch 0/leer, bis ItemCatalog
-    // (Abschnitt 4) verdrahtet ist.
-    private static Appearance ToAppearance(Character character)
+    /// <summary>M5a: Armor/Helmet/Weapon/Shield werden über ItemCatalog aus den EquippedXItemId-Spalten der
+    /// Character-Zeile aufgelöst (LookId nachschlagen) - beim Join, bevor die Entity überhaupt eine eigene
+    /// Appearance hat (siehe CompleteJoin). Für spätere Equip/Unequip-Änderungen siehe die Entity-Overload
+    /// unten (Body/Hair ändern sich dabei nicht, nur die vier Ausrüstungs-Slots).</summary>
+    private Appearance ToAppearance(Character character)
     {
         return new Appearance
         {
             BodyId = character.BodyId,
             HairStyleId = character.HairStyleId,
             HairColorId = character.HairColorId,
-            ArmorId = 0,
-            HelmetId = 0,
-            WeaponId = 0,
-            ShieldId = 0
+            ArmorId = ResolveLookId(character.EquippedArmorItemId ?? 0),
+            HelmetId = ResolveLookId(character.EquippedHelmetItemId ?? 0),
+            WeaponId = ResolveLookId(character.EquippedWeaponItemId ?? 0),
+            ShieldId = ResolveLookId(character.EquippedShieldItemId ?? 0)
         };
+    }
+
+    /// <summary>M5a: nach Equip/Unequip (siehe HandleEquipItemRequest/HandleUnequipItemRequest) - Body/Hair
+    /// bleiben unverändert (aus der bisherigen, beim Join gesetzten Appearance übernommen), nur die vier
+    /// Ausrüstungs-Slots werden aus den jetzt aktuellen EquippedXItemId-Feldern der Entity neu aufgelöst.</summary>
+    private Appearance ToAppearance(Entity entity)
+    {
+        Appearance current = entity.Appearance;
+        return new Appearance
+        {
+            BodyId = current.BodyId,
+            HairStyleId = current.HairStyleId,
+            HairColorId = current.HairColorId,
+            ArmorId = ResolveLookId(entity.EquippedArmorItemId),
+            HelmetId = ResolveLookId(entity.EquippedHelmetItemId),
+            WeaponId = ResolveLookId(entity.EquippedWeaponItemId),
+            ShieldId = ResolveLookId(entity.EquippedShieldItemId)
+        };
+    }
+
+    private int ResolveLookId(int itemId)
+    {
+        if (itemId == 0 || _itemCatalog == null || !_itemCatalog.TryGet(itemId, out ItemDefinition item))
+            return 0;
+        return item.LookId;
     }
 
     private void RejectJoin(ConnectionState conn, JoinRejectReason reason)
@@ -854,7 +977,10 @@ public sealed class GameServer : INetEventListener
         // NUR als Info (kein harter Fehler, der Kill oben bleibt gültig). Persistenz (siehe docs/tasks/
         // M5a-items-equipment.md Abschnitt 0b, eigener InventorySaveRequest-Channel) folgt in Abschnitt 6.
         if (result.DroppedItemIds.Count > 0 && _world.TryGet(attackerId, out Entity? looter))
+        {
             conn.Peer.SendPacket(BuildInventorySyncPacket(looter!));
+            _inventorySaveChannel.Writer.TryWrite(BuildInventorySaveRequest(looter!));
+        }
 
         if (result.ItemLostToFullInventory)
             conn.Peer.SendPacket(new InventoryActionFailedPacket { Reason = InventoryActionFailedReason.InventoryFull });
@@ -887,6 +1013,109 @@ public sealed class GameServer : INetEventListener
         }
 
         return packet;
+    }
+
+    /// <summary>Baut den vollen Persistenz-Snapshot aus dem aktuellen Entity-Zustand (M5a, siehe
+    /// InventorySaveRequest) - CharacterId muss gesetzt sein (nur Spieler-Entities lösen Inventaraktionen
+    /// aus, siehe Handle-Methoden unten).</summary>
+    private static InventorySaveRequest BuildInventorySaveRequest(Entity entity)
+    {
+        var slots = new List<(int SlotIndex, int ItemId)>();
+        for (int slotIndex = 0; slotIndex < entity.Inventory.Length; slotIndex++)
+        {
+            int itemId = entity.Inventory[slotIndex];
+            if (itemId != 0)
+                slots.Add((slotIndex, itemId));
+        }
+
+        return new InventorySaveRequest(entity.CharacterId!.Value, slots,
+            entity.EquippedArmorItemId, entity.EquippedHelmetItemId, entity.EquippedWeaponItemId, entity.EquippedShieldItemId);
+    }
+
+    /// <summary>EquipItemRequestPacket-Handler (M5a): ruft World.TryEquip auf. Erfolg: siehe
+    /// ApplyInventoryAndAppearanceChange. Fehlschlag: InventoryActionFailedPacket nur an den Anfragenden,
+    /// Verbindung bleibt bestehen.</summary>
+    private void HandleEquipItemRequest(ConnectionState conn, EquipItemRequestPacket request)
+    {
+        if (conn.EntityId is not int entityId)
+        {
+            _logger.Warn($"EquipItemRequest vor Join von Verbindung {conn.Peer.Id}");
+            conn.Peer.Disconnect();
+            return;
+        }
+
+        (bool success, InventoryActionFailedReason reason) = _world.TryEquip(entityId, request.InventorySlotIndex);
+        if (!success)
+        {
+            conn.Peer.SendPacket(new InventoryActionFailedPacket { Reason = reason });
+            return;
+        }
+
+        ApplyInventoryAndAppearanceChange(conn, entityId);
+    }
+
+    /// <summary>UnequipItemRequestPacket-Handler (M5a): ruft World.TryUnequip auf, sonst wie
+    /// HandleEquipItemRequest.</summary>
+    private void HandleUnequipItemRequest(ConnectionState conn, UnequipItemRequestPacket request)
+    {
+        if (conn.EntityId is not int entityId)
+        {
+            _logger.Warn($"UnequipItemRequest vor Join von Verbindung {conn.Peer.Id}");
+            conn.Peer.Disconnect();
+            return;
+        }
+
+        (bool success, InventoryActionFailedReason reason) = _world.TryUnequip(entityId, request.EquipmentSlot);
+        if (!success)
+        {
+            conn.Peer.SendPacket(new InventoryActionFailedPacket { Reason = reason });
+            return;
+        }
+
+        ApplyInventoryAndAppearanceChange(conn, entityId);
+    }
+
+    /// <summary>UseConsumableRequestPacket-Handler (M5a): ruft World.TryUseConsumable auf. Erfolg:
+    /// InventorySyncPacket an den Anfragenden plus asynchrones Speichern - bewusst KEIN Appearance-/
+    /// HP-Sync-Paket (Ausrüstung ändert sich dabei nie, HP-Anzeige beim Client ist ohnehin nur reaktiv über
+    /// EntityDamaged, siehe docs/tasks/M5a-items-equipment.md - "echte Health-Bars" ist wie in M4a nicht im
+    /// Umfang). Fehlschlag: InventoryActionFailedPacket nur an den Anfragenden.</summary>
+    private void HandleUseConsumableRequest(ConnectionState conn, UseConsumableRequestPacket request)
+    {
+        if (conn.EntityId is not int entityId)
+        {
+            _logger.Warn($"UseConsumableRequest vor Join von Verbindung {conn.Peer.Id}");
+            conn.Peer.Disconnect();
+            return;
+        }
+
+        (bool success, InventoryActionFailedReason reason) = _world.TryUseConsumable(entityId, request.InventorySlotIndex, _nowMs());
+        if (!success)
+        {
+            conn.Peer.SendPacket(new InventoryActionFailedPacket { Reason = reason });
+            return;
+        }
+
+        if (_world.TryGet(entityId, out Entity? entity))
+        {
+            conn.Peer.SendPacket(BuildInventorySyncPacket(entity!));
+            _inventorySaveChannel.Writer.TryWrite(BuildInventorySaveRequest(entity!));
+        }
+    }
+
+    /// <summary>Gemeinsame Netzwerk-Seite von Equip/Unequip (M5a) - beide ändern das Inventar UND
+    /// möglicherweise die sichtbare Ausrüstung: InventorySyncPacket an den Anfragenden selbst,
+    /// AppearanceChangedPacket an alle AOI-Beobachter inklusive der Entity selbst (siehe SendToVisible -
+    /// eigenes Paket statt EntityDespawn+EntitySpawn, siehe PacketId.AppearanceChanged-Kommentar), plus
+    /// asynchrones Speichern (siehe InventorySaveRequest).</summary>
+    private void ApplyInventoryAndAppearanceChange(ConnectionState conn, int entityId)
+    {
+        if (!_world.TryGet(entityId, out Entity? entity)) return; // sollte nicht vorkommen - Entity gerade erst erfolgreich geändert.
+
+        entity!.Appearance = ToAppearance(entity);
+        conn.Peer.SendPacket(BuildInventorySyncPacket(entity));
+        SendToVisible(entityId, new AppearanceChangedPacket { EntityId = entityId, Appearance = entity.Appearance });
+        _inventorySaveChannel.Writer.TryWrite(BuildInventorySaveRequest(entity));
     }
 
     /// <summary>Dev-Tools (siehe CLAUDE.md "Dev-Tools"): nur wirksam, wenn der Server mit

@@ -228,6 +228,16 @@ namespace Lumiis.Tests
         }
 
         [Fact]
+        public void AppearanceChanged_RoundTrip()
+        {
+            var appearance = new Appearance { BodyId = 1, HairStyleId = 2, HairColorId = 3, ArmorId = 4, HelmetId = 0, WeaponId = 2, ShieldId = 7 };
+            var original = new AppearanceChangedPacket { EntityId = 42, Appearance = appearance };
+            var decoded = Assert.IsType<AppearanceChangedPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.EntityId, decoded.EntityId);
+            Assert.Equal(original.Appearance, decoded.Appearance);
+        }
+
+        [Fact]
         public void Decode_HonorsOffsetAndCount()
         {
             byte[] body = PacketCodec.Encode(new MoveToPacket { X = 1, Y = 2 });

@@ -30,6 +30,12 @@ namespace Lumiis.Shared.Net
         YangChanged = 1009,
         InventorySync = 1010,
         InventoryActionFailed = 1011,
+
+        /// <summary>M5a: Aussehen einer Entity hat sich geändert (Equip/Unequip einer Waffe/Rüstung/Helm/
+        /// Schild) - an alle AOI-Beobachter inklusive der Entity selbst (siehe GameServer.SendToVisible),
+        /// eigenes Paket statt EntityDespawn+EntitySpawn (würde clientseitigen Animations-/Blickrichtungs-
+        /// zustand unnötig zurücksetzen).</summary>
+        AppearanceChanged = 1012,
     }
 
     /// <summary>Jede neue PacketId braucht hier eine Zeile (ein Test prüft das).</summary>
@@ -58,6 +64,7 @@ namespace Lumiis.Shared.Net
                 case PacketId.UseConsumableRequest: return new UseConsumableRequestPacket();
                 case PacketId.InventorySync: return new InventorySyncPacket();
                 case PacketId.InventoryActionFailed: return new InventoryActionFailedPacket();
+                case PacketId.AppearanceChanged: return new AppearanceChangedPacket();
                 default: return null;
             }
         }

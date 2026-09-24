@@ -5,6 +5,7 @@ using System.Threading;
 using LiteNetLib;
 using Lumiis.Data;
 using Lumiis.Data.Classes;
+using Lumiis.Data.Items;
 using Lumiis.Data.Maps;
 using Lumiis.Data.Mobs;
 using Lumiis.Server;
@@ -42,7 +43,8 @@ namespace Lumiis.Tests.Integration
             public TokenService TokenService { get; }
 
             public ServerFixture(Func<long>? nowMs = null, Func<long>? tokenNowUnixSeconds = null, CollisionMap? collisionMap = null,
-                MobCatalog? mobCatalog = null, SpawnCatalog? spawnCatalog = null, ClassCatalog? classCatalog = null, bool allowDebugCommands = false)
+                MobCatalog? mobCatalog = null, SpawnCatalog? spawnCatalog = null, ClassCatalog? classCatalog = null,
+                ItemCatalog? itemCatalog = null, bool allowDebugCommands = false)
             {
                 DbContextOptions<LumiisDbContext> options = new DbContextOptionsBuilder<LumiisDbContext>()
                     .UseInMemoryDatabase("gameserver-test-" + Guid.NewGuid())
@@ -57,7 +59,7 @@ namespace Lumiis.Tests.Integration
                     RejectGraceMs = 100, // echte Uhr, kleiner Wert - siehe M1-fixes.md Punkt 2
                     AllowDebugCommands = allowDebugCommands
                 };
-                Server = new GameServer(config, new NullLogger(), TokenService, _dbFactory, nowMs, collisionMap, mobCatalog, spawnCatalog, classCatalog);
+                Server = new GameServer(config, new NullLogger(), TokenService, _dbFactory, nowMs, collisionMap, mobCatalog, spawnCatalog, classCatalog, itemCatalog);
             }
 
             public (int CharacterId, string Token) CreateCharacter(string name, int? positionX = null, int? positionY = null, int? accountId = null)
@@ -226,12 +228,60 @@ namespace Lumiis.Tests.Integration
                 Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
 
                 // Ruestung/Helm/Waffe/Schild (M5a: jetzt ueber ItemCatalog aus EquippedXItemId aufgeloest,
-                // siehe Abschnitt 6) werden dort mit echten Items erneut abgedeckt - hier nur noch Koerper/
-                // Haare, die weiterhin direkt aus der Character-Zeile kommen.
+                // siehe JoinAccepted_ResolvesEquippedItemsToLookIds) werden dort mit echten Items abgedeckt -
+                // hier nur noch Koerper/Haare, die weiterhin direkt aus der Character-Zeile kommen.
                 Appearance appearance = client.Received.OfType<JoinAcceptedPacket>().First().Appearance;
                 Assert.Equal(1, appearance.BodyId);
                 Assert.Equal(2, appearance.HairStyleId);
                 Assert.Equal(3, appearance.HairColorId);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        /// <summary>M5a: EquippedWeaponItemId auf der Character-Zeile wird beim Join über ItemCatalog zu
+        /// einer LookId aufgelöst (siehe GameServer.CompleteJoin/ToAppearance) - kein direktes Durchreichen
+        /// einer DB-Spalte mehr wie vor M5a.</summary>
+        [Fact]
+        public void JoinAccepted_ResolvesEquippedItemsToLookIds()
+        {
+            ItemCatalog itemCatalog = ItemCatalog.LoadFromJson(@"{
+  ""items"": [
+    { ""id"": 1, ""name"": ""Testschwert"", ""itemType"": ""Weapon"", ""lookId"": 1, ""attackBonus"": 2, ""defenseBonus"": 0 }
+  ]
+}", TestLookCatalogs.CreateMinimal());
+
+            var fixture = new ServerFixture(itemCatalog: itemCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice");
+                using (LumiisDbContext db = fixture.OpenDb())
+                {
+                    Character character = db.Characters.Single(c => c.Id == characterId);
+                    character.EquippedWeaponItemId = 1;
+                    db.SaveChanges();
+                }
+
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+
+                Appearance appearance = client.Received.OfType<JoinAcceptedPacket>().First().Appearance;
+                Assert.Equal(1, appearance.WeaponId); // LookId aus dem Item, nicht die ItemId selbst.
+                Assert.Equal(0, appearance.ArmorId);
+                Assert.Equal(0, appearance.HelmetId);
+                Assert.Equal(0, appearance.ShieldId);
+
+                InventorySyncPacket sync = client.Received.OfType<InventorySyncPacket>().First();
+                Assert.Equal(1, sync.EquippedWeaponItemId); // hier weiterhin die ItemId, nicht die LookId.
+                Assert.Empty(sync.Slots);
             }
             finally
             {
