@@ -66,5 +66,55 @@ namespace Lumiis.Tests.Data.Mobs
             const string json = @"{ ""mobs"": [] }";
             Assert.Throws<MobCatalogException>(() => MobCatalog.LoadFromJson(json));
         }
+
+        [Fact]
+        public void LoadFromJson_WithDrops_ExposesDrops()
+        {
+            const string json = @"{
+  ""mobs"": [
+    { ""id"": 1, ""name"": ""A"", ""speedWire"": 100, ""wanderRadiusWire"": 100, ""wanderIntervalMinMs"": 1000, ""wanderIntervalMaxMs"": 2000, ""maxHp"": 10, ""attack"": 1, ""defense"": 0, ""yangMin"": 1, ""yangMax"": 1, ""meleeRangeWire"": 100, ""attackCooldownMs"": 500, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 300,
+      ""drops"": [ { ""itemId"": 8, ""chancePercent"": 30 }, { ""itemId"": 6, ""chancePercent"": 10 } ] }
+  ]
+}";
+            MobCatalog catalog = MobCatalog.LoadFromJson(json);
+            Assert.True(catalog.TryGet(1, out MobDefinition mob));
+            Assert.Equal(2, mob.Drops.Count);
+            Assert.Equal(8, mob.Drops[0].ItemId);
+            Assert.Equal(30, mob.Drops[0].ChancePercent);
+        }
+
+        [Fact]
+        public void LoadFromJson_NoDrops_ExposesEmptyDropsList()
+        {
+            MobCatalog catalog = MobCatalog.LoadFromJson(ValidJson);
+            Assert.True(catalog.TryGet(1, out MobDefinition mob));
+            Assert.Empty(mob.Drops);
+        }
+
+        [Fact]
+        public void LoadFromJson_DropWithInvalidItemId_Throws()
+        {
+            const string json = @"{
+  ""mobs"": [
+    { ""id"": 1, ""name"": ""A"", ""speedWire"": 100, ""wanderRadiusWire"": 100, ""wanderIntervalMinMs"": 1000, ""wanderIntervalMaxMs"": 2000, ""maxHp"": 10, ""attack"": 1, ""defense"": 0, ""yangMin"": 1, ""yangMax"": 1, ""meleeRangeWire"": 100, ""attackCooldownMs"": 500, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 300,
+      ""drops"": [ { ""itemId"": 0, ""chancePercent"": 30 } ] }
+  ]
+}";
+            var ex = Assert.Throws<MobCatalogException>(() => MobCatalog.LoadFromJson(json));
+            Assert.Contains("itemId <= 0", ex.Message);
+        }
+
+        [Fact]
+        public void LoadFromJson_DropWithChancePercentOutOfRange_Throws()
+        {
+            const string json = @"{
+  ""mobs"": [
+    { ""id"": 1, ""name"": ""A"", ""speedWire"": 100, ""wanderRadiusWire"": 100, ""wanderIntervalMinMs"": 1000, ""wanderIntervalMaxMs"": 2000, ""maxHp"": 10, ""attack"": 1, ""defense"": 0, ""yangMin"": 1, ""yangMax"": 1, ""meleeRangeWire"": 100, ""attackCooldownMs"": 500, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 300,
+      ""drops"": [ { ""itemId"": 8, ""chancePercent"": 101 } ] }
+  ]
+}";
+            var ex = Assert.Throws<MobCatalogException>(() => MobCatalog.LoadFromJson(json));
+            Assert.Contains("chancePercent", ex.Message);
+        }
     }
 }

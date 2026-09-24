@@ -1111,6 +1111,24 @@ namespace Lumiis.Tests.Integration
             return CollisionMap.LoadFromBytes(bytes, width, height);
         }
 
+        /// <summary>Sendet wiederholt AttackRequestPacket gegen targetEntityId, bis mindestens
+        /// minDamagePacketCount EntityDamagedPackets für dieses Ziel angekommen sind (Cooldown lehnt
+        /// einzelne Versuche ab, das ist erwartet, siehe AttackerKillsMonster-Test oben) oder ein 5s-Timeout
+        /// erreicht ist.</summary>
+        private static void AttackUntilDamaged(GameServer server, TestClient client, int targetEntityId, int minDamagePacketCount)
+        {
+            DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+            while (DateTime.UtcNow < deadline
+                && client.Received.OfType<EntityDamagedPacket>().Count(d => d.TargetEntityId == targetEntityId) < minDamagePacketCount)
+            {
+                client.Send(new AttackRequestPacket { TargetEntityId = targetEntityId });
+                server.Update();
+                client.Poll();
+                Thread.Sleep(15);
+            }
+            Assert.True(client.Received.OfType<EntityDamagedPacket>().Count(d => d.TargetEntityId == targetEntityId) >= minDamagePacketCount);
+        }
+
         [Fact]
         public void BotNearSpawnPoint_SeesMonsterSpawnAndEventualMovement()
         {
@@ -1226,6 +1244,89 @@ namespace Lumiis.Tests.Integration
                 long lastYang = attacker.Received.OfType<YangChangedPacket>().Last().NewTotal;
                 Assert.InRange(lastYang, 5, 15);
                 Assert.Empty(observer.Received.OfType<YangChangedPacket>());
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        // ---- M5a: Items/Inventar (siehe docs/tasks/M5a-items-equipment.md) ----
+
+        [Fact]
+        public void KillWithGuaranteedDrop_ThenEquipDroppedWeapon_IncreasesDamageOnNextHit()
+        {
+            // Monster A: 1 Treffer toetet es sicher (maxHp 10 < 15 Basis-Angriff), garantierter Drop
+            // (chancePercent 100, siehe World.TryAttack - deterministisch, kein Random-Seed noetig).
+            // Monster B: hohes MaxHp (stirbt nicht), dient als Schaden-Dummy vor/nach dem Ausruesten.
+            MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
+              ""mobs"": [
+                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 10, ""attack"": 5, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 0, ""meleeRangeWire"": 130, ""attackCooldownMs"": 700, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 700,
+                  ""drops"": [ { ""itemId"": 1, ""chancePercent"": 100 } ] },
+                { ""id"": 2, ""name"": ""Waldschrat"", ""speedWire"": 200, ""wanderRadiusWire"": 300, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 9999, ""attack"": 0, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 0, ""meleeRangeWire"": 150, ""attackCooldownMs"": 700, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 700 }
+              ]
+            }");
+            CollisionMap openMap = BuildOpenCollisionMap();
+            SpawnCatalog spawnCatalog = SpawnCatalog.LoadFromJson(@"{
+              ""spawns"": [
+                { ""id"": 1, ""mobId"": 1, ""positionX"": 50000, ""positionY"": 50000, ""respawnSeconds"": 999999 },
+                { ""id"": 2, ""mobId"": 2, ""positionX"": 50000, ""positionY"": 50000, ""respawnSeconds"": 999999 }
+              ]
+            }", mobCatalog, openMap);
+            ClassCatalog classCatalog = ClassCatalog.LoadFromJson(@"{
+              ""classes"": [ { ""name"": ""Krieger"", ""maxHp"": 100, ""attack"": 15, ""defense"": 0, ""meleeRangeWire"": 150, ""attackCooldownMs"": 50 } ]
+            }");
+            ItemCatalog itemCatalog = ItemCatalog.LoadFromJson(@"{
+              ""items"": [ { ""id"": 1, ""name"": ""Testschwert"", ""itemType"": ""Weapon"", ""lookId"": 1, ""attackBonus"": 50, ""defenseBonus"": 0 } ]
+            }", TestLookCatalogs.CreateMinimal());
+
+            var fixture = new ServerFixture(collisionMap: openMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog,
+                classCatalog: classCatalog, itemCatalog: itemCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice", positionX: 50000, positionY: 50000);
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+
+                // Startwaffe: keine (Testcharakter wird ohne EquippedWeaponItemId angelegt) - InventorySync
+                // beim Join ist leer.
+                InventorySyncPacket joinSync = client.Received.OfType<InventorySyncPacket>().First();
+                Assert.Empty(joinSync.Slots);
+                Assert.Equal(0, joinSync.EquippedWeaponItemId);
+
+                Assert.True(Pump(() => client.Received.OfType<EntitySpawnPacket>().Count(s => s.Kind == EntityKind.Monster) >= 2, server, client));
+                int wildhundId = client.Received.OfType<EntitySpawnPacket>().First(s => s.Kind == EntityKind.Monster && s.MobId == 1).EntityId;
+                int waldschratId = client.Received.OfType<EntitySpawnPacket>().First(s => s.Kind == EntityKind.Monster && s.MobId == 2).EntityId;
+
+                // Wildhund toeten (1 Treffer reicht, siehe MaxHp) - garantierter Drop.
+                client.Send(new AttackRequestPacket { TargetEntityId = wildhundId });
+                Assert.True(Pump(() => client.Received.OfType<EntityDiedPacket>().Any(d => d.EntityId == wildhundId), server, client));
+
+                InventorySyncPacket afterDrop = client.Received.OfType<InventorySyncPacket>().Last();
+                Assert.Contains(afterDrop.Slots, s => s.ItemId == 1);
+                int droppedSlotIndex = afterDrop.Slots.First(s => s.ItemId == 1).SlotIndex;
+
+                // Schaden VOR dem Ausruesten (Basis-Angriff 15, Verteidigung Waldschrat 0) - wiederholt
+                // versuchen (Cooldown 50ms lehnt einzelne Versuche ab, das ist erwartet), bis ein Treffer ankommt.
+                AttackUntilDamaged(server, client, waldschratId, minDamagePacketCount: 1);
+                int damageBeforeEquip = client.Received.OfType<EntityDamagedPacket>().First(d => d.TargetEntityId == waldschratId).Damage;
+                Assert.Equal(15, damageBeforeEquip);
+
+                // Ausruesten: InventorySync (Waffe jetzt ausgeruestet) UND AppearanceChanged kommen an.
+                client.Send(new EquipItemRequestPacket { InventorySlotIndex = droppedSlotIndex });
+                Assert.True(Pump(() => client.Received.OfType<InventorySyncPacket>().Any(s => s.EquippedWeaponItemId == 1), server, client));
+                Assert.Contains(client.Received.OfType<AppearanceChangedPacket>(), a => a.Appearance.WeaponId == 1); // LookId aus dem Item.
+
+                // Schaden NACH dem Ausruesten - um genau den AttackBonus (50) hoeher.
+                AttackUntilDamaged(server, client, waldschratId, minDamagePacketCount: 2);
+                int damageAfterEquip = client.Received.OfType<EntityDamagedPacket>().Last(d => d.TargetEntityId == waldschratId).Damage;
+                Assert.Equal(damageBeforeEquip + 50, damageAfterEquip);
             }
             finally
             {
