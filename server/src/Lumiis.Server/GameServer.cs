@@ -72,6 +72,18 @@ public sealed class GameServer : INetEventListener
     private readonly record struct InventorySaveRequest(int CharacterId, List<(int SlotIndex, int ItemId)> Slots,
         int EquippedArmorItemId, int EquippedHelmetItemId, int EquippedWeaponItemId, int EquippedShieldItemId);
 
+    /// <summary>Voller Yang- PLUS Inventar-/Ausrüstungs-Zustand (M5b, Kauf/Verkauf ändern beide zusammen),
+    /// per Channel an den Hintergrund-Task übergeben (siehe RunCharacterSaveConsumerAsync) - eigener,
+    /// dritter Channel statt Wiederverwendung von YangSaveRequest/InventorySaveRequest (siehe
+    /// docs/tasks/M5b-shop.md Abschnitt 0d): der Consumer schreibt beides in EINEM SaveChangesAsync-Aufruf
+    /// (EF Core fasst alle Änderungen eines SaveChangesAsync automatisch in einer Transaktion zusammen),
+    /// damit ein Absturz zwischen zwei separaten Writes nie einen Yang-neu/Inventar-alt-Zwischenstand (oder
+    /// umgekehrt) in der DB hinterlassen kann. Monster-Kill-Yang (nur Yang) und Equip/Unequip/Consumable/
+    /// Drop (nur Inventar) bleiben bewusst auf ihren bestehenden, getrennten Channels - dort ändert sich
+    /// jeweils nur eine der beiden Seiten, eine kombinierte Transaktion brächte dort keinen Vorteil.</summary>
+    private readonly record struct CharacterSaveRequest(int CharacterId, long Yang, List<(int SlotIndex, int ItemId)> Slots,
+        int EquippedArmorItemId, int EquippedHelmetItemId, int EquippedWeaponItemId, int EquippedShieldItemId);
+
     private const int MaxConsecutiveFailedTicks = 50;
 
     /// <summary>Fix, keine Konfiguration (siehe CLAUDE.md "Bekannte Lücken") - alle 30s wird die Position
@@ -110,10 +122,12 @@ public sealed class GameServer : INetEventListener
     private readonly Channel<PositionSaveRequest> _positionSaveChannel;
     private readonly Channel<YangSaveRequest> _yangSaveChannel;
     private readonly Channel<InventorySaveRequest> _inventorySaveChannel;
+    private readonly Channel<CharacterSaveRequest> _characterSaveChannel;
     private readonly CancellationTokenSource _positionSaveCts = new();
     private Task? _positionSaveConsumerTask;
     private Task? _yangSaveConsumerTask;
     private Task? _inventorySaveConsumerTask;
+    private Task? _characterSaveConsumerTask;
     private uint _tick;
     private int _consecutiveFailedTicks;
 
@@ -209,6 +223,15 @@ public sealed class GameServer : INetEventListener
             SingleReader = true,
             SingleWriter = true
         });
+
+        // Gleicher Mechanismus, eigener Channel (siehe CharacterSaveRequest-Kommentar) - immer ein voller
+        // Yang- plus Inventar-Snapshot, DropOldest bleibt sicher.
+        _characterSaveChannel = Channel.CreateBounded<CharacterSaveRequest>(new BoundedChannelOptions(config.MaxPlayers)
+        {
+            FullMode = BoundedChannelFullMode.DropOldest,
+            SingleReader = true,
+            SingleWriter = true
+        });
     }
 
     /// <summary>Tatsächlich gebundener Port (nach Start relevant, falls ServerConfig.Port 0 war).</summary>
@@ -220,6 +243,7 @@ public sealed class GameServer : INetEventListener
         _positionSaveConsumerTask = Task.Run(() => RunPositionSaveConsumerAsync(_positionSaveCts.Token));
         _yangSaveConsumerTask = Task.Run(() => RunYangSaveConsumerAsync(_positionSaveCts.Token));
         _inventorySaveConsumerTask = Task.Run(() => RunInventorySaveConsumerAsync(_positionSaveCts.Token));
+        _characterSaveConsumerTask = Task.Run(() => RunCharacterSaveConsumerAsync(_positionSaveCts.Token));
         _logger.Info($"Server gestartet auf Port {_netManager.LocalPort} (max. {_config.MaxPlayers} Spieler)");
     }
 
@@ -229,6 +253,7 @@ public sealed class GameServer : INetEventListener
         _positionSaveChannel.Writer.TryComplete();
         _yangSaveChannel.Writer.TryComplete();
         _inventorySaveChannel.Writer.TryComplete();
+        _characterSaveChannel.Writer.TryComplete();
         _positionSaveCts.Cancel();
         _logger.Info("Server gestoppt");
     }
@@ -506,6 +531,49 @@ public sealed class GameServer : INetEventListener
         }
     }
 
+    /// <summary>Läuft auf einem Threadpool-Thread, NIE auf dem Game-Loop-Thread (M5b, siehe
+    /// HandleBuyItemRequest/HandleSellItemRequest). Schreibt Yang PLUS das komplette Inventar/die Ausrüstung
+    /// in einem einzigen SaveChangesAsync-Aufruf - EF Core fasst das automatisch in einer Transaktion
+    /// zusammen (siehe CharacterSaveRequest-Kommentar), ein Absturz mittendrin kann also nie einen
+    /// halb-gespeicherten Zustand hinterlassen. Fehler werden geloggt, bringen den Server nicht zum Absturz -
+    /// der nächste Kauf/Verkauf dieses Charakters versucht es erneut mit dem dann aktuellen Stand.</summary>
+    private async Task RunCharacterSaveConsumerAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await foreach (CharacterSaveRequest request in _characterSaveChannel.Reader.ReadAllAsync(cancellationToken))
+            {
+                try
+                {
+                    await using LumiisDbContext db = _dbContextFactory();
+                    Character? character = await db.Characters.Include(c => c.InventoryItems)
+                        .SingleOrDefaultAsync(c => c.Id == request.CharacterId, cancellationToken);
+                    if (character == null) continue; // Charakter inzwischen gelöscht o. Ä. - kein Fehler, einfach überspringen.
+
+                    character.Yang = request.Yang;
+                    character.EquippedArmorItemId = request.EquippedArmorItemId == 0 ? null : request.EquippedArmorItemId;
+                    character.EquippedHelmetItemId = request.EquippedHelmetItemId == 0 ? null : request.EquippedHelmetItemId;
+                    character.EquippedWeaponItemId = request.EquippedWeaponItemId == 0 ? null : request.EquippedWeaponItemId;
+                    character.EquippedShieldItemId = request.EquippedShieldItemId == 0 ? null : request.EquippedShieldItemId;
+
+                    db.CharacterInventoryItems.RemoveRange(character.InventoryItems);
+                    foreach ((int slotIndex, int itemId) in request.Slots)
+                        character.InventoryItems.Add(new CharacterInventoryItem { CharacterId = request.CharacterId, SlotIndex = slotIndex, ItemId = itemId });
+
+                    await db.SaveChangesAsync(cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"Fehler beim Speichern von Yang+Inventar für Charakter {request.CharacterId}: {ex}");
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Erwarteter Abbruch beim Stop() - kein Fehler.
+        }
+    }
+
     /// <summary>Fester 25-Hz-Loop (Stopwatch, Catch-up begrenzt), bis der Token abgebrochen wird.</summary>
     public void Run(CancellationToken cancellationToken)
     {
@@ -675,6 +743,18 @@ public sealed class GameServer : INetEventListener
                 break;
             case UseConsumableRequestPacket useConsumable:
                 HandleUseConsumableRequest(conn, useConsumable);
+                break;
+            case OpenShopRequestPacket openShop:
+                HandleOpenShopRequest(conn, openShop);
+                break;
+            case BuyItemRequestPacket buyItem:
+                HandleBuyItemRequest(conn, buyItem);
+                break;
+            case SellItemRequestPacket sellItem:
+                HandleSellItemRequest(conn, sellItem);
+                break;
+            case DebugGiveYangRequestPacket debugGiveYang:
+                HandleDebugGiveYangRequest(conn, debugGiveYang);
                 break;
             default:
                 _logger.Warn($"Unerwartetes Paket {packet.Id} von Verbindung {conn.Peer.Id}");
@@ -1058,6 +1138,22 @@ public sealed class GameServer : INetEventListener
             entity.EquippedArmorItemId, entity.EquippedHelmetItemId, entity.EquippedWeaponItemId, entity.EquippedShieldItemId);
     }
 
+    /// <summary>M5b: wie BuildInventorySaveRequest, zusätzlich Yang - für den kombinierten
+    /// CharacterSaveRequest-Channel (Kauf/Verkauf, siehe SendShopActionSuccess).</summary>
+    private static CharacterSaveRequest BuildCharacterSaveRequest(Entity entity)
+    {
+        var slots = new List<(int SlotIndex, int ItemId)>();
+        for (int slotIndex = 0; slotIndex < entity.Inventory.Length; slotIndex++)
+        {
+            int itemId = entity.Inventory[slotIndex];
+            if (itemId != 0)
+                slots.Add((slotIndex, itemId));
+        }
+
+        return new CharacterSaveRequest(entity.CharacterId!.Value, entity.Yang, slots,
+            entity.EquippedArmorItemId, entity.EquippedHelmetItemId, entity.EquippedWeaponItemId, entity.EquippedShieldItemId);
+    }
+
     /// <summary>EquipItemRequestPacket-Handler (M5a): ruft World.TryEquip auf. Erfolg: siehe
     /// ApplyInventoryAndAppearanceChange. Fehlschlag: InventoryActionFailedPacket nur an den Anfragenden,
     /// Verbindung bleibt bestehen.</summary>
@@ -1145,6 +1241,124 @@ public sealed class GameServer : INetEventListener
         conn.Peer.SendPacket(BuildInventorySyncPacket(entity));
         SendToVisible(entityId, new AppearanceChangedPacket { EntityId = entityId, Appearance = entity.Appearance });
         _inventorySaveChannel.Writer.TryWrite(BuildInventorySaveRequest(entity));
+    }
+
+    /// <summary>OpenShopRequestPacket-Handler (M5b): ruft World.TryOpenShop auf. Erfolg: ShopContentPacket
+    /// nur an den Anfragenden - Sortiment wird hier aus npcEntity.ShopItemIds + ItemCatalog aufgelöst (kein
+    /// erneuter NpcCatalog-Zugriff nötig, siehe Entity.ShopItemIds-Kommentar). Fehlschlag:
+    /// ShopActionFailedPacket nur an den Anfragenden, Verbindung bleibt bestehen, geloggt.</summary>
+    private void HandleOpenShopRequest(ConnectionState conn, OpenShopRequestPacket request)
+    {
+        if (conn.EntityId is not int entityId)
+        {
+            _logger.Warn($"OpenShopRequest vor Join von Verbindung {conn.Peer.Id}");
+            conn.Peer.Disconnect();
+            return;
+        }
+
+        (bool success, ShopActionFailedReason reason) = _world.TryOpenShop(entityId, request.NpcEntityId);
+        if (!success)
+        {
+            conn.Peer.SendPacket(new ShopActionFailedPacket { Reason = reason });
+            _logger.Info($"OpenShopRequest von Entity {entityId} auf NPC {request.NpcEntityId} abgelehnt ({reason})");
+            return;
+        }
+
+        if (!_world.TryGet(request.NpcEntityId, out Entity? npc)) return; // sollte nicht vorkommen - TryOpenShop hat das gerade bestätigt.
+
+        var content = new ShopContentPacket { NpcEntityId = request.NpcEntityId };
+        foreach (int itemId in npc!.ShopItemIds)
+        {
+            if (_itemCatalog != null && _itemCatalog.TryGet(itemId, out ItemDefinition item))
+                content.Items.Add((itemId, item.BuyPrice));
+        }
+        conn.Peer.SendPacket(content);
+    }
+
+    /// <summary>BuyItemRequestPacket-Handler (M5b): ruft World.TryBuy auf, sonst wie
+    /// HandleOpenShopRequest - Erfolg siehe SendShopActionSuccess.</summary>
+    private void HandleBuyItemRequest(ConnectionState conn, BuyItemRequestPacket request)
+    {
+        if (conn.EntityId is not int entityId)
+        {
+            _logger.Warn($"BuyItemRequest vor Join von Verbindung {conn.Peer.Id}");
+            conn.Peer.Disconnect();
+            return;
+        }
+
+        (bool success, ShopActionFailedReason reason) = _world.TryBuy(entityId, request.NpcEntityId, request.ItemId);
+        if (!success)
+        {
+            conn.Peer.SendPacket(new ShopActionFailedPacket { Reason = reason });
+            _logger.Info($"BuyItemRequest von Entity {entityId} (Item {request.ItemId}, NPC {request.NpcEntityId}) abgelehnt ({reason})");
+            return;
+        }
+
+        SendShopActionSuccess(conn, entityId);
+        _logger.Info($"Entity {entityId} kauft Item {request.ItemId} bei NPC {request.NpcEntityId}");
+    }
+
+    /// <summary>SellItemRequestPacket-Handler (M5b): ruft World.TrySell auf, sonst wie
+    /// HandleOpenShopRequest - Erfolg siehe SendShopActionSuccess.</summary>
+    private void HandleSellItemRequest(ConnectionState conn, SellItemRequestPacket request)
+    {
+        if (conn.EntityId is not int entityId)
+        {
+            _logger.Warn($"SellItemRequest vor Join von Verbindung {conn.Peer.Id}");
+            conn.Peer.Disconnect();
+            return;
+        }
+
+        (bool success, ShopActionFailedReason reason) = _world.TrySell(entityId, request.NpcEntityId, request.InventorySlotIndex);
+        if (!success)
+        {
+            conn.Peer.SendPacket(new ShopActionFailedPacket { Reason = reason });
+            _logger.Info($"SellItemRequest von Entity {entityId} (Slot {request.InventorySlotIndex}, NPC {request.NpcEntityId}) abgelehnt ({reason})");
+            return;
+        }
+
+        SendShopActionSuccess(conn, entityId);
+        _logger.Info($"Entity {entityId} verkauft Inventarplatz {request.InventorySlotIndex} bei NPC {request.NpcEntityId}");
+    }
+
+    /// <summary>Gemeinsame Erfolgs-Netzwerk-Seite von Buy/Sell (M5b): InventorySyncPacket + YangChangedPacket
+    /// an den Spieler selbst (kein neues Erfolgspaket, siehe docs/tasks/M5b-shop.md Abschnitt 2), plus
+    /// asynchrones Speichern von Yang UND Inventar/Ausrüstung in einer Transaktion (kombinierter
+    /// CharacterSaveRequest, siehe Abschnitt 0d/RunCharacterSaveConsumerAsync).</summary>
+    private void SendShopActionSuccess(ConnectionState conn, int entityId)
+    {
+        if (!_world.TryGet(entityId, out Entity? entity)) return; // sollte nicht vorkommen - Entity gerade erst erfolgreich geändert.
+
+        conn.Peer.SendPacket(BuildInventorySyncPacket(entity!));
+        conn.Peer.SendPacket(new YangChangedPacket { NewTotal = entity!.Yang });
+        _characterSaveChannel.Writer.TryWrite(BuildCharacterSaveRequest(entity));
+    }
+
+    /// <summary>Dev-Tool (siehe CLAUDE.md "Dev-Tools"): nur wirksam, wenn der Server mit
+    /// --allow-debug-commands gestartet wurde - sonst still verworfen, analog zu HandleDebugSpawnMonster.
+    /// Schreibt Amount über die gemeinsame Yang-Methode (World.CreditYang, MaxYang-Deckel) gut und meldet
+    /// YangChangedPacket - nutzt bewusst den bestehenden, reinen Yang-Channel (kein Inventarbezug hier,
+    /// anders als bei Kauf/Verkauf).</summary>
+    private void HandleDebugGiveYangRequest(ConnectionState conn, DebugGiveYangRequestPacket request)
+    {
+        if (!_config.AllowDebugCommands)
+        {
+            _logger.Warn($"DebugGiveYangRequest von Verbindung {conn.Peer.Id} ohne --allow-debug-commands ignoriert");
+            return;
+        }
+
+        if (conn.EntityId is not int entityId || !_world.TryGet(entityId, out Entity? entity))
+        {
+            _logger.Warn($"DebugGiveYangRequest vor Join von Verbindung {conn.Peer.Id}");
+            return;
+        }
+
+        _world.CreditYang(entityId, request.Amount);
+        conn.Peer.SendPacket(new YangChangedPacket { NewTotal = entity!.Yang });
+        if (entity.CharacterId is int characterId)
+            _yangSaveChannel.Writer.TryWrite(new YangSaveRequest(characterId, entity.Yang));
+
+        _logger.Info($"Dev-Tools: Entity {entityId} bekommt {request.Amount} Yang (neuer Stand {entity.Yang})");
     }
 
     /// <summary>Dev-Tools (siehe CLAUDE.md "Dev-Tools"): nur wirksam, wenn der Server mit
