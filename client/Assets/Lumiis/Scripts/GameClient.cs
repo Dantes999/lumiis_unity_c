@@ -31,6 +31,11 @@ namespace Lumiis.Client
         private CharacterTestboard _sortingTestboard;
         private Vector2 _debugPanelScroll;
 
+        /// <summary>Bildschirmbereich des Debug-Test-Panels (siehe DrawDebugTestPanel) - wird dort jeden Frame
+        /// aktualisiert. HandleClickInput prüft das, damit ein Klick auf einen Button im Panel nicht
+        /// zusätzlich als Bewegungs-/Angriffsbefehl in die Welt durchschlägt.</summary>
+        private Rect _debugPanelRect;
+
         // Dev-Tools-Debug-Spawn (siehe CLAUDE.md "Dev-Tools"): fest hinterlegte Mob-Typen statt eines
         // geladenen Katalogs - der Client kennt mobs.json bewusst nicht (siehe CLAUDE.md Abschnitt "Monster"),
         // dieselbe kleine, feste MobId-Zuordnung wie MonsterShapeFor/MonsterColorFor, nur um einen Anzeigenamen
@@ -318,6 +323,7 @@ namespace Lumiis.Client
             const float w = 240f;
             float h = Mathf.Min(700f, Screen.height - 20f);
             Rect area = new Rect(Screen.width - w - 10f, 10f, w, h);
+            _debugPanelRect = area;
             GUILayout.BeginArea(area, GUI.skin.box);
             _debugPanelScroll = GUILayout.BeginScrollView(_debugPanelScroll);
 
@@ -530,6 +536,7 @@ namespace Lumiis.Client
         private void HandleClickInput()
         {
             if (Mouse.current == null) return;
+            if (IsPointerOverDebugPanel()) return; // Klick auf einen Debug-Panel-Button soll die Figur nicht bewegen/angreifen lassen.
 
             if (Mouse.current.leftButton.wasPressedThisFrame)
             {
@@ -541,6 +548,21 @@ namespace Lumiis.Client
 
             if (Mouse.current.rightButton.wasPressedThisFrame)
                 HandleRightClickAttack();
+        }
+
+        /// <summary>Wandelt die Input-System-Mausposition (Ursprung unten links) in GUI-Koordinaten (Ursprung
+        /// oben links) um und prüft sie gegen das zuletzt gezeichnete Debug-Panel-Rechteck - nur im Editor/
+        /// Development-Build vorhanden (das Panel existiert nur dort, siehe DrawDebugTestPanel), in Release-
+        /// Builds also immer false.</summary>
+        private bool IsPointerOverDebugPanel()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Vector2 mousePos = Mouse.current.position.ReadValue();
+            Vector2 guiPos = new Vector2(mousePos.x, Screen.height - mousePos.y);
+            return _debugPanelRect.Contains(guiPos);
+#else
+            return false;
+#endif
         }
 
         /// <summary>M4a: Rechtsklick auf ein sichtbares Monster sendet AttackRequestPacket - Bounds-Check auf
