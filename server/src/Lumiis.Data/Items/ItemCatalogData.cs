@@ -15,6 +15,12 @@ internal sealed class ItemEntryDto
     public int AttackBonus { get; set; }
     public int DefenseBonus { get; set; }
     public int HealAmount { get; set; }
+
+    /// <summary>M5b: Kaufpreis im Shop (0 = nicht im Sortiment kaufbar, siehe NpcCatalog).</summary>
+    public long BuyPrice { get; set; }
+
+    /// <summary>M5b: Verkaufspreis im Shop (0 = nicht verkäuflich, siehe World.TrySell).</summary>
+    public long SellPrice { get; set; }
 }
 
 internal sealed class ItemCatalogDto

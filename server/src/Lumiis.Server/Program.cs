@@ -5,6 +5,7 @@ using Lumiis.Data.Items;
 using Lumiis.Data.Looks;
 using Lumiis.Data.Maps;
 using Lumiis.Data.Mobs;
+using Lumiis.Data.Npcs;
 using Lumiis.Server;
 using Lumiis.Server.Logging;
 using Lumiis.Server.Net;
@@ -97,6 +98,24 @@ catch (Exception ex)
     return 1;
 }
 
+// Ebenfalls nur "village" hartkodiert (siehe Kommentar oben). NpcSpawnCatalog braucht NpcCatalog+
+// CollisionMap zur Validierung (analog zu SpawnCatalog für Monster). looks.json wird hier erneut geladen
+// (bewusst eine eigene, kleine Instanz statt Wiederverwendung der obigen - günstig, hält die Datenblöcke
+// unabhängig voneinander, siehe Item-Daten-Block).
+NpcCatalog npcCatalog;
+NpcSpawnCatalog npcSpawnCatalog;
+try
+{
+    LookCatalog npcLookCatalog = LookCatalog.LoadFromFile(Path.Combine(config.DataDir, "looks.json"));
+    npcCatalog = NpcCatalog.LoadFromFile(Path.Combine(config.DataDir, "npcs.json"), itemCatalog, npcLookCatalog);
+    npcSpawnCatalog = NpcSpawnCatalog.LoadFromFile(Path.Combine(config.DataDir, "maps", "village", "npcs.json"), npcCatalog, collisionMap);
+}
+catch (Exception ex)
+{
+    logger.Error($"Serverstart fehlgeschlagen (NPC-Daten): {ex.Message}");
+    return 1;
+}
+
 // Dieselben Variablen, dieselbe Fail-Fast-Regel wie Lumiis.Auth (siehe CLAUDE.md): fehlt eine, bricht der
 // Start mit klarer Meldung ab. Keine eigene Migration hier (bleibt Sache von Auth in Development).
 string connectionString;
@@ -125,7 +144,7 @@ Console.CancelKeyPress += (_, eventArgs) =>
     cts.Cancel();
 };
 
-GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, collisionMap: collisionMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog, classCatalog: classCatalog, itemCatalog: itemCatalog);
+GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, collisionMap: collisionMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog, classCatalog: classCatalog, itemCatalog: itemCatalog, npcCatalog: npcCatalog, npcSpawnCatalog: npcSpawnCatalog);
 
 try
 {

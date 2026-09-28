@@ -229,6 +229,21 @@ public sealed class Entity
             aggressive, aggroRangeWire, leashRangeWire, drops ?? System.Array.Empty<(int, int)>());
     }
 
+    /// <summary>M5b: ein statischer NPC (Shop-Händler) - keine Bewegung (movementSpeed 0, kein Wander-
+    /// Zustand), keine SpawnPointId (kein Respawn-Scheduling, das ist ohnehin an Kind=Monster gebunden, siehe
+    /// SpawnPointId-Kommentar), keine CharacterId. Kampfwerte bleiben auf den Default-Konstanten (nie
+    /// gelesen: TryAttack lehnt Kind=Npc als Ziel ab, bevor irgendein Kampfwert relevant würde, siehe
+    /// docs/tasks/M5b-shop.md Abschnitt 0a). Appearance wird von außen gesetzt (siehe Entity.Appearance,
+    /// GameServer-Konstruktor - analog zu Spielern/CompleteJoin, nicht wie bei Monstern ungenutzt).</summary>
+    public static Entity CreateNpc(int id, int npcId, string name, int x, int y)
+    {
+        return new Entity(id, EntityKind.Npc, characterId: null, npcId, spawnPointId: null, respawnSeconds: 0, name, x, y, movementSpeed: 0,
+            wanderRadiusWire: 0, wanderIntervalMinMs: 0, wanderIntervalMaxMs: 0,
+            maxHp: DefaultMaxHp, attack: DefaultAttack, defense: DefaultDefense,
+            meleeRangeWire: DefaultMeleeRangeWire, attackCooldownMs: DefaultAttackCooldownMs, yangMin: 0, yangMax: 0,
+            aggressive: false, aggroRangeWire: 0, leashRangeWire: 0, drops: System.Array.Empty<(int, int)>());
+    }
+
     public void MoveTo(int targetX, int targetY, int speed)
     {
         TargetX = targetX;

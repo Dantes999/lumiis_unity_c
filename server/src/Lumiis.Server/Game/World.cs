@@ -128,6 +128,24 @@ public sealed class World
         return entity;
     }
 
+    /// <summary>Legt eine statische NPC-Entity an (M5b, Serverstart, siehe GameServer-Konstruktor) - EntityId
+    /// aus demselben Zähler wie Spieler/Monster, kein Verbindungsbezug, kein Spielerlimit-Check. x/y kommen
+    /// bereits geprüft aus NpcSpawnCatalog (begehbare Zelle), werden hier trotzdem defensiv auf die
+    /// Kartengrenzen geklemmt, analog zu SpawnMonster/TryJoin. appearance kommt direkt aus der NpcCatalog
+    /// (anders als bei Monstern: NPCs haben eine echte, sichtbare Ausrüstung, siehe Entity.CreateNpc-
+    /// Kommentar).</summary>
+    public Entity SpawnNpc(int npcId, string name, int x, int y, Appearance appearance)
+    {
+        int clampedX = Math.Clamp(x, 0, GameConstants.MapWidth);
+        int clampedY = Math.Clamp(y, 0, GameConstants.MapHeight);
+
+        int id = _nextEntityId++;
+        Entity entity = Entity.CreateNpc(id, npcId, name, clampedX, clampedY);
+        entity.Appearance = appearance;
+        _entities[id] = entity;
+        return entity;
+    }
+
     /// <summary>Dev-Tools-Debug-Spawn (siehe GameServer.HandleDebugSpawnMonster): ein Punkt in zufälliger
     /// Richtung, offsetMin..offsetMax Wire-Einheiten von anchor entfernt, auf Kartengrenzen geklemmt. Ist die
     /// Zielzelle blockiert, wird (wie bei RunWanderAi) kein Retry versucht - stattdessen anchor selbst

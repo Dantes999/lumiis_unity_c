@@ -29,7 +29,15 @@ public sealed class ItemDefinition
     public int DefenseBonus { get; }
     public int HealAmount { get; }
 
-    public ItemDefinition(int id, string name, ItemType itemType, int lookId, int attackBonus, int defenseBonus, int healAmount)
+    /// <summary>M5b: Kaufpreis im Shop - 0 bedeutet "nicht direkt kaufbar" (z. B. Startwaffe), ein NPC-Sortiment
+    /// darf ein solches Item nicht listen (siehe NpcCatalog).</summary>
+    public long BuyPrice { get; }
+
+    /// <summary>M5b: Verkaufspreis im Shop - 0 bedeutet "nicht verkäuflich" (siehe World.TrySell).</summary>
+    public long SellPrice { get; }
+
+    public ItemDefinition(int id, string name, ItemType itemType, int lookId, int attackBonus, int defenseBonus, int healAmount,
+        long buyPrice, long sellPrice)
     {
         Id = id;
         Name = name;
@@ -38,6 +46,8 @@ public sealed class ItemDefinition
         AttackBonus = attackBonus;
         DefenseBonus = defenseBonus;
         HealAmount = healAmount;
+        BuyPrice = buyPrice;
+        SellPrice = sellPrice;
     }
 
     /// <summary>Nur bei Armor/Helmet/Weapon/Shield true - Consumables können nicht angelegt werden.</summary>
@@ -119,7 +129,13 @@ public sealed class ItemCatalog
                 }
             }
 
-            byId[entry.Id] = new ItemDefinition(entry.Id, entry.Name, itemType, entry.LookId, entry.AttackBonus, entry.DefenseBonus, entry.HealAmount);
+            if (entry.BuyPrice < 0)
+                throw new ItemCatalogException($"items.json: Item {entry.Id} ({entry.Name}) hat buyPrice < 0.");
+            if (entry.SellPrice < 0)
+                throw new ItemCatalogException($"items.json: Item {entry.Id} ({entry.Name}) hat sellPrice < 0.");
+
+            byId[entry.Id] = new ItemDefinition(entry.Id, entry.Name, itemType, entry.LookId, entry.AttackBonus, entry.DefenseBonus, entry.HealAmount,
+                entry.BuyPrice, entry.SellPrice);
         }
 
         if (byId.Count == 0)

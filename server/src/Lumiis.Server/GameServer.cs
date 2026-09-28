@@ -14,6 +14,7 @@ using Lumiis.Data.Classes;
 using Lumiis.Data.Items;
 using Lumiis.Data.Maps;
 using Lumiis.Data.Mobs;
+using Lumiis.Data.Npcs;
 using Lumiis.Server.Game;
 using Lumiis.Server.Logging;
 using Lumiis.Server.Net;
@@ -99,6 +100,11 @@ public sealed class GameServer : INetEventListener
     /// <summary>An World durchgereicht (siehe World-Konstruktor) UND hier für ToAppearance/CompleteJoin
     /// gehalten (Equipped-ItemId -> LookId auflösen, M5a).</summary>
     private readonly ItemCatalog? _itemCatalog;
+
+    /// <summary>M5b: für ShopContentPacket gehalten (Sortiment eines NPCs auflösen, siehe
+    /// HandleOpenShopRequest) - der reguläre Katalog-Spawn im Konstruktor braucht die Referenz danach nicht
+    /// mehr.</summary>
+    private readonly NpcCatalog? _npcCatalog;
     private readonly NetManager _netManager;
     private readonly ILogger _logger;
     private readonly Func<long> _nowMs;
@@ -130,10 +136,12 @@ public sealed class GameServer : INetEventListener
     /// data/classes.json (M4a). itemCatalog: null bedeutet "keine Items" (z. B. bestehende Tests ohne
     /// Item-Bezug) - Ausrüstung wird dann als LookId 0 (leer) dargestellt und Equip/Unequip/UseConsumable
     /// schlagen defensiv fehl (siehe World.TryEquip etc.). Program.cs lädt beim echten Serverstart immer eine
-    /// Instanz aus data/items.json (M5a).</summary>
+    /// Instanz aus data/items.json (M5a). npcCatalog/npcSpawnCatalog: null bedeutet "keine NPCs" (z. B.
+    /// bestehende Tests ohne Shop-Bezug) - Program.cs lädt beim echten Serverstart immer beide. NPCs werden
+    /// hier einmalig beim Serverstart angelegt, analog zu Monstern (siehe docs/tasks/M5b-shop.md).</summary>
     public GameServer(ServerConfig config, ILogger logger, TokenService tokenService, Func<LumiisDbContext> dbContextFactory,
         Func<long>? nowMs = null, CollisionMap? collisionMap = null, MobCatalog? mobCatalog = null, SpawnCatalog? spawnCatalog = null,
-        ClassCatalog? classCatalog = null, ItemCatalog? itemCatalog = null)
+        ClassCatalog? classCatalog = null, ItemCatalog? itemCatalog = null, NpcCatalog? npcCatalog = null, NpcSpawnCatalog? npcSpawnCatalog = null)
     {
         _config = config;
         _logger = logger;
@@ -142,6 +150,7 @@ public sealed class GameServer : INetEventListener
         _classCatalog = classCatalog;
         _mobCatalog = mobCatalog;
         _itemCatalog = itemCatalog;
+        _npcCatalog = npcCatalog;
         _world = new World(config.MaxPlayers, collisionMap, itemCatalog: itemCatalog);
         _netManager = new NetManager(this) { UpdateTime = 15 };
         _nowMs = nowMs ?? DefaultNowMs;
@@ -158,6 +167,15 @@ public sealed class GameServer : INetEventListener
                     meleeRangeWire: mobDef.MeleeRangeWire, attackCooldownMs: mobDef.AttackCooldownMs,
                     aggressive: mobDef.Aggressive, aggroRangeWire: mobDef.AggroRangeWire, leashRangeWire: mobDef.LeashRangeWire,
                     drops: mobDef.Drops.Select(d => (d.ItemId, d.ChancePercent)).ToList());
+            }
+        }
+
+        if (npcSpawnCatalog != null && npcCatalog != null)
+        {
+            foreach (NpcPlacement placement in npcSpawnCatalog.Placements)
+            {
+                npcCatalog.TryGet(placement.NpcId, out NpcDefinition npcDef); // Existenz bereits von NpcSpawnCatalog.LoadFromFile geprüft.
+                _world.SpawnNpc(placement.NpcId, npcDef.Name, placement.PositionX, placement.PositionY, npcDef.Appearance);
             }
         }
 
