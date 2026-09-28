@@ -272,7 +272,12 @@ public sealed class GameServer : INetEventListener
         // Stillstand gekommen" und der Client setzt die Position beim Empfang hart, exakt die
         // Teleport-Semantik (siehe docs/tasks/M4a-combat-core.md Abschnitt 5).
         foreach (Entity entity in respawned)
+        {
             SendToVisible(entity.Id, new EntityStopPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY });
+            // Bugfix nach M5a: Respawn setzt CurrentHp = MaxHp (siehe World.Tick), ohne dieses Paket bliebe
+            // die Leben-Anzeige beim Client auf 0 stehen (letzter Stand vor dem Tod).
+            SendToVisible(entity.Id, new EntityHpChangedPacket { EntityId = entity.Id, CurrentHp = entity.CurrentHp, MaxHp = entity.MaxHp });
+        }
 
         // Wander-KI (World.Tick) hat fälligen Monstern ein neues Ziel gesetzt - dieselbe EntityMove-
         // Benachrichtigung wie bei einem Spieler-MoveTo (HandleMoveTo), nur ohne eingehendes Paket als Auslöser.
@@ -357,6 +362,7 @@ public sealed class GameServer : INetEventListener
                 if (!_world.TryGet(otherId, out Entity? other)) continue; // sollte nicht vorkommen (Entity gerade erst in ComputeVisibility gesehen)
 
                 conn.Peer.SendPacket(new EntitySpawnPacket { EntityId = other!.Id, Name = other.Name, X = other.IntX, Y = other.IntY, Appearance = other.Appearance, Kind = other.Kind, MobId = other.MobId });
+                SendHpIfDamaged(conn.Peer, other);
                 if (other.IsMoving)
                 {
                     conn.Peer.SendPacket(new EntityMovePacket
@@ -809,6 +815,7 @@ public sealed class GameServer : INetEventListener
             if (!_world.TryGet(otherId, out Entity? other)) continue; // sollte nicht vorkommen
 
             conn.Peer.SendPacket(new EntitySpawnPacket { EntityId = other!.Id, Name = other.Name, X = other.IntX, Y = other.IntY, Appearance = other.Appearance, Kind = other.Kind, MobId = other.MobId });
+            SendHpIfDamaged(conn.Peer, other);
             if (other.IsMoving)
             {
                 conn.Peer.SendPacket(new EntityMovePacket
@@ -1100,6 +1107,9 @@ public sealed class GameServer : INetEventListener
         {
             conn.Peer.SendPacket(BuildInventorySyncPacket(entity!));
             _inventorySaveChannel.Writer.TryWrite(BuildInventorySaveRequest(entity!));
+            // Bugfix nach M5a: Heiltrank ändert CurrentHp ohne Treffer - ohne dieses Paket bliebe die
+            // Leben-Anzeige beim Client (und bei allen AOI-Beobachtern) auf dem alten Wert stehen.
+            SendToVisible(entityId, new EntityHpChangedPacket { EntityId = entityId, CurrentHp = entity!.CurrentHp, MaxHp = entity.MaxHp });
         }
     }
 
@@ -1154,6 +1164,17 @@ public sealed class GameServer : INetEventListener
             drops: mobDef.Drops.Select(d => (d.ItemId, d.ChancePercent)).ToList());
 
         _logger.Info($"Dev-Tools: {mobDef.Name} bei ({x},{y}) gespawnt (angefordert von Entity {senderId})");
+    }
+
+    /// <summary>Bugfix nach M5a: EntitySpawnPacket trägt kein Leben - eine Entity, die schon vor dem Betreten
+    /// der AOI eines Beobachters beschädigt war (z. B. ein Monster mitten im Kampf, oder ein Spieler, der sich
+    /// nach einem Treffer wieder nähert), würde ohne diesen Zusatz-Versand als "voll geheilt" erscheinen, bis
+    /// sie erneut getroffen wird. Wird direkt nach jedem EntitySpawnPacket für eine fremde Entity aufgerufen
+    /// (CompleteJoin/UpdateVisibility) - kein Sonderfall, einfach ein no-op bei vollem Leben.</summary>
+    private static void SendHpIfDamaged(NetPeer peer, Entity entity)
+    {
+        if (entity.CurrentHp < entity.MaxHp)
+            peer.SendPacket(new EntityHpChangedPacket { EntityId = entity.Id, CurrentHp = entity.CurrentHp, MaxHp = entity.MaxHp });
     }
 
     /// <summary>Benachrichtigt alle Verbindungen, die diese Entity laut ihrem letzten VisibleEntityIds-Stand
