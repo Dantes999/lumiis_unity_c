@@ -1,5 +1,36 @@
 {
   "classes": [
-    { "name": "Krieger", "maxHp": 100, "attack": 15, "defense": 5, "meleeRangeWire": 150, "attackCooldownMs": 800 }
+    {
+      "name": "Krieger",
+      "meleeRangeWire": 150,
+      "attackCooldownMs": 800,
+
+      "baseHp": 68,
+      "baseSp": 12,
+      "baseAttack": 3,
+      "baseDefense": 3,
+
+      "baseSt": 6,
+      "baseHt": 4,
+      "baseDx": 3,
+      "baseIq": 3,
+
+      "hpPerHt": 8,
+      "hpPerLevel": 10,
+      "spPerIq": 6,
+      "spPerLevel": 4,
+      "attackPerSt": 2,
+      "htPerDefense": 2,
+      "dodgeBpPerDx": 50,
+      "dodgeCapBp": 4000,
+
+      "statPointsPerLevel": 3,
+      "skillPointsPerLevel": 1,
+
+      "regenDelayMs": 5000,
+      "regenIntervalMs": 1000,
+      "hpRegenPercent": 1,
+      "spRegenPercent": 2
+    }
   ]
 }

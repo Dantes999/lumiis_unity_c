@@ -1,0 +1,27 @@
+{
+  "maxLevel": 25,
+
+  "xpToNext": [
+    90, 200, 330, 480, 650, 840, 1050, 1280, 1530, 1800,
+    2090, 2400, 2730, 3080, 3450, 3840, 4250, 4680, 5130, 5600,
+    6090, 6600, 7130, 7680
+  ],
+
+  "levelDiffPercent": [
+    { "maxDiff": -4, "percent": 120 },
+    { "maxDiff": -3, "percent": 115 },
+    { "maxDiff": -2, "percent": 110 },
+    { "maxDiff": -1, "percent": 105 },
+    { "maxDiff": 0, "percent": 100 },
+    { "maxDiff": 1, "percent": 95 },
+    { "maxDiff": 2, "percent": 90 },
+    { "maxDiff": 3, "percent": 80 },
+    { "maxDiff": 4, "percent": 70 },
+    { "maxDiff": 5, "percent": 60 },
+    { "maxDiff": 6, "percent": 45 },
+    { "maxDiff": 7, "percent": 30 },
+    { "maxDiff": 8, "percent": 20 },
+    { "maxDiff": 9, "percent": 15 },
+    { "maxDiff": 999999, "percent": 10 }
+  ]
+}
