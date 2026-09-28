@@ -568,6 +568,13 @@ namespace Lumiis.Client
                 return;
             }
 
+            EntityHpChangedPacket hpChanged = packet as EntityHpChangedPacket;
+            if (hpChanged != null)
+            {
+                _world.HandleEntityHpChanged(hpChanged.EntityId, hpChanged.CurrentHp, hpChanged.MaxHp);
+                return;
+            }
+
             EntityDiedPacket died = packet as EntityDiedPacket;
             if (died != null)
             {

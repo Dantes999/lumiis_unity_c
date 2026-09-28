@@ -137,8 +137,24 @@ namespace Lumiis.Client
         /// Tick-Runde bereits despawnt wurde), anders als bei Move/Stop keine Warnung nötig.</summary>
         public void HandleEntityDamaged(int targetEntityId, int hpAfter, int maxHp)
         {
-            if (!_entities.TryGetValue(targetEntityId, out ClientEntity entity)) return;
-            entity.CurrentHp = hpAfter;
+            ApplyHp(targetEntityId, hpAfter, maxHp);
+        }
+
+        /// <summary>Bugfix nach M5a: Leben-Änderung ohne Treffer (Heiltrank, Spieler-Respawn, bereits
+        /// verletzte Entity beim Betreten der AOI - siehe EntityHpChangedPacket-Kommentar). Derselbe
+        /// Zustandspfad wie HandleEntityDamaged (ApplyHp) - kein zweiter Codepfad, das Overlay liest in
+        /// beiden Fällen denselben ClientEntity.CurrentHp/MaxHp.</summary>
+        public void HandleEntityHpChanged(int entityId, int currentHp, int maxHp)
+        {
+            ApplyHp(entityId, currentHp, maxHp);
+        }
+
+        /// <summary>Gemeinsamer Schreibpfad für jede Art von Leben-Änderung (Treffer oder nicht) - siehe
+        /// HandleEntityDamaged/HandleEntityHpChanged. Unbekannte Entity-Id ist kein Fehler, siehe dort.</summary>
+        private void ApplyHp(int entityId, int currentHp, int maxHp)
+        {
+            if (!_entities.TryGetValue(entityId, out ClientEntity entity)) return;
+            entity.CurrentHp = currentHp;
             entity.MaxHp = maxHp;
         }
 
