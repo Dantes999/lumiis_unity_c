@@ -1243,10 +1243,13 @@ namespace Lumiis.Tests.Integration
                     && observer.Received.OfType<EntityDespawnPacket>().Any(d => d.EntityId == monsterId), server, attacker, observer));
 
                 // Yang nur beim Angreifer, im erwarteten Bereich - nur der Todesschlag zahlt aus (yangMin..yangMax).
-                Assert.True(attacker.Received.OfType<YangChangedPacket>().Any());
+                // Beide bekommen beim Join je ein YangChangedPacket mit dem Anfangsstand (Bugfix Yang-Anzeige) -
+                // beim Beobachter bleibt das der EINZIGE (0, unveraendert), er wird nie zusaetzlich gutgeschrieben.
+                Assert.True(attacker.Received.OfType<YangChangedPacket>().Count() >= 2); // Join (0) + Kill-Gutschrift.
                 long lastYang = attacker.Received.OfType<YangChangedPacket>().Last().NewTotal;
                 Assert.InRange(lastYang, 5, 15);
-                Assert.Empty(observer.Received.OfType<YangChangedPacket>());
+                Assert.Single(observer.Received.OfType<YangChangedPacket>());
+                Assert.Equal(0, observer.Received.OfType<YangChangedPacket>().Single().NewTotal);
             }
             finally
             {
@@ -1550,17 +1553,20 @@ namespace Lumiis.Tests.Integration
                 Assert.Equal(npcEntityId, content.NpcEntityId);
                 Assert.Contains(content.Items, i => i.ItemId == 1 && i.BuyPrice == 200);
 
-                // Kauf mit ausreichend Yang -> InventorySync + YangChanged.
+                // Vor dem Kauf steht bereits der beim Join verschickte Anfangsstand (Bugfix Yang-Anzeige) fest.
+                Assert.Equal(500, client.Received.OfType<YangChangedPacket>().Single().NewTotal);
+
+                // Kauf mit ausreichend Yang -> InventorySync + YangChanged. Auf den KONKRETEN neuen Stand warten
+                // (nicht nur "irgendein YangChangedPacket") - der Join-Stand allein würde die Pump-Bedingung
+                // sonst schon vor dem eigentlichen Kauf-Paket erfüllen.
                 client.Send(new BuyItemRequestPacket { NpcEntityId = npcEntityId, ItemId = 1 });
-                Assert.True(Pump(() => client.Received.OfType<YangChangedPacket>().Any(), server, client));
-                Assert.Equal(300, client.Received.OfType<YangChangedPacket>().Last().NewTotal); // 500 - 200
+                Assert.True(Pump(() => client.Received.OfType<YangChangedPacket>().Any(p => p.NewTotal == 300), server, client)); // 500 - 200
                 Assert.Contains(client.Received.OfType<InventorySyncPacket>().Last().Slots, s => s.ItemId == 1);
                 int boughtSlotIndex = client.Received.OfType<InventorySyncPacket>().Last().Slots.First(s => s.ItemId == 1).SlotIndex;
 
                 // Verkauf desselben Items zurueck -> erneut InventorySync + YangChanged.
                 client.Send(new SellItemRequestPacket { NpcEntityId = npcEntityId, InventorySlotIndex = boughtSlotIndex });
-                Assert.True(Pump(() => client.Received.OfType<YangChangedPacket>().Count() >= 2, server, client));
-                Assert.Equal(380, client.Received.OfType<YangChangedPacket>().Last().NewTotal); // 300 + 80
+                Assert.True(Pump(() => client.Received.OfType<YangChangedPacket>().Any(p => p.NewTotal == 380), server, client)); // 300 + 80
                 Assert.DoesNotContain(client.Received.OfType<InventorySyncPacket>().Last().Slots, s => s.ItemId == 1);
             }
             finally
@@ -1605,7 +1611,9 @@ namespace Lumiis.Tests.Integration
                 Assert.True(Pump(() => client.Received.OfType<ShopActionFailedPacket>().Any(), server, client));
 
                 Assert.Equal(ShopActionFailedReason.OutOfRange, client.Received.OfType<ShopActionFailedPacket>().First().Reason);
-                Assert.Empty(client.Received.OfType<YangChangedPacket>());
+                // Nur der Join-Anfangsstand (Bugfix Yang-Anzeige, 500 unveraendert) - keine zusaetzliche
+                // Gutschrift/Abbuchung durch den abgelehnten Kauf.
+                Assert.Equal(500, client.Received.OfType<YangChangedPacket>().Single().NewTotal);
                 Assert.Empty(client.Received.OfType<InventorySyncPacket>().SelectMany(p => p.Slots));
             }
             finally
@@ -1678,6 +1686,103 @@ namespace Lumiis.Tests.Integration
 
                 InventorySyncPacket rejoinSync = rejoinClient.Received.OfType<InventorySyncPacket>().First();
                 Assert.Contains(rejoinSync.Slots, s => s.ItemId == 1);
+
+                // Bugfix Yang-Anzeige: der Anfangsstand beim erneuten Join muss dem gespeicherten Stand
+                // entsprechen (300, nicht 0 oder der alte 500er Stand von vor dem Kauf).
+                Assert.Equal(300, rejoinClient.Received.OfType<YangChangedPacket>().Single().NewTotal);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        // ---- Bugfix: Yang-Anzeige beim Join (kein Anfangswert ohne YangChangedPacket direkt nach Join) ----
+
+        [Fact]
+        public void Join_WithStoredYang_SendsYangChangedWithStoredValueRightAfterJoin()
+        {
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice");
+                using (LumiisDbContext db = fixture.OpenDb())
+                {
+                    Character character = db.Characters.Single(c => c.Id == characterId);
+                    character.Yang = 1234;
+                    db.SaveChanges();
+                }
+
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<YangChangedPacket>().Any(), server, client));
+
+                Assert.True(client.Received.OfType<JoinAcceptedPacket>().Any());
+                Assert.Equal(1234, client.Received.OfType<YangChangedPacket>().Single().NewTotal);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        /// <summary>Einheitliches Verhalten, kein Sonderfall für Yang=0 (siehe docs/tasks-Bugfix-Auftrag) - ein
+        /// frisch erstellter Charakter (Yang startet bei 0, siehe Character.Yang-Default) bekommt genauso ein
+        /// YangChangedPacket wie einer mit einem echten Stand.</summary>
+        [Fact]
+        public void Join_WithZeroYang_StillSendsYangChanged()
+        {
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice"); // Yang bleibt beim DB-Default 0.
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+
+                Assert.Equal(0, client.Received.OfType<YangChangedPacket>().Single().NewTotal);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        /// <summary>Gleiche Fehlerklasse, zweite betroffene Stelle aus dem Audit: JoinAcceptedPacket trägt kein
+        /// Leben, die eigene Lebensanzeige blieb bis zum ersten Treffer auf "-" stehen (Entity.CurrentHp wird
+        /// nie aus der DB geladen, eine frische Entity startet immer bei MaxHp - siehe World.TryJoin) - jetzt
+        /// schickt CompleteJoin unbedingt ein EntityHpChangedPacket für die eigene Entity mit.</summary>
+        [Fact]
+        public void Join_SendsEntityHpChangedForOwnEntity()
+        {
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice");
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+                int ownEntityId = client.Received.OfType<JoinAcceptedPacket>().First().EntityId;
+
+                Assert.True(Pump(() => client.Received.OfType<EntityHpChangedPacket>().Any(p => p.EntityId == ownEntityId), server, client));
+                EntityHpChangedPacket hp = client.Received.OfType<EntityHpChangedPacket>().Single(p => p.EntityId == ownEntityId);
+                Assert.Equal(hp.MaxHp, hp.CurrentHp); // frische Entity, immer volles Leben.
+                Assert.True(hp.MaxHp > 0);
             }
             finally
             {
