@@ -18,6 +18,11 @@ namespace Lumiis.Client
         public int attackBonus;
         public int defenseBonus;
         public int healAmount;
+
+        /// <summary>M5b: Verkaufspreis (0 = nicht verkäuflich) - fürs Shop-Panel gebraucht (kein Paket trägt
+        /// Verkaufspreise, nur BuyPrice über ShopContentPacket, siehe GameClient.DrawShopPanel). BuyPrice wird
+        /// hier bewusst NICHT geladen - die kommt beim Kaufen ohnehin autoritativ vom Server.</summary>
+        public long sellPrice;
     }
 
     [Serializable]
@@ -27,11 +32,11 @@ namespace Lumiis.Client
     }
 
     /// <summary>Lädt items.json aus StreamingAssets (JsonUtility, analog zu LookCatalogClient) - der Client
-    /// braucht das für das Debug-Panel (M5a): Anzeigename und ItemType je ItemId, um zwischen "Anlegen" und
-    /// "Benutzen" zu entscheiden. LookId/AttackBonus/DefenseBonus/HealAmount werden hier bewusst NICHT
-    /// gebraucht (keine echte Inventar-Grafik, kein clientseitiger Schaden-/Heilungs-Vorschau-Text, siehe
-    /// CLAUDE.md Abschnitt "Items und Inventar") - trotzdem mitgeladen, um dieselbe Struktur wie
-    /// data/items.json 1:1 abzubilden.</summary>
+    /// braucht das für das Debug-Panel: Anzeigename und ItemType je ItemId (M5a, um zwischen "Anlegen" und
+    /// "Benutzen" zu entscheiden) sowie SellPrice (M5b, Shop-Panel). LookId/AttackBonus/DefenseBonus/
+    /// HealAmount werden hier bewusst NICHT gebraucht (keine echte Inventar-Grafik, kein clientseitiger
+    /// Schaden-/Heilungs-Vorschau-Text, siehe CLAUDE.md Abschnitt "Items und Inventar") - trotzdem
+    /// mitgeladen, um dieselbe Struktur wie data/items.json 1:1 abzubilden.</summary>
     public sealed class ItemCatalogClient
     {
         private readonly Dictionary<int, ItemEntryJson> _byId = new Dictionary<int, ItemEntryJson>();

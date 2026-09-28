@@ -91,6 +91,35 @@ namespace Lumiis.Client
             Send(new UseConsumableRequestPacket { InventorySlotIndex = inventorySlotIndex });
         }
 
+        /// <summary>M5b: Rechtsklick auf einen sichtbaren NPC (siehe GameClient.HandleRightClickAttack).</summary>
+        public void SendOpenShop(int npcEntityId)
+        {
+            if (_peer == null || !IsConnected) return;
+            Send(new OpenShopRequestPacket { NpcEntityId = npcEntityId });
+        }
+
+        /// <summary>M5b: "Kaufen"-Knopf im Shop-Panel.</summary>
+        public void SendBuyItem(int npcEntityId, int itemId)
+        {
+            if (_peer == null || !IsConnected) return;
+            Send(new BuyItemRequestPacket { NpcEntityId = npcEntityId, ItemId = itemId });
+        }
+
+        /// <summary>M5b: "Verkaufen"-Knopf im Shop-Panel.</summary>
+        public void SendSellItem(int npcEntityId, int inventorySlotIndex)
+        {
+            if (_peer == null || !IsConnected) return;
+            Send(new SellItemRequestPacket { NpcEntityId = npcEntityId, InventorySlotIndex = inventorySlotIndex });
+        }
+
+        /// <summary>Dev-Tools (siehe CLAUDE.md "Dev-Tools", GameClient-Debug-Panel) - nur wirksam, wenn der
+        /// Server mit --allow-debug-commands gestartet wurde, sonst still ohne Wirkung.</summary>
+        public void SendDebugGiveYang(long amount)
+        {
+            if (_peer == null || !IsConnected) return;
+            Send(new DebugGiveYangRequestPacket { Amount = amount });
+        }
+
         private void Send(IPacket packet)
         {
             if (_peer == null) return;

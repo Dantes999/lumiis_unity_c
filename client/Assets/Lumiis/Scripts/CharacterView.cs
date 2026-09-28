@@ -84,6 +84,21 @@ namespace Lumiis.Client
             ApplySortingOrder();
         }
 
+        /// <summary>Bounds-Check statt echtem Collider-System (M5b, Rechtsklick auf einen NPC - siehe
+        /// GameClient.HandleRightClickAttack), analog zu MonsterView.ContainsWorldPoint - kombiniert die
+        /// Bounds aller Ebenen-Renderer (Paper Doll hat anders als MonsterView keinen einzelnen Renderer).</summary>
+        public bool ContainsWorldPoint(Vector3 worldPos)
+        {
+            SpriteRenderer[] renderers = GetComponentsInChildren<SpriteRenderer>();
+            if (renderers.Length == 0) return false;
+
+            Bounds bounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++)
+                bounds.Encapsulate(renderers[i].bounds);
+
+            return bounds.Contains(worldPos);
+        }
+
         /// <summary>Weltraum-Offset zum Kopf-Anker (Namensschild), gespiegelt bei FlipX. Fällt auf eine feste
         /// Höhe zurück, wenn kein Anker im Katalog hinterlegt ist.</summary>
         public Vector3 GetHeadWorldOffset()

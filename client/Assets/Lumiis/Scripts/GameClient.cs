@@ -62,6 +62,13 @@ namespace Lumiis.Client
         private int _equippedShieldItemId;
         private string _lastInventoryActionFailedMessage = "";
 
+        // ---- Shop (M5b, Debug-Panel-Stil - siehe DrawShopPanel) ----
+        // -1 = kein Shop offen. Sortiment kommt per ShopContentPacket (Resync bei jedem OpenShopRequest,
+        // kein Delta - dieselbe Philosophie wie InventorySyncPacket).
+        private int _shopOpenNpcEntityId = -1;
+        private readonly List<(int ItemId, long BuyPrice)> _shopItems = new List<(int, long)>();
+        private string _lastShopActionFailedMessage = "";
+
         private const float MinZoom = 3f;
         private const float MaxZoom = 300f;
         private const float ZoomStep = 1f;
@@ -148,9 +155,32 @@ namespace Lumiis.Client
             if (_inGame) HandleClickInput();
             HandleZoomInput();
             HandleDebugToggleInput();
+            UpdateShopAutoClose();
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             HandleDebugHotkeys();
 #endif
+        }
+
+        /// <summary>Reine Komfortfunktion (M5b) - schließt das offene Shop-Panel, sobald sich die eigene
+        /// Figur weiter als NpcInteractRangeWire vom NPC entfernt oder der NPC/die eigene Figur nicht mehr
+        /// bekannt ist (z. B. nach einem Despawn). Der Server prüft jede Shop-Aktion ohnehin serverautoritativ
+        /// erneut (siehe World.CheckShopAccess) - das hier verhindert nur ein sichtbar totes Panel.</summary>
+        private void UpdateShopAutoClose()
+        {
+            if (_shopOpenNpcEntityId < 0) return;
+
+            if (_world.LocalEntityId < 0
+                || !_world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity local)
+                || !_world.Entities.TryGetValue(_shopOpenNpcEntityId, out ClientEntity npc))
+            {
+                _shopOpenNpcEntityId = -1;
+                return;
+            }
+
+            double dx = local.X - npc.X;
+            double dy = local.Y - npc.Y;
+            if (dx * dx + dy * dy > (double)GameConstants.NpcInteractRangeWire * GameConstants.NpcInteractRangeWire)
+                _shopOpenNpcEntityId = -1;
         }
 
         private void HandleZoomInput()
@@ -310,8 +340,12 @@ namespace Lumiis.Client
             }
 
             DrawDebugSpawnRow();
+            GUILayout.Space(6);
+            if (GUILayout.Button("+1000 Yang"))
+                _netClient.SendDebugGiveYang(1000);
             DrawEquipmentPanel();
             DrawInventoryPanel();
+            DrawShopPanel();
 
             GUILayout.EndScrollView();
             GUILayout.EndArea();
@@ -380,6 +414,48 @@ namespace Lumiis.Client
                 _netClient.SendUseConsumable(slotIndex);
             else
                 _netClient.SendEquipItem(slotIndex);
+        }
+
+        /// <summary>M5b: nur sichtbar, solange ein Shop offen ist (Rechtsklick auf einen NPC, siehe
+        /// HandleRightClickAttack) - Titel mit NPC-Name (aus ClientWorld, das Paket selbst trägt keinen
+        /// Namen), Sortiment (Name/Preis/Kaufen-Knopf, aus ShopContentPacket), darunter die eigenen
+        /// Inventar-Slots mit Verkaufspreis (nur SellPrice &gt; 0, lokal aus items.json/ItemCatalogClient -
+        /// kein Paket trägt Verkaufspreise), aktueller Yang-Stand, Schließen-Knopf. Schließt sich zusätzlich
+        /// automatisch bei zu großer Distanz (siehe UpdateShopAutoClose).</summary>
+        private void DrawShopPanel()
+        {
+            if (_shopOpenNpcEntityId < 0) return;
+
+            GUILayout.Space(6);
+            string npcName = _world.Entities.TryGetValue(_shopOpenNpcEntityId, out ClientEntity npc) ? npc.Name : "Händler";
+            GUILayout.Label("Shop: " + npcName);
+
+            foreach ((int itemId, long buyPrice) in _shopItems)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(_itemCatalog.DisplayName(itemId) + " (" + buyPrice + " Yang)", GUILayout.Width(170));
+                if (GUILayout.Button("Kaufen", GUILayout.Width(60)))
+                    _netClient.SendBuyItem(_shopOpenNpcEntityId, itemId);
+                GUILayout.EndHorizontal();
+            }
+
+            GUILayout.Space(4);
+            GUILayout.Label("Verkaufen (Yang: " + _yangTotal + ")");
+            for (int slotIndex = 0; slotIndex < GameConstants.InventorySize; slotIndex++)
+            {
+                int itemId = FindItemInSlot(slotIndex);
+                if (itemId == 0) continue;
+                if (!_itemCatalog.TryGet(itemId, out ItemEntryJson entry) || entry.sellPrice <= 0) continue;
+
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(entry.name + " (" + entry.sellPrice + " Yang)", GUILayout.Width(170));
+                if (GUILayout.Button("Verkaufen", GUILayout.Width(70)))
+                    _netClient.SendSellItem(_shopOpenNpcEntityId, slotIndex);
+                GUILayout.EndHorizontal();
+            }
+
+            if (GUILayout.Button("Schließen"))
+                _shopOpenNpcEntityId = -1;
         }
 
         /// <summary>Dev-Tools (siehe CLAUDE.md "Dev-Tools"): Mob-Typ-Cycler + Spawnen-Knopf. Ohne
@@ -469,16 +545,29 @@ namespace Lumiis.Client
 
         /// <summary>M4a: Rechtsklick auf ein sichtbares Monster sendet AttackRequestPacket - Bounds-Check auf
         /// der MonsterView reicht (siehe MonsterView.ContainsWorldPoint), kein echtes Collider-System nötig.
-        /// Nur Monster sind Ziele (Spieler-Views werden absichtlich nicht geprüft - PvP wird vom Server
-        /// ohnehin abgelehnt, siehe CLAUDE.md Abschnitt "Kampf").</summary>
+        /// Seit M5b zusätzlich: Rechtsklick auf einen NPC (Kind=Npc, dieselbe CharacterView wie Spieler, siehe
+        /// OnEntitySpawned) öffnet dessen Shop (OpenShopRequestPacket). Andere Spieler bleiben absichtlich
+        /// ungeprüft - PvP wird vom Server ohnehin abgelehnt, siehe CLAUDE.md Abschnitt "Kampf".</summary>
         private void HandleRightClickAttack()
         {
             Vector3 worldPos = ScreenToWorldPoint(Mouse.current.position.ReadValue());
+
             foreach (KeyValuePair<int, MonsterView> kvp in _monsterViews)
             {
                 if (kvp.Value == null || !kvp.Value.ContainsWorldPoint(worldPos)) continue;
                 _targetEntityId = kvp.Key;
                 _netClient.SendAttack(kvp.Key);
+                return;
+            }
+
+            foreach (KeyValuePair<int, CharacterView> kvp in _views)
+            {
+                if (kvp.Value == null || !kvp.Value.ContainsWorldPoint(worldPos)) continue;
+                if (!_world.Entities.TryGetValue(kvp.Key, out ClientEntity entity) || entity.Kind != EntityKind.Npc) continue;
+
+                _shopOpenNpcEntityId = kvp.Key;
+                _shopItems.Clear();
+                _netClient.SendOpenShop(kvp.Key);
                 return;
             }
         }
@@ -506,6 +595,9 @@ namespace Lumiis.Client
             _equippedWeaponItemId = 0;
             _equippedShieldItemId = 0;
             _lastInventoryActionFailedMessage = "";
+            _shopOpenNpcEntityId = -1;
+            _shopItems.Clear();
+            _lastShopActionFailedMessage = "";
         }
 
         private void OnPacketReceived(IPacket packet)
@@ -623,6 +715,24 @@ namespace Lumiis.Client
                     entity.Appearance = appearanceChanged.Appearance;
                 if (_views.TryGetValue(appearanceChanged.EntityId, out CharacterView view))
                     view.SetAppearance(appearanceChanged.Appearance);
+                return;
+            }
+
+            ShopContentPacket shopContent = packet as ShopContentPacket;
+            if (shopContent != null)
+            {
+                if (shopContent.NpcEntityId == _shopOpenNpcEntityId)
+                {
+                    _shopItems.Clear();
+                    _shopItems.AddRange(shopContent.Items);
+                }
+                return;
+            }
+
+            ShopActionFailedPacket shopFailed = packet as ShopActionFailedPacket;
+            if (shopFailed != null)
+            {
+                _lastShopActionFailedMessage = ShopActionFailedReasonText(shopFailed.Reason);
             }
         }
 
@@ -649,7 +759,26 @@ namespace Lumiis.Client
                 case AttackFailedReason.OutOfRange: return "Ziel außer Reichweite.";
                 case AttackFailedReason.OnCooldown: return "Angriff noch im Abklingen.";
                 case AttackFailedReason.TargetIsPlayer: return "Spieler können nicht angegriffen werden.";
+                case AttackFailedReason.TargetNotAttackable: return "Dieses Ziel kann nicht angegriffen werden.";
                 default: return "Angriff fehlgeschlagen.";
+            }
+        }
+
+        private static string ShopActionFailedReasonText(ShopActionFailedReason reason)
+        {
+            switch (reason)
+            {
+                case ShopActionFailedReason.NpcNotFound: return "Händler nicht gefunden.";
+                case ShopActionFailedReason.NotAShop: return "Dieser NPC hat kein Sortiment.";
+                case ShopActionFailedReason.OutOfRange: return "Zu weit vom Händler entfernt.";
+                case ShopActionFailedReason.ItemNotInStock: return "Gegenstand nicht im Sortiment.";
+                case ShopActionFailedReason.NotEnoughYang: return "Nicht genug Yang.";
+                case ShopActionFailedReason.InventoryFull: return "Inventar ist voll.";
+                case ShopActionFailedReason.InvalidSlot: return "Ungültiger Inventarplatz.";
+                case ShopActionFailedReason.EmptySlot: return "Inventarplatz ist leer.";
+                case ShopActionFailedReason.ItemNotSellable: return "Dieser Gegenstand kann nicht verkauft werden.";
+                case ShopActionFailedReason.YangCapReached: return "Yang-Höchststand erreicht.";
+                default: return "Shop-Aktion fehlgeschlagen.";
             }
         }
 
@@ -707,6 +836,7 @@ namespace Lumiis.Client
         private void OnEntityDespawned(int entityId)
         {
             if (entityId == _targetEntityId) _targetEntityId = -1;
+            if (entityId == _shopOpenNpcEntityId) _shopOpenNpcEntityId = -1; // NPCs despawnen praktisch nie, defensiv trotzdem.
 
             if (_monsterViews.TryGetValue(entityId, out MonsterView monsterView))
             {
@@ -822,6 +952,7 @@ namespace Lumiis.Client
             if (_isDead) text += " | Du bist gestorben, Respawn in Kürze...";
             else if (!string.IsNullOrEmpty(_lastAttackFailedMessage)) text += " | " + _lastAttackFailedMessage;
             if (!string.IsNullOrEmpty(_lastInventoryActionFailedMessage)) text += " | " + _lastInventoryActionFailedMessage;
+            if (!string.IsNullOrEmpty(_lastShopActionFailedMessage)) text += " | " + _lastShopActionFailedMessage;
 
             GUI.Label(new Rect(10, 32, 700, 20), text);
         }
@@ -843,7 +974,7 @@ namespace Lumiis.Client
                 if (shown >= MaxDebugEntityRows) break;
 
                 double distance = DistanceToLocal(local, entity);
-                string kindLabel = entity.Kind == EntityKind.Monster ? "Monster" : "Spieler";
+                string kindLabel = entity.Kind switch { EntityKind.Monster => "Monster", EntityKind.Npc => "NPC", _ => "Spieler" };
                 string line = "#" + entity.Id + " [" + kindLabel + "] " + entity.Name
                     + "  (" + (entity.X / 100.0).ToString("0.0") + ", " + (entity.Y / 100.0).ToString("0.0") + ")"
                     + "  " + distance.ToString("0.0") + " Einh.";
@@ -875,9 +1006,12 @@ namespace Lumiis.Client
 
                 float guiY = Screen.height - screenPos.y; // GUI-Koordinaten sind Y-invertiert gegenüber Screen-Koordinaten
 
-                // Eigener Name in Gelb statt Ebenen-Tönung - unterscheidet den lokalen Spieler zusätzlich zum Ring am Fuß.
+                // Eigener Name in Gelb statt Ebenen-Tönung - unterscheidet den lokalen Spieler zusätzlich zum
+                // Ring am Fuß. NPCs (M5b) in Grün, um sie auf einen Blick von anderen Spielern zu unterscheiden.
                 Color previousColor = GUI.color;
-                GUI.color = entity.Id == _world.LocalEntityId ? Color.yellow : Color.white;
+                if (entity.Id == _world.LocalEntityId) GUI.color = Color.yellow;
+                else if (entity.Kind == EntityKind.Npc) GUI.color = Color.green;
+                else GUI.color = Color.white;
                 GUI.Label(new Rect(screenPos.x - 40, guiY - 10, 80, 20), entity.Name);
                 GUI.color = previousColor;
             }
