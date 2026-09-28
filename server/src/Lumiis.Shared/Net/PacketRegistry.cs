@@ -36,6 +36,12 @@ namespace Lumiis.Shared.Net
         /// eigenes Paket statt EntityDespawn+EntitySpawn (würde clientseitigen Animations-/Blickrichtungs-
         /// zustand unnötig zurücksetzen).</summary>
         AppearanceChanged = 1012,
+
+        /// <summary>Bugfix nach M5a: Leben-Änderung ohne Treffer (Heiltrank, Spieler-Respawn, sowie direkt
+        /// nach EntitySpawn einer bereits verletzten Entity, die neu in die AOI eintritt - EntitySpawnPacket
+        /// trägt kein Leben) - an alle AOI-Beobachter inklusive der Entity selbst (siehe
+        /// GameServer.SendToVisible). EntityDamagedPacket bleibt für den Schadensfall zuständig.</summary>
+        EntityHpChanged = 1013,
     }
 
     /// <summary>Jede neue PacketId braucht hier eine Zeile (ein Test prüft das).</summary>
@@ -65,6 +71,7 @@ namespace Lumiis.Shared.Net
                 case PacketId.InventorySync: return new InventorySyncPacket();
                 case PacketId.InventoryActionFailed: return new InventoryActionFailedPacket();
                 case PacketId.AppearanceChanged: return new AppearanceChangedPacket();
+                case PacketId.EntityHpChanged: return new EntityHpChangedPacket();
                 default: return null;
             }
         }

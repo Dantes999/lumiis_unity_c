@@ -238,6 +238,16 @@ namespace Lumiis.Tests
         }
 
         [Fact]
+        public void EntityHpChanged_RoundTrip()
+        {
+            var original = new EntityHpChangedPacket { EntityId = 42, CurrentHp = 70, MaxHp = 100 };
+            var decoded = Assert.IsType<EntityHpChangedPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.EntityId, decoded.EntityId);
+            Assert.Equal(original.CurrentHp, decoded.CurrentHp);
+            Assert.Equal(original.MaxHp, decoded.MaxHp);
+        }
+
+        [Fact]
         public void Decode_HonorsOffsetAndCount()
         {
             byte[] body = PacketCodec.Encode(new MoveToPacket { X = 1, Y = 2 });

@@ -417,4 +417,34 @@ namespace Lumiis.Shared.Net
             Appearance.Read(reader);
         }
     }
+
+    /// <summary>Das Leben einer Entity hat sich außerhalb eines Treffers geändert (Bugfix nach M5a) - an alle
+    /// AOI-Beobachter inklusive der Entity selbst, siehe PacketId.EntityHpChanged-Kommentar für die genauen
+    /// Auslöser. EntityDamagedPacket bleibt für den Schadensfall unverändert (trägt zusätzlich Angreifer/
+    /// Schaden) - dieses Paket deckt die Fälle ab, in denen es keinen Angreifer/Schadenswert gibt.</summary>
+    public sealed class EntityHpChangedPacket : IPacket
+    {
+        public int EntityId;
+        public int CurrentHp;
+        public int MaxHp;
+
+        public PacketId Id
+        {
+            get { return PacketId.EntityHpChanged; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteInt32(EntityId);
+            writer.WriteInt32(CurrentHp);
+            writer.WriteInt32(MaxHp);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            EntityId = reader.ReadInt32();
+            CurrentHp = reader.ReadInt32();
+            MaxHp = reader.ReadInt32();
+        }
+    }
 }
