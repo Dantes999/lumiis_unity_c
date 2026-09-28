@@ -66,5 +66,18 @@ namespace Lumiis.Tests.Game
 
             Assert.Empty(due);
         }
+
+        /// <summary>M5b: NPCs haben wie Monster keine CharacterId und werden deshalb nie gespeichert - egal wie
+        /// lange LastSaveAtMs zurückliegt (siehe CLAUDE.md "Shop und NPCs", docs/tasks/M5b-shop.md Abschnitt 0e).</summary>
+        [Fact]
+        public void SelectDueForSave_Npc_NeverDue()
+        {
+            Entity npc = Entity.CreateNpc(id: 1, npcId: 1, "Haendler", x: 0, y: 0);
+            npc.LastSaveAtMs = 0;
+
+            List<Entity> due = GameServer.SelectDueForSave(new[] { npc }, nowMs: IntervalMs * 100, IntervalMs);
+
+            Assert.Empty(due);
+        }
     }
 }

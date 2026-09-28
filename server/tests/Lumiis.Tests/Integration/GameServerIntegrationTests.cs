@@ -8,6 +8,7 @@ using Lumiis.Data.Classes;
 using Lumiis.Data.Items;
 using Lumiis.Data.Maps;
 using Lumiis.Data.Mobs;
+using Lumiis.Data.Npcs;
 using Lumiis.Server;
 using Lumiis.Server.Logging;
 using Lumiis.Server.Net;
@@ -44,7 +45,8 @@ namespace Lumiis.Tests.Integration
 
             public ServerFixture(Func<long>? nowMs = null, Func<long>? tokenNowUnixSeconds = null, CollisionMap? collisionMap = null,
                 MobCatalog? mobCatalog = null, SpawnCatalog? spawnCatalog = null, ClassCatalog? classCatalog = null,
-                ItemCatalog? itemCatalog = null, bool allowDebugCommands = false)
+                ItemCatalog? itemCatalog = null, NpcCatalog? npcCatalog = null, NpcSpawnCatalog? npcSpawnCatalog = null,
+                bool allowDebugCommands = false)
             {
                 DbContextOptions<LumiisDbContext> options = new DbContextOptionsBuilder<LumiisDbContext>()
                     .UseInMemoryDatabase("gameserver-test-" + Guid.NewGuid())
@@ -59,7 +61,8 @@ namespace Lumiis.Tests.Integration
                     RejectGraceMs = 100, // echte Uhr, kleiner Wert - siehe M1-fixes.md Punkt 2
                     AllowDebugCommands = allowDebugCommands
                 };
-                Server = new GameServer(config, new NullLogger(), TokenService, _dbFactory, nowMs, collisionMap, mobCatalog, spawnCatalog, classCatalog, itemCatalog);
+                Server = new GameServer(config, new NullLogger(), TokenService, _dbFactory, nowMs, collisionMap, mobCatalog, spawnCatalog, classCatalog,
+                    itemCatalog, npcCatalog, npcSpawnCatalog);
             }
 
             public (int CharacterId, string Token) CreateCharacter(string name, int? positionX = null, int? positionY = null, int? accountId = null)
@@ -1490,6 +1493,191 @@ namespace Lumiis.Tests.Integration
 
                 Assert.Contains(joiner.Received.OfType<EntitySpawnPacket>(), s => s.EntityId == monsterId);
                 Assert.Contains(joiner.Received.OfType<EntityHpChangedPacket>(), p => p.EntityId == monsterId && p.CurrentHp == 15 && p.MaxHp == 30);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        // ---- M5b: Shop und NPCs (siehe docs/tasks/M5b-shop.md Abschnitt 7) ----
+
+        private const string ShopItemsJson = @"{
+  ""items"": [ { ""id"": 1, ""name"": ""Testschwert"", ""itemType"": ""Weapon"", ""lookId"": 1, ""attackBonus"": 5, ""defenseBonus"": 0, ""buyPrice"": 200, ""sellPrice"": 80 } ]
+}";
+
+        private const string ShopNpcsJson = @"{
+  ""npcs"": [ { ""id"": 1, ""name"": ""Dorfhaendler"", ""appearance"": { ""bodyId"": 1, ""hairStyleId"": 1, ""hairColorId"": 1 }, ""shopItemIds"": [1] } ]
+}";
+
+        [Fact]
+        public void BotNearNpc_OpensShopBuysAndSells_ReceivesShopContentInventorySyncAndYangChanged()
+        {
+            ItemCatalog itemCatalog = ItemCatalog.LoadFromJson(ShopItemsJson, TestLookCatalogs.CreateMinimal());
+            NpcCatalog npcCatalog = NpcCatalog.LoadFromJson(ShopNpcsJson, itemCatalog, TestLookCatalogs.CreateMinimal());
+            CollisionMap openMap = BuildOpenCollisionMap();
+            NpcSpawnCatalog npcSpawnCatalog = NpcSpawnCatalog.LoadFromJson(
+                @"{ ""placements"": [ { ""id"": 1, ""npcId"": 1, ""positionX"": 50000, ""positionY"": 50000 } ] }", npcCatalog, openMap);
+
+            var fixture = new ServerFixture(collisionMap: openMap, itemCatalog: itemCatalog, npcCatalog: npcCatalog, npcSpawnCatalog: npcSpawnCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice", positionX: 50000, positionY: 50000);
+                using (LumiisDbContext db = fixture.OpenDb())
+                {
+                    Character character = db.Characters.Single(c => c.Id == characterId);
+                    character.Yang = 500; // Test-Seed - "ausreichend Yang".
+                    db.SaveChanges();
+                }
+
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+
+                // Bot sieht den NPC per AOI (EntitySpawn Kind=Npc).
+                Assert.True(Pump(() => client.Received.OfType<EntitySpawnPacket>().Any(s => s.Kind == EntityKind.Npc), server, client));
+                int npcEntityId = client.Received.OfType<EntitySpawnPacket>().First(s => s.Kind == EntityKind.Npc).EntityId;
+
+                // OpenShop liefert das Sortiment.
+                client.Send(new OpenShopRequestPacket { NpcEntityId = npcEntityId });
+                Assert.True(Pump(() => client.Received.OfType<ShopContentPacket>().Any(), server, client));
+                ShopContentPacket content = client.Received.OfType<ShopContentPacket>().First();
+                Assert.Equal(npcEntityId, content.NpcEntityId);
+                Assert.Contains(content.Items, i => i.ItemId == 1 && i.BuyPrice == 200);
+
+                // Kauf mit ausreichend Yang -> InventorySync + YangChanged.
+                client.Send(new BuyItemRequestPacket { NpcEntityId = npcEntityId, ItemId = 1 });
+                Assert.True(Pump(() => client.Received.OfType<YangChangedPacket>().Any(), server, client));
+                Assert.Equal(300, client.Received.OfType<YangChangedPacket>().Last().NewTotal); // 500 - 200
+                Assert.Contains(client.Received.OfType<InventorySyncPacket>().Last().Slots, s => s.ItemId == 1);
+                int boughtSlotIndex = client.Received.OfType<InventorySyncPacket>().Last().Slots.First(s => s.ItemId == 1).SlotIndex;
+
+                // Verkauf desselben Items zurueck -> erneut InventorySync + YangChanged.
+                client.Send(new SellItemRequestPacket { NpcEntityId = npcEntityId, InventorySlotIndex = boughtSlotIndex });
+                Assert.True(Pump(() => client.Received.OfType<YangChangedPacket>().Count() >= 2, server, client));
+                Assert.Equal(380, client.Received.OfType<YangChangedPacket>().Last().NewTotal); // 300 + 80
+                Assert.DoesNotContain(client.Received.OfType<InventorySyncPacket>().Last().Slots, s => s.ItemId == 1);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void BuyItemRequest_OutOfRange_IsRejectedAndLeavesYangAndInventoryUnchanged()
+        {
+            ItemCatalog itemCatalog = ItemCatalog.LoadFromJson(ShopItemsJson, TestLookCatalogs.CreateMinimal());
+            NpcCatalog npcCatalog = NpcCatalog.LoadFromJson(ShopNpcsJson, itemCatalog, TestLookCatalogs.CreateMinimal());
+            CollisionMap openMap = BuildOpenCollisionMap();
+            NpcSpawnCatalog npcSpawnCatalog = NpcSpawnCatalog.LoadFromJson(
+                @"{ ""placements"": [ { ""id"": 1, ""npcId"": 1, ""positionX"": 50000, ""positionY"": 50000 } ] }", npcCatalog, openMap);
+
+            var fixture = new ServerFixture(collisionMap: openMap, itemCatalog: itemCatalog, npcCatalog: npcCatalog, npcSpawnCatalog: npcSpawnCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                // Weit genug weg vom NPC (50000,50000), aber noch innerhalb des AOI-Radius (1500) - der Bot
+                // sieht den NPC also, ist aber außerhalb NpcInteractRangeWire (300).
+                (int characterId, string token) = fixture.CreateCharacter("Bob", positionX: 50000 + 1000, positionY: 50000);
+                using (LumiisDbContext db = fixture.OpenDb())
+                {
+                    Character character = db.Characters.Single(c => c.Id == characterId);
+                    character.Yang = 500;
+                    db.SaveChanges();
+                }
+
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<EntitySpawnPacket>().Any(s => s.Kind == EntityKind.Npc), server, client));
+                int npcEntityId = client.Received.OfType<EntitySpawnPacket>().First(s => s.Kind == EntityKind.Npc).EntityId;
+
+                client.Send(new BuyItemRequestPacket { NpcEntityId = npcEntityId, ItemId = 1 });
+                Assert.True(Pump(() => client.Received.OfType<ShopActionFailedPacket>().Any(), server, client));
+
+                Assert.Equal(ShopActionFailedReason.OutOfRange, client.Received.OfType<ShopActionFailedPacket>().First().Reason);
+                Assert.Empty(client.Received.OfType<YangChangedPacket>());
+                Assert.Empty(client.Received.OfType<InventorySyncPacket>().SelectMany(p => p.Slots));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        /// <summary>Regression: der Include(InventoryItems)-Fehler aus M5a (siehe Bugfix-Sektion oben, "Fund -
+        /// Include(InventoryItems) fehlte beim Join") darf nach dem kombinierten CharacterSaveRequest-Channel
+        /// (Abschnitt 0d/5) nicht zurückkehren - nach Kauf, Disconnect und erneutem Join müssen Yang UND
+        /// Inventar exakt wie vor dem Disconnect sein.</summary>
+        [Fact]
+        public void AfterBuy_DisconnectAndRejoin_YangAndInventoryPersistExactly()
+        {
+            ItemCatalog itemCatalog = ItemCatalog.LoadFromJson(ShopItemsJson, TestLookCatalogs.CreateMinimal());
+            NpcCatalog npcCatalog = NpcCatalog.LoadFromJson(ShopNpcsJson, itemCatalog, TestLookCatalogs.CreateMinimal());
+            CollisionMap openMap = BuildOpenCollisionMap();
+            NpcSpawnCatalog npcSpawnCatalog = NpcSpawnCatalog.LoadFromJson(
+                @"{ ""placements"": [ { ""id"": 1, ""npcId"": 1, ""positionX"": 50000, ""positionY"": 50000 } ] }", npcCatalog, openMap);
+
+            var fixture = new ServerFixture(collisionMap: openMap, itemCatalog: itemCatalog, npcCatalog: npcCatalog, npcSpawnCatalog: npcSpawnCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                int characterId;
+                string token;
+
+                using (var client = new TestClient())
+                {
+                    client.Connect(server.ListenPort);
+                    Assert.True(WaitConnected(server, client));
+
+                    (characterId, token) = fixture.CreateCharacter("Alice", positionX: 50000, positionY: 50000);
+                    using (LumiisDbContext db = fixture.OpenDb())
+                    {
+                        Character character = db.Characters.Single(c => c.Id == characterId);
+                        character.Yang = 500;
+                        db.SaveChanges();
+                    }
+
+                    client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                    Assert.True(Pump(() => client.Received.OfType<EntitySpawnPacket>().Any(s => s.Kind == EntityKind.Npc), server, client));
+                    int npcEntityId = client.Received.OfType<EntitySpawnPacket>().First(s => s.Kind == EntityKind.Npc).EntityId;
+
+                    client.Send(new BuyItemRequestPacket { NpcEntityId = npcEntityId, ItemId = 1 });
+                    Assert.True(Pump(() => client.Received.OfType<InventorySyncPacket>().Any(s => s.Slots.Any(slot => slot.ItemId == 1)), server, client));
+
+                    client.Peer.Disconnect();
+                    Assert.True(Pump(() => client.Disconnected, server, client));
+                }
+
+                // Die kombinierte Speicherung (CharacterSaveRequest, Abschnitt 5) wurde bereits beim Kauf
+                // selbst angestoßen (nicht erst bei Disconnect) - hier nur abwarten, bis der
+                // Hintergrund-Consumer sie tatsächlich verarbeitet hat.
+                Assert.True(Pump(() =>
+                {
+                    using LumiisDbContext db = fixture.OpenDb();
+                    Character? character = db.Characters.Include(c => c.InventoryItems).SingleOrDefault(c => c.Id == characterId);
+                    return character != null && character.Yang == 300 && character.InventoryItems.Any(i => i.ItemId == 1);
+                }, server));
+
+                // Erneuter Join mit einer neuen Verbindung - InventorySync muss das Item wieder zeigen.
+                using var rejoinClient = new TestClient();
+                rejoinClient.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, rejoinClient));
+                rejoinClient.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => rejoinClient.Received.OfType<InventorySyncPacket>().Any(), server, rejoinClient));
+
+                InventorySyncPacket rejoinSync = rejoinClient.Received.OfType<InventorySyncPacket>().First();
+                Assert.Contains(rejoinSync.Slots, s => s.ItemId == 1);
             }
             finally
             {

@@ -177,5 +177,33 @@ namespace Lumiis.Tests.Game
             Assert.Equal(40 + 3000, player.RespawnAtMs); // bestehender M4a-Mechanismus (World.PlayerRespawnDelayMs)
             Assert.True(world.TryGet(player.Id, out _)); // kein Despawn, wie bei M4a
         }
+
+        // ---- M5b: NPCs sind fuer die Monster-KI unsichtbar (siehe docs/tasks/M5b-shop.md Abschnitt 0a/0e) ----
+
+        [Fact]
+        public void AggressiveMonster_OnlyNpcNearby_IgnoresNpcAndStaysWithoutTarget()
+        {
+            var world = new World(maxPlayers: 10);
+            world.SpawnNpc(npcId: 1, "Haendler", x: 50000, y: 50000, appearance: default);
+            Entity monster = SpawnMonster(world, x: 50000, y: 50000, aggressive: true, aggroRangeWire: 400, leashRangeWire: 700);
+
+            world.Tick(0.0, nowMs: 0);
+
+            Assert.Null(monster.TargetEntityId);
+        }
+
+        [Fact]
+        public void Npc_NeverWanders_PositionStaysFixedAcrossTicks()
+        {
+            var world = new World(maxPlayers: 10);
+            Entity npc = world.SpawnNpc(npcId: 1, "Haendler", x: 50000, y: 50000, appearance: default);
+
+            world.Tick(0.0, nowMs: 0);
+            world.Tick(0.0, nowMs: 1_000_000); // beliebig viel Zeit - RunMonsterAi/RunWanderAi laufen nur fuer Kind=Monster
+
+            Assert.Equal(50000, npc.IntX);
+            Assert.Equal(50000, npc.IntY);
+            Assert.False(npc.IsMoving);
+        }
     }
 }

@@ -157,6 +157,22 @@ namespace Lumiis.Tests.Game
             Assert.Equal(AttackFailedReason.TargetIsPlayer, result.Reason);
         }
 
+        /// <summary>M5b: NPCs sind unangreifbar - geprüft VOR dem Gleiche-Kinds-Check (der würde
+        /// Player-vs-Npc sonst nicht blocken, unterschiedliche Kinds), siehe docs/tasks/M5b-shop.md
+        /// Abschnitt 0a.</summary>
+        [Fact]
+        public void TryAttack_NpcTarget_IsRejectedAsNotAttackable()
+        {
+            var world = new World(maxPlayers: 10);
+            Entity attacker = JoinPlayer(world, 1, x: 50000, y: 50000);
+            Entity npc = world.SpawnNpc(npcId: 1, "Haendler", x: 50000, y: 50000, appearance: default);
+
+            AttackResult result = world.TryAttack(attacker.Id, npc.Id, nowMs: 0);
+
+            Assert.False(result.Success);
+            Assert.Equal(AttackFailedReason.TargetNotAttackable, result.Reason);
+        }
+
         [Fact]
         public void TryAttack_MonsterDies_YieldsYangInRangeAndIsRemovedWithoutRespawn()
         {
