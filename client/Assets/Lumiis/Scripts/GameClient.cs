@@ -707,7 +707,7 @@ namespace Lumiis.Client
             YangChangedPacket yangChanged = packet as YangChangedPacket;
             if (yangChanged != null)
             {
-                _yangTotal = yangChanged.NewTotal;
+                ApplyYang(yangChanged.NewTotal);
                 return;
             }
 
@@ -756,6 +756,14 @@ namespace Lumiis.Client
             {
                 _lastShopActionFailedMessage = ShopActionFailedReasonText(shopFailed.Reason);
             }
+        }
+
+        /// <summary>Einziger Schreibpfad für den bekannten Yang-Stand (Bugfix - vorher wurde YangChangedPacket
+        /// inline verarbeitet, kein zweiter Codepfad aktuell vorhanden, aber wie bei ClientWorld.ApplyHp bewusst
+        /// als eigene Methode, damit das so bleibt).</summary>
+        private void ApplyYang(long newTotal)
+        {
+            _yangTotal = newTotal;
         }
 
         private static string InventoryActionFailedReasonText(InventoryActionFailedReason reason)
