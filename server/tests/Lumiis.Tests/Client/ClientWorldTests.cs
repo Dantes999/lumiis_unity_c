@@ -90,5 +90,43 @@ namespace Lumiis.Tests.Client
             Assert.Equal(FacingDirection.Side, world.Entities[1].Facing.Direction);
             Assert.False(world.Entities[1].Facing.FlipX);
         }
+
+        // ---- Bugfix nach M5a: HandleEntityDamaged/HandleEntityHpChanged teilen sich denselben Schreibpfad
+        // (ApplyHp) - hier über das sichtbare Ergebnis verifiziert, kein zweiter Codepfad. ----
+
+        [Fact]
+        public void HandleEntityDamaged_UpdatesCurrentHpAndMaxHp()
+        {
+            var world = new ClientWorld();
+            world.HandleJoinAccepted(entityId: 1, x: 0, y: 0, localName: "Me", appearance: SomeAppearance);
+
+            world.HandleEntityDamaged(targetEntityId: 1, hpAfter: 70, maxHp: 100);
+
+            Assert.Equal(70, world.Entities[1].CurrentHp);
+            Assert.Equal(100, world.Entities[1].MaxHp);
+        }
+
+        [Fact]
+        public void HandleEntityHpChanged_UpdatesCurrentHpAndMaxHp()
+        {
+            // Deckt genau die vom User gemeldete Lücke ab: eine HP-Änderung OHNE Treffer (Heiltrank,
+            // Respawn, ...) muss denselben Zustand aktualisieren wie ein Treffer.
+            var world = new ClientWorld();
+            world.HandleJoinAccepted(entityId: 1, x: 0, y: 0, localName: "Me", appearance: SomeAppearance);
+            world.HandleEntityDamaged(targetEntityId: 1, hpAfter: 70, maxHp: 100);
+
+            world.HandleEntityHpChanged(entityId: 1, currentHp: 100, maxHp: 100);
+
+            Assert.Equal(100, world.Entities[1].CurrentHp);
+            Assert.Equal(100, world.Entities[1].MaxHp);
+        }
+
+        [Fact]
+        public void HandleEntityHpChanged_UnknownEntity_IsNoError()
+        {
+            var world = new ClientWorld();
+            world.HandleEntityHpChanged(entityId: 999, currentHp: 50, maxHp: 100); // darf nicht werfen.
+            Assert.False(world.Entities.ContainsKey(999));
+        }
     }
 }

@@ -712,7 +712,12 @@ public sealed class GameServer : INetEventListener
         try
         {
             await using LumiisDbContext db = _dbContextFactory();
-            Character? character = await db.Characters.AsNoTracking().SingleOrDefaultAsync(c => c.Id == characterId);
+            // Include(InventoryItems) ist zwingend (M5a-Bug, beim Schreiben dieses Fixes gefunden): ohne
+            // Include bleibt die Navigation Collection leer, CompleteJoin würde das gesamte gespeicherte
+            // Inventar beim nächsten Join stillschweigend verlieren (EquippedXItemId sind einfache Spalten
+            // und wären davon NICHT betroffen - nur die separate CharacterInventoryItem-Tabelle).
+            Character? character = await db.Characters.AsNoTracking().Include(c => c.InventoryItems)
+                .SingleOrDefaultAsync(c => c.Id == characterId);
 
             // Eigentümerschaft prüfen: die CharacterId muss zur AccountId aus dem Token gehören, sonst wie
             // "nicht gefunden" behandeln (kein Unterschied in der Antwort, der verriete, dass die Id

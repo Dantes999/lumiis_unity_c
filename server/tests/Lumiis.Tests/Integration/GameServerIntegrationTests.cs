@@ -1334,6 +1334,169 @@ namespace Lumiis.Tests.Integration
             }
         }
 
+        // ---- Bugfix nach M5a: EntityHpChangedPacket (HP-Änderung ohne Treffer) ----
+
+        [Fact]
+        public void UsingConsumable_SendsEntityHpChangedWithHealedValue()
+        {
+            ClassCatalog classCatalog = ClassCatalog.LoadFromJson(@"{
+              ""classes"": [ { ""name"": ""Krieger"", ""maxHp"": 100, ""attack"": 0, ""defense"": 0, ""meleeRangeWire"": 150, ""attackCooldownMs"": 800 } ]
+            }");
+            MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
+              ""mobs"": [
+                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 9999, ""attack"": 10, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 0, ""meleeRangeWire"": 150, ""attackCooldownMs"": 999999, ""aggressive"": true, ""aggroRangeWire"": 1000, ""leashRangeWire"": 2000 }
+              ]
+            }");
+            CollisionMap openMap = BuildOpenCollisionMap();
+            SpawnCatalog spawnCatalog = SpawnCatalog.LoadFromJson(@"{
+              ""spawns"": [ { ""id"": 1, ""mobId"": 1, ""positionX"": 50000, ""positionY"": 50000, ""respawnSeconds"": 999999 } ]
+            }", mobCatalog, openMap);
+            ItemCatalog itemCatalog = ItemCatalog.LoadFromJson(@"{
+              ""items"": [ { ""id"": 1, ""name"": ""Testtrank"", ""itemType"": ""Consumable"", ""healAmount"": 5 } ]
+            }", TestLookCatalogs.CreateMinimal());
+
+            var fixture = new ServerFixture(collisionMap: openMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog,
+                classCatalog: classCatalog, itemCatalog: itemCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice", positionX: 50000, positionY: 50000);
+                using (LumiisDbContext db = fixture.OpenDb())
+                {
+                    db.CharacterInventoryItems.Add(new CharacterInventoryItem { CharacterId = characterId, SlotIndex = 0, ItemId = 1 });
+                    db.SaveChanges();
+                }
+
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+                int ownId = client.Received.OfType<JoinAcceptedPacket>().First().EntityId;
+
+                // Der aggressive Wildhund (attackCooldownMs praktisch unendlich - nur EIN Treffer erwartet)
+                // schlägt automatisch zu: 100 -> 90 Leben.
+                Assert.True(Pump(() => client.Received.OfType<EntityDamagedPacket>().Any(d => d.TargetEntityId == ownId), server, client));
+                Assert.Equal(90, client.Received.OfType<EntityDamagedPacket>().First(d => d.TargetEntityId == ownId).TargetHpAfter);
+
+                client.Send(new UseConsumableRequestPacket { InventorySlotIndex = 0 });
+
+                Assert.True(Pump(
+                    () => client.Received.OfType<EntityHpChangedPacket>().Any(p => p.EntityId == ownId && p.CurrentHp == 95),
+                    server, client));
+                EntityHpChangedPacket healed = client.Received.OfType<EntityHpChangedPacket>().First(p => p.EntityId == ownId && p.CurrentHp == 95);
+                Assert.Equal(100, healed.MaxHp);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void PlayerRespawn_SendsEntityHpChangedWithMaxHp()
+        {
+            long fakeNow = 0;
+            ClassCatalog classCatalog = ClassCatalog.LoadFromJson(@"{
+              ""classes"": [ { ""name"": ""Krieger"", ""maxHp"": 10, ""attack"": 0, ""defense"": 0, ""meleeRangeWire"": 150, ""attackCooldownMs"": 800 } ]
+            }");
+            MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
+              ""mobs"": [
+                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 9999, ""attack"": 999, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 0, ""meleeRangeWire"": 150, ""attackCooldownMs"": 100, ""aggressive"": true, ""aggroRangeWire"": 1000, ""leashRangeWire"": 2000 }
+              ]
+            }");
+            CollisionMap openMap = BuildOpenCollisionMap();
+            SpawnCatalog spawnCatalog = SpawnCatalog.LoadFromJson(@"{
+              ""spawns"": [ { ""id"": 1, ""mobId"": 1, ""positionX"": 50000, ""positionY"": 50000, ""respawnSeconds"": 999999 } ]
+            }", mobCatalog, openMap);
+
+            var fixture = new ServerFixture(nowMs: () => fakeNow, collisionMap: openMap, mobCatalog: mobCatalog,
+                spawnCatalog: spawnCatalog, classCatalog: classCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice", positionX: 50000, positionY: 50000);
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+                int ownId = client.Received.OfType<JoinAcceptedPacket>().First().EntityId;
+
+                // Der Wildhund (Angriff 999 gegen 10 Leben) toetet mit dem ersten Treffer - RespawnAtMs wird
+                // dabei auf fakeNow (0) + 3000 (World.PlayerRespawnDelayMs) gesetzt.
+                Assert.True(Pump(() => client.Received.OfType<EntityDiedPacket>().Any(d => d.EntityId == ownId), server, client));
+
+                // Uhr über die (fixe, nicht konfigurierbare) 3s-Respawn-Frist hinausdrehen statt echt zu warten.
+                fakeNow = 3000;
+                Assert.True(Pump(() => client.Received.OfType<EntityStopPacket>().Any(s => s.EntityId == ownId), server, client));
+
+                Assert.Contains(client.Received.OfType<EntityHpChangedPacket>(), p => p.EntityId == ownId && p.CurrentHp == 10 && p.MaxHp == 10);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void LaterJoiner_SeesAlreadyDamagedMonster_ReceivesEntityHpChangedAfterSpawn()
+        {
+            ClassCatalog classCatalog = ClassCatalog.LoadFromJson(@"{
+              ""classes"": [ { ""name"": ""Krieger"", ""maxHp"": 100, ""attack"": 15, ""defense"": 0, ""meleeRangeWire"": 150, ""attackCooldownMs"": 800 } ]
+            }");
+            MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
+              ""mobs"": [
+                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 30, ""attack"": 0, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 0, ""meleeRangeWire"": 130, ""attackCooldownMs"": 700, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 700 }
+              ]
+            }");
+            CollisionMap openMap = BuildOpenCollisionMap();
+            SpawnCatalog spawnCatalog = SpawnCatalog.LoadFromJson(@"{
+              ""spawns"": [ { ""id"": 1, ""mobId"": 1, ""positionX"": 50000, ""positionY"": 50000, ""respawnSeconds"": 999999 } ]
+            }", mobCatalog, openMap);
+
+            var fixture = new ServerFixture(collisionMap: openMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog, classCatalog: classCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var attacker = new TestClient();
+                attacker.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, attacker));
+
+                (int attackerCharId, string attackerToken) = fixture.CreateCharacter("Attacker", positionX: 50000, positionY: 50000);
+                attacker.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = attackerToken, CharacterId = attackerCharId });
+                Assert.True(Pump(() => attacker.Received.OfType<JoinAcceptedPacket>().Any(), server, attacker));
+
+                Assert.True(Pump(() => attacker.Received.OfType<EntitySpawnPacket>().Any(s => s.Kind == EntityKind.Monster), server, attacker));
+                int monsterId = attacker.Received.OfType<EntitySpawnPacket>().First(s => s.Kind == EntityKind.Monster).EntityId;
+
+                attacker.Send(new AttackRequestPacket { TargetEntityId = monsterId });
+                Assert.True(Pump(() => attacker.Received.OfType<EntityDamagedPacket>().Any(d => d.TargetEntityId == monsterId), server, attacker));
+
+                // Erst JETZT joint ein zweiter Spieler - sieht das Monster zum ersten Mal, bereits verletzt
+                // (30 -> 15 Leben, Angriff 15 - Verteidigung 0).
+                using var joiner = new TestClient();
+                joiner.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, joiner, attacker));
+
+                (int joinerCharId, string joinerToken) = fixture.CreateCharacter("Joiner", positionX: 50000, positionY: 50000);
+                joiner.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = joinerToken, CharacterId = joinerCharId });
+                Assert.True(Pump(() => joiner.Received.OfType<JoinAcceptedPacket>().Any(), server, joiner, attacker));
+
+                Assert.Contains(joiner.Received.OfType<EntitySpawnPacket>(), s => s.EntityId == monsterId);
+                Assert.Contains(joiner.Received.OfType<EntityHpChangedPacket>(), p => p.EntityId == monsterId && p.CurrentHp == 15 && p.MaxHp == 30);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
         // ---- Dev-Tools: Debug-Spawn (siehe docs/tasks/dev-tools-debug-spawn.md) ----
 
         private static MobCatalog BuildSingleWildhundMobCatalog()
