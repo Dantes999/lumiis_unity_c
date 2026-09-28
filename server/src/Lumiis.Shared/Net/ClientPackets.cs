@@ -171,4 +171,97 @@ namespace Lumiis.Shared.Net
             InventorySlotIndex = reader.ReadInt32();
         }
     }
+
+    /// <summary>Rechtsklick auf einen sichtbaren NPC (M5b) - der Server prüft Existenz/Kind/Reichweite
+    /// erneut, siehe World.TryOpenShop.</summary>
+    public sealed class OpenShopRequestPacket : IPacket
+    {
+        public int NpcEntityId;
+
+        public PacketId Id
+        {
+            get { return PacketId.OpenShopRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteInt32(NpcEntityId);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            NpcEntityId = reader.ReadInt32();
+        }
+    }
+
+    /// <summary>Kauf-Knopf im Shop-Panel (M5b) - siehe World.TryBuy.</summary>
+    public sealed class BuyItemRequestPacket : IPacket
+    {
+        public int NpcEntityId;
+        public int ItemId;
+
+        public PacketId Id
+        {
+            get { return PacketId.BuyItemRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteInt32(NpcEntityId);
+            writer.WriteInt32(ItemId);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            NpcEntityId = reader.ReadInt32();
+            ItemId = reader.ReadInt32();
+        }
+    }
+
+    /// <summary>Verkaufen-Knopf im Shop-Panel (M5b) - siehe World.TrySell.</summary>
+    public sealed class SellItemRequestPacket : IPacket
+    {
+        public int NpcEntityId;
+        public int InventorySlotIndex;
+
+        public PacketId Id
+        {
+            get { return PacketId.SellItemRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteInt32(NpcEntityId);
+            writer.WriteInt32(InventorySlotIndex);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            NpcEntityId = reader.ReadInt32();
+            InventorySlotIndex = reader.ReadInt32();
+        }
+    }
+
+    /// <summary>Dev-Tool (siehe CLAUDE.md "Dev-Tools"): schreibt Amount über die gemeinsame Yang-Methode
+    /// (World.CreditYang, MaxYang-Deckel) gut. Nur wirksam mit --allow-debug-commands, sonst still
+    /// verworfen, analog zu DebugSpawnMonsterRequestPacket.</summary>
+    public sealed class DebugGiveYangRequestPacket : IPacket
+    {
+        public long Amount;
+
+        public PacketId Id
+        {
+            get { return PacketId.DebugGiveYangRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteInt64(Amount);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            Amount = reader.ReadInt64();
+        }
+    }
 }

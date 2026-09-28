@@ -361,7 +361,7 @@ public sealed class GameServer : INetEventListener
                 if (conn.VisibleEntityIds.Contains(otherId)) continue;
                 if (!_world.TryGet(otherId, out Entity? other)) continue; // sollte nicht vorkommen (Entity gerade erst in ComputeVisibility gesehen)
 
-                conn.Peer.SendPacket(new EntitySpawnPacket { EntityId = other!.Id, Name = other.Name, X = other.IntX, Y = other.IntY, Appearance = other.Appearance, Kind = other.Kind, MobId = other.MobId });
+                conn.Peer.SendPacket(new EntitySpawnPacket { EntityId = other!.Id, Name = other.Name, X = other.IntX, Y = other.IntY, Appearance = other.Appearance, Kind = other.Kind, TypeId = other.TypeId });
                 SendHpIfDamaged(conn.Peer, other);
                 if (other.IsMoving)
                 {
@@ -819,7 +819,7 @@ public sealed class GameServer : INetEventListener
         {
             if (!_world.TryGet(otherId, out Entity? other)) continue; // sollte nicht vorkommen
 
-            conn.Peer.SendPacket(new EntitySpawnPacket { EntityId = other!.Id, Name = other.Name, X = other.IntX, Y = other.IntY, Appearance = other.Appearance, Kind = other.Kind, MobId = other.MobId });
+            conn.Peer.SendPacket(new EntitySpawnPacket { EntityId = other!.Id, Name = other.Name, X = other.IntX, Y = other.IntY, Appearance = other.Appearance, Kind = other.Kind, TypeId = other.TypeId });
             SendHpIfDamaged(conn.Peer, other);
             if (other.IsMoving)
             {

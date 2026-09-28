@@ -359,7 +359,7 @@ public sealed class World
     private void ScheduleMonsterRespawn(int spawnPointId, Entity diedMonster, long nowMs)
     {
         _pendingMonsterRespawns[spawnPointId] = new PendingMonsterRespawn(
-            diedMonster.MobId, diedMonster.Name, diedMonster.WanderAnchorX, diedMonster.WanderAnchorY, diedMonster.MovementSpeed,
+            diedMonster.TypeId, diedMonster.Name, diedMonster.WanderAnchorX, diedMonster.WanderAnchorY, diedMonster.MovementSpeed,
             diedMonster.WanderRadiusWire, diedMonster.WanderIntervalMinMs, diedMonster.WanderIntervalMaxMs,
             diedMonster.MaxHp, diedMonster.Attack, diedMonster.Defense, diedMonster.YangMin, diedMonster.YangMax,
             diedMonster.RespawnSeconds, diedMonster.MeleeRangeWire, diedMonster.AttackCooldownMs,

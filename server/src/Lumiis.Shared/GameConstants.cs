@@ -20,5 +20,14 @@ namespace Lumiis.Shared
         /// Inventar") - Entity.Inventory (Server) und InventorySyncPacket.Slots (Wire, SlotIndex als byte)
         /// sowie das Debug-Panel (Client) richten sich alle danach.</summary>
         public const int InventorySize = 20;
+
+        /// <summary>Maximale Distanz (1/100 Welteinheiten) zu einem NPC, um dessen Shop zu öffnen/zu nutzen
+        /// (M5b, siehe CLAUDE.md "Shop und NPCs") - quadrierte Distanz wie bei AOI/TryAttack, jede
+        /// Shop-Aktion prüft das serverseitig erneut.</summary>
+        public const int NpcInteractRangeWire = 300;
+
+        /// <summary>Obergrenze für Entity.Yang (M5b) - Monster-Drops, Verkäufe und Debug-Tools kappen ihre
+        /// Gutschrift daran (siehe World.CreditYang), damit der Wert nie überläuft oder unbegrenzt wächst.</summary>
+        public const long MaxYang = 2_000_000_000;
     }
 }

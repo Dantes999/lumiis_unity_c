@@ -527,7 +527,7 @@ namespace Lumiis.Client
             if (spawn != null)
             {
                 Debug.Log("EntitySpawn: Id=" + spawn.EntityId + " Kind=" + spawn.Kind + " Name=" + spawn.Name + " Pos=(" + (spawn.X / 100.0) + "," + (spawn.Y / 100.0) + ")");
-                _world.HandleEntitySpawn(spawn.EntityId, spawn.Name, spawn.Kind, spawn.MobId, spawn.X, spawn.Y, spawn.Appearance);
+                _world.HandleEntitySpawn(spawn.EntityId, spawn.Name, spawn.Kind, spawn.TypeId, spawn.X, spawn.Y, spawn.Appearance);
                 return;
             }
 
@@ -661,7 +661,7 @@ namespace Lumiis.Client
             {
                 var monsterGo = new GameObject("Monster_" + entity.Id + "_" + entity.Name);
                 var monsterView = monsterGo.AddComponent<MonsterView>();
-                monsterView.Initialize(MonsterShapeFor(entity.MobId), MonsterColorFor(entity.MobId));
+                monsterView.Initialize(MonsterShapeFor(entity.TypeId), MonsterColorFor(entity.TypeId));
                 monsterView.SetWorldPosition(entity.X / 100.0, entity.Y / 100.0);
                 _monsterViews[entity.Id] = monsterView;
                 return;

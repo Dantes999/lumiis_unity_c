@@ -1159,7 +1159,7 @@ namespace Lumiis.Tests.Integration
 
                 Assert.True(Pump(() => client.Received.OfType<EntitySpawnPacket>().Any(s => s.Kind == EntityKind.Monster), server, client));
                 EntitySpawnPacket monsterSpawn = client.Received.OfType<EntitySpawnPacket>().First(s => s.Kind == EntityKind.Monster);
-                Assert.Equal(1, monsterSpawn.MobId);
+                Assert.Equal(1, monsterSpawn.TypeId);
                 Assert.Equal("Wildhund", monsterSpawn.Name);
 
                 Assert.True(Pump(
@@ -1301,8 +1301,8 @@ namespace Lumiis.Tests.Integration
                 Assert.Equal(0, joinSync.EquippedWeaponItemId);
 
                 Assert.True(Pump(() => client.Received.OfType<EntitySpawnPacket>().Count(s => s.Kind == EntityKind.Monster) >= 2, server, client));
-                int wildhundId = client.Received.OfType<EntitySpawnPacket>().First(s => s.Kind == EntityKind.Monster && s.MobId == 1).EntityId;
-                int waldschratId = client.Received.OfType<EntitySpawnPacket>().First(s => s.Kind == EntityKind.Monster && s.MobId == 2).EntityId;
+                int wildhundId = client.Received.OfType<EntitySpawnPacket>().First(s => s.Kind == EntityKind.Monster && s.TypeId == 1).EntityId;
+                int waldschratId = client.Received.OfType<EntitySpawnPacket>().First(s => s.Kind == EntityKind.Monster && s.TypeId == 2).EntityId;
 
                 // Wildhund toeten (1 Treffer reicht, siehe MaxHp) - garantierter Drop.
                 client.Send(new AttackRequestPacket { TargetEntityId = wildhundId });
@@ -1631,7 +1631,7 @@ namespace Lumiis.Tests.Integration
 
                 EntitySpawnPacket respawn = client.Received.OfType<EntitySpawnPacket>()
                     .First(s => s.Kind == EntityKind.Monster && s.EntityId != firstMonsterId);
-                Assert.Equal(1, respawn.MobId);
+                Assert.Equal(1, respawn.TypeId);
                 Assert.Equal("Wildhund", respawn.Name);
                 Assert.Equal(50000, respawn.X);
                 Assert.Equal(50000, respawn.Y);

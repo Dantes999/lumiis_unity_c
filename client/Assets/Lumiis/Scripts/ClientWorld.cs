@@ -11,7 +11,7 @@ namespace Lumiis.Client
         public int Id;
         public string Name;
         public EntityKind Kind;
-        public int MobId;
+        public int TypeId;
         public double X;
         public double Y;
         public Appearance Appearance;
@@ -70,19 +70,19 @@ namespace Lumiis.Client
         public void HandleJoinAccepted(int entityId, int x, int y, string localName, Appearance appearance)
         {
             LocalEntityId = entityId;
-            ApplyAppearance(entityId, localName, EntityKind.Player, mobId: 0, x, y, appearance);
+            ApplyAppearance(entityId, localName, EntityKind.Player, typeId: 0, x, y, appearance);
         }
 
-        public void HandleEntitySpawn(int entityId, string name, EntityKind kind, int mobId, int x, int y, Appearance appearance)
+        public void HandleEntitySpawn(int entityId, string name, EntityKind kind, int typeId, int x, int y, Appearance appearance)
         {
-            ApplyAppearance(entityId, name, kind, mobId, x, y, appearance);
+            ApplyAppearance(entityId, name, kind, typeId, x, y, appearance);
         }
 
         /// <summary>Gemeinsamer Erzeugungs-/Aktualisierungspfad für die eigene Figur (aus JoinAccepted, immer
         /// Kind=Player) und andere Figuren/Monster (aus EntitySpawn) - kein zweiter Codepfad.</summary>
-        private void ApplyAppearance(int entityId, string name, EntityKind kind, int mobId, int x, int y, Appearance appearance)
+        private void ApplyAppearance(int entityId, string name, EntityKind kind, int typeId, int x, int y, Appearance appearance)
         {
-            var entity = new ClientEntity { Id = entityId, Name = name, Kind = kind, MobId = mobId, X = x, Y = y, Appearance = appearance };
+            var entity = new ClientEntity { Id = entityId, Name = name, Kind = kind, TypeId = typeId, X = x, Y = y, Appearance = appearance };
             _entities[entityId] = entity;
             EntitySpawned?.Invoke(entity);
         }

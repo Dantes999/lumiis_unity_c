@@ -17,6 +17,15 @@ namespace Lumiis.Shared.Net
         UnequipItemRequest = 6,
         UseConsumableRequest = 7,
 
+        /// <summary>M5b: Rechtsklick auf einen NPC (siehe CLAUDE.md "Shop und NPCs").</summary>
+        OpenShopRequest = 8,
+        BuyItemRequest = 9,
+        SellItemRequest = 10,
+
+        /// <summary>Nur wirksam mit --allow-debug-commands, sonst still verworfen (siehe
+        /// DebugSpawnMonsterRequest-Kommentar).</summary>
+        DebugGiveYangRequest = 11,
+
         // Server -> Client: ab 1000
         JoinAccepted = 1000,
         JoinRejected = 1001,
@@ -42,6 +51,13 @@ namespace Lumiis.Shared.Net
         /// trägt kein Leben) - an alle AOI-Beobachter inklusive der Entity selbst (siehe
         /// GameServer.SendToVisible). EntityDamagedPacket bleibt für den Schadensfall zuständig.</summary>
         EntityHpChanged = 1013,
+
+        /// <summary>M5b: Antwort auf OpenShopRequest, nur an den Anfragenden - Sortiment des NPCs (siehe
+        /// CLAUDE.md "Shop und NPCs").</summary>
+        ShopContent = 1014,
+
+        /// <summary>M5b: ein Shop-Request (Open/Buy/Sell) wurde abgelehnt - nur an den Anfragenden.</summary>
+        ShopActionFailed = 1015,
     }
 
     /// <summary>Jede neue PacketId braucht hier eine Zeile (ein Test prüft das).</summary>
@@ -72,6 +88,12 @@ namespace Lumiis.Shared.Net
                 case PacketId.InventoryActionFailed: return new InventoryActionFailedPacket();
                 case PacketId.AppearanceChanged: return new AppearanceChangedPacket();
                 case PacketId.EntityHpChanged: return new EntityHpChangedPacket();
+                case PacketId.OpenShopRequest: return new OpenShopRequestPacket();
+                case PacketId.BuyItemRequest: return new BuyItemRequestPacket();
+                case PacketId.SellItemRequest: return new SellItemRequestPacket();
+                case PacketId.DebugGiveYangRequest: return new DebugGiveYangRequestPacket();
+                case PacketId.ShopContent: return new ShopContentPacket();
+                case PacketId.ShopActionFailed: return new ShopActionFailedPacket();
                 default: return null;
             }
         }

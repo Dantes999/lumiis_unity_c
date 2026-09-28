@@ -12,11 +12,13 @@ namespace Lumiis.Shared.Net
         ServerFull = 6
     }
 
-    /// <summary>Unterscheidet Spieler- von Monster-Entities in EntitySpawn (siehe dort) - seit M3c.</summary>
+    /// <summary>Unterscheidet Spieler- von Monster- (seit M3c) und NPC-Entities (seit M5b) in EntitySpawn
+    /// (siehe dort).</summary>
     public enum EntityKind : byte
     {
         Player = 0,
-        Monster = 1
+        Monster = 1,
+        Npc = 2
     }
 
     /// <summary>Der Client wurde aufgenommen und an der genannten Position gespawnt. Appearance ist die eigene
@@ -71,11 +73,13 @@ namespace Lumiis.Shared.Net
         }
     }
 
-    /// <summary>Eine (neue oder bereits vorhandene) Entity erscheint für den Client - eine andere Figur oder
-    /// (seit M3c) ein Monster, öffentliche Daten inklusive Appearance. Bei Kind=Monster ist Appearance mit
-    /// neutralen/Default-Werten befüllt (keine Bedeutung, das Feld bleibt aber für beide Kinds im Paket, damit
-    /// der Client nicht zwei verschiedene Paketformen unterscheiden muss) und MobId zeigt auf data/mobs.json;
-    /// bei Kind=Player ist MobId ungenutzt/0.</summary>
+    /// <summary>Eine (neue oder bereits vorhandene) Entity erscheint für den Client - eine andere Figur, ein
+    /// Monster (seit M3c) oder ein NPC (seit M5b), öffentliche Daten inklusive Appearance. Bei Kind=Monster
+    /// ist Appearance mit neutralen/Default-Werten befüllt (keine Bedeutung, das Feld bleibt aber für alle
+    /// Kinds im Paket, damit der Client nicht mehrere verschiedene Paketformen unterscheiden muss). TypeId
+    /// (bis M5a "MobId" genannt, seit M5b umbenannt - reiner Rename, keine Wire-Format-Änderung, siehe
+    /// docs/tasks/M5b-shop.md Abschnitt 0b) zeigt je nach Kind auf data/mobs.json (Monster) oder data/npcs.json
+    /// (Npc); bei Kind=Player ungenutzt/0.</summary>
     public sealed class EntitySpawnPacket : IPacket
     {
         public int EntityId;
@@ -84,7 +88,7 @@ namespace Lumiis.Shared.Net
         public int Y;
         public Appearance Appearance;
         public EntityKind Kind;
-        public int MobId;
+        public int TypeId;
 
         public PacketId Id
         {
@@ -99,7 +103,7 @@ namespace Lumiis.Shared.Net
             writer.WriteInt32(Y);
             Appearance.Write(writer);
             writer.WriteByte((byte)Kind);
-            writer.WriteInt32(MobId);
+            writer.WriteInt32(TypeId);
         }
 
         public void Read(PacketReader reader)
@@ -110,7 +114,7 @@ namespace Lumiis.Shared.Net
             Y = reader.ReadInt32();
             Appearance.Read(reader);
             Kind = (EntityKind)reader.ReadByte();
-            MobId = reader.ReadInt32();
+            TypeId = reader.ReadInt32();
         }
     }
 
@@ -208,7 +212,11 @@ namespace Lumiis.Shared.Net
         TargetAlreadyDead = 2,
         OutOfRange = 3,
         OnCooldown = 4,
-        TargetIsPlayer = 5
+        TargetIsPlayer = 5,
+
+        /// <summary>M5b: Ziel ist ein NPC (Kind=Npc) - NPCs sind unangreifbar/statisch, siehe CLAUDE.md
+        /// "Shop und NPCs".</summary>
+        TargetNotAttackable = 6
     }
 
     /// <summary>Eine Entity wurde getroffen (M4a) - an alle AOI-Beobachter des Ziels (inklusive Angreifer,
@@ -445,6 +453,82 @@ namespace Lumiis.Shared.Net
             EntityId = reader.ReadInt32();
             CurrentHp = reader.ReadInt32();
             MaxHp = reader.ReadInt32();
+        }
+    }
+
+    /// <summary>Antwort auf OpenShopRequest (M5b, nur an den Anfragenden) - das Sortiment des NPCs
+    /// (ItemId, BuyPrice je Eintrag, direkt aus NpcDefinition.ShopItemIds + ItemCatalog aufgelöst, siehe
+    /// World.TryOpenShop). NpcEntityId erlaubt dem Client, das Panel dem richtigen NPC zuzuordnen (z. B. bei
+    /// schnell aufeinanderfolgenden Requests).</summary>
+    public sealed class ShopContentPacket : IPacket
+    {
+        public int NpcEntityId;
+        public List<(int ItemId, long BuyPrice)> Items = new List<(int, long)>();
+
+        public PacketId Id
+        {
+            get { return PacketId.ShopContent; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteInt32(NpcEntityId);
+            writer.WriteByte((byte)Items.Count);
+            foreach ((int itemId, long buyPrice) in Items)
+            {
+                writer.WriteInt32(itemId);
+                writer.WriteInt64(buyPrice);
+            }
+        }
+
+        public void Read(PacketReader reader)
+        {
+            NpcEntityId = reader.ReadInt32();
+            int count = reader.ReadByte();
+            Items = new List<(int, long)>(count);
+            for (int i = 0; i < count; i++)
+            {
+                int itemId = reader.ReadInt32();
+                long buyPrice = reader.ReadInt64();
+                Items.Add((itemId, buyPrice));
+            }
+        }
+    }
+
+    /// <summary>Grund, warum ein Shop-Request (Open/Buy/Sell) abgelehnt wurde (M5b) - siehe
+    /// World.TryOpenShop/TryBuy/TrySell.</summary>
+    public enum ShopActionFailedReason : byte
+    {
+        NpcNotFound = 1,
+        NotAShop = 2,
+        OutOfRange = 3,
+        ItemNotInStock = 4,
+        NotEnoughYang = 5,
+        InventoryFull = 6,
+        InvalidSlot = 7,
+        EmptySlot = 8,
+        ItemNotSellable = 9,
+        YangCapReached = 10
+    }
+
+    /// <summary>Ein Shop-Request wurde abgelehnt - nur an den Anfragenden, Verbindung bleibt bestehen.</summary>
+    public sealed class ShopActionFailedPacket : IPacket
+    {
+        public ShopActionFailedReason Reason;
+
+        public PacketId Id
+        {
+            get { return PacketId.ShopActionFailed; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteByte((byte)Reason);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            Reason = (ShopActionFailedReason)reader.ReadByte();
         }
     }
 }

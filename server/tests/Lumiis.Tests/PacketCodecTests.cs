@@ -50,7 +50,7 @@ namespace Lumiis.Tests
         public void EntitySpawn_RoundTrip_Player()
         {
             var appearance = new Appearance { BodyId = 1, HairStyleId = 3, HairColorId = 5, ArmorId = 2, HelmetId = 2, WeaponId = 0, ShieldId = 1 };
-            var original = new EntitySpawnPacket { EntityId = 7, Name = "Held_1", X = 100, Y = -200, Appearance = appearance, Kind = EntityKind.Player, MobId = 0 };
+            var original = new EntitySpawnPacket { EntityId = 7, Name = "Held_1", X = 100, Y = -200, Appearance = appearance, Kind = EntityKind.Player, TypeId = 0 };
             var decoded = Assert.IsType<EntitySpawnPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
             Assert.Equal(original.EntityId, decoded.EntityId);
             Assert.Equal(original.Name, decoded.Name);
@@ -58,20 +58,20 @@ namespace Lumiis.Tests
             Assert.Equal(original.Y, decoded.Y);
             Assert.Equal(original.Appearance, decoded.Appearance);
             Assert.Equal(EntityKind.Player, decoded.Kind);
-            Assert.Equal(0, decoded.MobId);
+            Assert.Equal(0, decoded.TypeId);
         }
 
         [Fact]
         public void EntitySpawn_RoundTrip_Monster()
         {
-            var original = new EntitySpawnPacket { EntityId = 12, Name = "Wildhund", X = 30000, Y = 30000, Appearance = default, Kind = EntityKind.Monster, MobId = 1 };
+            var original = new EntitySpawnPacket { EntityId = 12, Name = "Wildhund", X = 30000, Y = 30000, Appearance = default, Kind = EntityKind.Monster, TypeId = 1 };
             var decoded = Assert.IsType<EntitySpawnPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
             Assert.Equal(original.EntityId, decoded.EntityId);
             Assert.Equal(original.Name, decoded.Name);
             Assert.Equal(original.X, decoded.X);
             Assert.Equal(original.Y, decoded.Y);
             Assert.Equal(EntityKind.Monster, decoded.Kind);
-            Assert.Equal(1, decoded.MobId);
+            Assert.Equal(1, decoded.TypeId);
         }
 
         [Fact]
@@ -245,6 +245,87 @@ namespace Lumiis.Tests
             Assert.Equal(original.EntityId, decoded.EntityId);
             Assert.Equal(original.CurrentHp, decoded.CurrentHp);
             Assert.Equal(original.MaxHp, decoded.MaxHp);
+        }
+
+        [Fact]
+        public void OpenShopRequest_RoundTrip()
+        {
+            var original = new OpenShopRequestPacket { NpcEntityId = 5 };
+            var decoded = Assert.IsType<OpenShopRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.NpcEntityId, decoded.NpcEntityId);
+        }
+
+        [Fact]
+        public void BuyItemRequest_RoundTrip()
+        {
+            var original = new BuyItemRequestPacket { NpcEntityId = 5, ItemId = 3 };
+            var decoded = Assert.IsType<BuyItemRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.NpcEntityId, decoded.NpcEntityId);
+            Assert.Equal(original.ItemId, decoded.ItemId);
+        }
+
+        [Fact]
+        public void SellItemRequest_RoundTrip()
+        {
+            var original = new SellItemRequestPacket { NpcEntityId = 5, InventorySlotIndex = 7 };
+            var decoded = Assert.IsType<SellItemRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.NpcEntityId, decoded.NpcEntityId);
+            Assert.Equal(original.InventorySlotIndex, decoded.InventorySlotIndex);
+        }
+
+        [Fact]
+        public void DebugGiveYangRequest_RoundTrip()
+        {
+            var original = new DebugGiveYangRequestPacket { Amount = 1000 };
+            var decoded = Assert.IsType<DebugGiveYangRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.Amount, decoded.Amount);
+        }
+
+        [Fact]
+        public void ShopContent_RoundTrip()
+        {
+            var original = new ShopContentPacket
+            {
+                NpcEntityId = 5,
+                Items = new System.Collections.Generic.List<(int ItemId, long BuyPrice)> { (8, 20), (2, 200), (3, 350) }
+            };
+            var decoded = Assert.IsType<ShopContentPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.NpcEntityId, decoded.NpcEntityId);
+            Assert.Equal(original.Items, decoded.Items);
+        }
+
+        [Fact]
+        public void ShopContent_RoundTrip_EmptyItems()
+        {
+            var original = new ShopContentPacket { NpcEntityId = 5 };
+            var decoded = Assert.IsType<ShopContentPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Empty(decoded.Items);
+        }
+
+        [Fact]
+        public void ShopActionFailed_RoundTrip()
+        {
+            var original = new ShopActionFailedPacket { Reason = ShopActionFailedReason.NotEnoughYang };
+            var decoded = Assert.IsType<ShopActionFailedPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.Reason, decoded.Reason);
+        }
+
+        [Fact]
+        public void EntitySpawn_RoundTrip_Npc()
+        {
+            var appearance = new Appearance { BodyId = 1, HairStyleId = 1, HairColorId = 1, ArmorId = 3, HelmetId = 0, WeaponId = 0, ShieldId = 0 };
+            var original = new EntitySpawnPacket { EntityId = 20, Name = "Dorfhaendler", X = 50000, Y = 50500, Appearance = appearance, Kind = EntityKind.Npc, TypeId = 1 };
+            var decoded = Assert.IsType<EntitySpawnPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(EntityKind.Npc, decoded.Kind);
+            Assert.Equal(1, decoded.TypeId);
+        }
+
+        [Fact]
+        public void AttackFailed_RoundTrip_TargetNotAttackable()
+        {
+            var original = new AttackFailedPacket { Reason = AttackFailedReason.TargetNotAttackable };
+            var decoded = Assert.IsType<AttackFailedPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(AttackFailedReason.TargetNotAttackable, decoded.Reason);
         }
 
         [Fact]

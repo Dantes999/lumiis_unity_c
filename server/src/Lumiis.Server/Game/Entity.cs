@@ -29,8 +29,10 @@ public sealed class Entity
 
     public EntityKind Kind { get; }
 
-    /// <summary>Nur bei Kind=Monster aussagekräftig (Index in data/mobs.json), bei Kind=Player ungenutzt/0.</summary>
-    public int MobId { get; }
+    /// <summary>Bei Kind=Monster ein Index in data/mobs.json, bei Kind=Npc (M5b) ein Index in data/npcs.json,
+    /// bei Kind=Player ungenutzt/0 - bis M5a "MobId" genannt, seit M5b umbenannt (reiner Rename, siehe
+    /// docs/tasks/M5b-shop.md Abschnitt 0b und EntitySpawnPacket.TypeId).</summary>
+    public int TypeId { get; }
 
     /// <summary>Nur bei Kind=Monster gesetzt - die Id des SpawnPoint aus spawns.json, an dem dieses Monster
     /// entstanden ist (siehe World.SpawnMonster/GameServer-Konstruktor). Null bei Spielern UND bei per
@@ -161,7 +163,7 @@ public sealed class Entity
     public int EquippedWeaponItemId { get; set; }
     public int EquippedShieldItemId { get; set; }
 
-    private Entity(int id, EntityKind kind, int? characterId, int mobId, int? spawnPointId, int respawnSeconds, string name, int x, int y, int movementSpeed,
+    private Entity(int id, EntityKind kind, int? characterId, int typeId, int? spawnPointId, int respawnSeconds, string name, int x, int y, int movementSpeed,
         int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs,
         int maxHp, int attack, int defense, int meleeRangeWire, int attackCooldownMs, int yangMin, int yangMax,
         bool aggressive, int aggroRangeWire, int leashRangeWire, IReadOnlyList<(int ItemId, int ChancePercent)> drops)
@@ -169,7 +171,7 @@ public sealed class Entity
         Id = id;
         Kind = kind;
         CharacterId = characterId;
-        MobId = mobId;
+        TypeId = typeId;
         SpawnPointId = spawnPointId;
         RespawnSeconds = respawnSeconds;
         Name = name;
@@ -200,7 +202,7 @@ public sealed class Entity
     public Entity(int id, int characterId, string name, int x, int y,
         int maxHp = DefaultMaxHp, int attack = DefaultAttack, int defense = DefaultDefense,
         int meleeRangeWire = DefaultMeleeRangeWire, int attackCooldownMs = DefaultAttackCooldownMs)
-        : this(id, EntityKind.Player, characterId, mobId: 0, spawnPointId: null, respawnSeconds: 0, name, x, y, movementSpeed: GameConstants.PlayerSpeed,
+        : this(id, EntityKind.Player, characterId, typeId: 0, spawnPointId: null, respawnSeconds: 0, name, x, y, movementSpeed: GameConstants.PlayerSpeed,
             wanderRadiusWire: 0, wanderIntervalMinMs: 0, wanderIntervalMaxMs: 0,
             maxHp, attack, defense, meleeRangeWire, attackCooldownMs, yangMin: 0, yangMax: 0,
             aggressive: false, aggroRangeWire: 0, leashRangeWire: 0, drops: System.Array.Empty<(int, int)>())

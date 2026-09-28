@@ -243,7 +243,7 @@ namespace Lumiis.Tests.Game
             Assert.Single(respawnedMonsters);
             Entity respawned = respawnedMonsters[0];
             Assert.NotEqual(monster.Id, respawned.Id); // neue EntityId, nicht die alte wiederbelebt
-            Assert.Equal(1, respawned.MobId);
+            Assert.Equal(1, respawned.TypeId);
             Assert.Equal("Wildhund", respawned.Name);
             Assert.Equal(50000, respawned.IntX);
             Assert.Equal(50000, respawned.IntY);
