@@ -163,6 +163,12 @@ public sealed class Entity
     public int EquippedWeaponItemId { get; set; }
     public int EquippedShieldItemId { get; set; }
 
+    /// <summary>M5b: Sortiment eines NPC-Händlers (ItemIds aus data/npcs.json, über NpcDefinition.ShopItemIds
+    /// von World.SpawnNpc gesetzt - analog zu Appearance dort, nicht über den Konstruktor, da nur bei
+    /// Kind=Npc relevant). Leer bei Kind=Player/Monster; "hat ein Sortiment" in World.TryOpenShop prüft
+    /// genau dieses Feld.</summary>
+    public IReadOnlyList<int> ShopItemIds { get; set; } = System.Array.Empty<int>();
+
     private Entity(int id, EntityKind kind, int? characterId, int typeId, int? spawnPointId, int respawnSeconds, string name, int x, int y, int movementSpeed,
         int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs,
         int maxHp, int attack, int defense, int meleeRangeWire, int attackCooldownMs, int yangMin, int yangMax,

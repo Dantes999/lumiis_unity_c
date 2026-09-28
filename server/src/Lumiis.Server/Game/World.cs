@@ -133,8 +133,9 @@ public sealed class World
     /// bereits geprüft aus NpcSpawnCatalog (begehbare Zelle), werden hier trotzdem defensiv auf die
     /// Kartengrenzen geklemmt, analog zu SpawnMonster/TryJoin. appearance kommt direkt aus der NpcCatalog
     /// (anders als bei Monstern: NPCs haben eine echte, sichtbare Ausrüstung, siehe Entity.CreateNpc-
-    /// Kommentar).</summary>
-    public Entity SpawnNpc(int npcId, string name, int x, int y, Appearance appearance)
+    /// Kommentar). shopItemIds: Sortiment aus der NpcCatalog (siehe Entity.ShopItemIds) - leer = kein Shop
+    /// (aktuell kein Anwendungsfall, alle NpcCatalog-Einträge haben ein validiertes, nicht-leeres Sortiment).</summary>
+    public Entity SpawnNpc(int npcId, string name, int x, int y, Appearance appearance, IReadOnlyList<int>? shopItemIds = null)
     {
         int clampedX = Math.Clamp(x, 0, GameConstants.MapWidth);
         int clampedY = Math.Clamp(y, 0, GameConstants.MapHeight);
@@ -142,6 +143,7 @@ public sealed class World
         int id = _nextEntityId++;
         Entity entity = Entity.CreateNpc(id, npcId, name, clampedX, clampedY);
         entity.Appearance = appearance;
+        entity.ShopItemIds = shopItemIds ?? Array.Empty<int>();
         _entities[id] = entity;
         return entity;
     }
@@ -276,6 +278,12 @@ public sealed class World
         if (target.IsDead)
             return AttackResult.Fail(AttackFailedReason.TargetAlreadyDead);
 
+        // M5b: NPCs sind unangreifbar/statisch (siehe docs/tasks/M5b-shop.md Abschnitt 0a) - vor dem
+        // Gleiche-Kinds-Check, weil der ("attacker.Kind == target.Kind") einen Player-vs-Npc-Angriff sonst
+        // NICHT blocken würde (unterschiedliche Kinds).
+        if (target.Kind == EntityKind.Npc)
+            return AttackResult.Fail(AttackFailedReason.TargetNotAttackable);
+
         if (attacker.Kind == target.Kind)
             return AttackResult.Fail(AttackFailedReason.TargetIsPlayer);
 
@@ -302,8 +310,11 @@ public sealed class World
         IReadOnlyList<(int ItemId, int ChancePercent)> targetDrops = target.Drops;
         (int targetHpAfter, bool died, long yangAwarded) = ApplyDamage(target, damage, nowMs);
 
+        // M5b: gemeinsame Yang-Methode mit MaxYang-Deckel (0c) - Rückgabewert bewusst ignoriert: schlägt die
+        // Gutschrift wegen des Deckels fehl, bleibt der Kill trotzdem gültig (gleiche "Haupt-Aktion bleibt
+        // gültig, Nebeneffekt geht ggf. verloren"-Linie wie bei vollem Inventar bei Drops, siehe unten).
         if (yangAwarded > 0)
-            attacker.Yang += yangAwarded;
+            CreditYang(attacker, yangAwarded);
 
         // M5a: Drops nach Yang, nur bei totem Monster (target ist nach ApplyDamage evtl. schon aus World
         // entfernt - deshalb targetDrops vorher gesichert statt target.Drops erneut zu lesen). Jeder Eintrag
@@ -527,6 +538,122 @@ public sealed class World
 
         entity.Attack = entity.BaseAttack + attackBonus;
         entity.Defense = entity.BaseDefense + defenseBonus;
+    }
+
+    // ---- M5b: Shop/Yang (kein Netzwerkbezug, siehe GameServer für die Paket-Seite) ----
+
+    /// <summary>Einzige Stelle im Projekt, die Entity.Yang erhöht (Monster-Drops via TryAttack, Verkauf via
+    /// TrySell, Debug-Tools via HandleDebugGiveYangRequest, siehe docs/tasks/M5b-shop.md Abschnitt 0c) -
+    /// deckelt bei GameConstants.MaxYang. amount &lt;= 0 ist ein No-op (gilt als Erfolg, nichts zu tun). Gibt
+    /// false zurück, wenn amount &gt; 0 den Deckel überschreiten würde - dann bleibt Yang UNVERÄNDERT (kein
+    /// Teilbetrag), der Aufrufer entscheidet, wie er das behandelt (TrySell bricht komplett ab, TryAttack
+    /// lässt den Kill trotzdem gültig).</summary>
+    public bool CreditYang(int entityId, long amount)
+    {
+        return _entities.TryGetValue(entityId, out Entity? entity) && CreditYang(entity, amount);
+    }
+
+    private static bool CreditYang(Entity entity, long amount)
+    {
+        if (amount <= 0) return true;
+        if (entity.Yang + amount > GameConstants.MaxYang) return false;
+
+        entity.Yang += amount;
+        return true;
+    }
+
+    /// <summary>Prüft, ob playerEntityId gerade mit npcEntityId Handel treiben darf: NPC existiert und ist
+    /// Kind=Npc, hat ein Sortiment (ShopItemIds nicht leer), Distanz &lt;= NpcInteractRangeWire (quadrierte
+    /// Distanz wie TryAttack/AOI). Gemeinsame Vorprüfung für TryOpenShop/TryBuy/TrySell - JEDE Shop-Aktion
+    /// prüft das erneut (der Spieler könnte sich seit dem letzten Request wegbewegt haben, siehe
+    /// docs/tasks/M5b-shop.md Abschnitt 4).</summary>
+    private (bool Success, ShopActionFailedReason Reason) CheckShopAccess(int playerEntityId, int npcEntityId)
+    {
+        if (!_entities.TryGetValue(playerEntityId, out Entity? player))
+            return (false, ShopActionFailedReason.NpcNotFound); // sollte nicht vorkommen, analog zu TryAttack.
+
+        if (!_entities.TryGetValue(npcEntityId, out Entity? npc) || npc.Kind != EntityKind.Npc)
+            return (false, ShopActionFailedReason.NpcNotFound);
+
+        if (npc.ShopItemIds.Count == 0)
+            return (false, ShopActionFailedReason.NotAShop);
+
+        long dx = player.IntX - npc.IntX;
+        long dy = player.IntY - npc.IntY;
+        long rangeSq = (long)GameConstants.NpcInteractRangeWire * GameConstants.NpcInteractRangeWire;
+        if (dx * dx + dy * dy > rangeSq)
+            return (false, ShopActionFailedReason.OutOfRange);
+
+        return (true, default);
+    }
+
+    public (bool Success, ShopActionFailedReason Reason) TryOpenShop(int playerEntityId, int npcEntityId)
+    {
+        return CheckShopAccess(playerEntityId, npcEntityId);
+    }
+
+    /// <summary>Kauft itemId beim NPC: NPC/Reichweite (erneut, siehe CheckShopAccess), Item im Sortiment,
+    /// genug Yang, freier Inventarplatz. Erfolg: Yang abziehen, Item über TryAddItemToInventory einfügen
+    /// (Platz gerade erst geprüft, kann dort nicht mehr fehlschlagen).</summary>
+    public (bool Success, ShopActionFailedReason Reason) TryBuy(int playerEntityId, int npcEntityId, int itemId)
+    {
+        (bool accessOk, ShopActionFailedReason accessReason) = CheckShopAccess(playerEntityId, npcEntityId);
+        if (!accessOk) return (false, accessReason);
+
+        Entity player = _entities[playerEntityId];
+        Entity npc = _entities[npcEntityId];
+
+        bool inStock = false;
+        foreach (int shopItemId in npc.ShopItemIds)
+        {
+            if (shopItemId == itemId) { inStock = true; break; }
+        }
+        if (!inStock)
+            return (false, ShopActionFailedReason.ItemNotInStock);
+
+        if (_itemCatalog == null || !_itemCatalog.TryGet(itemId, out ItemDefinition item))
+            return (false, ShopActionFailedReason.ItemNotInStock); // sollte nicht vorkommen - NpcCatalog validiert das beim Laden.
+
+        if (player.Yang < item.BuyPrice)
+            return (false, ShopActionFailedReason.NotEnoughYang);
+
+        if (FindFirstFreeInventorySlot(player) < 0)
+            return (false, ShopActionFailedReason.InventoryFull);
+
+        player.Yang -= item.BuyPrice;
+        TryAddItemToInventory(playerEntityId, itemId);
+        return (true, default);
+    }
+
+    /// <summary>Verkauft das Item aus inventorySlotIndex an den NPC: NPC/Reichweite, Slot gültig und belegt,
+    /// SellPrice &gt; 0. Erfolg: Slot leeren, Yang gutschreiben über CreditYang (MaxYang-Deckel) - bei
+    /// Überschreitung Abbruch mit YangCapReached, NICHTS wird verändert (Slot bleibt belegt, kein
+    /// Teilverkauf).</summary>
+    public (bool Success, ShopActionFailedReason Reason) TrySell(int playerEntityId, int npcEntityId, int inventorySlotIndex)
+    {
+        (bool accessOk, ShopActionFailedReason accessReason) = CheckShopAccess(playerEntityId, npcEntityId);
+        if (!accessOk) return (false, accessReason);
+
+        Entity player = _entities[playerEntityId];
+
+        if (inventorySlotIndex < 0 || inventorySlotIndex >= player.Inventory.Length)
+            return (false, ShopActionFailedReason.InvalidSlot);
+
+        int itemId = player.Inventory[inventorySlotIndex];
+        if (itemId == 0)
+            return (false, ShopActionFailedReason.EmptySlot);
+
+        if (_itemCatalog == null || !_itemCatalog.TryGet(itemId, out ItemDefinition item))
+            return (false, ShopActionFailedReason.ItemNotSellable); // sollte nicht vorkommen - Items im Inventar stammen immer aus dem Katalog.
+
+        if (item.SellPrice <= 0)
+            return (false, ShopActionFailedReason.ItemNotSellable);
+
+        if (!CreditYang(playerEntityId, item.SellPrice))
+            return (false, ShopActionFailedReason.YangCapReached);
+
+        player.Inventory[inventorySlotIndex] = 0;
+        return (true, default);
     }
 
     /// <summary>Für jede Entity: welche anderen Entities liegen innerhalb von radiusWire (quadrierte Distanz,

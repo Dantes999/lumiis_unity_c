@@ -98,13 +98,10 @@ public sealed class GameServer : INetEventListener
     private readonly MobCatalog? _mobCatalog;
 
     /// <summary>An World durchgereicht (siehe World-Konstruktor) UND hier für ToAppearance/CompleteJoin
-    /// gehalten (Equipped-ItemId -> LookId auflösen, M5a).</summary>
+    /// gehalten (Equipped-ItemId -> LookId auflösen, M5a) sowie für ShopContentPacket (BuyPrice je
+    /// Sortiments-Item, siehe HandleOpenShopRequest - NpcCatalog selbst wird dafür nicht mehr gebraucht: das
+    /// Sortiment sitzt bereits auf der Entity, siehe Entity.ShopItemIds/World.SpawnNpc).</summary>
     private readonly ItemCatalog? _itemCatalog;
-
-    /// <summary>M5b: für ShopContentPacket gehalten (Sortiment eines NPCs auflösen, siehe
-    /// HandleOpenShopRequest) - der reguläre Katalog-Spawn im Konstruktor braucht die Referenz danach nicht
-    /// mehr.</summary>
-    private readonly NpcCatalog? _npcCatalog;
     private readonly NetManager _netManager;
     private readonly ILogger _logger;
     private readonly Func<long> _nowMs;
@@ -150,7 +147,6 @@ public sealed class GameServer : INetEventListener
         _classCatalog = classCatalog;
         _mobCatalog = mobCatalog;
         _itemCatalog = itemCatalog;
-        _npcCatalog = npcCatalog;
         _world = new World(config.MaxPlayers, collisionMap, itemCatalog: itemCatalog);
         _netManager = new NetManager(this) { UpdateTime = 15 };
         _nowMs = nowMs ?? DefaultNowMs;
@@ -175,7 +171,7 @@ public sealed class GameServer : INetEventListener
             foreach (NpcPlacement placement in npcSpawnCatalog.Placements)
             {
                 npcCatalog.TryGet(placement.NpcId, out NpcDefinition npcDef); // Existenz bereits von NpcSpawnCatalog.LoadFromFile geprüft.
-                _world.SpawnNpc(placement.NpcId, npcDef.Name, placement.PositionX, placement.PositionY, npcDef.Appearance);
+                _world.SpawnNpc(placement.NpcId, npcDef.Name, placement.PositionX, placement.PositionY, npcDef.Appearance, npcDef.ShopItemIds);
             }
         }
 
