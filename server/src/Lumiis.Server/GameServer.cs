@@ -902,6 +902,18 @@ public sealed class GameServer : INetEventListener
         conn.Peer.SendPacket(new JoinAcceptedPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY, Appearance = entity.Appearance });
         conn.Peer.SendPacket(BuildInventorySyncPacket(entity));
 
+        // Bugfix (Yang-Anzeige zeigte 0 bis zum ersten Kauf/Verkauf/Kill): Yang und eigenes Leben hatten sonst
+        // keinen Anfangswert beim Client - beide werden nur durch Änderungs-Pakete aktualisiert
+        // (YangChangedPacket/EntityHpChangedPacket-Handler, siehe GameClient.OnPacketReceived), die beim Join
+        // selbst nie verschickt wurden, obwohl der Server den geladenen Yang-Stand (character.Yang) bzw. das
+        // volle Leben (Entity.CurrentHp - wird nie aus der DB geladen, jede frische Entity startet immer bei
+        // MaxHp, siehe World.TryJoin/Entity-Konstruktor) längst kennt. Gleiche Fehlerklasse wie der
+        // EntityHpChanged-Bugfix für fremde Entities (SendHpIfDamaged), hier für den Spieler selbst und
+        // deshalb bewusst unbedingt (nicht nur bei CurrentHp < MaxHp) - beide bestehenden Pakete, kein neues
+        // Protokollelement.
+        conn.Peer.SendPacket(new YangChangedPacket { NewTotal = entity.Yang });
+        conn.Peer.SendPacket(new EntityHpChangedPacket { EntityId = entity.Id, CurrentHp = entity.CurrentHp, MaxHp = entity.MaxHp });
+
         // Der Joiner bekommt nur die laut AOI-Radius ab seiner Startposition sichtbaren Entities (nicht mehr
         // alle), laufende Bewegungen zusätzlich als EntityMove ab aktueller Position. VisibleEntityIds wird
         // hier schon auf denselben Stand gebracht wie das Gesendete, damit der nächste UpdateVisibility-Tick
