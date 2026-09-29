@@ -558,6 +558,11 @@ namespace Lumiis.Shared.Net
         public int Defense;
         public int DodgeBp;
 
+        /// <summary>M6b: alle gelernten Skills (SkillId, Level 1-17) - Skills auf Stufe 0 (nicht gelernt)
+        /// fehlen in der Liste, analog zu InventorySyncPacket.Slots (kein Eintrag = leer). Vollständiger
+        /// eigener Stand wie der Rest dieses Pakets, kein Delta.</summary>
+        public List<(int SkillId, int Level)> Skills = new List<(int, int)>();
+
         public PacketId Id
         {
             get { return PacketId.CharacterStats; }
@@ -581,6 +586,12 @@ namespace Lumiis.Shared.Net
             writer.WriteInt32(Attack);
             writer.WriteInt32(Defense);
             writer.WriteInt32(DodgeBp);
+            writer.WriteByte((byte)Skills.Count);
+            foreach ((int skillId, int level) in Skills)
+            {
+                writer.WriteInt32(skillId);
+                writer.WriteByte((byte)level);
+            }
         }
 
         public void Read(PacketReader reader)
@@ -601,6 +612,14 @@ namespace Lumiis.Shared.Net
             Attack = reader.ReadInt32();
             Defense = reader.ReadInt32();
             DodgeBp = reader.ReadInt32();
+            int skillCount = reader.ReadByte();
+            Skills = new List<(int, int)>(skillCount);
+            for (int i = 0; i < skillCount; i++)
+            {
+                int skillId = reader.ReadInt32();
+                int level = reader.ReadByte();
+                Skills.Add((skillId, level));
+            }
         }
     }
 
@@ -629,6 +648,79 @@ namespace Lumiis.Shared.Net
         {
             AttackerEntityId = reader.ReadInt32();
             TargetEntityId = reader.ReadInt32();
+        }
+    }
+
+    /// <summary>Grund, warum ein UseSkillRequestPacket abgelehnt wurde (M6b) - siehe World.TryUseSkill.</summary>
+    public enum UseSkillFailedReason : byte
+    {
+        NotLearned = 1,
+        NotEnoughSp = 2,
+        OnCooldown = 3,
+        TargetRequired = 4,
+        TargetNotFound = 5,
+        TargetAlreadyDead = 6,
+        OutOfRange = 7,
+        TargetIsPlayer = 8,
+        TargetNotAttackable = 9
+    }
+
+    /// <summary>Ein UseSkillRequestPacket wurde abgelehnt - nur an den Anfragenden, Verbindung bleibt
+    /// bestehen (analog zu AttackFailedPacket).</summary>
+    public sealed class UseSkillFailedPacket : IPacket
+    {
+        public UseSkillFailedReason Reason;
+
+        public PacketId Id
+        {
+            get { return PacketId.UseSkillFailed; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteByte((byte)Reason);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            Reason = (UseSkillFailedReason)reader.ReadByte();
+        }
+    }
+
+    /// <summary>Voller eigener aktive-Buffs-Stand (M6b, nur an den Besitzer, siehe CLAUDE.md "Skills") - immer
+    /// ein voller Resync (analog zu InventorySyncPacket), kein Delta. RemainingMs statt eines absoluten
+    /// Zeitstempels (Projekt-Konvention: keine Client-Uhrensynchronisation) - der Client zählt lokal mit
+    /// Time.deltaTime herunter. Leere Liste = keine aktiven Buffs. Verschickt bei jedem Skill-Einsatz, der
+    /// den Buff-Zustand ändert, UND wenn ein Buff durch World.Tick abläuft.</summary>
+    public sealed class ActiveBuffsChangedPacket : IPacket
+    {
+        public List<(BuffType Type, long RemainingMs)> Buffs = new List<(BuffType, long)>();
+
+        public PacketId Id
+        {
+            get { return PacketId.ActiveBuffsChanged; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteByte((byte)Buffs.Count);
+            foreach ((BuffType type, long remainingMs) in Buffs)
+            {
+                writer.WriteByte((byte)type);
+                writer.WriteInt64(remainingMs);
+            }
+        }
+
+        public void Read(PacketReader reader)
+        {
+            int count = reader.ReadByte();
+            Buffs = new List<(BuffType, long)>(count);
+            for (int i = 0; i < count; i++)
+            {
+                BuffType type = (BuffType)reader.ReadByte();
+                long remainingMs = reader.ReadInt64();
+                Buffs.Add((type, remainingMs));
+            }
         }
     }
 }

@@ -33,6 +33,12 @@ namespace Lumiis.Shared.Net
         /// DebugSpawnMonsterRequest-Kommentar).</summary>
         DebugSetLevelRequest = 13,
 
+        /// <summary>M6b: Taste 1-4 (echte Spielsteuerung, siehe CLAUDE.md "Skills").</summary>
+        UseSkillRequest = 14,
+
+        /// <summary>M6b: ein Fertigkeitspunkt wird auf einen Skill verteilt.</summary>
+        AllocateSkillPointRequest = 15,
+
         // Server -> Client: ab 1000
         JoinAccepted = 1000,
         JoinRejected = 1001,
@@ -72,6 +78,13 @@ namespace Lumiis.Shared.Net
 
         /// <summary>M6a: ein Angriff wurde ausgewichen - an alle AOI-Beobachter des Ziels.</summary>
         EntityDodged = 1017,
+
+        /// <summary>M6b: ein UseSkillRequest wurde abgelehnt - nur an den Anfragenden.</summary>
+        UseSkillFailed = 1018,
+
+        /// <summary>M6b: der eigene aktive-Buffs-Stand hat sich geändert (Skill gewirkt oder Buff
+        /// abgelaufen) - nur an den Besitzer.</summary>
+        ActiveBuffsChanged = 1019,
     }
 
     /// <summary>Jede neue PacketId braucht hier eine Zeile (ein Test prüft das).</summary>
@@ -112,6 +125,10 @@ namespace Lumiis.Shared.Net
                 case PacketId.DebugSetLevelRequest: return new DebugSetLevelRequestPacket();
                 case PacketId.CharacterStats: return new CharacterStatsPacket();
                 case PacketId.EntityDodged: return new EntityDodgedPacket();
+                case PacketId.UseSkillRequest: return new UseSkillRequestPacket();
+                case PacketId.AllocateSkillPointRequest: return new AllocateSkillPointRequestPacket();
+                case PacketId.UseSkillFailed: return new UseSkillFailedPacket();
+                case PacketId.ActiveBuffsChanged: return new ActiveBuffsChangedPacket();
                 default: return null;
             }
         }

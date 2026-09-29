@@ -364,7 +364,8 @@ namespace Lumiis.Tests
                 CurrentSp = 20,
                 Attack = 25,
                 Defense = 8,
-                DodgeBp = 250
+                DodgeBp = 250,
+                Skills = new System.Collections.Generic.List<(int, int)> { (1, 5), (3, 12), (4, 17) }
             };
             var decoded = Assert.IsType<CharacterStatsPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
             Assert.Equal(original.Level, decoded.Level);
@@ -383,6 +384,15 @@ namespace Lumiis.Tests
             Assert.Equal(original.Attack, decoded.Attack);
             Assert.Equal(original.Defense, decoded.Defense);
             Assert.Equal(original.DodgeBp, decoded.DodgeBp);
+            Assert.Equal(original.Skills, decoded.Skills);
+        }
+
+        [Fact]
+        public void CharacterStats_RoundTrip_EmptySkills()
+        {
+            var original = new CharacterStatsPacket { Level = 1 };
+            var decoded = Assert.IsType<CharacterStatsPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Empty(decoded.Skills);
         }
 
         [Fact]
@@ -392,6 +402,50 @@ namespace Lumiis.Tests
             var decoded = Assert.IsType<EntityDodgedPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
             Assert.Equal(original.AttackerEntityId, decoded.AttackerEntityId);
             Assert.Equal(original.TargetEntityId, decoded.TargetEntityId);
+        }
+
+        [Fact]
+        public void UseSkillRequest_RoundTrip()
+        {
+            var original = new UseSkillRequestPacket { SkillId = 1, TargetEntityId = 42 };
+            var decoded = Assert.IsType<UseSkillRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.SkillId, decoded.SkillId);
+            Assert.Equal(original.TargetEntityId, decoded.TargetEntityId);
+        }
+
+        [Fact]
+        public void AllocateSkillPointRequest_RoundTrip()
+        {
+            var original = new AllocateSkillPointRequestPacket { SkillId = 3 };
+            var decoded = Assert.IsType<AllocateSkillPointRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.SkillId, decoded.SkillId);
+        }
+
+        [Fact]
+        public void UseSkillFailed_RoundTrip()
+        {
+            var original = new UseSkillFailedPacket { Reason = UseSkillFailedReason.NotEnoughSp };
+            var decoded = Assert.IsType<UseSkillFailedPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.Reason, decoded.Reason);
+        }
+
+        [Fact]
+        public void ActiveBuffsChanged_RoundTrip()
+        {
+            var original = new ActiveBuffsChangedPacket
+            {
+                Buffs = new System.Collections.Generic.List<(BuffType, long)> { (BuffType.AttackBuff, 12345), (BuffType.AttackSpeedBuff, 6789) }
+            };
+            var decoded = Assert.IsType<ActiveBuffsChangedPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.Buffs, decoded.Buffs);
+        }
+
+        [Fact]
+        public void ActiveBuffsChanged_RoundTrip_Empty()
+        {
+            var original = new ActiveBuffsChangedPacket();
+            var decoded = Assert.IsType<ActiveBuffsChangedPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Empty(decoded.Buffs);
         }
 
         [Fact]

@@ -322,4 +322,74 @@ namespace Lumiis.Shared.Net
             Level = reader.ReadInt32();
         }
     }
+
+    /// <summary>Skill-Typ (M6b, siehe CLAUDE.md Abschnitt "Skills") - bestimmt, wie World.TryUseSkill einen
+    /// Skill auflöst: SingleStrike/AreaAttack brauchen ResolveHit, AttackBuff/AttackSpeedBuff setzen nur
+    /// einen Buff-Zustand.</summary>
+    public enum SkillType : byte
+    {
+        SingleStrike = 1,
+        AreaAttack = 2,
+        AttackBuff = 3,
+        AttackSpeedBuff = 4
+    }
+
+    /// <summary>Aktiver Buff-Typ (M6b) - Untermenge von SkillType (nur die beiden Buff-Skills haben einen
+    /// aktiven Zustand mit Restzeit, siehe Entity.ActiveBuffs/ActiveBuffsChangedPacket).</summary>
+    public enum BuffType : byte
+    {
+        AttackBuff = 1,
+        AttackSpeedBuff = 2
+    }
+
+    /// <summary>Taste 1-4 im Spiel (M6b, echte Spielsteuerung, siehe CLAUDE.md "Skills") - der Server prüft
+    /// alles serverautoritativ erneut (gelernt, SP, Skill-Cooldown, ggf. Ziel/Reichweite, siehe
+    /// World.TryUseSkill). TargetEntityId 0 = kein Ziel/Selbstziel (AreaAttack/Buff-Skills brauchen keins).</summary>
+    public sealed class UseSkillRequestPacket : IPacket
+    {
+        public int SkillId;
+        public int TargetEntityId;
+
+        public PacketId Id
+        {
+            get { return PacketId.UseSkillRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteInt32(SkillId);
+            writer.WriteInt32(TargetEntityId);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            SkillId = reader.ReadInt32();
+            TargetEntityId = reader.ReadInt32();
+        }
+    }
+
+    /// <summary>Der Client will einen Fertigkeitspunkt auf den genannten Skill verteilen (M6b) - der Server
+    /// prüft erneut, ob UnspentSkillPoints > 0 UND die aktuelle Stufe &lt; 17 ist (siehe
+    /// World.TryAllocateSkillPoint). Ungültige Anfrage (keine Punkte, unbekannter Skill, schon Stufe 17)
+    /// führt zu keiner Trennung, nur zu einem erneuten CharacterStatsPacket mit dem unveränderten Stand
+    /// (analog zu AllocateStatPointRequestPacket, siehe GameServer.HandleAllocateSkillPointRequest).</summary>
+    public sealed class AllocateSkillPointRequestPacket : IPacket
+    {
+        public int SkillId;
+
+        public PacketId Id
+        {
+            get { return PacketId.AllocateSkillPointRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteInt32(SkillId);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            SkillId = reader.ReadInt32();
+        }
+    }
 }
