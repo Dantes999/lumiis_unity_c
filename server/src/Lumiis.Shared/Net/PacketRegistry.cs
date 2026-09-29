@@ -26,6 +26,13 @@ namespace Lumiis.Shared.Net
         /// DebugSpawnMonsterRequest-Kommentar).</summary>
         DebugGiveYangRequest = 11,
 
+        /// <summary>M6a: ein Statuspunkt wird verteilt (siehe CLAUDE.md "Fortschritt: Level, XP, Werte").</summary>
+        AllocateStatPointRequest = 12,
+
+        /// <summary>Nur wirksam mit --allow-debug-commands, sonst still verworfen (siehe
+        /// DebugSpawnMonsterRequest-Kommentar).</summary>
+        DebugSetLevelRequest = 13,
+
         // Server -> Client: ab 1000
         JoinAccepted = 1000,
         JoinRejected = 1001,
@@ -58,6 +65,13 @@ namespace Lumiis.Shared.Net
 
         /// <summary>M5b: ein Shop-Request (Open/Buy/Sell) wurde abgelehnt - nur an den Anfragenden.</summary>
         ShopActionFailed = 1015,
+
+        /// <summary>M6a: voller eigener Fortschritts-/Kampfwert-Stand (siehe CLAUDE.md "Fortschritt: Level,
+        /// XP, Werte") - nur an den Besitzer.</summary>
+        CharacterStats = 1016,
+
+        /// <summary>M6a: ein Angriff wurde ausgewichen - an alle AOI-Beobachter des Ziels.</summary>
+        EntityDodged = 1017,
     }
 
     /// <summary>Jede neue PacketId braucht hier eine Zeile (ein Test prüft das).</summary>
@@ -94,6 +108,10 @@ namespace Lumiis.Shared.Net
                 case PacketId.DebugGiveYangRequest: return new DebugGiveYangRequestPacket();
                 case PacketId.ShopContent: return new ShopContentPacket();
                 case PacketId.ShopActionFailed: return new ShopActionFailedPacket();
+                case PacketId.AllocateStatPointRequest: return new AllocateStatPointRequestPacket();
+                case PacketId.DebugSetLevelRequest: return new DebugSetLevelRequestPacket();
+                case PacketId.CharacterStats: return new CharacterStatsPacket();
+                case PacketId.EntityDodged: return new EntityDodgedPacket();
                 default: return null;
             }
         }

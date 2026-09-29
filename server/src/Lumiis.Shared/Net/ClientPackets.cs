@@ -264,4 +264,62 @@ namespace Lumiis.Shared.Net
             Amount = reader.ReadInt64();
         }
     }
+
+    /// <summary>Einer der vier verteilbaren Werte (M6a, siehe CLAUDE.md Abschnitt "Fortschritt: Level, XP,
+    /// Werte") - siehe AllocateStatPointRequestPacket.</summary>
+    public enum StatKind : byte
+    {
+        St = 1,
+        Ht = 2,
+        Dx = 3,
+        Iq = 4
+    }
+
+    /// <summary>Der Client will einen Statuspunkt auf den genannten Wert verteilen (M6a) - der Server prüft
+    /// erneut, ob UnspentStatPoints > 0 ist (siehe World.TryAllocateStatPoint). Eine ungültige Anfrage
+    /// (keine Punkte, unbekannter Wert) führt zu keiner Trennung, nur zu einem erneuten
+    /// CharacterStatsPacket mit dem unveränderten Stand (siehe GameServer.HandleAllocateStatPointRequest).</summary>
+    public sealed class AllocateStatPointRequestPacket : IPacket
+    {
+        public StatKind Stat;
+
+        public PacketId Id
+        {
+            get { return PacketId.AllocateStatPointRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteByte((byte)Stat);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            Stat = (StatKind)reader.ReadByte();
+        }
+    }
+
+    /// <summary>Dev-Tool (siehe CLAUDE.md "Dev-Tools"): setzt Level = Level, Xp/Spent* zurückgesetzt,
+    /// Unspent* entsprechend nachgezählt (dient auch als Stat-Reset zum Testen, siehe
+    /// World.ApplyDebugLevel). Nur wirksam mit --allow-debug-commands, sonst still verworfen, analog zu
+    /// DebugSpawnMonsterRequestPacket/DebugGiveYangRequestPacket.</summary>
+    public sealed class DebugSetLevelRequestPacket : IPacket
+    {
+        public int Level;
+
+        public PacketId Id
+        {
+            get { return PacketId.DebugSetLevelRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteInt32(Level);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            Level = reader.ReadInt32();
+        }
+    }
 }

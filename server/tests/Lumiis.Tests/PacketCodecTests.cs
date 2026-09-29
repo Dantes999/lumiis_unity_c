@@ -329,6 +329,72 @@ namespace Lumiis.Tests
         }
 
         [Fact]
+        public void AllocateStatPointRequest_RoundTrip()
+        {
+            var original = new AllocateStatPointRequestPacket { Stat = StatKind.Dx };
+            var decoded = Assert.IsType<AllocateStatPointRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.Stat, decoded.Stat);
+        }
+
+        [Fact]
+        public void DebugSetLevelRequest_RoundTrip()
+        {
+            var original = new DebugSetLevelRequestPacket { Level = 12 };
+            var decoded = Assert.IsType<DebugSetLevelRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.Level, decoded.Level);
+        }
+
+        [Fact]
+        public void CharacterStats_RoundTrip()
+        {
+            var original = new CharacterStatsPacket
+            {
+                Level = 5,
+                Xp = 1234,
+                XpToNext = 650,
+                St = 8,
+                Ht = 6,
+                Dx = 5,
+                Iq = 4,
+                UnspentStatPoints = 3,
+                UnspentSkillPoints = 1,
+                MaxHp = 148,
+                CurrentHp = 90,
+                MaxSp = 46,
+                CurrentSp = 20,
+                Attack = 25,
+                Defense = 8,
+                DodgeBp = 250
+            };
+            var decoded = Assert.IsType<CharacterStatsPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.Level, decoded.Level);
+            Assert.Equal(original.Xp, decoded.Xp);
+            Assert.Equal(original.XpToNext, decoded.XpToNext);
+            Assert.Equal(original.St, decoded.St);
+            Assert.Equal(original.Ht, decoded.Ht);
+            Assert.Equal(original.Dx, decoded.Dx);
+            Assert.Equal(original.Iq, decoded.Iq);
+            Assert.Equal(original.UnspentStatPoints, decoded.UnspentStatPoints);
+            Assert.Equal(original.UnspentSkillPoints, decoded.UnspentSkillPoints);
+            Assert.Equal(original.MaxHp, decoded.MaxHp);
+            Assert.Equal(original.CurrentHp, decoded.CurrentHp);
+            Assert.Equal(original.MaxSp, decoded.MaxSp);
+            Assert.Equal(original.CurrentSp, decoded.CurrentSp);
+            Assert.Equal(original.Attack, decoded.Attack);
+            Assert.Equal(original.Defense, decoded.Defense);
+            Assert.Equal(original.DodgeBp, decoded.DodgeBp);
+        }
+
+        [Fact]
+        public void EntityDodged_RoundTrip()
+        {
+            var original = new EntityDodgedPacket { AttackerEntityId = 3, TargetEntityId = 7 };
+            var decoded = Assert.IsType<EntityDodgedPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.AttackerEntityId, decoded.AttackerEntityId);
+            Assert.Equal(original.TargetEntityId, decoded.TargetEntityId);
+        }
+
+        [Fact]
         public void Decode_HonorsOffsetAndCount()
         {
             byte[] body = PacketCodec.Encode(new MoveToPacket { X = 1, Y = 2 });

@@ -531,4 +531,104 @@ namespace Lumiis.Shared.Net
             Reason = (ShopActionFailedReason)reader.ReadByte();
         }
     }
+
+    /// <summary>Der vollständige eigene Fortschritts-/Kampfwert-Stand (M6a, nur an den Besitzer, siehe
+    /// CLAUDE.md Abschnitt "Fortschritt: Level, XP, Werte") - immer ein voller Resync, kein Delta (analog zu
+    /// InventorySyncPacket). St/Ht/Dx/Iq sind jeweils die Summe aus Klassen-Basiswert und verteilten Punkten
+    /// (World.RecomputeDerivedStats). XpToNext ist 0 bei MaxLevel (kein weiterer XP-Gewinn möglich).
+    /// Attack/Defense/MaxHp/CurrentHp/MaxSp/CurrentSp sind dieselben abgeleiteten Werte wie überall sonst im
+    /// Protokoll (EntityDamaged/EntityHpChanged lesen/liefern weiterhin nur CurrentHp/MaxHp, kein
+    /// Sonderfall).</summary>
+    public sealed class CharacterStatsPacket : IPacket
+    {
+        public int Level;
+        public long Xp;
+        public long XpToNext;
+        public int St;
+        public int Ht;
+        public int Dx;
+        public int Iq;
+        public int UnspentStatPoints;
+        public int UnspentSkillPoints;
+        public int MaxHp;
+        public int CurrentHp;
+        public int MaxSp;
+        public int CurrentSp;
+        public int Attack;
+        public int Defense;
+        public int DodgeBp;
+
+        public PacketId Id
+        {
+            get { return PacketId.CharacterStats; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteInt32(Level);
+            writer.WriteInt64(Xp);
+            writer.WriteInt64(XpToNext);
+            writer.WriteInt32(St);
+            writer.WriteInt32(Ht);
+            writer.WriteInt32(Dx);
+            writer.WriteInt32(Iq);
+            writer.WriteInt32(UnspentStatPoints);
+            writer.WriteInt32(UnspentSkillPoints);
+            writer.WriteInt32(MaxHp);
+            writer.WriteInt32(CurrentHp);
+            writer.WriteInt32(MaxSp);
+            writer.WriteInt32(CurrentSp);
+            writer.WriteInt32(Attack);
+            writer.WriteInt32(Defense);
+            writer.WriteInt32(DodgeBp);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            Level = reader.ReadInt32();
+            Xp = reader.ReadInt64();
+            XpToNext = reader.ReadInt64();
+            St = reader.ReadInt32();
+            Ht = reader.ReadInt32();
+            Dx = reader.ReadInt32();
+            Iq = reader.ReadInt32();
+            UnspentStatPoints = reader.ReadInt32();
+            UnspentSkillPoints = reader.ReadInt32();
+            MaxHp = reader.ReadInt32();
+            CurrentHp = reader.ReadInt32();
+            MaxSp = reader.ReadInt32();
+            CurrentSp = reader.ReadInt32();
+            Attack = reader.ReadInt32();
+            Defense = reader.ReadInt32();
+            DodgeBp = reader.ReadInt32();
+        }
+    }
+
+    /// <summary>Ein Angriff wurde ausgewichen (M6a, siehe World.TryAttack/CLAUDE.md "Kampf") - an alle
+    /// AOI-Beobachter des Ziels (inklusive Angreifer, gleicher Verteiler wie EntityDamaged - der Angreifer
+    /// ist dank Nahkampfreichweite &lt; AOI-Radius immer selbst dabei). Ersetzt EntityDamagedPacket für
+    /// diesen Treffer komplett (kein Schaden, kein Tod), der Cooldown des Angreifers wird trotzdem verbraucht
+    /// (siehe World.TryAttack - unverändert).</summary>
+    public sealed class EntityDodgedPacket : IPacket
+    {
+        public int AttackerEntityId;
+        public int TargetEntityId;
+
+        public PacketId Id
+        {
+            get { return PacketId.EntityDodged; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteInt32(AttackerEntityId);
+            writer.WriteInt32(TargetEntityId);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            AttackerEntityId = reader.ReadInt32();
+            TargetEntityId = reader.ReadInt32();
+        }
+    }
 }
