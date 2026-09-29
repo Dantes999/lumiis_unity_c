@@ -465,6 +465,65 @@ Bewusst NICHT in M6a: Skills (M6b - Fertigkeitspunkte werden nur gesammelt, nich
 Monster-Regeneration, keine neuen Monstertypen/höheren Level für Monster (nur Level/BaseXp an den bestehenden
 zwei Typen ergänzt).
 
+## Skills
+Seit M6b gibt es vier Skills, auslösbar über die Tasten 1-4 (echte Spielsteuerung, kein Debug-Feature),
+investierbar über die seit M6a gesammelten Fertigkeitspunkte. Alle Zahlenwerte in `data/skills.json` sind
+Platzhalter (siehe das `_hinweis`-Feld dort), spätere Justierung erwartet:
+- Wuchtschlag (SkillId 1, SingleStrike): Einzelzielschaden mit stufenabhängigem Multiplikator auf den
+  normalen Schaden (Stufe 1 ~180%, Stufe 17 ~450%), Reichweite wie ein normaler Angriff (MeleeRangeWire).
+  Braucht ein Ziel.
+- Kreisschlag (SkillId 2, AreaAttack): trifft alle gültigen Ziele (anderes Kind als der Nutzer, lebendig,
+  kein NPC) innerhalb eines festen RadiusWire (200 Wire-Einheiten, konstant über alle Stufen) um den
+  Nutzer, niedrigerer Multiplikator als Wuchtschlag (Stufe 1 ~100%, Stufe 17 ~250%), jedes Ziel weicht
+  unabhängig aus. Kein Ziel nötig.
+- Kampfrausch (SkillId 3, AttackBuff): erhöht Attack vorübergehend um einen stufenabhängigen Prozentsatz
+  (Stufe 1 ~10%, Stufe 17 ~50%), feste Dauer 15s (konstant über alle Stufen). Kein Ziel nötig.
+- Hast (SkillId 4, AttackSpeedBuff): reduziert den NORMALEN Angriffs-Cooldown vorübergehend um einen
+  stufenabhängigen Prozentsatz (Stufe 1 ~2%, Stufe 17 EXAKT 20%, wie vom User vorgegeben), feste Dauer
+  15s. Kein Ziel nötig, wirkt nicht auf die Skill-eigenen Cooldowns.
+
+Jeder Skill hat Stufen 1-17 (0 = nicht gelernt), investierbar per Fertigkeitspunkt (`World.
+TryAllocateSkillPoint`, analog zu `TryAllocateStatPoint` aus M6a). Jeder Skill hat einen EIGENEN Cooldown
+(`Entity.SkillCooldownReadyAtMs`, vier unabhängige Tracker pro Charakter), getrennt vom normalen
+Angriffs-Cooldown (`Entity.AttackReadyAtMs`) - Wuchtschlag im eigenen Cooldown blockiert weder den
+normalen Angriff noch die anderen drei Skills.
+
+`World.ResolveHit` (aus `TryAttack` extrahiert) ist die gemeinsame Treffer-Auflösung für normale Angriffe
+(Multiplikator 100%) UND Wuchtschlag/Kreisschlag (stufenabhängiger Multiplikator) - Ausweichwurf, reaktive
+Zielerfassung, Tod-Behandlung inkl. XP/Yang/Drops laufen für Skill-Treffer exakt gleich wie bei einem
+normalen Angriff. Buffs (`Entity.ActiveBuffs`, ein Dictionary je `BuffType` mit Stärke + ExpiresAtMs)
+ersetzen sich bei erneutem Cast (kein Stapeln) und werden von `World.Tick` bei Ablauf entfernt
+(`RecomputeDerivedStats` läuft bei Buff-Start UND -Ende, damit der Wert sofort korrekt ist). Kampfrausch
+wirkt über `RecomputeDerivedStats` auf Attack (nach der bisherigen Ausrüstungs-Rechnung, gerundet), Hast
+über `World.EffectiveAttackCooldownMs` auf den nächsten normalen Angriff. Buffs und Skill-Cooldowns werden
+NICHT persistiert (sterben mit der Entity beim Disconnect, keine Datenbank-Spalte) - nur die gelernten
+Skillstufen selbst (`CharacterSkillLevel`, analog `CharacterInventoryItem`) überleben Disconnect/Rejoin,
+über denselben kombinierten `CharacterSaveRequest`-Channel wie Statuspunkte/Inventar/Yang.
+
+Pakete (Protocol.Version 12): `UseSkillRequestPacket` (Client→Server, SkillId+TargetEntityId, 0 = kein
+Ziel), `UseSkillFailedPacket` (nur an den Anfragenden, Reason-Enum NotLearned/NotEnoughSp/OnCooldown/
+TargetRequired/TargetNotFound/TargetAlreadyDead/OutOfRange/TargetIsPlayer/TargetNotAttackable),
+`ActiveBuffsChangedPacket` (nur an den Besitzer, Liste aus (BuffType, RemainingMs) - RemainingMs statt
+Zeitstempel, Projekt-Konvention keine Client-Uhrensynchronisation, leere Liste = keine aktiven Buffs),
+`AllocateSkillPointRequestPacket` (analog `AllocateStatPointRequestPacket`). `CharacterStatsPacket` trägt
+seit M6b zusätzlich alle gelernten Skillstufen (Skills-Liste, nur Einträge mit Stufe > 0). Erfolgreiche
+Schadens-Skills verschicken dieselben Pakete wie ein normaler Angriff (EntityDamaged/EntityDied/
+EntityDodged, je Ziel), erfolgreiche Buff-Skills ein `ActiveBuffsChangedPacket` plus `CharacterStatsPacket`
+(Attack kann sich geändert haben) an den Nutzer.
+
+Client: echte Tasten 1-4 (NICHT hinter `#if UNITY_EDITOR || DEVELOPMENT_BUILD`) senden
+`UseSkillRequestPacket` - Wuchtschlag nutzt das aktuell per Rechtsklick anvisierte Ziel, die anderen drei
+brauchen keins. Neue `SkillCatalogClient` (lädt `skills.json` aus StreamingAssets, analog
+`ItemCatalogClient`) nur für Anzeigenamen und CooldownMs je Stufe. Overlay (immer sichtbar, nicht nur
+Editor/Development-Build) zeigt die Tastenbelegung, lokal optimistisch gezählte Skill-Cooldowns (gesetzt
+beim Senden, der Server bleibt über `UseSkillFailedPacket(OnCooldown)` die einzige Autorität) und
+server-autoritative Buff-Restzeiten (`ActiveBuffsChangedPacket`, lokal mit `Time.deltaTime`
+heruntergezählt). Debug-Test-Panel bekommt einen Bereich "Skills" (Stufe 0-17 je Skill, "+"-Knopf, analog
+zum Statuspunkte-Bereich aus M6a).
+
+Bewusst NICHT in M6b: Skillbücher, Meister-System nach Stufe 17 (später), Partikeleffekte/Animationen,
+Skill-Icons (Text/Name reicht, wie bei Health-Bars/Items/Shop).
+
 ## Client
 Setup nach dem Klonen (auch auf dem zweiten Rechner):
 1. `cd server && dotnet build` - baut Lumiis.Shared und kopiert dabei Lumiis.Shared.dll sowie die netstandard2.1-Variante von LiteNetLib.dll nach `client/Assets/Plugins/Lumiis/` (git-ignoriert, entsteht bei jedem Build neu).
@@ -538,8 +597,11 @@ einen Respawn an einem (evtl. schon belegten) SpawnPoint aus.
 Map 1 (Startdorf + Feld), Krieger, Level 1-25, Monster/Bosse/Lumiis-Steine, Items/Drops/Shop, Chat, Gruppe. NICHT: Quests/Lua, Reittiere, Kostüme, Drachenseelen, Gildenkrieg, weitere Reiche.
 
 ## Meilensteine
-M0 Fundament (fertig) | M1 Walking Skeleton (fertig, inkl. M1b Unity-Client, M1c Sichtbarkeit/Testing, M1c-layered-characters Paper-Doll-Charaktere) | M2 Account & Charakter (komplett fertig): M2a Datenbank & Auth-Dienst, M2b Server-Join über Account/Token/Charakter, M2c Unity-Login-UI (UI Toolkit) | M3 Welt (Grid, AOI, Mobs) komplett fertig: M3a Kartenkollision, M3b Sichtbarkeitsbereich (kein Grid - siehe Abschnitt "Sichtbarkeitsbereich (AOI)"), M3c Monster (Spawns, Wander-KI, AOI-Integration - siehe Abschnitt "Monster") | M4 Kampf komplett fertig (inkl. Gegenwehr): M4a Kampf-Grundlagen, M4b Monster-Respawn, M4c Monster-Aggro/Verfolgung/Leine (siehe Abschnitt "Kampf") | M5 Items komplett fertig: M5a Items/Inventar/Ausrüstung/Drops (siehe Abschnitt "Items und Inventar"), M5b Shop/NPCs (siehe Abschnitt "Shop und NPCs") | M6 Metin-Kern: M6a Level/XP/Werte/SP/Ausweichen/Regeneration (siehe Abschnitt "Fortschritt: Level, XP, Werte"), M6b Skills (offen), M6c Upgrade (offen), M6d Lumiis-Steine (offen) | M7 Sozial | M8 Alpha-Betrieb.
-Aktuelle Aufgabe: keine - M6a ist fertig, für M6b gibt es noch keine Task-Datei unter docs/tasks/.
+M0 Fundament (fertig) | M1 Walking Skeleton (fertig, inkl. M1b Unity-Client, M1c Sichtbarkeit/Testing, M1c-layered-characters Paper-Doll-Charaktere) | M2 Account & Charakter (komplett fertig): M2a Datenbank & Auth-Dienst, M2b Server-Join über Account/Token/Charakter, M2c Unity-Login-UI (UI Toolkit) | M3 Welt (Grid, AOI, Mobs) komplett fertig: M3a Kartenkollision, M3b Sichtbarkeitsbereich (kein Grid - siehe Abschnitt "Sichtbarkeitsbereich (AOI)"), M3c Monster (Spawns, Wander-KI, AOI-Integration - siehe Abschnitt "Monster") | M4 Kampf komplett fertig (inkl. Gegenwehr): M4a Kampf-Grundlagen, M4b Monster-Respawn, M4c Monster-Aggro/Verfolgung/Leine (siehe Abschnitt "Kampf") | M5 Items komplett fertig: M5a Items/Inventar/Ausrüstung/Drops (siehe Abschnitt "Items und Inventar"), M5b Shop/NPCs (siehe Abschnitt "Shop und NPCs") | M6 Metin-Kern abgeschlossen: M6a Level/XP/Werte/SP/Ausweichen/Regeneration (siehe Abschnitt "Fortschritt: Level, XP, Werte"), M6b Skills (siehe Abschnitt "Skills") - die ursprünglich mitgeplanten M6c Upgrade/M6d Lumiis-Steine sind zurückgestellt (siehe "Aktuelle Aufgabe") | M7 Sozial | M8 Alpha-Betrieb.
+Aktuelle Aufgabe: keine - M6 (inkl. M6b) ist fertig. Offene Frage für die nächste Aufgabe (noch NICHT
+entschieden, siehe docs/tasks/M6b-skills.md Abschnitt 8): weiter mit M7 (Sozial/Chat/Gruppe) laut
+ursprünglichem Fahrplan, oder doch zuerst M6c Upgrade/M6d Lumiis-Steine nachholen - für keine der beiden
+Richtungen gibt es bisher eine Task-Datei unter docs/tasks/.
 
 ## Arbeitsweise
 - Kleine Schritte. Jeder endet mit grünem `dotnet test` und einem Commit (Präfix "M1: ...").
@@ -638,6 +700,56 @@ Aktuelle Aufgabe: keine - M6a ist fertig, für M6b gibt es noch keine Task-Datei
     - M6a damit fertig, M6b (Skills) offen). 504 Tests grün, mehrfach stabil, Batchmode-Compile-Check 0
     Fehler. Migration noch nicht gegen ein echtes Postgres angewendet/end-to-end mit Auth+Server+Bot
     verifiziert (siehe "Fertig, wenn" in der Aufgabenstellung) - offen für einen abschließenden manuellen Check.
+- M6b (Skills: Wuchtschlag, Kreisschlag, Kampfrausch, Hast, docs/tasks/M6b-skills.md) fertig, in 7 Commits
+  (0 Review nur berichtet, kein Commit): (1) `data/skills.json` (vier Platzhalter-Skills, je 17
+  Stufen-Einträge, `_hinweis`-Feld markiert alle Zahlen als Platzhalter). (2) Migration
+  `AddCharacterSkillLevels` - neue Tabelle `CharacterSkillLevel` (analog `CharacterInventoryItem`,
+  Unique-Index CharacterId+SkillId). (3) Shared: `SkillType`/`BuffType`-Enums, `UseSkillRequestPacket`,
+  `AllocateSkillPointRequestPacket`, `UseSkillFailedPacket`, `ActiveBuffsChangedPacket`,
+  `CharacterStatsPacket` um eine Skills-Liste (SkillId, Level) erweitert, Protocol.Version 11 -> 12. (4)
+  `SkillCatalog`/`SkillCatalogData` (`Lumiis.Data.Skills`, analog MobCatalog) laden/validieren fail-fast;
+  `World.TryAttack` in ein schlankes `ResolveHit` extrahiert (Schaden jetzt mit einem
+  `damageMultiplierPercent`-Parameter skaliert, bei 100% mathematisch identisch zur bisherigen Formel -
+  alle bestehenden TryAttack-Tests blieben dabei unverändert grün, der Beleg für die Extraktion selbst);
+  `TryUseSkill`/`TryUseSingleStrike`/`TryUseAreaAttack`/`TryUseBuffSkill`/`ConsumeSkillUse` (vier
+  UNABHÄNGIGE Skill-Cooldowns pro Charakter, `Entity.SkillCooldownReadyAtMs`, getrennt vom normalen
+  Angriffs-Cooldown), `TryAllocateSkillPoint` (analog `TryAllocateStatPoint`); Buffs
+  (`Entity.ActiveBuffs`, kein Stapeln bei erneutem Cast) fließen über `RecomputeDerivedStats`
+  (Kampfrausch, Attack) bzw. das neue `World.EffectiveAttackCooldownMs` (Hast, nächster normaler Angriff)
+  ein und werden von `World.Tick` bei Ablauf entfernt (kein Persistenz-/Disconnect-Sonderfall nötig, siehe
+  Entity.ActiveBuffs-Kommentar). (5) `Program.cs` lädt skills.json fail-fast;
+  `HandleUseSkillRequest`/`HandleAllocateSkillPointRequest` neu, dabei die Netzwerk-/Yang-/XP-/Drop-Seite
+  eines Treffers aus `HandleAttackRequest` in ein gemeinsames `ApplyAttackResult` extrahiert (reine
+  Extraktion, `HandleAttackRequest` unverändert im Verhalten) - wiederverwendet für Wuchtschlag (ein
+  Treffer) UND Kreisschlag (mehrere Treffer, je Ziel ein Aufruf); `World.Tick`s neue `BuffsExpired`-Liste
+  löst `ActiveBuffsChangedPacket`+`CharacterStatsPacket` an den Besitzer aus; Skillstufen-Persistenz über
+  den bestehenden kombinierten `CharacterSaveRequest`-Channel (M5b/M6a), voller Snapshot wie Inventar,
+  sofort bei Punkteverteilung. (6) Client: echte Tasten 1-4 (NICHT hinter
+  `#if UNITY_EDITOR || DEVELOPMENT_BUILD`, echte Spielsteuerung) senden `UseSkillRequestPacket` -
+  Wuchtschlag nutzt das per Rechtsklick anvisierte Ziel; neue `SkillCatalogClient` (lädt skills.json aus
+  StreamingAssets, analog `ItemCatalogClient`, nur Anzeigenamen/CooldownMs je Stufe); Overlay-Zeile
+  (ungated) mit Tastenbelegung, lokal optimistisch gezählten Skill-Cooldowns und server-autoritativen
+  Buff-Restzeiten (`ActiveBuffsChangedPacket`, lokal mit `Time.deltaTime` heruntergezählt);
+  `ClientWorld.CharacterState` um eine Skills-Dictionary erweitert (UnityEngine-frei, über `dotnet test`
+  mitgeprüft); Debug-Test-Panel-Bereich "Skills" (Stufe 0-17 je Skill, "+"-Knopf, analog zu M6a).
+  Batchmode-Compile-Check 0 Fehler, `tools/test-client-playmode.sh` 4/4 grün. (7) `SkillCatalogTests` (15,
+  inkl. Regressionstest gegen die echte data/skills.json - Hast Stufe 17 EXAKT 20% Cooldown-Reduktion, wie
+  vom User vorgegeben), `WorldSkillTests` (17, eigene kleine SkillCatalog-Fixture: gemeinsame
+  Vorprüfungen/vier unabhängige Skill-Cooldowns, Wuchtschlag-Schaden/-Reichweite, Kreisschlag-Mehrfachtreffer
+  mit unabhängigem Ausweichen je Ziel, Kampfrausch sofort+Ablauf+kein Stapeln, Hast Stufe 1/17 exakt+Ablauf,
+  AllocateSkillPoint), 6 neue LiteNetLib-Integrationstests (Punkteverteilung, Wuchtschlag-Mehrschaden,
+  Kreisschlag-Mehrfachtreffer, Kampfrausch+ActiveBuffsChanged+Mehrschaden, Hast mit Fake-Zeit beweist einen
+  früher möglichen zweiten Angriff, Skillstufen überleben Disconnect+Rejoin - dabei denselben bekannten
+  Async-Save-Race wie bei `AfterBuy_DisconnectAndRejoin_YangAndInventoryPersistExactly` getroffen, hier
+  aber mit einem expliziten DB-Poll-Wait vor dem Rejoin deterministisch abgefangen statt es dem
+  Netzwerk-Zufallstiming zu überlassen). (8) Diese Doku-Aktualisierung (neuer Abschnitt "Skills",
+  Meilensteine/Status - M6 damit abgeschlossen, M7 vs. M6c/M6d als offene Frage markiert, siehe
+  "Aktuelle Aufgabe"). 548 Tests grün, mehrfach stabil (ein einzelner Fehlschlag in einem Lauf war der
+  bereits dokumentierte, unveränderte CPU-Kontentions-Flake bei `AfterBuy_DisconnectAndRejoin...`),
+  Batchmode-Compile-Check 0 Fehler. Noch offen: manueller End-to-End-Check mit echtem Auth+Server+Bot
+  (Bot selbst nutzt keine Skills, siehe "Fertig, wenn" in der Aufgabenstellung) sowie das Anwenden der
+  Migration `AddCharacterSkillLevels` gegen ein echtes Postgres (bisher nur generiert, wie schon
+  `AddCharacterProgression` aus M6a).
 
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client
 War kein Codefehler. User hat den Test mit fokussiertem Unity-Fenster wiederholt (Server, Unity Play, dann Bots
