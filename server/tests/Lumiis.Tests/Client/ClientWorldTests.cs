@@ -128,5 +128,89 @@ namespace Lumiis.Tests.Client
             world.HandleEntityHpChanged(entityId: 999, currentHp: 50, maxHp: 100); // darf nicht werfen.
             Assert.False(world.Entities.ContainsKey(999));
         }
+
+        // ---- M6a: ApplyCharacterStats - eigene HP laufen ueber die BESTEHENDE gemeinsame ApplyHp, kein
+        // zweiter Speicherort (siehe docs/tasks/M6a-progression.md Abschnitt 6). ----
+
+        private static CharacterStatsPacket SomeCharacterStats(int currentHp = 70, int maxHp = 100) => new CharacterStatsPacket
+        {
+            Level = 3,
+            Xp = 45,
+            XpToNext = 55,
+            St = 8,
+            Ht = 5,
+            Dx = 3,
+            Iq = 4,
+            UnspentStatPoints = 2,
+            UnspentSkillPoints = 1,
+            MaxHp = maxHp,
+            CurrentHp = currentHp,
+            MaxSp = 40,
+            CurrentSp = 20,
+            Attack = 19,
+            Defense = 7,
+            DodgeBp = 150
+        };
+
+        [Fact]
+        public void ApplyCharacterStats_UpdatesOwnHpViaSharedApplyHp_NoSecondStorage()
+        {
+            var world = new ClientWorld();
+            world.HandleJoinAccepted(entityId: 1, x: 0, y: 0, localName: "Me", appearance: SomeAppearance);
+
+            world.ApplyCharacterStats(SomeCharacterStats(currentHp: 70, maxHp: 100));
+
+            // Derselbe Schreibpfad wie HandleEntityDamaged/HandleEntityHpChanged (ApplyHp) - eigene HP landen
+            // in ClientEntity, nicht (auch) in CharacterStats (das Feld existiert dort bewusst nicht, siehe
+            // ClientWorld.CharacterState).
+            Assert.Equal(70, world.Entities[1].CurrentHp);
+            Assert.Equal(100, world.Entities[1].MaxHp);
+        }
+
+        [Fact]
+        public void ApplyCharacterStats_UpdatesAllOtherFields()
+        {
+            var world = new ClientWorld();
+            world.HandleJoinAccepted(entityId: 1, x: 0, y: 0, localName: "Me", appearance: SomeAppearance);
+
+            world.ApplyCharacterStats(SomeCharacterStats());
+
+            Assert.Equal(3, world.CharacterStats.Level);
+            Assert.Equal(45, world.CharacterStats.Xp);
+            Assert.Equal(55, world.CharacterStats.XpToNext);
+            Assert.Equal(8, world.CharacterStats.St);
+            Assert.Equal(5, world.CharacterStats.Ht);
+            Assert.Equal(3, world.CharacterStats.Dx);
+            Assert.Equal(4, world.CharacterStats.Iq);
+            Assert.Equal(2, world.CharacterStats.UnspentStatPoints);
+            Assert.Equal(1, world.CharacterStats.UnspentSkillPoints);
+            Assert.Equal(40, world.CharacterStats.MaxSp);
+            Assert.Equal(20, world.CharacterStats.CurrentSp);
+            Assert.Equal(19, world.CharacterStats.Attack);
+            Assert.Equal(7, world.CharacterStats.Defense);
+            Assert.Equal(150, world.CharacterStats.DodgeBp);
+        }
+
+        [Fact]
+        public void ApplyCharacterStats_WithoutLocalEntity_DoesNotThrowAndStillUpdatesCharacterStats()
+        {
+            var world = new ClientWorld(); // kein HandleJoinAccepted - LocalEntityId bleibt -1.
+
+            world.ApplyCharacterStats(SomeCharacterStats());
+
+            Assert.Equal(3, world.CharacterStats.Level);
+        }
+
+        [Fact]
+        public void Reset_ClearsCharacterStatsToSentinel()
+        {
+            var world = new ClientWorld();
+            world.HandleJoinAccepted(entityId: 1, x: 0, y: 0, localName: "Me", appearance: SomeAppearance);
+            world.ApplyCharacterStats(SomeCharacterStats());
+
+            world.Reset();
+
+            Assert.Equal(0, world.CharacterStats.Level); // Sentinel: noch kein Paket seit dem Reset erhalten.
+        }
     }
 }

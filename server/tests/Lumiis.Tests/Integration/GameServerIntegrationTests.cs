@@ -9,6 +9,7 @@ using Lumiis.Data.Items;
 using Lumiis.Data.Maps;
 using Lumiis.Data.Mobs;
 using Lumiis.Data.Npcs;
+using Lumiis.Data.Progression;
 using Lumiis.Server;
 using Lumiis.Server.Logging;
 using Lumiis.Server.Net;
@@ -46,7 +47,7 @@ namespace Lumiis.Tests.Integration
             public ServerFixture(Func<long>? nowMs = null, Func<long>? tokenNowUnixSeconds = null, CollisionMap? collisionMap = null,
                 MobCatalog? mobCatalog = null, SpawnCatalog? spawnCatalog = null, ClassCatalog? classCatalog = null,
                 ItemCatalog? itemCatalog = null, NpcCatalog? npcCatalog = null, NpcSpawnCatalog? npcSpawnCatalog = null,
-                bool allowDebugCommands = false)
+                bool allowDebugCommands = false, ProgressionCatalog? progressionCatalog = null)
             {
                 DbContextOptions<LumiisDbContext> options = new DbContextOptionsBuilder<LumiisDbContext>()
                     .UseInMemoryDatabase("gameserver-test-" + Guid.NewGuid())
@@ -62,10 +63,14 @@ namespace Lumiis.Tests.Integration
                     AllowDebugCommands = allowDebugCommands
                 };
                 Server = new GameServer(config, new NullLogger(), TokenService, _dbFactory, nowMs, collisionMap, mobCatalog, spawnCatalog, classCatalog,
-                    itemCatalog, npcCatalog, npcSpawnCatalog);
+                    itemCatalog, npcCatalog, npcSpawnCatalog, progressionCatalog);
             }
 
-            public (int CharacterId, string Token) CreateCharacter(string name, int? positionX = null, int? positionY = null, int? accountId = null)
+            /// <summary>level/xp/spent*/unspent*/currentHp/currentSp: M6a-Fortschrittsstand der neuen Zeile
+            /// (Defaults entsprechen einem frischen Level-1-Charakter, siehe Character-Spaltendefaults).</summary>
+            public (int CharacterId, string Token) CreateCharacter(string name, int? positionX = null, int? positionY = null, int? accountId = null,
+                int level = 1, long xp = 0, int spentSt = 0, int spentHt = 0, int spentDx = 0, int spentIq = 0,
+                int unspentStatPoints = 0, int unspentSkillPoints = 0, int? currentHp = null, int? currentSp = null)
             {
                 using LumiisDbContext db = _dbFactory();
                 int ownerAccountId = accountId ?? CreateAccount(db);
@@ -77,7 +82,17 @@ namespace Lumiis.Tests.Integration
                     BodyId = 1,
                     CreatedAtUtc = DateTime.UtcNow,
                     PositionX = positionX,
-                    PositionY = positionY
+                    PositionY = positionY,
+                    Level = level,
+                    Xp = xp,
+                    SpentSt = spentSt,
+                    SpentHt = spentHt,
+                    SpentDx = spentDx,
+                    SpentIq = spentIq,
+                    UnspentStatPoints = unspentStatPoints,
+                    UnspentSkillPoints = unspentSkillPoints,
+                    CurrentHp = currentHp,
+                    CurrentSp = currentSp
                 };
                 db.Characters.Add(character);
                 db.SaveChanges();
@@ -2025,6 +2040,341 @@ namespace Lumiis.Tests.Integration
             finally
             {
                 server.Stop();
+            }
+        }
+
+        // ---- M6a: Fortschritt (Level/XP/Werte/SP/Ausweichen, siehe docs/tasks/M6a-progression.md Abschnitt 7) ----
+
+        /// <summary>Krieger 1:1 wie data/classes.json - fuer Tests, die reale Formelwerte sehen wollen.</summary>
+        private static ClassCatalog CreateTestClassCatalog() => ClassCatalog.LoadFromJson(@"{
+          ""classes"": [ { ""name"": ""Krieger"", ""meleeRangeWire"": 150, ""attackCooldownMs"": 800,
+            ""baseHp"": 68, ""baseSp"": 12, ""baseAttack"": 3, ""baseDefense"": 3,
+            ""baseSt"": 6, ""baseHt"": 4, ""baseDx"": 3, ""baseIq"": 3,
+            ""hpPerHt"": 8, ""hpPerLevel"": 10, ""spPerIq"": 6, ""spPerLevel"": 4, ""attackPerSt"": 2, ""htPerDefense"": 2,
+            ""dodgeBpPerDx"": 50, ""dodgeCapBp"": 4000, ""statPointsPerLevel"": 3, ""skillPointsPerLevel"": 1,
+            ""regenDelayMs"": 999999, ""regenIntervalMs"": 999999, ""hpRegenPercent"": 1, ""spRegenPercent"": 2 } ]
+        }");
+
+        /// <summary>Kleine, deterministische Progression-Tabelle fuer Tests - xpPerLevel konstant pro Level,
+        /// levelDiffPercent nur ein Katalog-Eintrag (100% fuer jeden Unterschied), sofern nicht anders
+        /// benoetigt.</summary>
+        private static ProgressionCatalog CreateTestProgressionCatalog(int maxLevel = 10, long xpPerLevel = 100)
+        {
+            string xpEntries = string.Join(",", Enumerable.Repeat(xpPerLevel.ToString(), maxLevel - 1));
+            return ProgressionCatalog.LoadFromJson(@"{ ""maxLevel"": " + maxLevel + @", ""xpToNext"": [" + xpEntries + @"], ""levelDiffPercent"": [
+                { ""maxDiff"": 999999, ""percent"": 100 }
+            ] }");
+        }
+
+        [Fact]
+        public void Join_SendsCharacterStatsWithStoredValues()
+        {
+            ClassCatalog classCatalog = CreateTestClassCatalog();
+            ProgressionCatalog progressionCatalog = CreateTestProgressionCatalog();
+
+            var fixture = new ServerFixture(classCatalog: classCatalog, progressionCatalog: progressionCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice",
+                    level: 3, xp: 45, spentSt: 2, spentHt: 1, spentDx: 0, spentIq: 1,
+                    unspentStatPoints: 3, unspentSkillPoints: 1, currentHp: 50, currentSp: 5);
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+
+                Assert.True(Pump(() => client.Received.OfType<CharacterStatsPacket>().Any(), server, client));
+                CharacterStatsPacket stats = client.Received.OfType<CharacterStatsPacket>().Single();
+
+                Assert.Equal(3, stats.Level);
+                Assert.Equal(45, stats.Xp);
+                Assert.Equal(3, stats.UnspentStatPoints);
+                Assert.Equal(1, stats.UnspentSkillPoints);
+                Assert.Equal(6 + 2, stats.St);
+                Assert.Equal(4 + 1, stats.Ht);
+                Assert.Equal(3 + 0, stats.Dx);
+                Assert.Equal(3 + 1, stats.Iq);
+                Assert.Equal(50, stats.CurrentHp);
+                Assert.Equal(5, stats.CurrentSp);
+                Assert.Equal(68 + 5 * 8 + 2 * 10, stats.MaxHp); // Ht=5, Level=3 -> 68+40+20=128
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void KillingMonster_GrantsXpAndCanLevelUp()
+        {
+            MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
+              ""mobs"": [
+                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 10, ""attack"": 0, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 0, ""meleeRangeWire"": 130, ""attackCooldownMs"": 700, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 700, ""level"": 1, ""baseXp"": 15 }
+              ]
+            }");
+            CollisionMap openMap = BuildOpenCollisionMap();
+            SpawnCatalog spawnCatalog = SpawnCatalog.LoadFromJson(@"{
+              ""spawns"": [ { ""id"": 1, ""mobId"": 1, ""positionX"": 50000, ""positionY"": 50000, ""respawnSeconds"": 999999 } ]
+            }", mobCatalog, openMap);
+            ClassCatalog classCatalog = CreateTestClassCatalog();
+            ProgressionCatalog progressionCatalog = CreateTestProgressionCatalog(maxLevel: 5, xpPerLevel: 10); // klein - ein Kill soll sicher aufsteigen.
+
+            var fixture = new ServerFixture(collisionMap: openMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog,
+                classCatalog: classCatalog, progressionCatalog: progressionCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice", positionX: 50000, positionY: 50000);
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+
+                Assert.True(Pump(() => client.Received.OfType<EntitySpawnPacket>().Any(s => s.Kind == EntityKind.Monster), server, client));
+                int monsterId = client.Received.OfType<EntitySpawnPacket>().First(s => s.Kind == EntityKind.Monster).EntityId;
+
+                // Krieger-Angriff (15, siehe CreateTestClassCatalog) toetet den Wildhund (10 HP, 0 Verteidigung) in einem Treffer.
+                client.Send(new AttackRequestPacket { TargetEntityId = monsterId });
+                Assert.True(Pump(() => client.Received.OfType<EntityDiedPacket>().Any(d => d.EntityId == monsterId), server, client));
+
+                // 15 XP bei 10 XP/Level (Levelunterschied 0 -> 100%): 1 Levelaufstieg (10 verbraucht), Rest 5.
+                Assert.True(Pump(() => client.Received.OfType<CharacterStatsPacket>().Any(s => s.Level == 2), server, client));
+                CharacterStatsPacket stats = client.Received.OfType<CharacterStatsPacket>().Last(s => s.Level == 2);
+                Assert.Equal(5, stats.Xp);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void AllocateStatPointRequest_ChangesStats_InvalidRequestReturnsUnchangedStand()
+        {
+            ClassCatalog classCatalog = CreateTestClassCatalog();
+            ProgressionCatalog progressionCatalog = CreateTestProgressionCatalog();
+
+            var fixture = new ServerFixture(classCatalog: classCatalog, progressionCatalog: progressionCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice", unspentStatPoints: 1);
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<CharacterStatsPacket>().Any(), server, client));
+                int stBefore = client.Received.OfType<CharacterStatsPacket>().Single().St;
+
+                client.Send(new AllocateStatPointRequestPacket { Stat = StatKind.St });
+                Assert.True(Pump(() => client.Received.OfType<CharacterStatsPacket>().Any(s => s.St == stBefore + 1), server, client));
+                Assert.Equal(0, client.Received.OfType<CharacterStatsPacket>().Last().UnspentStatPoints);
+
+                // Ungueltige Anfrage (keine Punkte mehr): keine Trennung, kein Fehlerpaket - nur ein erneutes
+                // CharacterStatsPacket mit dem unveraenderten Stand.
+                int countBefore = client.Received.OfType<CharacterStatsPacket>().Count();
+                client.Send(new AllocateStatPointRequestPacket { Stat = StatKind.St });
+                Assert.True(Pump(() => client.Received.OfType<CharacterStatsPacket>().Count() > countBefore, server, client));
+
+                CharacterStatsPacket afterRejected = client.Received.OfType<CharacterStatsPacket>().Last();
+                Assert.Equal(stBefore + 1, afterRejected.St);
+                Assert.Equal(0, afterRejected.UnspentStatPoints);
+                Assert.False(client.Disconnected);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void Disconnect_PersistsProgressionAndHpExactly_RejoinRestoresIt()
+        {
+            MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
+              ""mobs"": [
+                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 9999, ""attack"": 3, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 0, ""meleeRangeWire"": 130, ""attackCooldownMs"": 999999, ""aggressive"": true, ""aggroRangeWire"": 1000, ""leashRangeWire"": 2000, ""level"": 1, ""baseXp"": 10 }
+              ]
+            }");
+            CollisionMap openMap = BuildOpenCollisionMap();
+            // 900 Wire-Einheiten vom Spieler entfernt (innerhalb AggroRangeWire 1000, aber außerhalb
+            // MeleeRangeWire 130) - der Wildhund braucht dadurch echte Laufzeit, um in Reichweite zu kommen.
+            // Das stellt sicher, dass der Treffer zuverlässig NACH dem AllocateStatPointRequest ankommt (dessen
+            // Netzwerk-Umlauf auf Loopback nur Millisekunden braucht) statt in einer Race dazu zu stehen.
+            SpawnCatalog spawnCatalog = SpawnCatalog.LoadFromJson(@"{
+              ""spawns"": [ { ""id"": 1, ""mobId"": 1, ""positionX"": 50900, ""positionY"": 50000, ""respawnSeconds"": 999999 } ]
+            }", mobCatalog, openMap);
+            ClassCatalog classCatalog = CreateTestClassCatalog();
+            ProgressionCatalog progressionCatalog = CreateTestProgressionCatalog();
+
+            var fixture = new ServerFixture(collisionMap: openMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog,
+                classCatalog: classCatalog, progressionCatalog: progressionCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                int characterId;
+                string token;
+                int expectedLevel, expectedHt, expectedUnspent, expectedCurrentHp, expectedCurrentSp;
+                long expectedXp;
+
+                using (var client = new TestClient())
+                {
+                    client.Connect(server.ListenPort);
+                    Assert.True(WaitConnected(server, client));
+
+                    (characterId, token) = fixture.CreateCharacter("Alice", positionX: 50000, positionY: 50000, unspentStatPoints: 1);
+                    client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                    Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+                    int myEntityId = client.Received.OfType<JoinAcceptedPacket>().First().EntityId;
+
+                    // Punkteverteilung speichert sofort (Level/Spent*/Unspent*-Teil dieses Tests).
+                    client.Send(new AllocateStatPointRequestPacket { Stat = StatKind.Ht });
+                    Assert.True(Pump(() => client.Received.OfType<CharacterStatsPacket>().Any(s => s.UnspentStatPoints == 0), server, client));
+
+                    // Vom aggressiven Wildhund treffen lassen (kein eigener Angriff) - Schaden loest bewusst
+                    // KEIN sofortiges Save aus (siehe World.TryAttack/RunRegeneration-Kommentar), nur der
+                    // anschliessende Disconnect (HP/SP-Teil dieses Tests).
+                    Assert.True(Pump(() => client.Received.OfType<EntityDamagedPacket>().Any(d => d.TargetEntityId == myEntityId), server, client));
+
+                    CharacterStatsPacket finalStats = client.Received.OfType<CharacterStatsPacket>().Last();
+                    EntityDamagedPacket lastHit = client.Received.OfType<EntityDamagedPacket>().Last(d => d.TargetEntityId == myEntityId);
+
+                    expectedLevel = finalStats.Level;
+                    expectedXp = finalStats.Xp;
+                    expectedHt = finalStats.Ht;
+                    expectedUnspent = finalStats.UnspentStatPoints;
+                    expectedCurrentHp = lastHit.TargetHpAfter;
+                    expectedCurrentSp = finalStats.CurrentSp;
+
+                    client.Peer!.Disconnect();
+                    Assert.True(Pump(() => client.Disconnected, server, client));
+                }
+
+                using var rejoinClient = new TestClient();
+                rejoinClient.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, rejoinClient));
+                rejoinClient.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => rejoinClient.Received.OfType<CharacterStatsPacket>().Any(), server, rejoinClient));
+                CharacterStatsPacket rejoinStats = rejoinClient.Received.OfType<CharacterStatsPacket>().Single();
+
+                Assert.Equal(expectedLevel, rejoinStats.Level);
+                Assert.Equal(expectedXp, rejoinStats.Xp);
+                Assert.Equal(expectedHt, rejoinStats.Ht);
+                Assert.Equal(expectedUnspent, rejoinStats.UnspentStatPoints);
+                Assert.Equal(expectedCurrentHp, rejoinStats.CurrentHp);
+                Assert.Equal(expectedCurrentSp, rejoinStats.CurrentSp);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void ForcedDodge_SendsEntityDodgedPacket()
+        {
+            MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
+              ""mobs"": [
+                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 9999, ""attack"": 5, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 0, ""meleeRangeWire"": 130, ""attackCooldownMs"": 300, ""aggressive"": true, ""aggroRangeWire"": 1000, ""leashRangeWire"": 2000, ""level"": 1, ""baseXp"": 10 }
+              ]
+            }");
+            CollisionMap openMap = BuildOpenCollisionMap();
+            SpawnCatalog spawnCatalog = SpawnCatalog.LoadFromJson(@"{
+              ""spawns"": [ { ""id"": 1, ""mobId"": 1, ""positionX"": 50000, ""positionY"": 50000, ""respawnSeconds"": 999999 } ]
+            }", mobCatalog, openMap);
+            // dodgeBpPerDx so hoch, dass der Spieler garantiert immer ausweicht (DodgeBp >= 10000, siehe
+            // World.TryAttack: "Wert 0..9999 kleiner als DodgeBp") - keine Zufallssteuerung noetig.
+            ClassCatalog classCatalog = ClassCatalog.LoadFromJson(@"{
+              ""classes"": [ { ""name"": ""Krieger"", ""meleeRangeWire"": 150, ""attackCooldownMs"": 800,
+                ""baseHp"": 100, ""baseSp"": 0, ""baseAttack"": 15, ""baseDefense"": 0,
+                ""baseSt"": 1, ""baseHt"": 1, ""baseDx"": 1, ""baseIq"": 1,
+                ""hpPerHt"": 0, ""hpPerLevel"": 0, ""spPerIq"": 0, ""spPerLevel"": 0, ""attackPerSt"": 0, ""htPerDefense"": 1000,
+                ""dodgeBpPerDx"": 10000, ""dodgeCapBp"": 10000, ""statPointsPerLevel"": 0, ""skillPointsPerLevel"": 0,
+                ""regenDelayMs"": 999999, ""regenIntervalMs"": 999999, ""hpRegenPercent"": 0, ""spRegenPercent"": 0 } ]
+            }");
+            ProgressionCatalog progressionCatalog = CreateTestProgressionCatalog();
+
+            var fixture = new ServerFixture(collisionMap: openMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog,
+                classCatalog: classCatalog, progressionCatalog: progressionCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice", positionX: 50000, positionY: 50000);
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+                int myEntityId = client.Received.OfType<JoinAcceptedPacket>().First().EntityId;
+
+                Assert.True(Pump(() => client.Received.OfType<EntityDodgedPacket>().Any(d => d.TargetEntityId == myEntityId), server, client));
+                Assert.Empty(client.Received.OfType<EntityDamagedPacket>());
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void DebugSetLevelRequest_OnlyWorksWithAllowDebugCommandsFlag()
+        {
+            ClassCatalog classCatalog = CreateTestClassCatalog();
+            ProgressionCatalog progressionCatalog = CreateTestProgressionCatalog(maxLevel: 10);
+
+            var fixtureWithoutFlag = new ServerFixture(classCatalog: classCatalog, progressionCatalog: progressionCatalog, allowDebugCommands: false);
+            GameServer serverWithoutFlag = fixtureWithoutFlag.Server;
+            serverWithoutFlag.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(serverWithoutFlag.ListenPort);
+                Assert.True(WaitConnected(serverWithoutFlag, client));
+
+                (int characterId, string token) = fixtureWithoutFlag.CreateCharacter("Alice");
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<CharacterStatsPacket>().Any(), serverWithoutFlag, client));
+
+                client.Send(new DebugSetLevelRequestPacket { Level = 5 });
+                PumpForDuration(TimeSpan.FromMilliseconds(300), serverWithoutFlag, client);
+
+                Assert.Single(client.Received.OfType<CharacterStatsPacket>()); // nur der Join-Stand.
+                Assert.False(client.Disconnected);
+            }
+            finally
+            {
+                serverWithoutFlag.Stop();
+            }
+
+            var fixtureWithFlag = new ServerFixture(classCatalog: classCatalog, progressionCatalog: progressionCatalog, allowDebugCommands: true);
+            GameServer serverWithFlag = fixtureWithFlag.Server;
+            serverWithFlag.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(serverWithFlag.ListenPort);
+                Assert.True(WaitConnected(serverWithFlag, client));
+
+                (int characterId, string token) = fixtureWithFlag.CreateCharacter("Alice");
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<CharacterStatsPacket>().Any(), serverWithFlag, client));
+
+                client.Send(new DebugSetLevelRequestPacket { Level = 5 });
+                Assert.True(Pump(() => client.Received.OfType<CharacterStatsPacket>().Any(s => s.Level == 5), serverWithFlag, client));
+            }
+            finally
+            {
+                serverWithFlag.Stop();
             }
         }
     }
