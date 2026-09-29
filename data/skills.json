@@ -1,0 +1,105 @@
+{
+  "_hinweis": "Alle Zahlenwerte in diesem File sind Platzhalter (siehe docs/tasks/M6b-skills.md) - spaetere Justierung erwartet. levels[i] gilt fuer Stufe i+1 (levels[0] = Stufe 1, levels[16] = Stufe 17).",
+
+  "skills": [
+    {
+      "id": 1,
+      "name": "Wuchtschlag",
+      "type": "SingleStrike",
+      "levels": [
+        { "spCost": 10, "cooldownMs": 3000, "damageMultiplierPercent": 180 },
+        { "spCost": 11, "cooldownMs": 2906, "damageMultiplierPercent": 197 },
+        { "spCost": 12, "cooldownMs": 2812, "damageMultiplierPercent": 214 },
+        { "spCost": 13, "cooldownMs": 2719, "damageMultiplierPercent": 231 },
+        { "spCost": 14, "cooldownMs": 2625, "damageMultiplierPercent": 248 },
+        { "spCost": 15, "cooldownMs": 2531, "damageMultiplierPercent": 264 },
+        { "spCost": 16, "cooldownMs": 2438, "damageMultiplierPercent": 281 },
+        { "spCost": 17, "cooldownMs": 2344, "damageMultiplierPercent": 298 },
+        { "spCost": 18, "cooldownMs": 2250, "damageMultiplierPercent": 315 },
+        { "spCost": 19, "cooldownMs": 2156, "damageMultiplierPercent": 332 },
+        { "spCost": 20, "cooldownMs": 2062, "damageMultiplierPercent": 349 },
+        { "spCost": 21, "cooldownMs": 1969, "damageMultiplierPercent": 366 },
+        { "spCost": 22, "cooldownMs": 1875, "damageMultiplierPercent": 382 },
+        { "spCost": 23, "cooldownMs": 1781, "damageMultiplierPercent": 399 },
+        { "spCost": 24, "cooldownMs": 1688, "damageMultiplierPercent": 416 },
+        { "spCost": 25, "cooldownMs": 1594, "damageMultiplierPercent": 433 },
+        { "spCost": 26, "cooldownMs": 1500, "damageMultiplierPercent": 450 }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Kreisschlag",
+      "type": "AreaAttack",
+      "radiusWire": 200,
+      "levels": [
+        { "spCost": 20, "cooldownMs": 6000, "damageMultiplierPercent": 100 },
+        { "spCost": 22, "cooldownMs": 5812, "damageMultiplierPercent": 109 },
+        { "spCost": 24, "cooldownMs": 5625, "damageMultiplierPercent": 119 },
+        { "spCost": 26, "cooldownMs": 5438, "damageMultiplierPercent": 128 },
+        { "spCost": 28, "cooldownMs": 5250, "damageMultiplierPercent": 138 },
+        { "spCost": 30, "cooldownMs": 5062, "damageMultiplierPercent": 147 },
+        { "spCost": 32, "cooldownMs": 4875, "damageMultiplierPercent": 156 },
+        { "spCost": 34, "cooldownMs": 4688, "damageMultiplierPercent": 166 },
+        { "spCost": 36, "cooldownMs": 4500, "damageMultiplierPercent": 175 },
+        { "spCost": 38, "cooldownMs": 4312, "damageMultiplierPercent": 184 },
+        { "spCost": 40, "cooldownMs": 4125, "damageMultiplierPercent": 194 },
+        { "spCost": 42, "cooldownMs": 3938, "damageMultiplierPercent": 203 },
+        { "spCost": 44, "cooldownMs": 3750, "damageMultiplierPercent": 212 },
+        { "spCost": 46, "cooldownMs": 3562, "damageMultiplierPercent": 222 },
+        { "spCost": 48, "cooldownMs": 3375, "damageMultiplierPercent": 231 },
+        { "spCost": 50, "cooldownMs": 3188, "damageMultiplierPercent": 241 },
+        { "spCost": 52, "cooldownMs": 3000, "damageMultiplierPercent": 250 }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Kampfrausch",
+      "type": "AttackBuff",
+      "durationMs": 15000,
+      "levels": [
+        { "spCost": 15, "cooldownMs": 20000, "attackBonusPercent": 10 },
+        { "spCost": 16, "cooldownMs": 19500, "attackBonusPercent": 12 },
+        { "spCost": 18, "cooldownMs": 19000, "attackBonusPercent": 15 },
+        { "spCost": 20, "cooldownMs": 18500, "attackBonusPercent": 18 },
+        { "spCost": 21, "cooldownMs": 18000, "attackBonusPercent": 20 },
+        { "spCost": 22, "cooldownMs": 17500, "attackBonusPercent": 22 },
+        { "spCost": 24, "cooldownMs": 17000, "attackBonusPercent": 25 },
+        { "spCost": 26, "cooldownMs": 16500, "attackBonusPercent": 28 },
+        { "spCost": 27, "cooldownMs": 16000, "attackBonusPercent": 30 },
+        { "spCost": 28, "cooldownMs": 15500, "attackBonusPercent": 32 },
+        { "spCost": 30, "cooldownMs": 15000, "attackBonusPercent": 35 },
+        { "spCost": 32, "cooldownMs": 14500, "attackBonusPercent": 38 },
+        { "spCost": 33, "cooldownMs": 14000, "attackBonusPercent": 40 },
+        { "spCost": 34, "cooldownMs": 13500, "attackBonusPercent": 42 },
+        { "spCost": 36, "cooldownMs": 13000, "attackBonusPercent": 45 },
+        { "spCost": 38, "cooldownMs": 12500, "attackBonusPercent": 48 },
+        { "spCost": 39, "cooldownMs": 12000, "attackBonusPercent": 50 }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "Hast",
+      "type": "AttackSpeedBuff",
+      "durationMs": 15000,
+      "levels": [
+        { "spCost": 15, "cooldownMs": 20000, "cooldownReductionPercent": 2 },
+        { "spCost": 16, "cooldownMs": 19500, "cooldownReductionPercent": 3 },
+        { "spCost": 18, "cooldownMs": 19000, "cooldownReductionPercent": 4 },
+        { "spCost": 20, "cooldownMs": 18500, "cooldownReductionPercent": 5 },
+        { "spCost": 21, "cooldownMs": 18000, "cooldownReductionPercent": 6 },
+        { "spCost": 22, "cooldownMs": 17500, "cooldownReductionPercent": 8 },
+        { "spCost": 24, "cooldownMs": 17000, "cooldownReductionPercent": 9 },
+        { "spCost": 26, "cooldownMs": 16500, "cooldownReductionPercent": 10 },
+        { "spCost": 27, "cooldownMs": 16000, "cooldownReductionPercent": 11 },
+        { "spCost": 28, "cooldownMs": 15500, "cooldownReductionPercent": 12 },
+        { "spCost": 30, "cooldownMs": 15000, "cooldownReductionPercent": 13 },
+        { "spCost": 32, "cooldownMs": 14500, "cooldownReductionPercent": 14 },
+        { "spCost": 33, "cooldownMs": 14000, "cooldownReductionPercent": 16 },
+        { "spCost": 34, "cooldownMs": 13500, "cooldownReductionPercent": 17 },
+        { "spCost": 36, "cooldownMs": 13000, "cooldownReductionPercent": 18 },
+        { "spCost": 38, "cooldownMs": 12500, "cooldownReductionPercent": 19 },
+        { "spCost": 39, "cooldownMs": 12000, "cooldownReductionPercent": 20 }
+      ]
+    }
+  ]
+}
