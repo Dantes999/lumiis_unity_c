@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -10,6 +11,7 @@ using Lumiis.Data.Maps;
 using Lumiis.Data.Mobs;
 using Lumiis.Data.Npcs;
 using Lumiis.Data.Progression;
+using Lumiis.Data.Skills;
 using Lumiis.Server;
 using Lumiis.Server.Logging;
 using Lumiis.Server.Net;
@@ -47,7 +49,7 @@ namespace Lumiis.Tests.Integration
             public ServerFixture(Func<long>? nowMs = null, Func<long>? tokenNowUnixSeconds = null, CollisionMap? collisionMap = null,
                 MobCatalog? mobCatalog = null, SpawnCatalog? spawnCatalog = null, ClassCatalog? classCatalog = null,
                 ItemCatalog? itemCatalog = null, NpcCatalog? npcCatalog = null, NpcSpawnCatalog? npcSpawnCatalog = null,
-                bool allowDebugCommands = false, ProgressionCatalog? progressionCatalog = null)
+                bool allowDebugCommands = false, ProgressionCatalog? progressionCatalog = null, SkillCatalog? skillCatalog = null)
             {
                 DbContextOptions<LumiisDbContext> options = new DbContextOptionsBuilder<LumiisDbContext>()
                     .UseInMemoryDatabase("gameserver-test-" + Guid.NewGuid())
@@ -63,14 +65,16 @@ namespace Lumiis.Tests.Integration
                     AllowDebugCommands = allowDebugCommands
                 };
                 Server = new GameServer(config, new NullLogger(), TokenService, _dbFactory, nowMs, collisionMap, mobCatalog, spawnCatalog, classCatalog,
-                    itemCatalog, npcCatalog, npcSpawnCatalog, progressionCatalog);
+                    itemCatalog, npcCatalog, npcSpawnCatalog, progressionCatalog, skillCatalog);
             }
 
             /// <summary>level/xp/spent*/unspent*/currentHp/currentSp: M6a-Fortschrittsstand der neuen Zeile
-            /// (Defaults entsprechen einem frischen Level-1-Charakter, siehe Character-Spaltendefaults).</summary>
+            /// (Defaults entsprechen einem frischen Level-1-Charakter, siehe Character-Spaltendefaults).
+            /// skillLevels: M6b, bereits gelernte Skills (SkillId, Level) - leer/null = kein Skill gelernt.</summary>
             public (int CharacterId, string Token) CreateCharacter(string name, int? positionX = null, int? positionY = null, int? accountId = null,
                 int level = 1, long xp = 0, int spentSt = 0, int spentHt = 0, int spentDx = 0, int spentIq = 0,
-                int unspentStatPoints = 0, int unspentSkillPoints = 0, int? currentHp = null, int? currentSp = null)
+                int unspentStatPoints = 0, int unspentSkillPoints = 0, int? currentHp = null, int? currentSp = null,
+                IEnumerable<(int SkillId, int Level)>? skillLevels = null)
             {
                 using LumiisDbContext db = _dbFactory();
                 int ownerAccountId = accountId ?? CreateAccount(db);
@@ -94,6 +98,11 @@ namespace Lumiis.Tests.Integration
                     CurrentHp = currentHp,
                     CurrentSp = currentSp
                 };
+                if (skillLevels != null)
+                {
+                    foreach ((int skillId, int skillLevel) in skillLevels)
+                        character.SkillLevels.Add(new CharacterSkillLevel { SkillId = skillId, Level = skillLevel });
+                }
                 db.Characters.Add(character);
                 db.SaveChanges();
 
@@ -2066,6 +2075,29 @@ namespace Lumiis.Tests.Integration
             ] }");
         }
 
+        /// <summary>M6b: kleine, deterministische Skill-Tabelle fuer die Integrationstests unten - dieselben
+        /// vier SkillIds/Typen wie die echten Daten (1=Wuchtschlag/SingleStrike, 2=Kreisschlag/AreaAttack,
+        /// 3=Kampfrausch/AttackBuff, 4=Hast/AttackSpeedBuff), aber mit bewusst extremen/kurzen Werten (200%
+        /// Multiplikator, 100% Angriffsbonus, 50% Cooldown-Reduktion, kurzer Skill-Cooldown), damit Effekte im
+        /// Test klar messbar sind und nicht durch reale Balancing-Werte verschleiert werden - eigene, von
+        /// data/skills.json unabhaengige Fixture, analog zu CreateTestClassCatalog/CreateTestProgressionCatalog.</summary>
+        private static SkillCatalog CreateTestSkillCatalog()
+        {
+            string levels17(string effectField, int effectValue) => string.Join(",",
+                Enumerable.Repeat($@"{{ ""spCost"": 5, ""cooldownMs"": 500, ""{effectField}"": {effectValue} }}", 17));
+
+            return SkillCatalog.LoadFromJson($@"{{ ""skills"": [
+                {{ ""id"": 1, ""name"": ""Wuchtschlag"", ""type"": ""SingleStrike"", ""radiusWire"": 0, ""durationMs"": 0,
+                   ""levels"": [ {levels17("damageMultiplierPercent", 200)} ] }},
+                {{ ""id"": 2, ""name"": ""Kreisschlag"", ""type"": ""AreaAttack"", ""radiusWire"": 500, ""durationMs"": 0,
+                   ""levels"": [ {levels17("damageMultiplierPercent", 200)} ] }},
+                {{ ""id"": 3, ""name"": ""Kampfrausch"", ""type"": ""AttackBuff"", ""radiusWire"": 0, ""durationMs"": 10000,
+                   ""levels"": [ {levels17("attackBonusPercent", 100)} ] }},
+                {{ ""id"": 4, ""name"": ""Hast"", ""type"": ""AttackSpeedBuff"", ""radiusWire"": 0, ""durationMs"": 10000,
+                   ""levels"": [ {levels17("cooldownReductionPercent", 50)} ] }}
+            ] }}");
+        }
+
         [Fact]
         public void Join_SendsCharacterStatsWithStoredValues()
         {
@@ -2375,6 +2407,323 @@ namespace Lumiis.Tests.Integration
             finally
             {
                 serverWithFlag.Stop();
+            }
+        }
+
+        // ---- M6b: Skills (docs/tasks/M6b-skills.md Abschnitt 7) ----
+
+        [Fact]
+        public void AllocateSkillPointRequest_IncreasesLevel_ReflectedInCharacterStats()
+        {
+            ClassCatalog classCatalog = CreateTestClassCatalog();
+            ProgressionCatalog progressionCatalog = CreateTestProgressionCatalog();
+            SkillCatalog skillCatalog = CreateTestSkillCatalog();
+
+            var fixture = new ServerFixture(classCatalog: classCatalog, progressionCatalog: progressionCatalog, skillCatalog: skillCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice", unspentSkillPoints: 1);
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<CharacterStatsPacket>().Any(), server, client));
+                Assert.Empty(client.Received.OfType<CharacterStatsPacket>().Single().Skills);
+
+                client.Send(new AllocateSkillPointRequestPacket { SkillId = 1 });
+                Assert.True(Pump(() => client.Received.OfType<CharacterStatsPacket>().Any(s => s.Skills.Contains((1, 1))), server, client));
+                Assert.Equal(0, client.Received.OfType<CharacterStatsPacket>().Last().UnspentSkillPoints);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void UseSkillRequest_SingleStrike_DealsMoreDamageThanNormalAttack()
+        {
+            MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
+              ""mobs"": [
+                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 9999, ""attack"": 0, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 0, ""meleeRangeWire"": 130, ""attackCooldownMs"": 999999, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 700, ""level"": 1, ""baseXp"": 0 }
+              ]
+            }");
+            CollisionMap openMap = BuildOpenCollisionMap();
+            SpawnCatalog spawnCatalog = SpawnCatalog.LoadFromJson(@"{
+              ""spawns"": [ { ""id"": 1, ""mobId"": 1, ""positionX"": 50000, ""positionY"": 50000, ""respawnSeconds"": 999999 } ]
+            }", mobCatalog, openMap);
+            ClassCatalog classCatalog = CreateTestClassCatalog();
+            ProgressionCatalog progressionCatalog = CreateTestProgressionCatalog();
+            SkillCatalog skillCatalog = CreateTestSkillCatalog();
+
+            var fixture = new ServerFixture(collisionMap: openMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog,
+                classCatalog: classCatalog, progressionCatalog: progressionCatalog, skillCatalog: skillCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice", positionX: 50000, positionY: 50000,
+                    skillLevels: new[] { (SkillId: 1, Level: 1) });
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<EntitySpawnPacket>().Any(s => s.Kind == EntityKind.Monster), server, client));
+                int monsterId = client.Received.OfType<EntitySpawnPacket>().First(s => s.Kind == EntityKind.Monster).EntityId;
+
+                client.Send(new AttackRequestPacket { TargetEntityId = monsterId });
+                Assert.True(Pump(() => client.Received.OfType<EntityDamagedPacket>().Any(d => d.TargetEntityId == monsterId), server, client));
+                int normalDamage = client.Received.OfType<EntityDamagedPacket>().First(d => d.TargetEntityId == monsterId).Damage;
+
+                client.Send(new UseSkillRequestPacket { SkillId = 1, TargetEntityId = monsterId });
+                Assert.True(Pump(
+                    () => client.Received.OfType<EntityDamagedPacket>().Count(d => d.TargetEntityId == monsterId) >= 2,
+                    server, client));
+                int skillDamage = client.Received.OfType<EntityDamagedPacket>().Last(d => d.TargetEntityId == monsterId).Damage;
+
+                Assert.Equal(2 * normalDamage, skillDamage); // 200% Multiplikator laut CreateTestSkillCatalog.
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void UseSkillRequest_AreaAttack_HitsMultipleMonstersWithSeparateEntityDamagedPackets()
+        {
+            MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
+              ""mobs"": [
+                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 9999, ""attack"": 0, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 0, ""meleeRangeWire"": 130, ""attackCooldownMs"": 999999, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 700, ""level"": 1, ""baseXp"": 0 }
+              ]
+            }");
+            CollisionMap openMap = BuildOpenCollisionMap();
+            SpawnCatalog spawnCatalog = SpawnCatalog.LoadFromJson(@"{
+              ""spawns"": [
+                { ""id"": 1, ""mobId"": 1, ""positionX"": 50100, ""positionY"": 50000, ""respawnSeconds"": 999999 },
+                { ""id"": 2, ""mobId"": 1, ""positionX"": 50000, ""positionY"": 50100, ""respawnSeconds"": 999999 }
+              ]
+            }", mobCatalog, openMap);
+            ClassCatalog classCatalog = CreateTestClassCatalog();
+            ProgressionCatalog progressionCatalog = CreateTestProgressionCatalog();
+            SkillCatalog skillCatalog = CreateTestSkillCatalog();
+
+            var fixture = new ServerFixture(collisionMap: openMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog,
+                classCatalog: classCatalog, progressionCatalog: progressionCatalog, skillCatalog: skillCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice", positionX: 50000, positionY: 50000,
+                    skillLevels: new[] { (SkillId: 2, Level: 1) });
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(
+                    () => client.Received.OfType<EntitySpawnPacket>().Count(s => s.Kind == EntityKind.Monster) >= 2,
+                    server, client));
+                var monsterIds = client.Received.OfType<EntitySpawnPacket>().Where(s => s.Kind == EntityKind.Monster).Select(s => s.EntityId).ToList();
+
+                client.Send(new UseSkillRequestPacket { SkillId = 2, TargetEntityId = 0 }); // Kreisschlag braucht kein Ziel.
+                Assert.True(Pump(() => client.Received.OfType<EntityDamagedPacket>().Count() >= 2, server, client));
+
+                var damagedIds = client.Received.OfType<EntityDamagedPacket>().Select(d => d.TargetEntityId).ToList();
+                foreach (int monsterId in monsterIds)
+                    Assert.Contains(monsterId, damagedIds);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void UseSkillRequest_AttackBuff_ActiveBuffsChangedArrivesThenNormalAttackDealsMoreDamage()
+        {
+            MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
+              ""mobs"": [
+                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 9999, ""attack"": 0, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 0, ""meleeRangeWire"": 130, ""attackCooldownMs"": 999999, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 700, ""level"": 1, ""baseXp"": 0 }
+              ]
+            }");
+            CollisionMap openMap = BuildOpenCollisionMap();
+            SpawnCatalog spawnCatalog = SpawnCatalog.LoadFromJson(@"{
+              ""spawns"": [ { ""id"": 1, ""mobId"": 1, ""positionX"": 50000, ""positionY"": 50000, ""respawnSeconds"": 999999 } ]
+            }", mobCatalog, openMap);
+            ClassCatalog classCatalog = CreateTestClassCatalog();
+            ProgressionCatalog progressionCatalog = CreateTestProgressionCatalog();
+            SkillCatalog skillCatalog = CreateTestSkillCatalog();
+
+            var fixture = new ServerFixture(collisionMap: openMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog,
+                classCatalog: classCatalog, progressionCatalog: progressionCatalog, skillCatalog: skillCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice", positionX: 50000, positionY: 50000,
+                    skillLevels: new[] { (SkillId: 3, Level: 1) });
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<EntitySpawnPacket>().Any(s => s.Kind == EntityKind.Monster), server, client));
+                int monsterId = client.Received.OfType<EntitySpawnPacket>().First(s => s.Kind == EntityKind.Monster).EntityId;
+
+                client.Send(new AttackRequestPacket { TargetEntityId = monsterId });
+                Assert.True(Pump(() => client.Received.OfType<EntityDamagedPacket>().Any(d => d.TargetEntityId == monsterId), server, client));
+                int damageBeforeBuff = client.Received.OfType<EntityDamagedPacket>().First(d => d.TargetEntityId == monsterId).Damage;
+
+                client.Send(new UseSkillRequestPacket { SkillId = 3, TargetEntityId = 0 }); // Kampfrausch braucht kein Ziel.
+                Assert.True(Pump(() => client.Received.OfType<ActiveBuffsChangedPacket>().Any(p => p.Buffs.Contains((BuffType.AttackBuff, 10000L))), server, client));
+
+                // Normaler Angriffs-Cooldown (Krieger 800ms, siehe CreateTestClassCatalog) real abwarten, bevor
+                // der zweite Angriff erlaubt ist - Kampfrausch selbst hat einen eigenen, unabhängigen Cooldown.
+                PumpForDuration(TimeSpan.FromMilliseconds(900), server, client);
+                client.Send(new AttackRequestPacket { TargetEntityId = monsterId });
+                Assert.True(Pump(
+                    () => client.Received.OfType<EntityDamagedPacket>().Count(d => d.TargetEntityId == monsterId) >= 2,
+                    server, client));
+                int damageAfterBuff = client.Received.OfType<EntityDamagedPacket>().Last(d => d.TargetEntityId == monsterId).Damage;
+
+                Assert.Equal(2 * damageBeforeBuff, damageAfterBuff); // 100% Angriffsbonus laut CreateTestSkillCatalog.
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void UseSkillRequest_AttackSpeedBuff_MakesSecondAttackPossibleEarlier_UsesFakeClock()
+        {
+            MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
+              ""mobs"": [
+                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 9999, ""attack"": 0, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 0, ""meleeRangeWire"": 130, ""attackCooldownMs"": 999999, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 700, ""level"": 1, ""baseXp"": 0 }
+              ]
+            }");
+            CollisionMap openMap = BuildOpenCollisionMap();
+            SpawnCatalog spawnCatalog = SpawnCatalog.LoadFromJson(@"{
+              ""spawns"": [ { ""id"": 1, ""mobId"": 1, ""positionX"": 50000, ""positionY"": 50000, ""respawnSeconds"": 999999 } ]
+            }", mobCatalog, openMap);
+            ClassCatalog classCatalog = CreateTestClassCatalog(); // AttackCooldownMs 800.
+            ProgressionCatalog progressionCatalog = CreateTestProgressionCatalog();
+            SkillCatalog skillCatalog = CreateTestSkillCatalog(); // Hast: 50% Cooldown-Reduktion -> effektiv 400ms statt 800ms.
+
+            long fakeNow = 0;
+            var fixture = new ServerFixture(nowMs: () => fakeNow, collisionMap: openMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog,
+                classCatalog: classCatalog, progressionCatalog: progressionCatalog, skillCatalog: skillCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice", positionX: 50000, positionY: 50000,
+                    skillLevels: new[] { (SkillId: 4, Level: 1) });
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<EntitySpawnPacket>().Any(s => s.Kind == EntityKind.Monster), server, client));
+                int monsterId = client.Received.OfType<EntitySpawnPacket>().First(s => s.Kind == EntityKind.Monster).EntityId;
+
+                // Erster Angriff bei fakeNow=0 setzt AttackReadyAtMs auf 800 (noch ohne Hast).
+                client.Send(new AttackRequestPacket { TargetEntityId = monsterId });
+                Assert.True(Pump(() => client.Received.OfType<EntityDamagedPacket>().Any(d => d.TargetEntityId == monsterId), server, client));
+
+                fakeNow = 800; // normaler Cooldown erreicht - Hast aktivieren.
+                client.Send(new UseSkillRequestPacket { SkillId = 4, TargetEntityId = 0 });
+                Assert.True(Pump(() => client.Received.OfType<ActiveBuffsChangedPacket>().Any(p => p.Buffs.Contains((BuffType.AttackSpeedBuff, 10000L))), server, client));
+
+                // Zweiter Angriff bei fakeNow=800 (Cooldown bereit) setzt AttackReadyAtMs auf 800+400=1200 (mit Hast),
+                // statt 800+800=1600 ohne Hast.
+                client.Send(new AttackRequestPacket { TargetEntityId = monsterId });
+                Assert.True(Pump(
+                    () => client.Received.OfType<EntityDamagedPacket>().Count(d => d.TargetEntityId == monsterId) >= 2,
+                    server, client));
+
+                // Bei fakeNow=1199 (< 1200, aber bereits >= 800 ohne Hast waere das noch nicht erreicht) noch im Cooldown.
+                fakeNow = 1199;
+                client.Send(new AttackRequestPacket { TargetEntityId = monsterId });
+                Assert.True(Pump(() => client.Received.OfType<AttackFailedPacket>().Any(f => f.Reason == AttackFailedReason.OnCooldown), server, client));
+                Assert.Equal(2, client.Received.OfType<EntityDamagedPacket>().Count(d => d.TargetEntityId == monsterId));
+
+                // Bei fakeNow=1200 (effektiver Hast-Cooldown erreicht, 400ms statt 800ms) ist der dritte Angriff möglich.
+                fakeNow = 1200;
+                client.Send(new AttackRequestPacket { TargetEntityId = monsterId });
+                Assert.True(Pump(
+                    () => client.Received.OfType<EntityDamagedPacket>().Count(d => d.TargetEntityId == monsterId) >= 3,
+                    server, client));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void Disconnect_PersistsSkillLevels_RejoinRestoresThem()
+        {
+            ClassCatalog classCatalog = CreateTestClassCatalog();
+            ProgressionCatalog progressionCatalog = CreateTestProgressionCatalog();
+            SkillCatalog skillCatalog = CreateTestSkillCatalog();
+
+            var fixture = new ServerFixture(classCatalog: classCatalog, progressionCatalog: progressionCatalog, skillCatalog: skillCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                int characterId;
+                string token;
+
+                using (var client = new TestClient())
+                {
+                    client.Connect(server.ListenPort);
+                    Assert.True(WaitConnected(server, client));
+
+                    (characterId, token) = fixture.CreateCharacter("Alice", unspentSkillPoints: 2);
+                    client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                    Assert.True(Pump(() => client.Received.OfType<CharacterStatsPacket>().Any(), server, client));
+
+                    client.Send(new AllocateSkillPointRequestPacket { SkillId = 1 });
+                    Assert.True(Pump(() => client.Received.OfType<CharacterStatsPacket>().Any(s => s.Skills.Contains((1, 1))), server, client));
+
+                    client.Send(new AllocateSkillPointRequestPacket { SkillId = 3 });
+                    Assert.True(Pump(() => client.Received.OfType<CharacterStatsPacket>().Any(s => s.Skills.Contains((3, 1))), server, client));
+
+                    client.Peer!.Disconnect();
+                    Assert.True(Pump(() => client.Disconnected, server, client));
+                }
+
+                // Der Disconnect-Save laeuft asynchron im Hintergrund (siehe RunCharacterSaveConsumerAsync) -
+                // hier direkt gegen die DB abwarten, bis er tatsaechlich angekommen ist, statt sich auf
+                // zufaellige Netzwerk-Rundenzeiten zu verlassen (bekanntes Race-Muster, siehe
+                // AfterBuy_DisconnectAndRejoin_YangAndInventoryPersistExactly weiter oben).
+                Assert.True(Pump(() =>
+                {
+                    using LumiisDbContext db = fixture.OpenDb();
+                    return db.CharacterSkillLevels.Count(s => s.CharacterId == characterId) >= 2;
+                }, server));
+
+                using var rejoinClient = new TestClient();
+                rejoinClient.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, rejoinClient));
+                rejoinClient.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => rejoinClient.Received.OfType<CharacterStatsPacket>().Any(), server, rejoinClient));
+
+                CharacterStatsPacket rejoinStats = rejoinClient.Received.OfType<CharacterStatsPacket>().Single();
+                Assert.Contains((1, 1), rejoinStats.Skills);
+                Assert.Contains((3, 1), rejoinStats.Skills);
+                Assert.Equal(0, rejoinStats.UnspentSkillPoints);
+            }
+            finally
+            {
+                server.Stop();
             }
         }
     }
