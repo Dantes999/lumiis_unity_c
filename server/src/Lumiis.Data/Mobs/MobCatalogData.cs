@@ -25,6 +25,10 @@ internal sealed class MobEntryDto
 
     /// <summary>M5a: Drops bei Monstertod, siehe MobDrop.</summary>
     public List<MobDropDto> Drops { get; set; } = new();
+
+    // M6a: für World.AwardXp, siehe CLAUDE.md Abschnitt "Fortschritt: Level, XP, Werte".
+    public int Level { get; set; }
+    public int BaseXp { get; set; }
 }
 
 internal sealed class MobDropDto

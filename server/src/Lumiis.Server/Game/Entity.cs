@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Lumiis.Data.Classes;
 using Lumiis.Shared;
 using Lumiis.Shared.Net;
 
@@ -10,8 +11,8 @@ public sealed class Entity
 {
     /// <summary>Default-Kampfwerte für Call-Sites ohne Kampfbezug (Bewegung/AOI/Positions-Speicherung-Tests,
     /// die new Entity(...)/World.TryJoin/World.SpawnMonster ohne explizite Werte aufrufen) - reale Spieler
-    /// bekommen ihre Werte immer explizit aus der ClassCatalog (siehe GameServer.CompleteJoin), reale Monster
-    /// aus der MobCatalog (siehe World.SpawnMonster-Aufruf im GameServer-Konstruktor).</summary>
+    /// bekommen ihre Werte immer aus ClassDef (siehe GameServer.CompleteJoin/World.RecomputeDerivedStats),
+    /// reale Monster aus der MobCatalog (siehe World.SpawnMonster-Aufruf im GameServer-Konstruktor).</summary>
     internal const int DefaultMaxHp = 100;
     internal const int DefaultAttack = 10;
     internal const int DefaultDefense = 0;
@@ -91,21 +92,22 @@ public sealed class Entity
     /// mit jeweils eigener Geschwindigkeit teilen.</summary>
     public int MovementSpeed { get; }
 
-    public int MaxHp { get; }
+    public int MaxHp { get; set; }
     public int CurrentHp { get; set; }
 
-    /// <summary>Grundwerte ohne Ausrüstungs-Boni (M5a) - bei Spielern aus ClassCatalog beim Join, bei
-    /// Monstern identisch zu Attack/Defense (Monster rüsten nie etwas aus). Attack/Defense selbst sind seit
-    /// M5a mutable und werden nach jedem Equip/Unequip auf BaseAttack/BaseDefense plus die Summe aller
-    /// ausgerüsteten Item-Boni neu berechnet (siehe World.RecalculateCombatStats) - TryAttack liest weiterhin
-    /// nur Attack/Defense, unverändert.</summary>
-    public int BaseAttack { get; }
-    public int BaseDefense { get; }
+    /// <summary>Grundwerte ohne Ausrüstungs-Boni (M5a; seit M6a bei Spielern zusätzlich inklusive
+    /// Level-/Werte-Formel, siehe World.RecomputeDerivedStats) - bei Spielern aus ClassDef, bei Monstern
+    /// identisch zu Attack/Defense (Monster rüsten nie etwas aus). Attack/Defense sind mutable und werden nach
+    /// jeder Änderung (Equip/Unequip, Levelaufstieg, Punkteverteilung) auf BaseAttack/BaseDefense plus die
+    /// Summe aller vier ausgerüsteten Item-Boni neu berechnet - TryAttack liest weiterhin nur Attack/Defense,
+    /// unverändert.</summary>
+    public int BaseAttack { get; set; }
+    public int BaseDefense { get; set; }
     public int Attack { get; set; }
     public int Defense { get; set; }
 
-    /// <summary>Nur bei Kind=Player aussagekräftig (aus ClassCatalog) - Monster greifen in M4a nicht an,
-    /// bei Kind=Monster 0/ungenutzt.</summary>
+    /// <summary>Nur bei Kind=Player aussagekräftig (aus ClassDef) - Monster/NPCs greifen mit ihren eigenen
+    /// Werten aus MobCatalog bzw. gar nicht (NPCs), bei Kind=Npc 0/ungenutzt.</summary>
     public int MeleeRangeWire { get; }
     public int AttackCooldownMs { get; }
 
@@ -169,10 +171,67 @@ public sealed class Entity
     /// genau dieses Feld.</summary>
     public IReadOnlyList<int> ShopItemIds { get; set; } = System.Array.Empty<int>();
 
+    // ---- M6a: Fortschritt (Level/XP/Werte/SP/Ausweichen/Regeneration, siehe CLAUDE.md Abschnitt
+    // "Fortschritt: Level, XP, Werte") ----
+
+    /// <summary>Klassen-Formelkonstanten (BaseHp/HpPerHt/DodgeCapBp/... siehe Lumiis.Data.Classes.
+    /// ClassDefinition) - nur bei Kind=Player gesetzt, aus der ClassCatalog beim Join (siehe
+    /// World.TryJoin/RecomputeDerivedStats). Null bedeutet "keine Formel-Werte" (bestehende Tests ohne
+    /// Fortschritts-/Kampfbezug, die new Entity(...)/World.TryJoin ohne classDef aufrufen) - MaxHp/Attack/
+    /// Defense bleiben dann bei den direkt übergebenen Konstruktor-Werten, RecomputeDerivedStats ist dann ein
+    /// No-op (siehe dort). Bewusst als Referenz statt einzelner Felder gehalten - World kennt Lumiis.Data
+    /// bereits (CollisionMap/ItemCatalog), eine Kopie aller ~20 Formelkonstanten auf jede Entity wäre
+    /// unnötige Duplikation.</summary>
+    public ClassDefinition? ClassDef { get; }
+
+    /// <summary>Bei Kind=Player: Charakter-Level (1..ProgressionCatalog.MaxLevel), aus der DB beim Join
+    /// geladen (siehe World.TryJoin), erhöht durch World.AwardXp/Dev-Tools-DebugSetLevel. Bei Kind=Monster:
+    /// fixer Mob-Level aus MobCatalog (siehe World.SpawnMonster) - für den Levelunterschieds-Faktor in
+    /// World.AwardXp, ändert sich nie. Bei Kind=Npc 0/ungenutzt.</summary>
+    public int Level { get; set; } = 1;
+
+    public long Xp { get; set; }
+    public int SpentSt { get; set; }
+    public int SpentHt { get; set; }
+    public int SpentDx { get; set; }
+    public int SpentIq { get; set; }
+    public int UnspentStatPoints { get; set; }
+    public int UnspentSkillPoints { get; set; }
+
+    /// <summary>Summe aus Klassen-Basiswert (ClassDef, 0 wenn kein ClassDef) und verteilten Punkten - reine
+    /// Lesehilfe, kein eigener Zustand.</summary>
+    public int St => (ClassDef?.BaseSt ?? 0) + SpentSt;
+    public int Ht => (ClassDef?.BaseHt ?? 0) + SpentHt;
+    public int Dx => (ClassDef?.BaseDx ?? 0) + SpentDx;
+    public int Iq => (ClassDef?.BaseIq ?? 0) + SpentIq;
+
+    /// <summary>Zweite Ressource (M6a) - analog zu MaxHp/CurrentHp, siehe World.RecomputeDerivedStats. Nur
+    /// bei Kind=Player sinnvoll befüllt (0 bei Monster/Npc, ClassDef ist dort null).</summary>
+    public int MaxSp { get; set; }
+    public int CurrentSp { get; set; }
+
+    /// <summary>Ausweichchance in Basispunkten (100 = 1 Prozent, siehe World.TryAttack) - aus Dx berechnet
+    /// (World.RecomputeDerivedStats), bei Monstern/NPCs immer 0 (nie neu berechnet, ClassDef ist null).</summary>
+    public int DodgeBp { get; set; }
+
+    /// <summary>Wandzeit des letzten Kampfereignisses dieser Entity (Schaden genommen, Schaden ausgeteilt
+    /// oder einem Treffer ausgewichen) - World.Tick regeneriert erst RegenDelayMs danach (siehe
+    /// World.RunRegeneration). Nur bei Kind=Player relevant.</summary>
+    public long LastCombatAtMs { get; set; }
+
+    /// <summary>Wandzeit, wann die nächste Regenerations-Prüfung fällig ist (siehe World.RunRegeneration) -
+    /// dasselbe Fälligkeits-Muster wie NextWanderAtMs bei Monstern. Nur bei Kind=Player relevant.</summary>
+    public long NextRegenAtMs { get; set; }
+
+    /// <summary>Nur bei Kind=Monster aussagekräftig (aus MobCatalog, siehe World.SpawnMonster) - Basis-XP für
+    /// World.AwardXp, vor Anwendung des Levelunterschieds-Faktors. 0/ungenutzt bei Kind=Player/Npc.</summary>
+    public int BaseXp { get; }
+
     private Entity(int id, EntityKind kind, int? characterId, int typeId, int? spawnPointId, int respawnSeconds, string name, int x, int y, int movementSpeed,
         int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs,
         int maxHp, int attack, int defense, int meleeRangeWire, int attackCooldownMs, int yangMin, int yangMax,
-        bool aggressive, int aggroRangeWire, int leashRangeWire, IReadOnlyList<(int ItemId, int ChancePercent)> drops)
+        bool aggressive, int aggroRangeWire, int leashRangeWire, IReadOnlyList<(int ItemId, int ChancePercent)> drops,
+        ClassDefinition? classDef, int baseXp)
     {
         Id = id;
         Kind = kind;
@@ -203,15 +262,23 @@ public sealed class Entity
         AggroRangeWire = aggroRangeWire;
         LeashRangeWire = leashRangeWire;
         Drops = drops;
+        ClassDef = classDef;
+        BaseXp = baseXp;
     }
 
+    /// <summary>classDef: null bedeutet "keine Formel-Werte" (siehe ClassDef-Kommentar) - maxHp/attack/
+    /// defense sind in dem Fall die tatsächlichen Werte (wie vor M6a), sonst nur Platzhalter bis zum
+    /// nächsten World.RecomputeDerivedStats-Aufruf (siehe World.TryJoin, ruft das bei gesetztem classDef
+    /// selbst auf).</summary>
     public Entity(int id, int characterId, string name, int x, int y,
         int maxHp = DefaultMaxHp, int attack = DefaultAttack, int defense = DefaultDefense,
-        int meleeRangeWire = DefaultMeleeRangeWire, int attackCooldownMs = DefaultAttackCooldownMs)
+        int meleeRangeWire = DefaultMeleeRangeWire, int attackCooldownMs = DefaultAttackCooldownMs,
+        ClassDefinition? classDef = null)
         : this(id, EntityKind.Player, characterId, typeId: 0, spawnPointId: null, respawnSeconds: 0, name, x, y, movementSpeed: GameConstants.PlayerSpeed,
             wanderRadiusWire: 0, wanderIntervalMinMs: 0, wanderIntervalMaxMs: 0,
             maxHp, attack, defense, meleeRangeWire, attackCooldownMs, yangMin: 0, yangMax: 0,
-            aggressive: false, aggroRangeWire: 0, leashRangeWire: 0, drops: System.Array.Empty<(int, int)>())
+            aggressive: false, aggroRangeWire: 0, leashRangeWire: 0, drops: System.Array.Empty<(int, int)>(),
+            classDef, baseXp: 0)
     {
     }
 
@@ -221,24 +288,28 @@ public sealed class Entity
     /// respawnSeconds: nur bei gesetzter spawnPointId aussagekräftig (siehe RespawnSeconds-Kommentar).
     /// meleeRangeWire/attackCooldownMs/aggressive/aggroRangeWire/leashRangeWire: aus dem Mob-Typ (M4c, siehe
     /// MobCatalog) - Defaults nur für bestehende Tests ohne Kampf-/Aggro-Bezug. drops: mögliche Drops beim
-    /// Tod (M5a, siehe MobCatalog.MobDrop) - Default leer.</summary>
+    /// Tod (M5a, siehe MobCatalog.MobDrop) - Default leer. level/baseXp: M6a, siehe Level/BaseXp-Kommentar -
+    /// Defaults nur für bestehende Tests ohne XP-Bezug.</summary>
     public static Entity CreateMonster(int id, int mobId, int? spawnPointId, string name, int x, int y, int speedWire,
         int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs,
         int maxHp = DefaultMaxHp, int attack = DefaultAttack, int defense = DefaultDefense, int yangMin = 0, int yangMax = 0,
         int respawnSeconds = 0, int meleeRangeWire = DefaultMeleeRangeWire, int attackCooldownMs = DefaultAttackCooldownMs,
         bool aggressive = false, int aggroRangeWire = 0, int leashRangeWire = 0,
-        IReadOnlyList<(int ItemId, int ChancePercent)>? drops = null)
+        IReadOnlyList<(int ItemId, int ChancePercent)>? drops = null, int level = 1, int baseXp = 0)
     {
-        return new Entity(id, EntityKind.Monster, characterId: null, mobId, spawnPointId, respawnSeconds, name, x, y, movementSpeed: speedWire,
+        Entity entity = new(id, EntityKind.Monster, characterId: null, mobId, spawnPointId, respawnSeconds, name, x, y, movementSpeed: speedWire,
             wanderRadiusWire, wanderIntervalMinMs, wanderIntervalMaxMs,
             maxHp, attack, defense, meleeRangeWire, attackCooldownMs, yangMin, yangMax,
-            aggressive, aggroRangeWire, leashRangeWire, drops ?? System.Array.Empty<(int, int)>());
+            aggressive, aggroRangeWire, leashRangeWire, drops ?? System.Array.Empty<(int, int)>(),
+            classDef: null, baseXp);
+        entity.Level = level;
+        return entity;
     }
 
     /// <summary>M5b: ein statischer NPC (Shop-Händler) - keine Bewegung (movementSpeed 0, kein Wander-
     /// Zustand), keine SpawnPointId (kein Respawn-Scheduling, das ist ohnehin an Kind=Monster gebunden, siehe
     /// SpawnPointId-Kommentar), keine CharacterId. Kampfwerte bleiben auf den Default-Konstanten (nie
-    /// gelesen: TryAttack lehnt Kind=Npc als Ziel ab, bevor irgendein Kampfwert relevant würde, siehe
+    /// gelesen: TryAttack lehnt Kind=Npc-Ziele ab, bevor irgendein Kampfwert relevant würde, siehe
     /// docs/tasks/M5b-shop.md Abschnitt 0a). Appearance wird von außen gesetzt (siehe Entity.Appearance,
     /// GameServer-Konstruktor - analog zu Spielern/CompleteJoin, nicht wie bei Monstern ungenutzt).</summary>
     public static Entity CreateNpc(int id, int npcId, string name, int x, int y)
@@ -247,7 +318,8 @@ public sealed class Entity
             wanderRadiusWire: 0, wanderIntervalMinMs: 0, wanderIntervalMaxMs: 0,
             maxHp: DefaultMaxHp, attack: DefaultAttack, defense: DefaultDefense,
             meleeRangeWire: DefaultMeleeRangeWire, attackCooldownMs: DefaultAttackCooldownMs, yangMin: 0, yangMax: 0,
-            aggressive: false, aggroRangeWire: 0, leashRangeWire: 0, drops: System.Array.Empty<(int, int)>());
+            aggressive: false, aggroRangeWire: 0, leashRangeWire: 0, drops: System.Array.Empty<(int, int)>(),
+            classDef: null, baseXp: 0);
     }
 
     public void MoveTo(int targetX, int targetY, int speed)

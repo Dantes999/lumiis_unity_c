@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using Lumiis.Data.Classes;
 using Lumiis.Data.Items;
 using Lumiis.Data.Maps;
+using Lumiis.Data.Progression;
 using Lumiis.Shared;
 using Lumiis.Shared.Net;
 
@@ -22,13 +24,14 @@ public sealed class World
         int WanderRadiusWire, int WanderIntervalMinMs, int WanderIntervalMaxMs,
         int MaxHp, int Attack, int Defense, int YangMin, int YangMax, int RespawnSeconds,
         int MeleeRangeWire, int AttackCooldownMs, bool Aggressive, int AggroRangeWire, int LeashRangeWire,
-        IReadOnlyList<(int ItemId, int ChancePercent)> Drops, long DueAtMs);
+        IReadOnlyList<(int ItemId, int ChancePercent)> Drops, int Level, int BaseXp, long DueAtMs);
 
     private readonly Dictionary<int, Entity> _entities = new();
     private readonly Dictionary<int, int> _entityIdByCharacterId = new();
     private readonly Dictionary<int, PendingMonsterRespawn> _pendingMonsterRespawns = new();
     private readonly CollisionMap? _collisionMap;
     private readonly ItemCatalog? _itemCatalog;
+    private readonly ProgressionCatalog? _progressionCatalog;
     private readonly Random _random;
     private int _nextEntityId = 1;
 
@@ -42,13 +45,18 @@ public sealed class World
     /// Abfragen gehalten (M5a: TryEquip/TryUnequip/TryUseConsumable müssen zur Laufzeit beliebige ItemIds aus
     /// dem Inventar auflösen können, nicht nur einmalig beim Spawn/Join wie MobCatalog/ClassCatalog - siehe
     /// docs/tasks/M5a-items-equipment.md Abschnitt 0). random: injizierbare Zufallsquelle für die Wander-KI
-    /// (siehe RunWanderAi) und Drops (siehe ApplyDamage/TryAttack), Default eine echte, nicht-deterministische
-    /// Instanz - Tests übergeben eine geseedete Instanz für deterministisches Verhalten.</summary>
-    public World(int maxPlayers, CollisionMap? collisionMap = null, Random? random = null, ItemCatalog? itemCatalog = null)
+    /// (siehe RunWanderAi), Drops (siehe ApplyDamage/TryAttack) und seit M6a den Ausweichwurf (siehe
+    /// TryAttack), Default eine echte, nicht-deterministische Instanz - Tests übergeben eine geseedete
+    /// Instanz für deterministisches Verhalten. progressionCatalog: null bedeutet "kein XP-Gewinn" (z. B.
+    /// bestehende Tests ohne Fortschrittsbezug - World.AwardXp wird dann zum No-op, siehe dort) - Program.cs
+    /// lädt beim echten Serverstart immer eine Instanz aus data/progression.json (M6a).</summary>
+    public World(int maxPlayers, CollisionMap? collisionMap = null, Random? random = null, ItemCatalog? itemCatalog = null,
+        ProgressionCatalog? progressionCatalog = null)
     {
         MaxPlayers = maxPlayers;
         _collisionMap = collisionMap;
         _itemCatalog = itemCatalog;
+        _progressionCatalog = progressionCatalog;
         _random = random ?? new Random();
     }
 
@@ -63,12 +71,19 @@ public sealed class World
     /// seit M2b0 über einen case-insensitiven Unique-Index in der DB global eindeutig (siehe
     /// LumiisDbContext) - eine zweite, rein speicherresidente Prüfung hier wäre redundant und könnte bei
     /// direkten DB-Änderungen sogar von der tatsächlichen Quelle der Wahrheit abweichen.</summary>
-    /// <summary>maxHp/attack/defense/meleeRangeWire/attackCooldownMs: Kampfwerte aus der ClassCatalog (M4a,
-    /// siehe GameServer.CompleteJoin) - Defaults nur für bestehende Tests ohne Kampfbezug, siehe
-    /// Entity.DefaultMaxHp-Kommentar.</summary>
+    /// <summary>maxHp/attack/defense/meleeRangeWire/attackCooldownMs: Kampfwerte-Fallback für bestehende
+    /// Tests ohne Kampf-/Fortschrittsbezug (kein classDef, siehe Entity.DefaultMaxHp-Kommentar). classDef:
+    /// Klassen-Formelkonstanten (M6a, siehe GameServer.CompleteJoin) - null bedeutet "keine Formel-Werte",
+    /// dann gelten maxHp/attack/defense direkt wie vor M6a. level/xp/spent*/unspent*: aus der geladenen
+    /// Character-Zeile (M6a) - Defaults (Level 1, alles andere 0) entsprechen einem frischen Charakter.
+    /// currentHp/currentSp: aus der Character-Zeile, Login-Regeln siehe unten - Defaults null (voll).</summary>
     public bool TryJoin(int characterId, string name, int? x, int? y, out Entity? entity, out JoinRejectReason reason,
         int maxHp = Entity.DefaultMaxHp, int attack = Entity.DefaultAttack, int defense = Entity.DefaultDefense,
-        int meleeRangeWire = Entity.DefaultMeleeRangeWire, int attackCooldownMs = Entity.DefaultAttackCooldownMs)
+        int meleeRangeWire = Entity.DefaultMeleeRangeWire, int attackCooldownMs = Entity.DefaultAttackCooldownMs,
+        ClassDefinition? classDef = null, int level = 1, long xp = 0,
+        int spentSt = 0, int spentHt = 0, int spentDx = 0, int spentIq = 0,
+        int unspentStatPoints = 0, int unspentSkillPoints = 0,
+        int? currentHp = null, int? currentSp = null)
     {
         entity = null;
         reason = default;
@@ -89,8 +104,39 @@ public sealed class World
         int spawnY = Math.Clamp(y ?? GameConstants.MapHeight / 2, 0, GameConstants.MapHeight);
 
         int id = _nextEntityId++;
-        entity = new Entity(id, characterId, name, spawnX, spawnY, maxHp, attack, defense, meleeRangeWire, attackCooldownMs);
-        _entities[id] = entity;
+        Entity created = new(id, characterId, name, spawnX, spawnY, maxHp, attack, defense, meleeRangeWire, attackCooldownMs, classDef);
+        created.Level = level;
+        created.Xp = xp;
+        created.SpentSt = spentSt;
+        created.SpentHt = spentHt;
+        created.SpentDx = spentDx;
+        created.SpentIq = spentIq;
+        created.UnspentStatPoints = unspentStatPoints;
+        created.UnspentSkillPoints = unspentSkillPoints;
+
+        if (classDef != null)
+            RecomputeDerivedStats(created);
+
+        // M6a Login-Regeln (siehe docs/tasks/M6a-progression.md Abschnitt 0d/4): null -> voll, <= 0 ->
+        // wiederbelebt (HP UND SP voll, Position Kartenmitte - "Ausloggen im Tod"), sonst auf das
+        // berechnete Maximum begrenzt. "Wiederbelebt" wird ausschließlich an CurrentHp festgemacht (dieselbe
+        // HP<=0-Definition wie Entity.IsDead) - CurrentSp hat in M6a keinen eigenen "Tod"-Zustand (nichts
+        // senkt SP unter 0), wird im Wiederbelebungsfall aber trotzdem mit auf voll gesetzt.
+        bool revived = currentHp.HasValue && currentHp.Value <= 0;
+        if (revived)
+        {
+            created.CurrentHp = created.MaxHp;
+            created.CurrentSp = created.MaxSp;
+            created.Teleport(GameConstants.MapWidth / 2, GameConstants.MapHeight / 2);
+        }
+        else
+        {
+            created.CurrentHp = currentHp.HasValue ? Math.Min(currentHp.Value, created.MaxHp) : created.MaxHp;
+            created.CurrentSp = currentSp.HasValue ? Math.Min(currentSp.Value, created.MaxSp) : created.MaxSp;
+        }
+
+        entity = created;
+        _entities[id] = created;
         _entityIdByCharacterId[characterId] = id;
         return true;
     }
@@ -107,14 +153,15 @@ public sealed class World
     /// GameServer-Konstruktor übergibt hier immer die echte SpawnPoint.Id. respawnSeconds: nur bei gesetzter
     /// spawnPointId aussagekräftig (siehe Entity.RespawnSeconds, M4b). meleeRangeWire/attackCooldownMs/
     /// aggressive/aggroRangeWire/leashRangeWire: Kampf-/Aggro-Werte aus der MobCatalog (M4c). drops: mögliche
-    /// Drops beim Tod (M5a, siehe Entity.Drops) - Default leer.</summary>
+    /// Drops beim Tod (M5a, siehe Entity.Drops) - Default leer. level/baseXp: M6a, siehe MobDefinition.Level/
+    /// BaseXp - Defaults nur für bestehende Tests ohne XP-Bezug.</summary>
     public Entity SpawnMonster(int mobId, string name, int x, int y, int speedWire,
         int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs, long nowMs,
         int maxHp = Entity.DefaultMaxHp, int attack = Entity.DefaultAttack, int defense = Entity.DefaultDefense,
         int yangMin = 0, int yangMax = 0, int? spawnPointId = null, int respawnSeconds = 0,
         int meleeRangeWire = Entity.DefaultMeleeRangeWire, int attackCooldownMs = Entity.DefaultAttackCooldownMs,
         bool aggressive = false, int aggroRangeWire = 0, int leashRangeWire = 0,
-        IReadOnlyList<(int ItemId, int ChancePercent)>? drops = null)
+        IReadOnlyList<(int ItemId, int ChancePercent)>? drops = null, int level = 1, int baseXp = 0)
     {
         int clampedX = Math.Clamp(x, 0, GameConstants.MapWidth);
         int clampedY = Math.Clamp(y, 0, GameConstants.MapHeight);
@@ -122,7 +169,7 @@ public sealed class World
         int id = _nextEntityId++;
         Entity entity = Entity.CreateMonster(id, mobId, spawnPointId, name, clampedX, clampedY, speedWire,
             wanderRadiusWire, wanderIntervalMinMs, wanderIntervalMaxMs, maxHp, attack, defense, yangMin, yangMax, respawnSeconds,
-            meleeRangeWire, attackCooldownMs, aggressive, aggroRangeWire, leashRangeWire, drops);
+            meleeRangeWire, attackCooldownMs, aggressive, aggroRangeWire, leashRangeWire, drops, level, baseXp);
         entity.NextWanderAtMs = nowMs + _random.Next(wanderIntervalMinMs, wanderIntervalMaxMs + 1);
         _entities[id] = entity;
         return entity;
@@ -301,20 +348,50 @@ public sealed class World
         // Reaktive Zielerfassung (M4c): ein getroffenes Monster ohne eigenes Ziel merkt sich den Angreifer -
         // gilt für aggressive UND passive Mobs gleichermaßen (ein Wildhund, der von hinten angegriffen wird,
         // dreht sich natürlich auch um). target.Kind == Monster schließt die umgekehrte Richtung (Spieler
-        // wird von einem Monster getroffen) hier automatisch aus, kein Sonderfall nötig.
+        // wird von einem Monster getroffen) hier automatisch aus, kein Sonderfall nötig. Läuft bewusst VOR
+        // dem Ausweichwurf (M6a) - ein ausgewichener Treffer ist immer noch ein Angriff, der den Verteidiger
+        // aufmerksam macht (siehe docs/tasks/M6a-progression.md Abschnitt 0e).
         if (target.Kind == EntityKind.Monster && target.TargetEntityId == null)
             target.TargetEntityId = attackerEntityId;
 
+        // M6a: Ausweichwurf NACH Cooldown-Verbrauch und reaktiver Zielerfassung (beide bleiben unverändert,
+        // siehe Kommentare oben) - Monster haben DodgeBp 0 (nie neu berechnet, siehe RecomputeDerivedStats),
+        // weichen also nie aus. Bei Ausweichen: kein Schaden, kein Yang/XP/Drop, nur das Ziel merkt sich das
+        // Kampfereignis (der Angreifer hat ja tatsächlich getroffen... nein, verfehlt - siehe LastCombatAtMs-
+        // Kommentar auf Entity: "austeilt" zählt nur bei einem tatsächlichen Treffer).
+        if (target.DodgeBp > 0 && _random.Next(10000) < target.DodgeBp)
+        {
+            target.LastCombatAtMs = nowMs;
+            return AttackResult.Dodge(target.Kind);
+        }
+
         int targetMaxHp = target.MaxHp;
+        int targetLevel = target.Level;
+        int targetBaseXp = target.BaseXp;
         int damage = Math.Max(1, attacker.Attack - target.Defense);
         IReadOnlyList<(int ItemId, int ChancePercent)> targetDrops = target.Drops;
         (int targetHpAfter, bool died, long yangAwarded) = ApplyDamage(target, damage, nowMs);
+
+        attacker.LastCombatAtMs = nowMs;
+        // target wurde bei einem tödlichen Treffer an ein Monster ggf. schon aus World entfernt (siehe
+        // ApplyDamage) - LastCombatAtMs auf der entfernten Instanz zu setzen ist harmlos (kein Verweis mehr
+        // von irgendwo), aber sinnlos bei einem toten Spieler-Ziel ebenfalls unschädlich (Tote regenerieren
+        // ohnehin nicht, siehe RunRegeneration).
+        target.LastCombatAtMs = nowMs;
 
         // M5b: gemeinsame Yang-Methode mit MaxYang-Deckel (0c) - Rückgabewert bewusst ignoriert: schlägt die
         // Gutschrift wegen des Deckels fehl, bleibt der Kill trotzdem gültig (gleiche "Haupt-Aktion bleibt
         // gültig, Nebeneffekt geht ggf. verloren"-Linie wie bei vollem Inventar bei Drops, siehe unten).
         if (yangAwarded > 0)
             CreditYang(attacker, yangAwarded);
+
+        // M6a: XP am selben Punkt wie Yang (0c) - nur wenn ein SPIELER ein MONSTER getötet hat (Monster/NPCs
+        // sammeln in M6a keine XP). AwardXp ist bei fehlendem ProgressionCatalog/ClassDef (bestehende Tests
+        // ohne Fortschrittsbezug) ein No-op und gibt (0, false) zurück.
+        long xpAwarded = 0;
+        bool leveledUp = false;
+        if (died && target.Kind == EntityKind.Monster && attacker.Kind == EntityKind.Player)
+            (xpAwarded, leveledUp) = AwardXp(attacker, targetLevel, targetBaseXp);
 
         // M5a: Drops nach Yang, nur bei totem Monster (target ist nach ApplyDamage evtl. schon aus World
         // entfernt - deshalb targetDrops vorher gesichert statt target.Drops erneut zu lesen). Jeder Eintrag
@@ -340,7 +417,8 @@ public sealed class World
             }
         }
 
-        return AttackResult.Hit(damage, targetHpAfter, targetMaxHp, died, target.Kind, yangAwarded, droppedItemIds, itemLostToFullInventory);
+        return AttackResult.Hit(damage, targetHpAfter, targetMaxHp, died, target.Kind, yangAwarded,
+            xpAwarded, leveledUp, droppedItemIds, itemLostToFullInventory);
     }
 
     /// <summary>Wendet Schaden auf eine beliebige Entity an und löst bei 0 Leben die passende Tod-Behandlung
@@ -393,7 +471,133 @@ public sealed class World
             diedMonster.MaxHp, diedMonster.Attack, diedMonster.Defense, diedMonster.YangMin, diedMonster.YangMax,
             diedMonster.RespawnSeconds, diedMonster.MeleeRangeWire, diedMonster.AttackCooldownMs,
             diedMonster.Aggressive, diedMonster.AggroRangeWire, diedMonster.LeashRangeWire, diedMonster.Drops,
-            nowMs + diedMonster.RespawnSeconds * 1000L);
+            diedMonster.Level, diedMonster.BaseXp, nowMs + diedMonster.RespawnSeconds * 1000L);
+    }
+
+    // ---- M6a: Fortschritt (Level/XP/Werte/SP/Regeneration, kein Netzwerkbezug, siehe GameServer für die
+    // Paket-Seite und CLAUDE.md Abschnitt "Fortschritt: Level, XP, Werte") ----
+
+    /// <summary>Berechnet den XP-Gewinn nach einem Monster-Kill (Levelunterschied Spielerlevel minus
+    /// Monsterlevel, Prozent-Faktor aus ProgressionCatalog, mindestens 1 XP solange der Faktor &gt; 0),
+    /// wendet ihn auf player.Xp an und durchläuft danach so viele Levelaufstiege wie die XP hergeben
+    /// (Schleife statt Rekursion, stoppt an MaxLevel - überschüssige Xp verfallen dort, siehe
+    /// docs/tasks/M6a-progression.md Abschnitt 1: "Ab MaxLevel gibt es keine XP mehr"). Pro Levelaufstieg:
+    /// +StatPointsPerLevel/+SkillPointsPerLevel (aus ClassDef), volle Heilung (HP UND SP),
+    /// RecomputeDerivedStats. No-op (gibt (0, false) zurück) ohne ProgressionCatalog/ClassDef (bestehende
+    /// Tests ohne Fortschrittsbezug) oder wenn player bereits auf MaxLevel steht.</summary>
+    internal (long XpGained, bool LeveledUp) AwardXp(Entity player, int monsterLevel, int monsterBaseXp)
+    {
+        if (_progressionCatalog == null || player.ClassDef == null) return (0, false);
+        if (player.Level >= _progressionCatalog.MaxLevel) return (0, false);
+
+        int percent = _progressionCatalog.PercentForLevelDiff(player.Level - monsterLevel);
+        if (percent <= 0) return (0, false);
+
+        long xpGained = Math.Max(1, monsterBaseXp * (long)percent / 100);
+        player.Xp += xpGained;
+
+        bool leveledUp = false;
+        while (player.Level < _progressionCatalog.MaxLevel && player.Xp >= _progressionCatalog.XpToNextLevel(player.Level))
+        {
+            player.Xp -= _progressionCatalog.XpToNextLevel(player.Level);
+            player.Level++;
+            player.UnspentStatPoints += player.ClassDef.StatPointsPerLevel;
+            player.UnspentSkillPoints += player.ClassDef.SkillPointsPerLevel;
+            RecomputeDerivedStats(player);
+            player.CurrentHp = player.MaxHp;
+            player.CurrentSp = player.MaxSp;
+            leveledUp = true;
+        }
+
+        if (player.Level >= _progressionCatalog.MaxLevel)
+            player.Xp = 0;
+
+        return (xpGained, leveledUp);
+    }
+
+    /// <summary>Verteilt einen Statuspunkt (M6a, siehe AllocateStatPointRequestPacket/GameServer.
+    /// HandleAllocateStatPointRequest) - braucht UnspentStatPoints &gt; 0, sonst false (keine Wirkung,
+    /// GameServer antwortet trotzdem mit dem aktuellen, unveränderten CharacterStatsPacket, kein eigenes
+    /// Fehlerpaket). Ein HT-Punkt erhöht CurrentHp um dieselbe Differenz wie MaxHp, ein IQ-Punkt CurrentSp
+    /// analog - verteilte Punkte heilen also nie über den bisherigen "fehlenden" Betrag hinaus, sie schieben
+    /// nur die Obergrenze mit hoch (bei St/Dx ändert sich MaxHp/MaxSp nicht, die Differenz ist dann 0).</summary>
+    public bool TryAllocateStatPoint(int entityId, StatKind stat)
+    {
+        if (!_entities.TryGetValue(entityId, out Entity? entity)) return false;
+        if (entity.UnspentStatPoints <= 0) return false;
+
+        switch (stat)
+        {
+            case StatKind.St: entity.SpentSt++; break;
+            case StatKind.Ht: entity.SpentHt++; break;
+            case StatKind.Dx: entity.SpentDx++; break;
+            case StatKind.Iq: entity.SpentIq++; break;
+            default: return false;
+        }
+
+        int previousMaxHp = entity.MaxHp;
+        int previousMaxSp = entity.MaxSp;
+        entity.UnspentStatPoints--;
+        RecomputeDerivedStats(entity);
+        entity.CurrentHp += entity.MaxHp - previousMaxHp;
+        entity.CurrentSp += entity.MaxSp - previousMaxSp;
+
+        return true;
+    }
+
+    /// <summary>Dev-Tool (siehe DebugSetLevelRequestPacket/CLAUDE.md "Dev-Tools") - setzt Level = level,
+    /// Xp/Spent* zurückgesetzt, Unspent* entsprechend nachgezählt (dient auch als Stat-Reset zum Testen), HP
+    /// und SP voll. level muss zwischen 1 und ProgressionCatalog.MaxLevel liegen, sonst false (keine
+    /// Wirkung).</summary>
+    public bool TryDebugSetLevel(int entityId, int level)
+    {
+        if (!_entities.TryGetValue(entityId, out Entity? entity) || entity.ClassDef == null) return false;
+        if (_progressionCatalog != null && (level < 1 || level > _progressionCatalog.MaxLevel)) return false;
+        if (_progressionCatalog == null && level < 1) return false;
+
+        entity.Level = level;
+        entity.Xp = 0;
+        entity.SpentSt = 0;
+        entity.SpentHt = 0;
+        entity.SpentDx = 0;
+        entity.SpentIq = 0;
+        entity.UnspentStatPoints = (level - 1) * entity.ClassDef.StatPointsPerLevel;
+        entity.UnspentSkillPoints = (level - 1) * entity.ClassDef.SkillPointsPerLevel;
+        RecomputeDerivedStats(entity);
+        entity.CurrentHp = entity.MaxHp;
+        entity.CurrentSp = entity.MaxSp;
+
+        return true;
+    }
+
+    /// <summary>Natürliche Regeneration (M6a): läuft für jeden lebenden Spieler höchstens einmal pro
+    /// RegenIntervalMs (dasselbe Fälligkeits-Muster wie NextWanderAtMs bei Monstern), und nur, wenn seit
+    /// LastCombatAtMs mindestens RegenDelayMs vergangen sind (Schaden genommen/ausgeteilt/ausgewichen -
+    /// siehe TryAttack). Hebt HP/SP um HpRegenPercent/SpRegenPercent Prozent des jeweiligen Maximums an
+    /// (mindestens 1 Punkt, gedeckelt am Maximum). Tote regenerieren nicht (werden gar nicht erst geprüft -
+    /// ihr CurrentHp bleibt bis zum Respawn unverändert, siehe Tick). Gibt zurück, ob sich CurrentHp/CurrentSp
+    /// tatsächlich geändert haben (für GameServer: nur dann lohnt ein neues CharacterStatsPacket).</summary>
+    private bool RunRegeneration(Entity entity, long nowMs)
+    {
+        if (entity.Kind != EntityKind.Player || entity.ClassDef == null) return false;
+        if (entity.IsDead) return false;
+        if (nowMs < entity.NextRegenAtMs) return false;
+
+        entity.NextRegenAtMs = nowMs + entity.ClassDef.RegenIntervalMs;
+
+        if (nowMs - entity.LastCombatAtMs < entity.ClassDef.RegenDelayMs) return false;
+
+        int hpGain = entity.MaxHp > 0 ? Math.Max(1, entity.MaxHp * entity.ClassDef.HpRegenPercent / 100) : 0;
+        int spGain = entity.MaxSp > 0 ? Math.Max(1, entity.MaxSp * entity.ClassDef.SpRegenPercent / 100) : 0;
+
+        int newHp = Math.Min(entity.MaxHp, entity.CurrentHp + hpGain);
+        int newSp = Math.Min(entity.MaxSp, entity.CurrentSp + spGain);
+
+        if (newHp == entity.CurrentHp && newSp == entity.CurrentSp) return false;
+
+        entity.CurrentHp = newHp;
+        entity.CurrentSp = newSp;
+        return true;
     }
 
     // ---- M5a: Items, Inventar, Ausrüstung (kein Netzwerkbezug, siehe GameServer für die Paket-Seite) ----
@@ -424,7 +628,7 @@ public sealed class World
         }
 
         entity.Inventory[inventorySlotIndex] = previousEquippedItemId;
-        RecalculateCombatStats(entity);
+        RecomputeDerivedStats(entity);
         return (true, default);
     }
 
@@ -456,7 +660,7 @@ public sealed class World
         }
 
         entity.Inventory[freeSlot] = currentItemId;
-        RecalculateCombatStats(entity);
+        RecomputeDerivedStats(entity);
         return (true, default);
     }
 
@@ -507,21 +711,41 @@ public sealed class World
         return -1;
     }
 
-    /// <summary>Setzt Attack/Defense auf BaseAttack/BaseDefense plus die Summe der Boni aller vier
-    /// Ausrüstungs-Slots - nach jedem Equip/Unequip aufgerufen (M5a). Öffentlich, damit GameServer sie auch
-    /// direkt nach dem Join aufrufen kann, sobald die aus der DB geladene Ausrüstung auf die Entity
-    /// übertragen wurde (siehe GameServer.CompleteJoin).</summary>
-    public void RecalculateCombatStats(int entityId)
+    /// <summary>M6a: einzige Stelle, die MaxHp/MaxSp/Attack/Defense/DodgeBp berechnet (ersetzt das bisherige
+    /// M5a-RecalculateCombatStats, das nur Attack/Defense aus Ausrüstungs-Boni kannte) - siehe
+    /// docs/tasks/M6a-progression.md Abschnitt 4. Aufruf bei Join (siehe TryJoin), Levelaufstieg
+    /// (AwardXp), Punkteverteilung (TryAllocateStatPoint) und Equip/Unequip (ApplyInventoryAndAppearanceChange
+    /// über GameServer) - bei reinen Ausrüstungsänderungen ändern sich MaxHp/MaxSp/DodgeBp dabei nicht
+    /// (Level/Werte bleiben gleich), nur Attack/Defense (Formel-Basiswert ist ohnehin gleich, nur der
+    /// Ausrüstungs-Bonus variiert) - "Equip/Unequip verändern nur Attack/Defense" ergibt sich so von selbst,
+    /// ohne Sonderfall. Bei Kind != Player ein No-op. Ohne ClassDef (siehe Entity.ClassDef-Kommentar, z. B.
+    /// bestehende Tests ohne Fortschrittsbezug) bleiben MaxHp/MaxSp/DodgeBp/BaseAttack/BaseDefense bei ihrem
+    /// bisherigen Stand (Konstruktor-Default) - NUR der Ausrüstungs-Bonus auf Attack/Defense wird trotzdem
+    /// angewendet, damit Equip/Unequip für diese Tests unverändert wie vor M6a funktioniert (genau das
+    /// bisherige RecalculateCombatStats-Verhalten). Öffentlich, damit GameServer sie auch direkt nach dem
+    /// Join aufrufen kann (siehe CompleteJoin).</summary>
+    public void RecomputeDerivedStats(int entityId)
     {
         if (_entities.TryGetValue(entityId, out Entity? entity))
-            RecalculateCombatStats(entity);
+            RecomputeDerivedStats(entity);
     }
 
-    private void RecalculateCombatStats(Entity entity)
+    internal void RecomputeDerivedStats(Entity entity)
     {
+        if (entity.Kind != EntityKind.Player) return;
+
+        if (entity.ClassDef != null)
+        {
+            ClassDefinition classDef = entity.ClassDef;
+            entity.MaxHp = classDef.BaseHp + entity.Ht * classDef.HpPerHt + (entity.Level - 1) * classDef.HpPerLevel;
+            entity.MaxSp = classDef.BaseSp + entity.Iq * classDef.SpPerIq + (entity.Level - 1) * classDef.SpPerLevel;
+            entity.BaseAttack = classDef.BaseAttack + entity.St * classDef.AttackPerSt;
+            entity.BaseDefense = classDef.BaseDefense + entity.Ht / classDef.HtPerDefense;
+            entity.DodgeBp = Math.Min(classDef.DodgeCapBp, entity.Dx * classDef.DodgeBpPerDx);
+        }
+
         int attackBonus = 0;
         int defenseBonus = 0;
-
         if (_itemCatalog != null)
         {
             int[] equippedItemIds = { entity.EquippedArmorItemId, entity.EquippedHelmetItemId, entity.EquippedWeaponItemId, entity.EquippedShieldItemId };
@@ -707,11 +931,13 @@ public sealed class World
     /// respawnt sind - ebenfalls für EntityStop an der neuen Position, siehe GameServer), RespawnedMonsters
     /// (neu erschienene Monster - kein Sonderfall nötig, der normale AOI-Diff-Mechanismus erkennt sie als "neu
     /// sichtbar" und verschickt EntitySpawn von selbst, siehe GameServer.UpdateVisibility; die Liste dient
-    /// GameServer nur zum Loggen) und MonsterAttacks (M4c: erfolgreiche Monster-initiierte Angriffe gegen
+    /// GameServer nur zum Loggen), MonsterAttacks (M4c: erfolgreiche Monster-initiierte Angriffe gegen
     /// Spieler - AttackerEntityId/TargetEntityId/Result, damit GameServer dieselben Pakete verschicken kann
-    /// wie bei einem spielerinitiierten Angriff, siehe GameServer.BroadcastAttackResult).</summary>
+    /// wie bei einem spielerinitiierten Angriff, siehe GameServer.BroadcastAttackResult) und RegeneratedPlayers
+    /// (M6a: Spieler, deren HP/SP sich in diesem Tick durch natürliche Regeneration tatsächlich geändert
+    /// haben, siehe RunRegeneration - GameServer verschickt dafür ein neues CharacterStatsPacket).</summary>
     public (List<Entity> Arrived, List<Entity> StartedWandering, List<Entity> Respawned, List<Entity> RespawnedMonsters,
-        List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> MonsterAttacks) Tick(double deltaSeconds, long nowMs)
+        List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> MonsterAttacks, List<Entity> RegeneratedPlayers) Tick(double deltaSeconds, long nowMs)
     {
         List<Entity> arrived = new();
         foreach (Entity entity in _entities.Values)
@@ -736,6 +962,7 @@ public sealed class World
 
             entity.Teleport(GameConstants.MapWidth / 2, GameConstants.MapHeight / 2);
             entity.CurrentHp = entity.MaxHp;
+            entity.CurrentSp = entity.MaxSp; // M6a: Respawn heilt HP UND SP voll.
             entity.RespawnAtMs = 0;
             respawned.Add(entity);
         }
@@ -760,12 +987,19 @@ public sealed class World
                     spawnPointId: spawnPointId, respawnSeconds: pending.RespawnSeconds,
                     meleeRangeWire: pending.MeleeRangeWire, attackCooldownMs: pending.AttackCooldownMs,
                     aggressive: pending.Aggressive, aggroRangeWire: pending.AggroRangeWire, leashRangeWire: pending.LeashRangeWire,
-                    drops: pending.Drops);
+                    drops: pending.Drops, level: pending.Level, baseXp: pending.BaseXp);
                 respawnedMonsters.Add(monster);
             }
         }
 
-        return (arrived, startedWandering, respawned, respawnedMonsters, monsterAttacks);
+        List<Entity> regeneratedPlayers = new();
+        foreach (Entity entity in _entities.Values)
+        {
+            if (RunRegeneration(entity, nowMs))
+                regeneratedPlayers.Add(entity);
+        }
+
+        return (arrived, startedWandering, respawned, respawnedMonsters, monsterAttacks, regeneratedPlayers);
     }
 
     /// <summary>Monster-KI für ein einzelnes Monster (M3c Wander, M4c Zielerfassung/Verfolgung/Leine/Angriff).

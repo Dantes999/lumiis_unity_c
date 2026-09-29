@@ -55,10 +55,16 @@ public sealed class MobDefinition
     /// definiert sind.</summary>
     public IReadOnlyList<MobDrop> Drops { get; }
 
+    /// <summary>M6a: Mob-Level und Basis-XP für World.AwardXp (siehe CLAUDE.md Abschnitt "Fortschritt: Level,
+    /// XP, Werte") - Level fließt in den Levelunterschieds-Faktor ein, BaseXp ist der XP-Betrag vor Anwendung
+    /// dieses Faktors.</summary>
+    public int Level { get; }
+    public int BaseXp { get; }
+
     public MobDefinition(int id, string name, int speedWire, int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs,
         int maxHp, int attack, int defense, int yangMin, int yangMax,
         int meleeRangeWire, int attackCooldownMs, bool aggressive, int aggroRangeWire, int leashRangeWire,
-        IReadOnlyList<MobDrop> drops)
+        IReadOnlyList<MobDrop> drops, int level, int baseXp)
     {
         Id = id;
         Name = name;
@@ -77,6 +83,8 @@ public sealed class MobDefinition
         AggroRangeWire = aggroRangeWire;
         LeashRangeWire = leashRangeWire;
         Drops = drops;
+        Level = level;
+        BaseXp = baseXp;
     }
 }
 
@@ -185,9 +193,16 @@ public sealed class MobCatalog
                 drops.Add(new MobDrop(dropEntry.ItemId, dropEntry.ChancePercent));
             }
 
+            if (entry.Level <= 0)
+                throw new MobCatalogException($"mobs.json: Mob {entry.Id} ({entry.Name}) hat level <= 0.");
+
+            if (entry.BaseXp < 0)
+                throw new MobCatalogException($"mobs.json: Mob {entry.Id} ({entry.Name}) hat baseXp < 0.");
+
             byId[entry.Id] = new MobDefinition(entry.Id, entry.Name, entry.SpeedWire, entry.WanderRadiusWire, entry.WanderIntervalMinMs, entry.WanderIntervalMaxMs,
                 entry.MaxHp, entry.Attack, entry.Defense, entry.YangMin, entry.YangMax,
-                entry.MeleeRangeWire, entry.AttackCooldownMs, entry.Aggressive, entry.AggroRangeWire, entry.LeashRangeWire, drops);
+                entry.MeleeRangeWire, entry.AttackCooldownMs, entry.Aggressive, entry.AggroRangeWire, entry.LeashRangeWire, drops,
+                entry.Level, entry.BaseXp);
         }
 
         if (byId.Count == 0)

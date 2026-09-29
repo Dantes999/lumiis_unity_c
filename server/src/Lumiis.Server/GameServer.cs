@@ -303,7 +303,7 @@ public sealed class GameServer : INetEventListener
 
         double deltaSeconds = 1.0 / Protocol.TickRate;
         (List<Entity> arrived, List<Entity> startedWandering, List<Entity> respawned, List<Entity> respawnedMonsters,
-            List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> monsterAttacks) = _world.Tick(deltaSeconds, _nowMs());
+            List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> monsterAttacks, List<Entity> regeneratedPlayers) = _world.Tick(deltaSeconds, _nowMs());
         foreach (Entity entity in arrived)
             SendToVisible(entity.Id, new EntityStopPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY });
 
@@ -866,7 +866,11 @@ public sealed class GameServer : INetEventListener
         if (_classCatalog != null && _classCatalog.TryGet(DefaultClassName, out ClassDefinition classDef))
         {
             joined = _world.TryJoin(character.Id, character.Name, character.PositionX, character.PositionY, out entity, out reason,
-                classDef.MaxHp, classDef.Attack, classDef.Defense, classDef.MeleeRangeWire, classDef.AttackCooldownMs);
+                meleeRangeWire: classDef.MeleeRangeWire, attackCooldownMs: classDef.AttackCooldownMs, classDef: classDef,
+                level: character.Level, xp: character.Xp,
+                spentSt: character.SpentSt, spentHt: character.SpentHt, spentDx: character.SpentDx, spentIq: character.SpentIq,
+                unspentStatPoints: character.UnspentStatPoints, unspentSkillPoints: character.UnspentSkillPoints,
+                currentHp: character.CurrentHp, currentSp: character.CurrentSp);
         }
         else
         {
@@ -896,7 +900,7 @@ public sealed class GameServer : INetEventListener
             if (inventoryItem.SlotIndex >= 0 && inventoryItem.SlotIndex < entity.Inventory.Length)
                 entity.Inventory[inventoryItem.SlotIndex] = inventoryItem.ItemId;
         }
-        _world.RecalculateCombatStats(entity.Id);
+        _world.RecomputeDerivedStats(entity.Id);
         entity.Appearance = ToAppearance(character);
 
         conn.Peer.SendPacket(new JoinAcceptedPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY, Appearance = entity.Appearance });

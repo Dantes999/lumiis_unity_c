@@ -86,14 +86,14 @@ namespace Lumiis.Tests.Game
             world.Tick(0.0, nowMs: 0); // Ziel erfassen (Distanz 0, direkt im Nahkampf)
             Assert.Equal(player.Id, monster.TargetEntityId);
 
-            (_, _, _, _, List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> firstHit) = world.Tick(0.0, nowMs: 40);
+            (_, _, _, _, List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> firstHit, _) = world.Tick(0.0, nowMs: 40);
             Assert.Single(firstHit);
             Assert.Equal(1000 - 5, player.CurrentHp);
 
-            (_, _, _, _, List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> tooEarly) = world.Tick(0.0, nowMs: 40 + 500); // < 700ms Cooldown
+            (_, _, _, _, List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> tooEarly, _) = world.Tick(0.0, nowMs: 40 + 500); // < 700ms Cooldown
             Assert.Empty(tooEarly);
 
-            (_, _, _, _, List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> secondHit) = world.Tick(0.0, nowMs: 40 + 700);
+            (_, _, _, _, List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> secondHit, _) = world.Tick(0.0, nowMs: 40 + 700);
             Assert.Single(secondHit);
             Assert.Equal(1000 - 10, player.CurrentHp);
         }
@@ -108,7 +108,7 @@ namespace Lumiis.Tests.Game
             world.Tick(0.0, nowMs: 0); // Ziel erfassen
             Assert.Equal(player.Id, monster.TargetEntityId);
 
-            (_, _, _, _, List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> attacks) = world.Tick(0.0, nowMs: 40);
+            (_, _, _, _, List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> attacks, _) = world.Tick(0.0, nowMs: 40);
 
             Assert.Empty(attacks); // 300 > MeleeRangeWire (130) - kein Angriff, sondern Bewegung
             Assert.True(monster.IsMoving);
@@ -169,7 +169,7 @@ namespace Lumiis.Tests.Game
             Entity monster = SpawnMonster(world, x: 50000, y: 50000, aggressive: true, aggroRangeWire: 400, leashRangeWire: 700, attack: 999);
 
             world.Tick(0.0, nowMs: 0); // Ziel erfassen
-            (_, _, _, _, List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> attacks) = world.Tick(0.0, nowMs: 40);
+            (_, _, _, _, List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> attacks, _) = world.Tick(0.0, nowMs: 40);
 
             Assert.Single(attacks);
             Assert.True(attacks[0].Result.TargetDied);

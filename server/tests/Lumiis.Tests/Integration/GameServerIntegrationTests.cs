@@ -1138,7 +1138,7 @@ namespace Lumiis.Tests.Integration
             // Kurzes Wander-Intervall (synthetisch, nicht die echten mobs.json-Werte) - haelt den Test schnell.
             MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
               ""mobs"": [
-                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 100, ""wanderIntervalMaxMs"": 200, ""maxHp"": 30, ""attack"": 5, ""defense"": 0, ""yangMin"": 5, ""yangMax"": 15, ""meleeRangeWire"": 130, ""attackCooldownMs"": 700, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 700 }
+                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 100, ""wanderIntervalMaxMs"": 200, ""maxHp"": 30, ""attack"": 5, ""defense"": 0, ""yangMin"": 5, ""yangMax"": 15, ""meleeRangeWire"": 130, ""attackCooldownMs"": 700, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 700, ""level"": 3, ""baseXp"": 30 }
               ]
             }");
             CollisionMap openMap = BuildOpenCollisionMap();
@@ -1184,7 +1184,7 @@ namespace Lumiis.Tests.Integration
             // Test schnell, erzwingt aber trotzdem mehrere Treffer (40 HP / 15 Schaden pro Treffer = 3 Treffer).
             MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
               ""mobs"": [
-                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 40, ""attack"": 5, ""defense"": 0, ""yangMin"": 5, ""yangMax"": 15, ""meleeRangeWire"": 130, ""attackCooldownMs"": 700, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 700 }
+                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 40, ""attack"": 5, ""defense"": 0, ""yangMin"": 5, ""yangMax"": 15, ""meleeRangeWire"": 130, ""attackCooldownMs"": 700, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 700, ""level"": 3, ""baseXp"": 30 }
               ]
             }");
             CollisionMap openMap = BuildOpenCollisionMap();
@@ -1192,7 +1192,7 @@ namespace Lumiis.Tests.Integration
               ""spawns"": [ { ""id"": 1, ""mobId"": 1, ""positionX"": 50000, ""positionY"": 50000, ""respawnSeconds"": 30 } ]
             }", mobCatalog, openMap);
             ClassCatalog classCatalog = ClassCatalog.LoadFromJson(@"{
-              ""classes"": [ { ""name"": ""Krieger"", ""maxHp"": 100, ""attack"": 15, ""defense"": 0, ""meleeRangeWire"": 150, ""attackCooldownMs"": 50 } ]
+              ""classes"": [ { ""name"": ""Krieger"", ""meleeRangeWire"": 150, ""attackCooldownMs"": 50, ""baseHp"": 100, ""baseSp"": 0, ""baseAttack"": 15, ""baseDefense"": 0, ""baseSt"": 1, ""baseHt"": 1, ""baseDx"": 1, ""baseIq"": 1, ""hpPerHt"": 0, ""hpPerLevel"": 0, ""spPerIq"": 0, ""spPerLevel"": 0, ""attackPerSt"": 0, ""htPerDefense"": 1000, ""dodgeBpPerDx"": 0, ""dodgeCapBp"": 0, ""statPointsPerLevel"": 0, ""skillPointsPerLevel"": 0, ""regenDelayMs"": 999999, ""regenIntervalMs"": 999999, ""hpRegenPercent"": 0, ""spRegenPercent"": 0 } ]
             }");
 
             var fixture = new ServerFixture(collisionMap: openMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog, classCatalog: classCatalog);
@@ -1267,9 +1267,9 @@ namespace Lumiis.Tests.Integration
             // Monster B: hohes MaxHp (stirbt nicht), dient als Schaden-Dummy vor/nach dem Ausruesten.
             MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
               ""mobs"": [
-                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 10, ""attack"": 5, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 0, ""meleeRangeWire"": 130, ""attackCooldownMs"": 700, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 700,
+                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 10, ""attack"": 5, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 0, ""meleeRangeWire"": 130, ""attackCooldownMs"": 700, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 700, ""level"": 3, ""baseXp"": 30,
                   ""drops"": [ { ""itemId"": 1, ""chancePercent"": 100 } ] },
-                { ""id"": 2, ""name"": ""Waldschrat"", ""speedWire"": 200, ""wanderRadiusWire"": 300, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 9999, ""attack"": 0, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 0, ""meleeRangeWire"": 150, ""attackCooldownMs"": 700, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 700 }
+                { ""id"": 2, ""name"": ""Waldschrat"", ""speedWire"": 200, ""wanderRadiusWire"": 300, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 9999, ""attack"": 0, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 0, ""meleeRangeWire"": 150, ""attackCooldownMs"": 700, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 700, ""level"": 3, ""baseXp"": 30 }
               ]
             }");
             CollisionMap openMap = BuildOpenCollisionMap();
@@ -1280,7 +1280,7 @@ namespace Lumiis.Tests.Integration
               ]
             }", mobCatalog, openMap);
             ClassCatalog classCatalog = ClassCatalog.LoadFromJson(@"{
-              ""classes"": [ { ""name"": ""Krieger"", ""maxHp"": 100, ""attack"": 15, ""defense"": 0, ""meleeRangeWire"": 150, ""attackCooldownMs"": 50 } ]
+              ""classes"": [ { ""name"": ""Krieger"", ""meleeRangeWire"": 150, ""attackCooldownMs"": 50, ""baseHp"": 100, ""baseSp"": 0, ""baseAttack"": 15, ""baseDefense"": 0, ""baseSt"": 1, ""baseHt"": 1, ""baseDx"": 1, ""baseIq"": 1, ""hpPerHt"": 0, ""hpPerLevel"": 0, ""spPerIq"": 0, ""spPerLevel"": 0, ""attackPerSt"": 0, ""htPerDefense"": 1000, ""dodgeBpPerDx"": 0, ""dodgeCapBp"": 0, ""statPointsPerLevel"": 0, ""skillPointsPerLevel"": 0, ""regenDelayMs"": 999999, ""regenIntervalMs"": 999999, ""hpRegenPercent"": 0, ""spRegenPercent"": 0 } ]
             }");
             ItemCatalog itemCatalog = ItemCatalog.LoadFromJson(@"{
               ""items"": [ { ""id"": 1, ""name"": ""Testschwert"", ""itemType"": ""Weapon"", ""lookId"": 1, ""attackBonus"": 50, ""defenseBonus"": 0 } ]
@@ -1346,11 +1346,11 @@ namespace Lumiis.Tests.Integration
         public void UsingConsumable_SendsEntityHpChangedWithHealedValue()
         {
             ClassCatalog classCatalog = ClassCatalog.LoadFromJson(@"{
-              ""classes"": [ { ""name"": ""Krieger"", ""maxHp"": 100, ""attack"": 0, ""defense"": 0, ""meleeRangeWire"": 150, ""attackCooldownMs"": 800 } ]
+              ""classes"": [ { ""name"": ""Krieger"", ""meleeRangeWire"": 150, ""attackCooldownMs"": 800, ""baseHp"": 100, ""baseSp"": 0, ""baseAttack"": 0, ""baseDefense"": 0, ""baseSt"": 1, ""baseHt"": 1, ""baseDx"": 1, ""baseIq"": 1, ""hpPerHt"": 0, ""hpPerLevel"": 0, ""spPerIq"": 0, ""spPerLevel"": 0, ""attackPerSt"": 0, ""htPerDefense"": 1000, ""dodgeBpPerDx"": 0, ""dodgeCapBp"": 0, ""statPointsPerLevel"": 0, ""skillPointsPerLevel"": 0, ""regenDelayMs"": 999999, ""regenIntervalMs"": 999999, ""hpRegenPercent"": 0, ""spRegenPercent"": 0 } ]
             }");
             MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
               ""mobs"": [
-                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 9999, ""attack"": 10, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 0, ""meleeRangeWire"": 150, ""attackCooldownMs"": 999999, ""aggressive"": true, ""aggroRangeWire"": 1000, ""leashRangeWire"": 2000 }
+                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 9999, ""attack"": 10, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 0, ""meleeRangeWire"": 150, ""attackCooldownMs"": 999999, ""aggressive"": true, ""aggroRangeWire"": 1000, ""leashRangeWire"": 2000, ""level"": 3, ""baseXp"": 30 }
               ]
             }");
             CollisionMap openMap = BuildOpenCollisionMap();
@@ -1406,11 +1406,11 @@ namespace Lumiis.Tests.Integration
         {
             long fakeNow = 0;
             ClassCatalog classCatalog = ClassCatalog.LoadFromJson(@"{
-              ""classes"": [ { ""name"": ""Krieger"", ""maxHp"": 10, ""attack"": 0, ""defense"": 0, ""meleeRangeWire"": 150, ""attackCooldownMs"": 800 } ]
+              ""classes"": [ { ""name"": ""Krieger"", ""meleeRangeWire"": 150, ""attackCooldownMs"": 800, ""baseHp"": 10, ""baseSp"": 0, ""baseAttack"": 0, ""baseDefense"": 0, ""baseSt"": 1, ""baseHt"": 1, ""baseDx"": 1, ""baseIq"": 1, ""hpPerHt"": 0, ""hpPerLevel"": 0, ""spPerIq"": 0, ""spPerLevel"": 0, ""attackPerSt"": 0, ""htPerDefense"": 1000, ""dodgeBpPerDx"": 0, ""dodgeCapBp"": 0, ""statPointsPerLevel"": 0, ""skillPointsPerLevel"": 0, ""regenDelayMs"": 999999, ""regenIntervalMs"": 999999, ""hpRegenPercent"": 0, ""spRegenPercent"": 0 } ]
             }");
             MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
               ""mobs"": [
-                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 9999, ""attack"": 999, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 0, ""meleeRangeWire"": 150, ""attackCooldownMs"": 100, ""aggressive"": true, ""aggroRangeWire"": 1000, ""leashRangeWire"": 2000 }
+                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 9999, ""attack"": 999, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 0, ""meleeRangeWire"": 150, ""attackCooldownMs"": 100, ""aggressive"": true, ""aggroRangeWire"": 1000, ""leashRangeWire"": 2000, ""level"": 3, ""baseXp"": 30 }
               ]
             }");
             CollisionMap openMap = BuildOpenCollisionMap();
@@ -1453,11 +1453,11 @@ namespace Lumiis.Tests.Integration
         public void LaterJoiner_SeesAlreadyDamagedMonster_ReceivesEntityHpChangedAfterSpawn()
         {
             ClassCatalog classCatalog = ClassCatalog.LoadFromJson(@"{
-              ""classes"": [ { ""name"": ""Krieger"", ""maxHp"": 100, ""attack"": 15, ""defense"": 0, ""meleeRangeWire"": 150, ""attackCooldownMs"": 800 } ]
+              ""classes"": [ { ""name"": ""Krieger"", ""meleeRangeWire"": 150, ""attackCooldownMs"": 800, ""baseHp"": 100, ""baseSp"": 0, ""baseAttack"": 15, ""baseDefense"": 0, ""baseSt"": 1, ""baseHt"": 1, ""baseDx"": 1, ""baseIq"": 1, ""hpPerHt"": 0, ""hpPerLevel"": 0, ""spPerIq"": 0, ""spPerLevel"": 0, ""attackPerSt"": 0, ""htPerDefense"": 1000, ""dodgeBpPerDx"": 0, ""dodgeCapBp"": 0, ""statPointsPerLevel"": 0, ""skillPointsPerLevel"": 0, ""regenDelayMs"": 999999, ""regenIntervalMs"": 999999, ""hpRegenPercent"": 0, ""spRegenPercent"": 0 } ]
             }");
             MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
               ""mobs"": [
-                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 30, ""attack"": 0, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 0, ""meleeRangeWire"": 130, ""attackCooldownMs"": 700, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 700 }
+                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 30, ""attack"": 0, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 0, ""meleeRangeWire"": 130, ""attackCooldownMs"": 700, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 700, ""level"": 3, ""baseXp"": 30 }
               ]
             }");
             CollisionMap openMap = BuildOpenCollisionMap();
@@ -1796,7 +1796,7 @@ namespace Lumiis.Tests.Integration
         {
             return MobCatalog.LoadFromJson(@"{
               ""mobs"": [
-                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 30, ""attack"": 5, ""defense"": 0, ""yangMin"": 5, ""yangMax"": 15, ""meleeRangeWire"": 130, ""attackCooldownMs"": 700, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 700 }
+                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 30, ""attack"": 5, ""defense"": 0, ""yangMin"": 5, ""yangMax"": 15, ""meleeRangeWire"": 130, ""attackCooldownMs"": 700, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 700, ""level"": 3, ""baseXp"": 30 }
               ]
             }");
         }
@@ -1942,7 +1942,7 @@ namespace Lumiis.Tests.Integration
         {
             MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
               ""mobs"": [
-                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 30, ""attack"": 5, ""defense"": 0, ""yangMin"": 5, ""yangMax"": 15, ""meleeRangeWire"": 130, ""attackCooldownMs"": 300, ""aggressive"": true, ""aggroRangeWire"": 400, ""leashRangeWire"": 700 }
+                { ""id"": 1, ""name"": ""Wildhund"", ""speedWire"": 700, ""wanderRadiusWire"": 500, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 30, ""attack"": 5, ""defense"": 0, ""yangMin"": 5, ""yangMax"": 15, ""meleeRangeWire"": 130, ""attackCooldownMs"": 300, ""aggressive"": true, ""aggroRangeWire"": 400, ""leashRangeWire"": 700, ""level"": 3, ""baseXp"": 30 }
               ]
             }");
             CollisionMap openMap = BuildOpenCollisionMap();
@@ -1983,7 +1983,7 @@ namespace Lumiis.Tests.Integration
         {
             MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
               ""mobs"": [
-                { ""id"": 2, ""name"": ""Waldschrat"", ""speedWire"": 200, ""wanderRadiusWire"": 300, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 60, ""attack"": 8, ""defense"": 3, ""yangMin"": 10, ""yangMax"": 25, ""meleeRangeWire"": 150, ""attackCooldownMs"": 300, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 600 }
+                { ""id"": 2, ""name"": ""Waldschrat"", ""speedWire"": 200, ""wanderRadiusWire"": 300, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 60, ""attack"": 8, ""defense"": 3, ""yangMin"": 10, ""yangMax"": 25, ""meleeRangeWire"": 150, ""attackCooldownMs"": 300, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 600, ""level"": 3, ""baseXp"": 30 }
               ]
             }");
             CollisionMap openMap = BuildOpenCollisionMap();
@@ -1993,7 +1993,7 @@ namespace Lumiis.Tests.Integration
             // Langer eigener Cooldown stellt sicher, dass ein spaeterer Treffer beim Client wirklich vom
             // Waldschrat kommt - der Client selbst koennte in diesem Zeitraum gar nicht erneut treffen.
             ClassCatalog classCatalog = ClassCatalog.LoadFromJson(@"{
-              ""classes"": [ { ""name"": ""Krieger"", ""maxHp"": 100, ""attack"": 15, ""defense"": 0, ""meleeRangeWire"": 150, ""attackCooldownMs"": 5000 } ]
+              ""classes"": [ { ""name"": ""Krieger"", ""meleeRangeWire"": 150, ""attackCooldownMs"": 5000, ""baseHp"": 100, ""baseSp"": 0, ""baseAttack"": 15, ""baseDefense"": 0, ""baseSt"": 1, ""baseHt"": 1, ""baseDx"": 1, ""baseIq"": 1, ""hpPerHt"": 0, ""hpPerLevel"": 0, ""spPerIq"": 0, ""spPerLevel"": 0, ""attackPerSt"": 0, ""htPerDefense"": 1000, ""dodgeBpPerDx"": 0, ""dodgeCapBp"": 0, ""statPointsPerLevel"": 0, ""skillPointsPerLevel"": 0, ""regenDelayMs"": 999999, ""regenIntervalMs"": 999999, ""hpRegenPercent"": 0, ""spRegenPercent"": 0 } ]
             }");
 
             var fixture = new ServerFixture(collisionMap: openMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog, classCatalog: classCatalog);
