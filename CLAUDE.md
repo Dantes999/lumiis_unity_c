@@ -377,6 +377,94 @@ Debug-Entity-Liste. Neuer Debug-Panel-Knopf "+1000 Yang" sendet `DebugGiveYangRe
 Bewusst NICHT in M5b: Rückkauf, Mengenkauf, Dialogsystem, Quests, echte Shop-Grafik (Debug-Panel-Stil reicht,
 wie bei Inventar/Ausrüstung), weitere NPC-Typen (nur Händler).
 
+## Fortschritt: Level, XP, Werte
+Seit M6a hat ein Charakter ein Level (1-25), sammelt Erfahrung (XP) durch Monster-Kills, verteilt beim
+Levelaufstieg Statuspunkte auf vier Werte (ST/HT/DX/IQ) und Fertigkeitspunkte (nur gesammelt, noch nicht
+ausgegeben - Skills folgen erst in M6b), hat SP als zweite Ressource neben HP, kann Angriffen ausweichen und
+regeneriert HP/SP natürlich außerhalb des Kampfs. Beschluss "Weg 2": das Leben überdauert das Ausloggen (kein
+Volllade-Heilen mehr beim Login wie bis M5).
+
+Formeln (alle Faktoren als Zahlen in `data/classes.json`, ein Eintrag pro Klasse - Alpha kennt nur "Krieger"):
+- `MaxHp = BaseHp + Ht*HpPerHt + (Level-1)*HpPerLevel`
+- `MaxSp = BaseSp + Iq*SpPerIq + (Level-1)*SpPerLevel`
+- `Attack = BaseAttack + St*AttackPerSt + Waffen-Bonus` (Waffen-Bonus wie bisher aus M5a, `ItemDefinition.AttackBonus`)
+- `Defense = BaseDefense + (Ht / HtPerDefense, ganzzahlig abgerundet) + Rüstungs-Boni` (M5a)
+- `Ausweichen (DodgeBp, 100 = 1 Prozent) = min(DodgeCapBp, Dx*DodgeBpPerDx)`
+- St/Ht/Dx/Iq sind jeweils `BaseXx` (Klassen-Startwert, `classes.json`) + `SpentXx` (verteilte Punkte, DB-Spalte).
+
+Aktuelle Platzhalterwerte (Krieger, `data/classes.json`): BaseHp 68, BaseSp 12, BaseAttack 3, BaseDefense 3,
+BaseSt 6, BaseHt 4, BaseDx 3, BaseIq 3, HpPerHt 8, HpPerLevel 10, SpPerIq 6, SpPerLevel 4, AttackPerSt 2,
+HtPerDefense 2, DodgeBpPerDx 50, DodgeCapBp 4000, StatPointsPerLevel 3, SkillPointsPerLevel 1 - so hergeleitet,
+dass ein frischer Level-1-Krieger exakt die bisherigen Werte hat (MaxHp 100, Attack 15, Defense 5, siehe M4a).
+Regeneration (ebenfalls `classes.json`): RegenDelayMs 5000 (Pause seit dem letzten Kampfereignis, bevor
+Regeneration einsetzt), RegenIntervalMs 1000, HpRegenPercent 1, SpRegenPercent 2 (jeweils vom Maximum,
+mindestens 1 Punkt pro Intervall, gedeckelt am Maximum).
+
+XP: `data/progression.json` (neu) - `MaxLevel` 25, `xpToNext`-Tabelle (Level 1..24, Formel `(8+L)*10*L`) und
+eine Levelunterschieds-Tabelle (Spielerlevel minus Monsterlevel → Prozent der Basis-XP, 15 Stufen von
+`<=-4: 120%` bis `>=+10: 10%`). `data/mobs.json` bekam `level`/`baseXp` (Regel `baseXp = 10*level`) - z. B.
+Wildhund Level 3/30 XP, Waldschrat Level 6/60 XP. XP-Gewinn = `BaseXp * Prozent(Levelunterschied) / 100`,
+ganzzahlig abgerundet, mindestens 1 solange Prozent > 0, keine XP mehr ab MaxLevel. `World.AwardXp` wendet
+mehrere Levelaufstiege in einer Schleife an (falls die XP reichen), pro Aufstieg gibt es
+StatPointsPerLevel/SkillPointsPerLevel Punkte und volle Heilung (HP+SP).
+
+Zentrale Logik: `World.RecomputeDerivedStats(entity)` (`Lumiis.Server.Game`) ist die EINZIGE Stelle, die
+MaxHp/MaxSp/Attack/Defense/DodgeBp berechnet - aufgerufen bei Join, Levelaufstieg, Punkteverteilung und
+Equip/Unequip. Ohne `Entity.ClassDef` (bestehende netzwerk-/kampfferne Tests) ein No-op für die
+Level-Formel-Werte, der Ausrüstungs-Bonus auf Attack/Defense wird trotzdem immer angewendet (bisheriges
+Verhalten bleibt für diese Tests exakt erhalten). `Entity` hält dafür eine Referenz auf `ClassDefinition`
+(`Lumiis.Data.Classes`) statt alle ~20 Formelkonstanten zu duplizieren - World kennt Lumiis.Data ohnehin schon
+(CollisionMap/ItemCatalog).
+
+Ausweichen: `World.TryAttack` würfelt (injizierbare Zufallsquelle, Wert 0..9999 kleiner als `DodgeBp` des
+Ziels) NACH Cooldown-Verbrauch und reaktiver Monster-Zielerfassung (M4c) - beide bleiben bei einem Ausweicher
+unverändert, nur der Schaden entfällt. `EntityDodgedPacket` (an alle AOI-Beobachter des Ziels) ersetzt
+`EntityDamagedPacket` für diesen Treffer komplett. Monster haben immer `DodgeBp` 0 (kein `ClassDef`, nie neu
+berechnet).
+
+Regeneration: `World.RunRegeneration`, Teil von `World.Tick` - pro Spieler höchstens einmal pro
+`RegenIntervalMs` geprüft (`Entity.NextRegenAtMs`, dasselbe Fälligkeits-Muster wie `NextWanderAtMs` bei
+Monstern), nur wenn seit `Entity.LastCombatAtMs` (gesetzt bei Schaden nehmen, Schaden austeilen oder
+Ausweichen - jeweils nur bei einem tatsächlichen Treffer/Ausweicher, nicht bei einem Fehlschlag der
+Gegenseite) mindestens `RegenDelayMs` vergangen sind. Tote regenerieren nicht. `CharacterStatsPacket` wird
+dafür nur bei tatsächlicher HP/SP-Änderung verschickt (höchstens einmal pro `RegenIntervalMs`).
+
+Login-Regeln (`World.TryJoin`, "Weg 2"): `Character.CurrentHp`/`CurrentSp` (beide `int?`) - `null` bedeutet
+voll (frischer oder nie im Tod ausgeloggter Charakter), ein Wert `<= 0` bedeutet "im Tod ausgeloggt" und wird
+beim Join wiederbelebt (HP UND SP voll, Position Kartenmitte - "wiederbelebt" wird ausschließlich an HP
+festgemacht, dieselbe Definition wie `Entity.IsDead`), ein Wert über dem aktuell berechneten Maximum wird
+darauf begrenzt (z. B. nach einem nachträglichen Stat-Reset). Spieler-Respawn (M4a) setzt weiterhin HP UND SP
+voll, Levelaufstieg heilt ebenfalls voll.
+
+Netzwerk: `CharacterStatsPacket` (Server→Client, nur an den Besitzer, immer der VOLLSTÄNDIGE Stand - Level,
+Xp, XpToNext, St/Ht/Dx/Iq, UnspentStatPoints/UnspentSkillPoints, MaxHp/CurrentHp, MaxSp/CurrentSp, Attack,
+Defense, DodgeBp) wird beim Join direkt nach JoinAccepted/InventorySync/YangChanged verschickt (EntityHpChanged
+bleibt dazwischen, bestehende Reihenfolge) und danach erneut bei XP-Gewinn/Levelaufstieg, Punkteverteilung,
+Equip/Unequip, Heiltrank, Respawn und Regeneration. `AllocateStatPointRequestPacket` (Client→Server, `StatKind`
+St/Ht/Dx/Iq) - eine ungültige Anfrage (keine Punkte, unbekannter Wert) wird nur geloggt und verworfen, der
+Server antwortet trotzdem mit dem aktuellen `CharacterStatsPacket` (keine Trennung, kein eigenes
+Fehlerpaket). `DebugSetLevelRequestPacket` (Dev-Tools, siehe unten). Protocol.Version 11.
+
+Persistenz: Level/Xp/SpentSt/SpentHt/SpentDx/SpentIq/UnspentStatPoints/UnspentSkillPoints/CurrentHp/CurrentSp
+gehen in den bestehenden kombinierten `CharacterSaveRequest`-Channel (M5b, bisher Yang+Inventar) - seit M6a
+zusätzlich mit zwei neuen Auslösern: periodisch alle 30s (dieselbe Fälligkeit wie die Positions-Speicherung)
+und bei Disconnect. Sofortiges Speichern weiterhin nur bei Levelaufstieg und Punkteverteilung (plus
+Dev-Tools-`DebugSetLevel`) - Schaden/Regeneration lösen bewusst KEIN sofortiges Speichern aus (der
+periodische/Disconnect-Auslöser holt diese HP/SP-Änderungen ein).
+
+Client: `ClientWorld.CharacterStats` (neue `CharacterState`-Klasse, UnityEngine-frei) hält Level/Xp/XpToNext/
+Werte/SP/Angriff/Verteidigung/Ausweichen - eigene HP laufen weiterhin über die bestehende gemeinsame `ApplyHp`
+(kein zweiter Speicherort für CurrentHp/MaxHp). Debug-Panel-Bereich "Charakter" (nur Editor/Development-Build):
+Level, "XP x/y" (bei MaxLevel "MAX"), HP, SP, ST/HT/DX/IQ mit "+"-Knopf (nur aktiv bei
+UnspentStatPoints > 0), Status-/Fertigkeitspunkte, Angriff/Verteidigung/Ausweichen in Prozent, dazu ein
+Level-Cycler + "Level setzen"-Knopf (Dev-Tools). Overlay-Meldungen: "Level Up! Level N" (am steigenden Level
+erkannt), "Ausgewichen!"/"Verfehlt!" (`EntityDodgedPacket`, je nachdem ob die eigene Entity Ziel oder Angreifer war).
+
+Bewusst NICHT in M6a: Skills (M6b - Fertigkeitspunkte werden nur gesammelt, nicht ausgegeben), Upgrade-System
+(M6c), Lumiis-Steine (M6d), Stat-Reset für Spieler (nur Dev-Tools-`DebugSetLevel` kann das zum Testen), keine
+Monster-Regeneration, keine neuen Monstertypen/höheren Level für Monster (nur Level/BaseXp an den bestehenden
+zwei Typen ergänzt).
+
 ## Client
 Setup nach dem Klonen (auch auf dem zweiten Rechner):
 1. `cd server && dotnet build` - baut Lumiis.Shared und kopiert dabei Lumiis.Shared.dll sowie die netstandard2.1-Variante von LiteNetLib.dll nach `client/Assets/Plugins/Lumiis/` (git-ignoriert, entsteht bei jedem Build neu).
@@ -426,7 +514,7 @@ Log-Eintrag). **Nie in einem "echten" Serverstart aktivieren** - das ist ausschl
 Kampf-Testing gedacht (`dotnet run --project server/src/Lumiis.Server -- --allow-debug-commands`, zusätzlich
 zu den sonstigen Argumenten).
 
-Zwei Befehle:
+Drei Befehle:
 - `DebugSpawnMonsterRequestPacket` (Client->Server, MobId) - spawnt ein Monster des angegebenen Mob-Typs nahe
   der Position des Absenders (`World.FindNearbyWalkablePoint`, 100-300 Wire-Einheiten Versatz in zufälliger
   Richtung, auf Kartengrenzen geklemmt, bei blockierter Zielzelle kein Retry sondern Rückfall auf die
@@ -434,6 +522,10 @@ Zwei Befehle:
   einen Bereich "Monster spawnen" mit "<"/">"-Cycler + Knopf.
 - `DebugGiveYangRequestPacket` (M5b, Client->Server, Amount) - schreibt Amount über `World.CreditYang`
   (MaxYang-Deckel) gut. Im Client: Knopf "+1000 Yang" im Debug-Testpanel.
+- `DebugSetLevelRequestPacket` (M6a, Client->Server, Level) - setzt Level = Level, Xp/Spent* zurückgesetzt,
+  Unspent* entsprechend nachgezählt ((Level-1) * StatPointsPerLevel/SkillPointsPerLevel), HP und SP voll -
+  dient auch als Stat-Reset zum Testen (`World.TryDebugSetLevel`). Im Client: Level-Cycler + "Level setzen"-
+  Knopf im Debug-Testpanel-Bereich "Charakter".
 
 Ein so gespawntes Monster ist wie jedes andere behandelt (`World.TryAttack` kennt keinen Sonderfall) - der
 einzige Unterschied ist `Entity.SpawnPointId == null` statt der echten `SpawnPoint.Id` aus spawns.json (die
@@ -446,8 +538,8 @@ einen Respawn an einem (evtl. schon belegten) SpawnPoint aus.
 Map 1 (Startdorf + Feld), Krieger, Level 1-25, Monster/Bosse/Lumiis-Steine, Items/Drops/Shop, Chat, Gruppe. NICHT: Quests/Lua, Reittiere, Kostüme, Drachenseelen, Gildenkrieg, weitere Reiche.
 
 ## Meilensteine
-M0 Fundament (fertig) | M1 Walking Skeleton (fertig, inkl. M1b Unity-Client, M1c Sichtbarkeit/Testing, M1c-layered-characters Paper-Doll-Charaktere) | M2 Account & Charakter (komplett fertig): M2a Datenbank & Auth-Dienst, M2b Server-Join über Account/Token/Charakter, M2c Unity-Login-UI (UI Toolkit) | M3 Welt (Grid, AOI, Mobs) komplett fertig: M3a Kartenkollision, M3b Sichtbarkeitsbereich (kein Grid - siehe Abschnitt "Sichtbarkeitsbereich (AOI)"), M3c Monster (Spawns, Wander-KI, AOI-Integration - siehe Abschnitt "Monster") | M4 Kampf komplett fertig (inkl. Gegenwehr): M4a Kampf-Grundlagen, M4b Monster-Respawn, M4c Monster-Aggro/Verfolgung/Leine (siehe Abschnitt "Kampf") | M5 Items komplett fertig: M5a Items/Inventar/Ausrüstung/Drops (siehe Abschnitt "Items und Inventar"), M5b Shop/NPCs (siehe Abschnitt "Shop und NPCs") | M6 Metin-Kern (Skills, Lumiis-Steine) | M7 Sozial | M8 Alpha-Betrieb.
-Aktuelle Aufgabe: keine - M5 (inkl. aller Unteraufgaben) ist fertig, für M6 gibt es noch keine Task-Datei unter docs/tasks/.
+M0 Fundament (fertig) | M1 Walking Skeleton (fertig, inkl. M1b Unity-Client, M1c Sichtbarkeit/Testing, M1c-layered-characters Paper-Doll-Charaktere) | M2 Account & Charakter (komplett fertig): M2a Datenbank & Auth-Dienst, M2b Server-Join über Account/Token/Charakter, M2c Unity-Login-UI (UI Toolkit) | M3 Welt (Grid, AOI, Mobs) komplett fertig: M3a Kartenkollision, M3b Sichtbarkeitsbereich (kein Grid - siehe Abschnitt "Sichtbarkeitsbereich (AOI)"), M3c Monster (Spawns, Wander-KI, AOI-Integration - siehe Abschnitt "Monster") | M4 Kampf komplett fertig (inkl. Gegenwehr): M4a Kampf-Grundlagen, M4b Monster-Respawn, M4c Monster-Aggro/Verfolgung/Leine (siehe Abschnitt "Kampf") | M5 Items komplett fertig: M5a Items/Inventar/Ausrüstung/Drops (siehe Abschnitt "Items und Inventar"), M5b Shop/NPCs (siehe Abschnitt "Shop und NPCs") | M6 Metin-Kern: M6a Level/XP/Werte/SP/Ausweichen/Regeneration (siehe Abschnitt "Fortschritt: Level, XP, Werte"), M6b Skills (offen), M6c Upgrade (offen), M6d Lumiis-Steine (offen) | M7 Sozial | M8 Alpha-Betrieb.
+Aktuelle Aufgabe: keine - M6a ist fertig, für M6b gibt es noch keine Task-Datei unter docs/tasks/.
 
 ## Arbeitsweise
 - Kleine Schritte. Jeder endet mit grünem `dotnet test` und einem Commit (Präfix "M1: ...").
@@ -498,6 +590,49 @@ Aktuelle Aufgabe: keine - M5 (inkl. aller Unteraufgaben) ist fertig, für M6 gib
 
 - Bugfix HP-Anzeige (vom User nach einem echten Unity-Test gemeldet: Heiltrank benutzt, HP-Anzeige blieb auf dem alten Wert stehen), in 4 Commits: Audit ergab drei Lücken ohne Paket für eine HP-Änderung ohne Treffer - Heiltrank (`World.TryUseConsumable`), Spieler-Respawn (`World.Tick`) und eine bereits verletzte Entity, die per `EntitySpawnPacket` (trägt kein Leben) neu in die AOI eines Beobachters eintritt (Join UND laufender Sichtbarkeits-Diff). `ApplyDamage` (Schaden) und die Entity-Erzeugung selbst (immer volles Leben) hatten dagegen keine Lücke. (1) Neues `EntityHpChangedPacket` (EntityId, CurrentHp, MaxHp), Protocol.Version 8 -> 9; `EntityDamagedPacket` bleibt für den Schadensfall unverändert. (2) `GameServer.SendHpIfDamaged` direkt nach jedem `EntitySpawnPacket` für eine fremde Entity (CompleteJoin + UpdateVisibility); Heiltrank-Erfolg und Spieler-Respawn broadcasten das neue Paket zusätzlich zum jeweils bestehenden Paket. (3) Client: `ClientWorld.ApplyHp` ist jetzt der einzige Schreibpfad für `CurrentHp`/`MaxHp` - `HandleEntityDamaged` UND das neue `HandleEntityHpChanged` rufen beide dieselbe Methode auf, kein zweiter Codepfad. (4) Tests (3 `ClientWorldTests` + 3 LiteNetLib-Integrationstests, Respawn-Test nutzt eine fake Uhr statt echt 3s zu warten, analog zu JoinTimeout/RejectGrace) - dabei einen zweiten, unabhängigen Bug gefunden: `LookupCharacterForJoinAsync` lud `Character.InventoryItems` ohne `Include(...)`, das gespeicherte Inventar ging bei jedem Login still verloren (EquippedXItemId-Spalten waren davon nicht betroffen, nur die separate Tabelle) - mitbehoben. 364 Tests grün, mehrfach stabil.
 - M5b (Shop/NPCs, docs/tasks/M5b-shop.md) fertig, in 7 Commits (0 Review nur berichtet, kein Commit): (1) `data/items.json` um BuyPrice/SellPrice erweitert (Holzschwert nur Verkaufspreis, Rest nach Kampfwert-Bonus gestaffelt); `data/npcs.json` (Platzhalter-Händler "Dorfhaendler") und `data/maps/village/npcs.json` (eine Platzierung 500 Wire-Einheiten südlich der Kartenmitte). (2) Shared: `EntityKind.Npc`, `EntitySpawnPacket.MobId` zu `TypeId` umbenannt (0b: reiner Wire-Rename, `Entity.MobId`/`ClientEntity.MobId` mitgezogen, `SpawnPoint.MobId`/`DebugSpawnMonsterRequestPacket.MobId` bleiben unverändert - monster-spezifisch); neue Pakete `OpenShopRequestPacket`/`BuyItemRequestPacket`/`SellItemRequestPacket`/`ShopContentPacket`/`ShopActionFailedPacket`/`DebugGiveYangRequestPacket`; `AttackFailedReason.TargetNotAttackable` (0a); `GameConstants.NpcInteractRangeWire`/`MaxYang`; Protocol.Version 9 -> 10. (3) `ItemCatalog` um BuyPrice/SellPrice erweitert; neue `NpcCatalog`/`NpcSpawnCatalog` (`Lumiis.Data.Npcs`, analog zu MobCatalog/SpawnCatalog) - jede ShopItemId muss in ItemCatalog existieren UND BuyPrice > 0 haben; `Entity.CreateNpc`/`World.SpawnNpc` (keine Bewegung, keine SpawnPointId/CharacterId, Kampfwerte auf Default-Konstanten, nie gelesen); `GameServer`-Konstruktor legt beim Start für jede Platzierung eine NPC-Entity an, `Program.cs` lädt npcs.json fail-fast - manuell verifiziert (Server startet fehlerfrei). (4) `World.CreditYang` (0c) ist jetzt die einzige Stelle, die Entity.Yang erhöht (Monster-Drops, Verkauf, Debug-Tools) - deckelt bei MaxYang, `TryAttack` nutzt sie für Monster-Kill-Yang (Kill bleibt gültig, auch wenn der Deckel greift); `TryAttack` lehnt Kind=Npc-Ziele mit TargetNotAttackable ab (VOR dem Gleiche-Kinds-Check, der Player-vs-Npc sonst nicht blockt); `TryOpenShop`/`TryBuy`/`TrySell` (World, kein Netzwerk) mit `CheckShopAccess` als gemeinsamer, bei jeder Aktion erneuter Vorprüfung (NPC existiert/ist Npc-Kind/hat Sortiment/Reichweite); bestehende Monster-KI-/Save-Schleifen brauchten keine Änderung (prüfen bereits explizit auf Kind=Monster/Player bzw. CharacterId.HasValue, siehe 0e). (5) Handler rufen die World-Methoden auf (Erfolg: ShopContent bzw. bestehende InventorySync/YangChanged, Fehlschlag: ShopActionFailed); neuer, dritter `CharacterSaveRequest`-Channel (0d) - Kauf/Verkauf speichern Yang UND Inventar/Ausrüstung in einem SaveChangesAsync-Aufruf (EF Core fasst das automatisch in einer Transaktion zusammen), bestehende Yang-only-/Inventory-only-Channels bleiben für ihre bisherigen Auslöser unverändert; DebugGiveYangRequest-Handler nutzt den bestehenden reinen Yang-Channel. (6) Client: NPCs nutzen dieselbe CharacterView wie Spieler (grüner statt weißer Name, "NPC" in der Debug-Liste, `CharacterView.ContainsWorldPoint` neu für den Rechtsklick-Bounds-Check über alle Ebenen-Renderer); Shop-Panel im bestehenden Debug-Test-Panel (Sortiment mit Kaufen-Knopf, eigene Slots mit Verkaufspreis aus `ItemCatalogClient` [kein Paket trägt Verkaufspreise], Yang-Stand, Schließen-Knopf, automatisches Schließen bei zu großer Distanz); "+1000 Yang"-Knopf. Batchmode-Compile-Check 0 Fehler. (7) `NpcCatalogTests`/`NpcSpawnCatalogTests`, `WorldShopTests` (TryOpenShop/TryBuy/TrySell/CreditYang vollständig), TryAttack-vs-Npc, aggressive Monster ignorieren NPCs, NPCs wandern/speichern nie; 3 LiteNetLib-Integrationstests (AOI-Sichtbarkeit/Kauf/Verkauf/Außer-Reichweite, Regressionstest: Yang UND Inventar bleiben nach Kauf+Disconnect+Rejoin exakt erhalten - deckt sowohl den neuen kombinierten Channel als auch den Include-Fund aus dem HP-Anzeige-Bugfix ab). (8) Diese Doku-Aktualisierung (neuer Abschnitt "Shop und NPCs", Dev-Tools/Meilensteine/Status, veraltete HP-Sync-Lücke entfernt und durch die neue Yang-bei-Join-Lücke ersetzt - M5 damit komplett fertig, M6 offen). 417 Tests grün, mehrfach stabil (ein vereinzelter, vorbestehender Timing-Flake bei einem unveränderten AOI-Test trat einmal auf, in Wiederholung grün), Batchmode-Compile-Check 0 Fehler.
+
+- M6a (Level, XP, Werte, SP, Ausweichen, Speichern von HP/SP, docs/tasks/M6a-progression.md) fertig, in 7
+  Commits (0 Review nur berichtet, kein Commit): (1) `data/classes.json` (Krieger) auf Formelkonstanten
+  umgestellt (BaseHp/BaseSp/BaseAttack/BaseDefense/BaseSt/BaseHt/BaseDx/BaseIq + Faktoren, so hergeleitet,
+  dass Level 1 exakt die bisherigen Werte ergibt), neue `data/progression.json` (XpToNext-Tabelle, 15-stufige
+  Levelunterschieds-Tabelle), `data/mobs.json` um Level/BaseXp erweitert. (2) Migration `AddCharacterProgression`
+  - Level (DB-Spalten-Default 1, nicht nur der C#-Default, sonst hätten bestehende Zeilen das ungültige
+    Level 0 bekommen), Xp, SpentSt/Ht/Dx/Iq, UnspentStatPoints/SkillPoints, CurrentHp/CurrentSp (beide
+    nullable, siehe Login-Regeln). (3) Shared: `StatKind`, `CharacterStatsPacket`, `AllocateStatPointRequestPacket`,
+    `EntityDodgedPacket`, `DebugSetLevelRequestPacket`, Protocol.Version 11. (4) `ClassCatalog`/`MobCatalog`
+    um die neuen Felder erweitert, neue `ProgressionCatalog` (`Lumiis.Data.Progression`, analog zu
+    MobCatalog); `Entity` hält eine `ClassDefinition`-Referenz statt ~20 Formelkonstanten zu duplizieren
+    (World kennt Lumiis.Data ohnehin), dazu Level/Xp/Spent*/Unspent*/MaxSp/CurrentSp/DodgeBp/LastCombatAtMs/
+    NextRegenAtMs/BaseXp; `World.RecomputeDerivedStats` ersetzt das bisherige M5a-`RecalculateCombatStats`
+    (mit ClassDef: volle Formel; ohne ClassDef bleibt nur der bestehende Ausrüstungs-Bonus-Pfad aktiv, damit
+    alle kampf-/fortschrittsfernen Bestandstests unverändert funktionieren); `TryJoin` bekommt
+    classDef/level/xp/spent*/unspent*/currentHp/currentSp als neue optionale Parameter (Defaults erhalten
+    alle bestehenden Aufrufer) und wendet die Login-Regeln an (null→voll, ≤0→wiederbelebt, über Max→
+    begrenzt); `TryAttack` würfelt nach Cooldown-Verbrauch/reaktiver Zielerfassung einen Ausweichwurf;
+    `AwardXp` (Schleife für mehrere Levelaufstiege pro Kill), `TryAllocateStatPoint`, `TryDebugSetLevel`,
+    `RunRegeneration` (Teil von `World.Tick`) neu. (5) `GameServer`: `CharacterStatsPacket` beim Join und nach
+    jedem der in der Aufgabe genannten Ereignisse (neuer `FindConnectionByEntityId`-Helfer für Respawn/
+    Regeneration, die außerhalb eines eingehenden Pakets ausgelöst werden); `BroadcastAttackResult` verschickt
+    bei Ausweichen `EntityDodgedPacket` statt `EntityDamagedPacket`; kombinierter `CharacterSaveRequest`-
+    Channel (M5b) um den vollen Fortschritts-Stand erweitert, mit zwei neuen Auslösern (periodisch wie
+    Position, Disconnect) zusätzlich zu sofort bei Levelaufstieg/Punkteverteilung; `Program.cs` lädt
+    progression.json fail-fast. (6) Client: `ClientWorld.CharacterStats`/`CharacterState` (eigene HP
+    weiterhin über die bestehende `ApplyHp`, kein zweiter Speicherort), Debug-Panel-Bereich "Charakter"
+    (Level/XP/HP/SP/Werte mit "+"-Knöpfen/Status-Fertigkeitspunkte/Angriff/Verteidigung/Ausweichen,
+    Level-Cycler + "Level setzen"), Overlay-Meldungen "Level Up!"/"Ausgewichen!"/"Verfehlt!". Batchmode-
+    Compile-Check 0 Fehler, `tools/test-client-playmode.sh` 4/4 grün. (7) Neue `ProgressionCatalogTests`
+    (inkl. Regressionstest gegen die echte data/progression.json), neue `WorldProgressionTests` (40 Tests:
+    Level-1-Regressionstest, Formel-Beispiele, Dodge-Deckel, alle Levelunterschieds-Stufen, Mindestens-1-Regel,
+    mehrere Levelaufstiege pro Kill, kein XP bei MaxLevel, Punkteverteilung inkl. HT/IQ-CurrentHp/Sp-Kopplung,
+    Ausweichen mit DodgeBp 10000/0, Regeneration mit Fake-Zeit, Login-Regeln), 6 neue LiteNetLib-
+    Integrationstests (Join-CharacterStats, Kill-XP-mit-Levelaufstieg, AllocateStatPoint inkl. Ablehnung,
+    Disconnect/Rejoin-Persistenz-Regression - dabei einen echten Timing-Race-Testfehler gefunden und durch
+    räumlichen Abstand zwischen Spieler und Monster behoben, statt den eigentlichen Code anzupassen -,
+    erzwungenes Ausweichen, DebugSetLevel nur mit Flag), ClientWorldTests für `ApplyCharacterStats`. (8)
+    Diese Doku-Aktualisierung (neuer Abschnitt "Fortschritt: Level, XP, Werte", Dev-Tools/Meilensteine/Status
+    - M6a damit fertig, M6b (Skills) offen). 504 Tests grün, mehrfach stabil, Batchmode-Compile-Check 0
+    Fehler. Migration noch nicht gegen ein echtes Postgres angewendet/end-to-end mit Auth+Server+Bot
+    verifiziert (siehe "Fertig, wenn" in der Aufgabenstellung) - offen für einen abschließenden manuellen Check.
 
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client
 War kein Codefehler. User hat den Test mit fokussiertem Unity-Fenster wiederholt (Server, Unity Play, dann Bots
