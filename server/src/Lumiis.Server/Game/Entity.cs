@@ -227,6 +227,26 @@ public sealed class Entity
     /// World.AwardXp, vor Anwendung des Levelunterschieds-Faktors. 0/ungenutzt bei Kind=Player/Npc.</summary>
     public int BaseXp { get; }
 
+    // ---- M6b: Skills (Lernstufen/Cooldowns/aktive Buffs, siehe CLAUDE.md Abschnitt "Skills") ----
+
+    /// <summary>Gelernte Skillstufen (SkillId -> Level 1-17) - kein Eintrag = nicht gelernt (Stufe 0), analog
+    /// zum Inventar-Array (0 = leer). Nur bei Kind=Player befüllt, aus der DB beim Join geladen (siehe
+    /// GameServer.CompleteJoin).</summary>
+    public Dictionary<int, int> SkillLevels { get; } = new();
+
+    /// <summary>Wandzeit (siehe GameServer._nowMs), ab wann der jeweilige Skill wieder einsetzbar ist
+    /// (SkillId -> readyAtMs) - vier UNABHÄNGIGE Cooldowns pro Charakter, getrennt vom normalen
+    /// Angriffs-Cooldown (AttackReadyAtMs). Kein Eintrag = noch nie benutzt (sofort bereit). Nur bei
+    /// Kind=Player relevant.</summary>
+    public Dictionary<int, long> SkillCooldownReadyAtMs { get; } = new();
+
+    /// <summary>Aktive Buffs (BuffType -> Wirkungsstärke aus der Skill-Stufe [AttackBonusPercent bzw.
+    /// CooldownReductionPercent] + Ablaufzeitpunkt in Wandzeit) - höchstens ein Eintrag pro BuffType, ein
+    /// erneuter Cast desselben Typs ersetzt den bisherigen (kein Stapeln, siehe World.TryUseSkill).
+    /// Überleben KEINEN Disconnect (kein eigener Aufräum-Code nötig - die ganze Entity verschwindet mit dem
+    /// Disconnect aus World, siehe World.Remove). Nur bei Kind=Player relevant.</summary>
+    public Dictionary<BuffType, (int Strength, long ExpiresAtMs)> ActiveBuffs { get; } = new();
+
     private Entity(int id, EntityKind kind, int? characterId, int typeId, int? spawnPointId, int respawnSeconds, string name, int x, int y, int movementSpeed,
         int wanderRadiusWire, int wanderIntervalMinMs, int wanderIntervalMaxMs,
         int maxHp, int attack, int defense, int meleeRangeWire, int attackCooldownMs, int yangMin, int yangMax,

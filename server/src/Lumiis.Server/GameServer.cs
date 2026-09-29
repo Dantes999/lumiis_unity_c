@@ -322,7 +322,8 @@ public sealed class GameServer : INetEventListener
 
         double deltaSeconds = 1.0 / Protocol.TickRate;
         (List<Entity> arrived, List<Entity> startedWandering, List<Entity> respawned, List<Entity> respawnedMonsters,
-            List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> monsterAttacks, List<Entity> regeneratedPlayers) = _world.Tick(deltaSeconds, _nowMs());
+            List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> monsterAttacks, List<Entity> regeneratedPlayers,
+            List<Entity> buffsExpired) = _world.Tick(deltaSeconds, _nowMs());
         foreach (Entity entity in arrived)
             SendToVisible(entity.Id, new EntityStopPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY });
 

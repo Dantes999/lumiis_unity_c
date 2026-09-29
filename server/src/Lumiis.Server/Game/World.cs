@@ -4,6 +4,7 @@ using Lumiis.Data.Classes;
 using Lumiis.Data.Items;
 using Lumiis.Data.Maps;
 using Lumiis.Data.Progression;
+using Lumiis.Data.Skills;
 using Lumiis.Shared;
 using Lumiis.Shared.Net;
 
@@ -32,6 +33,7 @@ public sealed class World
     private readonly CollisionMap? _collisionMap;
     private readonly ItemCatalog? _itemCatalog;
     private readonly ProgressionCatalog? _progressionCatalog;
+    private readonly SkillCatalog? _skillCatalog;
     private readonly Random _random;
     private int _nextEntityId = 1;
 
@@ -49,14 +51,18 @@ public sealed class World
     /// TryAttack), Default eine echte, nicht-deterministische Instanz - Tests übergeben eine geseedete
     /// Instanz für deterministisches Verhalten. progressionCatalog: null bedeutet "kein XP-Gewinn" (z. B.
     /// bestehende Tests ohne Fortschrittsbezug - World.AwardXp wird dann zum No-op, siehe dort) - Program.cs
-    /// lädt beim echten Serverstart immer eine Instanz aus data/progression.json (M6a).</summary>
+    /// lädt beim echten Serverstart immer eine Instanz aus data/progression.json (M6a). skillCatalog: null
+    /// bedeutet "keine Skills nutzbar" (z. B. bestehende Tests ohne Skillbezug - World.TryUseSkill lehnt dann
+    /// jeden Versuch mit NotLearned ab, siehe dort) - Program.cs lädt beim echten Serverstart immer eine
+    /// Instanz aus data/skills.json (M6b).</summary>
     public World(int maxPlayers, CollisionMap? collisionMap = null, Random? random = null, ItemCatalog? itemCatalog = null,
-        ProgressionCatalog? progressionCatalog = null)
+        ProgressionCatalog? progressionCatalog = null, SkillCatalog? skillCatalog = null)
     {
         MaxPlayers = maxPlayers;
         _collisionMap = collisionMap;
         _itemCatalog = itemCatalog;
         _progressionCatalog = progressionCatalog;
+        _skillCatalog = skillCatalog;
         _random = random ?? new Random();
     }
 
@@ -310,7 +316,10 @@ public sealed class World
     /// eigener KI-Code nie aus, aber konzeptionell konsistent; ersetzt den ursprünglichen "Ziel ist kein
     /// Spieler"-Check aus M4a, der implizit "Angreifer ist immer ein Spieler" annahm), Cooldown des
     /// Angreifers, Reichweite (quadrierte Distanz wie ComputeVisibility, gegen MeleeRangeWire des Angreifers -
-    /// bei Spielern aus ClassCatalog, bei Monstern seit M4c aus MobCatalog statt hartkodiert 0).
+    /// bei Spielern aus ClassCatalog, bei Monstern seit M4c aus MobCatalog statt hartkodiert 0). Setzt danach
+    /// den (ggf. per Hast verkürzten, M6b siehe EffectiveAttackCooldownMs) Cooldown und delegiert die
+    /// eigentliche Treffer-Auflösung an ResolveHit (M6b-Extraktion, siehe docs/tasks/M6b-skills.md
+    /// Abschnitt 0a - Multiplikator 100 = normaler Angriff, unverändertes Verhalten).
     /// attackerEntityId muss bereits als existierende Entity geprüft sein (bei Spieler-initiierten Angriffen
     /// die per Verbindung gehaltene eigene Entity, siehe GameServer.HandleAttackRequest) - der defensive
     /// TargetNotFound-Fallback hier sollte nie greifen.</summary>
@@ -343,8 +352,32 @@ public sealed class World
         if (dx * dx + dy * dy > rangeSq)
             return AttackResult.Fail(AttackFailedReason.OutOfRange);
 
-        attacker.AttackReadyAtMs = nowMs + attacker.AttackCooldownMs;
+        attacker.AttackReadyAtMs = nowMs + EffectiveAttackCooldownMs(attacker);
 
+        return ResolveHit(attacker, target, damageMultiplierPercent: 100, nowMs);
+    }
+
+    /// <summary>M6b: normaler Angriffs-Cooldown, ggf. durch einen aktiven Hast-Buff verkürzt (siehe
+    /// docs/tasks/M6b-skills.md Abschnitt 0d) - effektiver Cooldown = Basis * (100 - CooldownReductionPercent)
+    /// / 100, sonst unverändert. Betrifft NUR den normalen Angriffs-Cooldown (AttackReadyAtMs), nicht die
+    /// skill-eigenen Cooldowns (siehe TryUseSkill - die haben keinen Hast-Bezug).</summary>
+    private static int EffectiveAttackCooldownMs(Entity attacker)
+    {
+        if (attacker.ActiveBuffs.TryGetValue(BuffType.AttackSpeedBuff, out (int Strength, long ExpiresAtMs) hast))
+            return attacker.AttackCooldownMs * (100 - hast.Strength) / 100;
+        return attacker.AttackCooldownMs;
+    }
+
+    /// <summary>M6b-Extraktion aus TryAttack (siehe docs/tasks/M6b-skills.md Abschnitt 0a) - reine
+    /// Treffer-Auflösung OHNE die Existenz-/Kind-/Cooldown-/Reichweiten-Vorprüfungen und OHNE
+    /// Cooldown-Verbrauch (beides bleibt Sache des jeweiligen Aufrufers: TryAttack für normale Angriffe,
+    /// TryUseSkill für Wuchtschlag/Kreisschlag, siehe dort). Reaktive Zielerfassung (M4c), Ausweichwurf (M6a),
+    /// Schaden (skaliert mit damageMultiplierPercent - bei 100 mathematisch identisch zum bisherigen
+    /// Math.Max(1, attacker.Attack - target.Defense), damit bleiben alle bestehenden TryAttack-Tests
+    /// unverändert gültig), Tod-Behandlung inkl. XP/Yang/Drops (M6a/M5a) - alles unverändert wie vorher in
+    /// TryAttack, nur ausgelagert.</summary>
+    private AttackResult ResolveHit(Entity attacker, Entity target, int damageMultiplierPercent, long nowMs)
+    {
         // Reaktive Zielerfassung (M4c): ein getroffenes Monster ohne eigenes Ziel merkt sich den Angreifer -
         // gilt für aggressive UND passive Mobs gleichermaßen (ein Wildhund, der von hinten angegriffen wird,
         // dreht sich natürlich auch um). target.Kind == Monster schließt die umgekehrte Richtung (Spieler
@@ -352,13 +385,12 @@ public sealed class World
         // dem Ausweichwurf (M6a) - ein ausgewichener Treffer ist immer noch ein Angriff, der den Verteidiger
         // aufmerksam macht (siehe docs/tasks/M6a-progression.md Abschnitt 0e).
         if (target.Kind == EntityKind.Monster && target.TargetEntityId == null)
-            target.TargetEntityId = attackerEntityId;
+            target.TargetEntityId = attacker.Id;
 
-        // M6a: Ausweichwurf NACH Cooldown-Verbrauch und reaktiver Zielerfassung (beide bleiben unverändert,
-        // siehe Kommentare oben) - Monster haben DodgeBp 0 (nie neu berechnet, siehe RecomputeDerivedStats),
-        // weichen also nie aus. Bei Ausweichen: kein Schaden, kein Yang/XP/Drop, nur das Ziel merkt sich das
-        // Kampfereignis (der Angreifer hat ja tatsächlich getroffen... nein, verfehlt - siehe LastCombatAtMs-
-        // Kommentar auf Entity: "austeilt" zählt nur bei einem tatsächlichen Treffer).
+        // M6a: Ausweichwurf NACH reaktiver Zielerfassung (bleibt unverändert, siehe Kommentar oben) - Monster
+        // haben DodgeBp 0 (nie neu berechnet, siehe RecomputeDerivedStats), weichen also nie aus. Bei
+        // Ausweichen: kein Schaden, kein Yang/XP/Drop, nur das Ziel merkt sich das Kampfereignis (der
+        // Angreifer selbst zählt das nicht als "ausgeteilt" - siehe LastCombatAtMs-Kommentar auf Entity).
         if (target.DodgeBp > 0 && _random.Next(10000) < target.DodgeBp)
         {
             target.LastCombatAtMs = nowMs;
@@ -368,7 +400,12 @@ public sealed class World
         int targetMaxHp = target.MaxHp;
         int targetLevel = target.Level;
         int targetBaseXp = target.BaseXp;
-        int damage = Math.Max(1, attacker.Attack - target.Defense);
+        // M6b: Multiplikator wirkt auf die rohe Differenz VOR dem Mindestschaden-Floor (nicht danach) - bei
+        // 100 % ist Math.Round(rawDamage * 100 / 100.0) == rawDamage, das Ergebnis bleibt exakt
+        // Math.Max(1, rawDamage) wie vor der Extraktion.
+        int rawDamage = attacker.Attack - target.Defense;
+        int scaledDamage = (int)Math.Round(rawDamage * damageMultiplierPercent / 100.0);
+        int damage = Math.Max(1, scaledDamage);
         IReadOnlyList<(int ItemId, int ChancePercent)> targetDrops = target.Drops;
         (int targetHpAfter, bool died, long yangAwarded) = ApplyDamage(target, damage, nowMs);
 
@@ -405,7 +442,7 @@ public sealed class World
                 if (_random.Next(100) >= chancePercent)
                     continue;
 
-                if (TryAddItemToInventory(attackerEntityId, itemId))
+                if (TryAddItemToInventory(attacker.Id, itemId))
                 {
                     droppedItemIds ??= new List<int>();
                     droppedItemIds.Add(itemId);
@@ -600,6 +637,137 @@ public sealed class World
         return true;
     }
 
+    // ---- M6b: Skills (kein Netzwerkbezug, siehe GameServer für die Paket-Seite und CLAUDE.md Abschnitt
+    // "Skills") ----
+
+    /// <summary>Löst einen Skill-Einsatz auf (M6b, siehe UseSkillRequestPacket/docs/tasks/M6b-skills.md
+    /// Abschnitt 4). Gemeinsame Vorprüfungen für alle Skill-Typen: Skill existiert (SkillCatalog), Charakter
+    /// hat ihn gelernt (Level &gt; 0), genug SP, Skill-eigener Cooldown bereit (vier UNABHÄNGIGE Cooldowns
+    /// pro Charakter, siehe Entity.SkillCooldownReadyAtMs - getrennt vom normalen Angriffs-Cooldown). Danach
+    /// je Typ: SingleStrike braucht ein gültiges Ziel in MeleeRangeWire (wie ein normaler Angriff) und ruft
+    /// ResolveHit einmal auf; AreaAttack braucht kein Ziel, findet alle gültigen Ziele (anderes Kind als der
+    /// Nutzer, kein NPC, lebendig) innerhalb RadiusWire und ruft ResolveHit für jedes einzeln auf (jedes Ziel
+    /// weicht unabhängig aus); AttackBuff/AttackSpeedBuff brauchen kein Ziel und setzen nur den passenden
+    /// Buff-Zustand (kein Stapeln - ein erneuter Cast ersetzt den bisherigen Eintrag). Bei jedem Erfolg: SP
+    /// abziehen, Skill-Cooldown setzen (siehe ConsumeSkillUse) - auch bei einem ausgewichenen Wuchtschlag,
+    /// analog zum normalen Angriffs-Cooldown, der ebenfalls unabhängig vom Ausweichen verbraucht wird.</summary>
+    public SkillUseResult TryUseSkill(int userEntityId, int skillId, int targetEntityId, long nowMs)
+    {
+        if (!_entities.TryGetValue(userEntityId, out Entity? user))
+            return SkillUseResult.Fail(UseSkillFailedReason.NotLearned); // sollte nicht vorkommen, siehe GameServer.HandleUseSkillRequest.
+
+        if (_skillCatalog == null || !_skillCatalog.TryGet(skillId, out SkillDefinition skillDef))
+            return SkillUseResult.Fail(UseSkillFailedReason.NotLearned);
+
+        if (!user.SkillLevels.TryGetValue(skillId, out int level) || level <= 0)
+            return SkillUseResult.Fail(UseSkillFailedReason.NotLearned);
+
+        SkillLevelDefinition levelData = skillDef.LevelData(level);
+
+        if (user.CurrentSp < levelData.SpCost)
+            return SkillUseResult.Fail(UseSkillFailedReason.NotEnoughSp);
+
+        if (user.SkillCooldownReadyAtMs.TryGetValue(skillId, out long readyAtMs) && nowMs < readyAtMs)
+            return SkillUseResult.Fail(UseSkillFailedReason.OnCooldown);
+
+        return skillDef.Type switch
+        {
+            SkillType.SingleStrike => TryUseSingleStrike(user, skillDef, levelData, targetEntityId, nowMs),
+            SkillType.AreaAttack => TryUseAreaAttack(user, skillDef, levelData, nowMs),
+            _ => TryUseBuffSkill(user, skillDef, levelData, nowMs)
+        };
+    }
+
+    private SkillUseResult TryUseSingleStrike(Entity user, SkillDefinition skillDef, SkillLevelDefinition levelData, int targetEntityId, long nowMs)
+    {
+        if (targetEntityId == 0)
+            return SkillUseResult.Fail(UseSkillFailedReason.TargetRequired);
+
+        if (!_entities.TryGetValue(targetEntityId, out Entity? target))
+            return SkillUseResult.Fail(UseSkillFailedReason.TargetNotFound);
+
+        if (target.IsDead)
+            return SkillUseResult.Fail(UseSkillFailedReason.TargetAlreadyDead);
+
+        if (target.Kind == EntityKind.Npc)
+            return SkillUseResult.Fail(UseSkillFailedReason.TargetNotAttackable);
+
+        if (user.Kind == target.Kind)
+            return SkillUseResult.Fail(UseSkillFailedReason.TargetIsPlayer);
+
+        long dx = user.IntX - target.IntX;
+        long dy = user.IntY - target.IntY;
+        long rangeSq = (long)user.MeleeRangeWire * user.MeleeRangeWire;
+        if (dx * dx + dy * dy > rangeSq)
+            return SkillUseResult.Fail(UseSkillFailedReason.OutOfRange);
+
+        ConsumeSkillUse(user, skillDef.Id, levelData, nowMs);
+
+        AttackResult result = ResolveHit(user, target, levelData.EffectValue, nowMs);
+        return SkillUseResult.HitSuccess(skillDef.Type, new List<(int TargetEntityId, AttackResult Result)> { (targetEntityId, result) });
+    }
+
+    private SkillUseResult TryUseAreaAttack(Entity user, SkillDefinition skillDef, SkillLevelDefinition levelData, long nowMs)
+    {
+        ConsumeSkillUse(user, skillDef.Id, levelData, nowMs);
+
+        var hits = new List<(int TargetEntityId, AttackResult Result)>();
+        long radiusSq = (long)skillDef.RadiusWire * skillDef.RadiusWire;
+        // Kopie, da ResolveHit ein sterbendes Monster aus _entities entfernt (siehe ApplyDamage) - direktes
+        // Iterieren über _entities.Values würde dabei die Sammlung während der Iteration verändern.
+        foreach (Entity candidate in new List<Entity>(_entities.Values))
+        {
+            if (candidate.Id == user.Id || candidate.Kind == user.Kind || candidate.Kind == EntityKind.Npc || candidate.IsDead)
+                continue;
+
+            long dx = user.IntX - candidate.IntX;
+            long dy = user.IntY - candidate.IntY;
+            if (dx * dx + dy * dy > radiusSq) continue;
+
+            AttackResult result = ResolveHit(user, candidate, levelData.EffectValue, nowMs);
+            hits.Add((candidate.Id, result));
+        }
+
+        return SkillUseResult.HitSuccess(skillDef.Type, hits);
+    }
+
+    private SkillUseResult TryUseBuffSkill(Entity user, SkillDefinition skillDef, SkillLevelDefinition levelData, long nowMs)
+    {
+        ConsumeSkillUse(user, skillDef.Id, levelData, nowMs);
+
+        BuffType buffType = skillDef.Type == SkillType.AttackBuff ? BuffType.AttackBuff : BuffType.AttackSpeedBuff;
+        // Kein Stapeln - ein erneuter Cast ersetzt den bisherigen Eintrag desselben Typs komplett (neue
+        // Wirkungsstärke, neue volle Dauer).
+        user.ActiveBuffs[buffType] = (levelData.EffectValue, nowMs + skillDef.DurationMs);
+        RecomputeDerivedStats(user); // siehe docs/tasks/M6b-skills.md Abschnitt 4: bei Buff-Start UND -Ende.
+
+        return SkillUseResult.BuffSuccess(skillDef.Type, buffType);
+    }
+
+    private static void ConsumeSkillUse(Entity user, int skillId, SkillLevelDefinition levelData, long nowMs)
+    {
+        user.CurrentSp -= levelData.SpCost;
+        user.SkillCooldownReadyAtMs[skillId] = nowMs + levelData.CooldownMs;
+    }
+
+    /// <summary>Verteilt einen Fertigkeitspunkt (M6b, siehe AllocateSkillPointRequestPacket/GameServer.
+    /// HandleAllocateSkillPointRequest) - braucht UnspentSkillPoints &gt; 0 UND aktuelle Stufe &lt; 17, sonst
+    /// false (keine Wirkung, GameServer antwortet trotzdem mit dem aktuellen, unveränderten
+    /// CharacterStatsPacket, kein eigenes Fehlerpaket - analog zu TryAllocateStatPoint aus M6a).</summary>
+    public bool TryAllocateSkillPoint(int entityId, int skillId)
+    {
+        if (!_entities.TryGetValue(entityId, out Entity? entity)) return false;
+        if (entity.UnspentSkillPoints <= 0) return false;
+        if (_skillCatalog == null || !_skillCatalog.TryGet(skillId, out _)) return false;
+
+        int currentLevel = entity.SkillLevels.TryGetValue(skillId, out int level) ? level : 0;
+        if (currentLevel >= SkillCatalog.MaxSkillLevel) return false;
+
+        entity.SkillLevels[skillId] = currentLevel + 1;
+        entity.UnspentSkillPoints--;
+        return true;
+    }
+
     // ---- M5a: Items, Inventar, Ausrüstung (kein Netzwerkbezug, siehe GameServer für die Paket-Seite) ----
 
     /// <summary>Legt das Item aus inventorySlotIndex an: prüft Slot belegt und dass der ItemType zu einem
@@ -760,7 +928,16 @@ public sealed class World
             }
         }
 
-        entity.Attack = entity.BaseAttack + attackBonus;
+        int attackAfterEquipment = entity.BaseAttack + attackBonus;
+
+        // M6b: Kampfrausch NACH der bisherigen Attack-Berechnung (auf den bereits ausrüstungsverstärkten
+        // Wert, siehe docs/tasks/M6b-skills.md Abschnitt 0c) - ändert nichts an den Formelzeilen davor, die
+        // Level-1-Krieger-Regressionstests (ohne aktiven Buff) bleiben unberührt. Gerundet (nicht
+        // abgeschnitten), siehe Abschnitt 4.
+        if (entity.ActiveBuffs.TryGetValue(BuffType.AttackBuff, out (int Strength, long ExpiresAtMs) rage))
+            attackAfterEquipment += (int)Math.Round(attackAfterEquipment * rage.Strength / 100.0);
+
+        entity.Attack = attackAfterEquipment;
         entity.Defense = entity.BaseDefense + defenseBonus;
     }
 
@@ -937,7 +1114,8 @@ public sealed class World
     /// (M6a: Spieler, deren HP/SP sich in diesem Tick durch natürliche Regeneration tatsächlich geändert
     /// haben, siehe RunRegeneration - GameServer verschickt dafür ein neues CharacterStatsPacket).</summary>
     public (List<Entity> Arrived, List<Entity> StartedWandering, List<Entity> Respawned, List<Entity> RespawnedMonsters,
-        List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> MonsterAttacks, List<Entity> RegeneratedPlayers) Tick(double deltaSeconds, long nowMs)
+        List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> MonsterAttacks, List<Entity> RegeneratedPlayers,
+        List<Entity> BuffsExpired) Tick(double deltaSeconds, long nowMs)
     {
         List<Entity> arrived = new();
         foreach (Entity entity in _entities.Values)
@@ -999,7 +1177,34 @@ public sealed class World
                 regeneratedPlayers.Add(entity);
         }
 
-        return (arrived, startedWandering, respawned, respawnedMonsters, monsterAttacks, regeneratedPlayers);
+        // M6b: abgelaufene Buffs entfernen (Skill-Start meldet sich selbst über den TryUseSkill-Rückgabewert,
+        // Ablauf braucht dafür diese Tick-getriebene Liste, analog zu RegeneratedPlayers). Buffs überleben
+        // keinen Disconnect (siehe Entity.ActiveBuffs-Kommentar) - hier geht es nur um natürliches Ablaufen
+        // bei weiterhin verbundenen Spielern.
+        List<Entity> buffsExpired = new();
+        foreach (Entity entity in _entities.Values)
+        {
+            if (entity.ActiveBuffs.Count == 0) continue;
+
+            List<BuffType>? expired = null;
+            foreach (KeyValuePair<BuffType, (int Strength, long ExpiresAtMs)> kvp in entity.ActiveBuffs)
+            {
+                if (nowMs >= kvp.Value.ExpiresAtMs)
+                {
+                    expired ??= new List<BuffType>();
+                    expired.Add(kvp.Key);
+                }
+            }
+            if (expired == null) continue;
+
+            foreach (BuffType buffType in expired)
+                entity.ActiveBuffs.Remove(buffType);
+
+            RecomputeDerivedStats(entity);
+            buffsExpired.Add(entity);
+        }
+
+        return (arrived, startedWandering, respawned, respawnedMonsters, monsterAttacks, regeneratedPlayers, buffsExpired);
     }
 
     /// <summary>Monster-KI für ein einzelnes Monster (M3c Wander, M4c Zielerfassung/Verfolgung/Leine/Angriff).

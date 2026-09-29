@@ -314,7 +314,7 @@ namespace Lumiis.Tests.Game
             player.CurrentHp = player.MaxHp - 20;
             player.LastCombatAtMs = 1000;
 
-            (_, _, _, _, _, System.Collections.Generic.List<Entity> regenerated) = world.Tick(0.0, nowMs: 1000 + 4999); // < RegenDelayMs 5000
+            (_, _, _, _, _, System.Collections.Generic.List<Entity> regenerated, _) = world.Tick(0.0, nowMs: 1000 + 4999); // < RegenDelayMs 5000
 
             Assert.Empty(regenerated);
             Assert.Equal(player.MaxHp - 20, player.CurrentHp);
@@ -329,14 +329,14 @@ namespace Lumiis.Tests.Game
             player.CurrentHp = startHp;
             player.LastCombatAtMs = 0;
 
-            (_, _, _, _, _, System.Collections.Generic.List<Entity> regenerated) = world.Tick(0.0, nowMs: 5000); // >= RegenDelayMs
+            (_, _, _, _, _, System.Collections.Generic.List<Entity> regenerated, _) = world.Tick(0.0, nowMs: 5000); // >= RegenDelayMs
 
             Assert.Contains(player, regenerated);
             Assert.True(player.CurrentHp > startHp);
             Assert.True(player.CurrentHp <= player.MaxHp);
 
             int hpAfterFirst = player.CurrentHp;
-            (_, _, _, _, _, System.Collections.Generic.List<Entity> regenerated2) = world.Tick(0.0, nowMs: 5500); // < RegenIntervalMs seit letztem Regen.
+            (_, _, _, _, _, System.Collections.Generic.List<Entity> regenerated2, _) = world.Tick(0.0, nowMs: 5500); // < RegenIntervalMs seit letztem Regen.
 
             Assert.DoesNotContain(player, regenerated2);
             Assert.Equal(hpAfterFirst, player.CurrentHp);
@@ -349,7 +349,7 @@ namespace Lumiis.Tests.Game
             Entity player = JoinWithClass(world, 1, KriegerClassDef());
             player.LastCombatAtMs = 0;
 
-            (_, _, _, _, _, System.Collections.Generic.List<Entity> regenerated) = world.Tick(0.0, nowMs: 5000);
+            (_, _, _, _, _, System.Collections.Generic.List<Entity> regenerated, _) = world.Tick(0.0, nowMs: 5000);
 
             Assert.DoesNotContain(player, regenerated);
             Assert.Equal(player.MaxHp, player.CurrentHp);
@@ -363,7 +363,7 @@ namespace Lumiis.Tests.Game
             player.CurrentHp = 0;
             player.LastCombatAtMs = 0;
 
-            (_, _, _, _, _, System.Collections.Generic.List<Entity> regenerated) = world.Tick(0.0, nowMs: 5000);
+            (_, _, _, _, _, System.Collections.Generic.List<Entity> regenerated, _) = world.Tick(0.0, nowMs: 5000);
 
             Assert.DoesNotContain(player, regenerated);
             Assert.Equal(0, player.CurrentHp);
