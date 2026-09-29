@@ -73,6 +73,12 @@ namespace Lumiis.Data.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("CurrentHp")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("CurrentSp")
+                        .HasColumnType("integer");
+
                     b.Property<int?>("EquippedArmorItemId")
                         .HasColumnType("integer");
 
@@ -91,6 +97,11 @@ namespace Lumiis.Data.Migrations
                     b.Property<int>("HairStyleId")
                         .HasColumnType("integer");
 
+                    b.Property<int>("Level")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -105,6 +116,27 @@ namespace Lumiis.Data.Migrations
 
                     b.Property<int?>("PositionY")
                         .HasColumnType("integer");
+
+                    b.Property<int>("SpentDx")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SpentHt")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SpentIq")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SpentSt")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UnspentSkillPoints")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UnspentStatPoints")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("Xp")
+                        .HasColumnType("bigint");
 
                     b.Property<long>("Yang")
                         .HasColumnType("bigint");

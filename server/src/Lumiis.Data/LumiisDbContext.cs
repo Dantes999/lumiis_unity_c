@@ -34,6 +34,11 @@ public sealed class LumiisDbContext : DbContext
                 .WithMany(a => a.Characters)
                 .HasForeignKey(c => c.AccountId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            // M6a: DB-Spalten-Default 1 (nicht nur der C#-Objekt-Default auf Character.Level) - sonst würde
+            // die Migration bestehende Zeilen (und jede Zeile, die EF ohne explizit gesetztes Level einfügt)
+            // auf 0 setzen, ein ungültiges Level (siehe ProgressionCatalog.MaxLevel-Bereich 1..25).
+            entity.Property(c => c.Level).HasDefaultValue(1);
         });
 
         modelBuilder.Entity<CharacterInventoryItem>(entity =>
