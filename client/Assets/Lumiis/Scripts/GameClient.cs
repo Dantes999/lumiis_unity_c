@@ -74,6 +74,16 @@ namespace Lumiis.Client
         private readonly List<(int ItemId, long BuyPrice)> _shopItems = new List<(int, long)>();
         private string _lastShopActionFailedMessage = "";
 
+        // ---- Fortschritt (M6a, Debug-Panel-Stil - siehe DrawCharacterPanel) ----
+        // Level/XP/Werte/SP/Ausweichen leben in ClientWorld.CharacterStats (siehe dort) - hier nur die
+        // beiden kurzlebigen Overlay-Meldungen (Level Up/Ausgewichen/Verfehlt) und der lokale Level-Cycler
+        // fürs Dev-Tools-Debug-Panel.
+        private string _lastLevelUpMessage = "";
+        private string _lastDodgeMessage = "";
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        private int _debugSetLevelValue = 1;
+#endif
+
         private const float MinZoom = 3f;
         private const float MaxZoom = 300f;
         private const float ZoomStep = 1f;
@@ -349,12 +359,70 @@ namespace Lumiis.Client
             GUILayout.Space(6);
             if (GUILayout.Button("+1000 Yang"))
                 _netClient.SendDebugGiveYang(1000);
+            DrawCharacterPanel();
             DrawEquipmentPanel();
             DrawInventoryPanel();
             DrawShopPanel();
 
             GUILayout.EndScrollView();
             GUILayout.EndArea();
+        }
+
+        /// <summary>M6a: Level/XP/Werte/SP/Ausweichen aus ClientWorld.CharacterStats (siehe dort) - eigenes
+        /// Leben kommt bewusst aus ClientEntity (derselbe einzige Speicherort wie überall sonst, siehe
+        /// ClientWorld.ApplyHp), nicht aus CharacterStats (das Paket trägt es nur redundant mit). "+"-Knöpfe
+        /// neben ST/HT/DX/IQ nur aktiv, wenn UnspentStatPoints &gt; 0 - der Server prüft das ohnehin erneut
+        /// (siehe World.TryAllocateStatPoint). Dazu ein Level-Cycler + "Level setzen"-Knopf (Dev-Tools, nur
+        /// wirksam mit --allow-debug-commands am Server - der Client weiß nicht, ob die Option aktiv ist,
+        /// siehe DrawDebugSpawnRow-Kommentar).</summary>
+        private void DrawCharacterPanel()
+        {
+            GUILayout.Space(6);
+            GUILayout.Label("Charakter");
+
+            CharacterState stats = _world.CharacterStats;
+            if (stats.Level <= 0)
+            {
+                GUILayout.Label("(noch kein Stand)");
+            }
+            else
+            {
+                string xpText = stats.XpToNext > 0 ? stats.Xp + "/" + (stats.Xp + stats.XpToNext) : "MAX";
+                GUILayout.Label("Level " + stats.Level + " - XP " + xpText);
+
+                string ownHp = "-";
+                if (_world.LocalEntityId >= 0 && _world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity local) && local.CurrentHp >= 0)
+                    ownHp = local.CurrentHp + "/" + local.MaxHp;
+                GUILayout.Label("HP " + ownHp + "   SP " + stats.CurrentSp + "/" + stats.MaxSp);
+
+                DrawStatRow("ST", StatKind.St, stats.St, stats.UnspentStatPoints);
+                DrawStatRow("HT", StatKind.Ht, stats.Ht, stats.UnspentStatPoints);
+                DrawStatRow("DX", StatKind.Dx, stats.Dx, stats.UnspentStatPoints);
+                DrawStatRow("IQ", StatKind.Iq, stats.Iq, stats.UnspentStatPoints);
+
+                GUILayout.Label("Statuspunkte: " + stats.UnspentStatPoints + "   Fertigkeitspunkte: " + stats.UnspentSkillPoints);
+                GUILayout.Label("Angriff: " + stats.Attack + "   Verteidigung: " + stats.Defense
+                    + "   Ausweichen: " + (stats.DodgeBp / 100.0).ToString("0.0") + "%");
+            }
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("<", GUILayout.Width(24)) && _debugSetLevelValue > 1) _debugSetLevelValue--;
+            GUILayout.Label("Level " + _debugSetLevelValue, GUILayout.Width(70));
+            if (GUILayout.Button(">", GUILayout.Width(24))) _debugSetLevelValue++;
+            GUILayout.EndHorizontal();
+            if (GUILayout.Button("Level setzen (Dev-Tools)"))
+                _netClient.SendDebugSetLevel(_debugSetLevelValue);
+        }
+
+        private void DrawStatRow(string label, StatKind stat, int value, int unspentStatPoints)
+        {
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(label + ": " + value, GUILayout.Width(150));
+            GUI.enabled = unspentStatPoints > 0;
+            if (GUILayout.Button("+", GUILayout.Width(24)))
+                _netClient.SendAllocateStatPoint(stat);
+            GUI.enabled = true;
+            GUILayout.EndHorizontal();
         }
 
         /// <summary>M5a: die vier Ausrüstungs-Slots mit aktuellem Item-Namen (oder "leer") plus
@@ -620,6 +688,8 @@ namespace Lumiis.Client
             _shopOpenNpcEntityId = -1;
             _shopItems.Clear();
             _lastShopActionFailedMessage = "";
+            _lastLevelUpMessage = "";
+            _lastDodgeMessage = "";
         }
 
         private void OnPacketReceived(IPacket packet)
@@ -755,6 +825,27 @@ namespace Lumiis.Client
             if (shopFailed != null)
             {
                 _lastShopActionFailedMessage = ShopActionFailedReasonText(shopFailed.Reason);
+                return;
+            }
+
+            CharacterStatsPacket characterStats = packet as CharacterStatsPacket;
+            if (characterStats != null)
+            {
+                // "Level Up!" nur bei einer tatsächlichen Steigerung erkannt (aufsteigender Level) - der
+                // Sentinel-Wert 0 (ClientWorld.Reset, "noch kein Paket erhalten") verhindert eine
+                // Fehlmeldung beim allerersten CharacterStatsPacket nach dem Join.
+                int previousLevel = _world.CharacterStats.Level;
+                _world.ApplyCharacterStats(characterStats);
+                if (previousLevel > 0 && characterStats.Level > previousLevel)
+                    _lastLevelUpMessage = "Level Up! Level " + characterStats.Level;
+                return;
+            }
+
+            EntityDodgedPacket dodged = packet as EntityDodgedPacket;
+            if (dodged != null)
+            {
+                if (dodged.TargetEntityId == _world.LocalEntityId) _lastDodgeMessage = "Ausgewichen!";
+                else if (dodged.AttackerEntityId == _world.LocalEntityId) _lastDodgeMessage = "Verfehlt!";
             }
         }
 
@@ -978,11 +1069,14 @@ namespace Lumiis.Client
             if (_targetEntityId >= 0 && _world.Entities.TryGetValue(_targetEntityId, out ClientEntity target))
                 targetText = target.Name + " (" + (target.CurrentHp >= 0 ? target.CurrentHp + "/" + target.MaxHp : "-") + ")";
 
-            string text = "Leben: " + ownHp + " | Ziel: " + targetText + " | Yang: " + _yangTotal;
+            string text = "Leben: " + ownHp + " | Ziel: " + targetText + " | Yang: " + _yangTotal
+                + " | Level: " + (_world.CharacterStats.Level > 0 ? _world.CharacterStats.Level.ToString() : "-");
             if (_isDead) text += " | Du bist gestorben, Respawn in Kürze...";
             else if (!string.IsNullOrEmpty(_lastAttackFailedMessage)) text += " | " + _lastAttackFailedMessage;
             if (!string.IsNullOrEmpty(_lastInventoryActionFailedMessage)) text += " | " + _lastInventoryActionFailedMessage;
             if (!string.IsNullOrEmpty(_lastShopActionFailedMessage)) text += " | " + _lastShopActionFailedMessage;
+            if (!string.IsNullOrEmpty(_lastLevelUpMessage)) text += " | " + _lastLevelUpMessage;
+            if (!string.IsNullOrEmpty(_lastDodgeMessage)) text += " | " + _lastDodgeMessage;
 
             GUI.Label(new Rect(10, 32, 700, 20), text);
         }

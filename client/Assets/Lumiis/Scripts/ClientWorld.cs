@@ -41,6 +41,27 @@ namespace Lumiis.Client
         }
     }
 
+    /// <summary>M6a: der vollständige eigene Fortschritts-/Kampfwert-Stand (siehe CharacterStatsPacket) -
+    /// reine Daten, kein UnityEngine-Bezug. Enthält bewusst NICHT CurrentHp/MaxHp - die eigenen HP bleiben
+    /// ausschließlich in ClientEntity.CurrentHp/MaxHp (siehe ClientWorld.ApplyHp), kein zweiter Speicherort.</summary>
+    public sealed class CharacterState
+    {
+        public int Level;
+        public long Xp;
+        public long XpToNext;
+        public int St;
+        public int Ht;
+        public int Dx;
+        public int Iq;
+        public int UnspentStatPoints;
+        public int UnspentSkillPoints;
+        public int MaxSp;
+        public int CurrentSp;
+        public int Attack;
+        public int Defense;
+        public int DodgeBp;
+    }
+
     /// <summary>Reine Client-Weltsicht: verwaltet Entities aus Server-Paketen. Kennt kein UnityEngine, kein Time.* -
     /// die aktuelle Zeit wird von außen übergeben (Client-Empfangszeit, keine Uhrensynchronisation in M1b).
     /// Der Client berechnet nie Spielzustand selbst: eigene Charakterdaten kommen im JoinAccepted, öffentliche
@@ -55,6 +76,11 @@ namespace Lumiis.Client
             get { return _entities; }
         }
 
+        /// <summary>M6a: eigener Fortschritts-/Kampfwert-Stand (siehe CharacterState) - Instanz bleibt über
+        /// die gesamte Lebenszeit von ClientWorld bestehen, ApplyCharacterStats aktualisiert nur ihre Felder
+        /// (kein Neuanlegen), damit gehaltene Referenzen (z. B. im Debug-Panel) gültig bleiben.</summary>
+        public CharacterState CharacterStats { get; } = new CharacterState();
+
         public event Action<ClientEntity> EntitySpawned;
         public event Action<int> EntityDespawned;
         public event Action<string> Warning;
@@ -64,6 +90,20 @@ namespace Lumiis.Client
             List<int> ids = new List<int>(_entities.Keys);
             _entities.Clear();
             LocalEntityId = -1;
+            CharacterStats.Level = 0; // 0 = noch kein CharacterStatsPacket erhalten (frisch nach Reset/vor Join).
+            CharacterStats.Xp = 0;
+            CharacterStats.XpToNext = 0;
+            CharacterStats.St = 0;
+            CharacterStats.Ht = 0;
+            CharacterStats.Dx = 0;
+            CharacterStats.Iq = 0;
+            CharacterStats.UnspentStatPoints = 0;
+            CharacterStats.UnspentSkillPoints = 0;
+            CharacterStats.MaxSp = 0;
+            CharacterStats.CurrentSp = 0;
+            CharacterStats.Attack = 0;
+            CharacterStats.Defense = 0;
+            CharacterStats.DodgeBp = 0;
             foreach (int id in ids) EntityDespawned?.Invoke(id);
         }
 
@@ -156,6 +196,32 @@ namespace Lumiis.Client
             if (!_entities.TryGetValue(entityId, out ClientEntity entity)) return;
             entity.CurrentHp = currentHp;
             entity.MaxHp = maxHp;
+        }
+
+        /// <summary>M6a: voller eigener Fortschritts-/Kampfwert-Stand (siehe CharacterStatsPacket/
+        /// CharacterState) - die eigenen HP laufen dabei über die BESTEHENDE gemeinsame ApplyHp (kein
+        /// zweiter Speicherort für CurrentHp/MaxHp, siehe CharacterState-Kommentar), alle anderen Werte
+        /// landen in CharacterStats. Unbekannter LocalEntityId (Paket vor JoinAccepted - sollte nicht
+        /// vorkommen) überspringt nur den ApplyHp-Aufruf, CharacterStats wird trotzdem aktualisiert.</summary>
+        public void ApplyCharacterStats(CharacterStatsPacket packet)
+        {
+            if (LocalEntityId >= 0)
+                ApplyHp(LocalEntityId, packet.CurrentHp, packet.MaxHp);
+
+            CharacterStats.Level = packet.Level;
+            CharacterStats.Xp = packet.Xp;
+            CharacterStats.XpToNext = packet.XpToNext;
+            CharacterStats.St = packet.St;
+            CharacterStats.Ht = packet.Ht;
+            CharacterStats.Dx = packet.Dx;
+            CharacterStats.Iq = packet.Iq;
+            CharacterStats.UnspentStatPoints = packet.UnspentStatPoints;
+            CharacterStats.UnspentSkillPoints = packet.UnspentSkillPoints;
+            CharacterStats.MaxSp = packet.MaxSp;
+            CharacterStats.CurrentSp = packet.CurrentSp;
+            CharacterStats.Attack = packet.Attack;
+            CharacterStats.Defense = packet.Defense;
+            CharacterStats.DodgeBp = packet.DodgeBp;
         }
 
         /// <summary>M4a: EntityDamaged geht dem hier immer voraus (siehe GameServer.HandleAttackRequest), das

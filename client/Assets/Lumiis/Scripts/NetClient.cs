@@ -120,6 +120,22 @@ namespace Lumiis.Client
             Send(new DebugGiveYangRequestPacket { Amount = amount });
         }
 
+        /// <summary>M6a: "+"-Knopf neben einem Wert im Debug-Panel (siehe GameClient.DrawCharacterPanel) - der
+        /// Server prüft erneut, ob UnspentStatPoints &gt; 0 sind.</summary>
+        public void SendAllocateStatPoint(StatKind stat)
+        {
+            if (_peer == null || !IsConnected) return;
+            Send(new AllocateStatPointRequestPacket { Stat = stat });
+        }
+
+        /// <summary>Dev-Tools (siehe CLAUDE.md "Dev-Tools", GameClient-Debug-Panel) - nur wirksam, wenn der
+        /// Server mit --allow-debug-commands gestartet wurde, sonst still ohne Wirkung.</summary>
+        public void SendDebugSetLevel(int level)
+        {
+            if (_peer == null || !IsConnected) return;
+            Send(new DebugSetLevelRequestPacket { Level = level });
+        }
+
         private void Send(IPacket packet)
         {
             if (_peer == null) return;
