@@ -183,6 +183,10 @@ namespace Lumiis.Client
             IsConnected = false;
             _peer = null;
             Ping = 0;
+            // Bisher landete der Trennungsgrund nur in der UI-Fehlermeldung (LoginFlow.OnDisconnected),
+            // nie in der Console - für Fehlerdiagnosen (z. B. "kein JoinRequest beim Server angekommen")
+            // ohne dieses Log nicht unterscheidbar, ob überhaupt ein Disconnect-Event feuerte.
+            Debug.Log($"NetClient: Verbindung getrennt (Reason={disconnectInfo.Reason}, SocketErrorCode={disconnectInfo.SocketErrorCode})");
             Disconnected?.Invoke(disconnectInfo.Reason.ToString());
         }
 
