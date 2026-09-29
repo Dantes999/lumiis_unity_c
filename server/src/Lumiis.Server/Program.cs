@@ -6,6 +6,7 @@ using Lumiis.Data.Looks;
 using Lumiis.Data.Maps;
 using Lumiis.Data.Mobs;
 using Lumiis.Data.Npcs;
+using Lumiis.Data.Progression;
 using Lumiis.Server;
 using Lumiis.Server.Logging;
 using Lumiis.Server.Net;
@@ -82,6 +83,18 @@ catch (Exception ex)
     return 1;
 }
 
+// M6a: XP-Tabelle/Levelunterschieds-Prozente, siehe CLAUDE.md Abschnitt "Fortschritt: Level, XP, Werte".
+ProgressionCatalog progressionCatalog;
+try
+{
+    progressionCatalog = ProgressionCatalog.LoadFromFile(Path.Combine(config.DataDir, "progression.json"));
+}
+catch (Exception ex)
+{
+    logger.Error($"Serverstart fehlgeschlagen (Fortschritts-Daten): {ex.Message}");
+    return 1;
+}
+
 // looks.json wird nur zur Validierung von items.json gebraucht (jedes Ausrüstungs-Item braucht eine
 // existierende LookId im passenden Slot, siehe ItemCatalog.LoadFromJson) - der Server selbst löst Looks
 // seit M2b nicht mehr aus einem Katalog auf (Appearance kommt aus der DB-Zeile bzw. seit M5a zusätzlich
@@ -144,7 +157,7 @@ Console.CancelKeyPress += (_, eventArgs) =>
     cts.Cancel();
 };
 
-GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, collisionMap: collisionMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog, classCatalog: classCatalog, itemCatalog: itemCatalog, npcCatalog: npcCatalog, npcSpawnCatalog: npcSpawnCatalog);
+GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, collisionMap: collisionMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog, classCatalog: classCatalog, itemCatalog: itemCatalog, npcCatalog: npcCatalog, npcSpawnCatalog: npcSpawnCatalog, progressionCatalog: progressionCatalog);
 
 try
 {

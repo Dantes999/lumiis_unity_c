@@ -15,6 +15,7 @@ using Lumiis.Data.Items;
 using Lumiis.Data.Maps;
 using Lumiis.Data.Mobs;
 using Lumiis.Data.Npcs;
+using Lumiis.Data.Progression;
 using Lumiis.Server.Game;
 using Lumiis.Server.Logging;
 using Lumiis.Server.Net;
@@ -80,9 +81,17 @@ public sealed class GameServer : INetEventListener
     /// damit ein Absturz zwischen zwei separaten Writes nie einen Yang-neu/Inventar-alt-Zwischenstand (oder
     /// umgekehrt) in der DB hinterlassen kann. Monster-Kill-Yang (nur Yang) und Equip/Unequip/Consumable/
     /// Drop (nur Inventar) bleiben bewusst auf ihren bestehenden, getrennten Channels - dort ändert sich
-    /// jeweils nur eine der beiden Seiten, eine kombinierte Transaktion brächte dort keinen Vorteil.</summary>
+    /// jeweils nur eine der beiden Seiten, eine kombinierte Transaktion brächte dort keinen Vorteil. Seit M6a
+    /// zusätzlich der volle Fortschritts-Stand (Level/Xp/Spent*/Unspent*/CurrentHp/CurrentSp, siehe
+    /// docs/tasks/M6a-progression.md Abschnitt 0b/5) - Yang/Inventar UND Fortschritt ändern sich oft
+    /// gemeinsam (Levelaufstieg heilt z. B. voll), eine gemeinsame Transaktion ist deshalb weiterhin sinnvoll.
+    /// Neue Auslöser seit M6a: periodisch wie Position (siehe EnqueueDuePositionSaves) und bei Disconnect
+    /// (siehe OnPeerDisconnected) - diese beiden decken die kontinuierlichen HP/SP-Änderungen durch Kampf/
+    /// Regeneration ab, die bewusst KEIN eigenes sofortiges Save auslösen (siehe RunRegeneration/TryAttack).</summary>
     private readonly record struct CharacterSaveRequest(int CharacterId, long Yang, List<(int SlotIndex, int ItemId)> Slots,
-        int EquippedArmorItemId, int EquippedHelmetItemId, int EquippedWeaponItemId, int EquippedShieldItemId);
+        int EquippedArmorItemId, int EquippedHelmetItemId, int EquippedWeaponItemId, int EquippedShieldItemId,
+        int Level, long Xp, int SpentSt, int SpentHt, int SpentDx, int SpentIq,
+        int UnspentStatPoints, int UnspentSkillPoints, int CurrentHp, int CurrentSp);
 
     private const int MaxConsecutiveFailedTicks = 50;
 
@@ -114,6 +123,10 @@ public sealed class GameServer : INetEventListener
     /// Sortiments-Item, siehe HandleOpenShopRequest - NpcCatalog selbst wird dafür nicht mehr gebraucht: das
     /// Sortiment sitzt bereits auf der Entity, siehe Entity.ShopItemIds/World.SpawnNpc).</summary>
     private readonly ItemCatalog? _itemCatalog;
+
+    /// <summary>Für BuildCharacterStatsPacket gehalten (XpToNext, siehe dort) - an World durchgereicht
+    /// (siehe World-Konstruktor) für AwardXp/TryDebugSetLevel.</summary>
+    private readonly ProgressionCatalog? _progressionCatalog;
     private readonly NetManager _netManager;
     private readonly ILogger _logger;
     private readonly Func<long> _nowMs;
@@ -149,10 +162,14 @@ public sealed class GameServer : INetEventListener
     /// schlagen defensiv fehl (siehe World.TryEquip etc.). Program.cs lädt beim echten Serverstart immer eine
     /// Instanz aus data/items.json (M5a). npcCatalog/npcSpawnCatalog: null bedeutet "keine NPCs" (z. B.
     /// bestehende Tests ohne Shop-Bezug) - Program.cs lädt beim echten Serverstart immer beide. NPCs werden
-    /// hier einmalig beim Serverstart angelegt, analog zu Monstern (siehe docs/tasks/M5b-shop.md).</summary>
+    /// hier einmalig beim Serverstart angelegt, analog zu Monstern (siehe docs/tasks/M5b-shop.md).
+    /// progressionCatalog: null bedeutet "kein XP-Gewinn/keine XpToNext-Angabe" (z. B. bestehende Tests ohne
+    /// Fortschrittsbezug, siehe World-Konstruktor) - Program.cs lädt beim echten Serverstart immer eine
+    /// Instanz aus data/progression.json (M6a).</summary>
     public GameServer(ServerConfig config, ILogger logger, TokenService tokenService, Func<LumiisDbContext> dbContextFactory,
         Func<long>? nowMs = null, CollisionMap? collisionMap = null, MobCatalog? mobCatalog = null, SpawnCatalog? spawnCatalog = null,
-        ClassCatalog? classCatalog = null, ItemCatalog? itemCatalog = null, NpcCatalog? npcCatalog = null, NpcSpawnCatalog? npcSpawnCatalog = null)
+        ClassCatalog? classCatalog = null, ItemCatalog? itemCatalog = null, NpcCatalog? npcCatalog = null, NpcSpawnCatalog? npcSpawnCatalog = null,
+        ProgressionCatalog? progressionCatalog = null)
     {
         _config = config;
         _logger = logger;
@@ -161,7 +178,8 @@ public sealed class GameServer : INetEventListener
         _classCatalog = classCatalog;
         _mobCatalog = mobCatalog;
         _itemCatalog = itemCatalog;
-        _world = new World(config.MaxPlayers, collisionMap, itemCatalog: itemCatalog);
+        _progressionCatalog = progressionCatalog;
+        _world = new World(config.MaxPlayers, collisionMap, itemCatalog: itemCatalog, progressionCatalog: progressionCatalog);
         _netManager = new NetManager(this) { UpdateTime = 15 };
         _nowMs = nowMs ?? DefaultNowMs;
 
@@ -176,7 +194,8 @@ public sealed class GameServer : INetEventListener
                     spawnPointId: spawn.Id, respawnSeconds: spawn.RespawnSeconds,
                     meleeRangeWire: mobDef.MeleeRangeWire, attackCooldownMs: mobDef.AttackCooldownMs,
                     aggressive: mobDef.Aggressive, aggroRangeWire: mobDef.AggroRangeWire, leashRangeWire: mobDef.LeashRangeWire,
-                    drops: mobDef.Drops.Select(d => (d.ItemId, d.ChancePercent)).ToList());
+                    drops: mobDef.Drops.Select(d => (d.ItemId, d.ChancePercent)).ToList(),
+                    level: mobDef.Level, baseXp: mobDef.BaseXp);
             }
         }
 
@@ -316,7 +335,17 @@ public sealed class GameServer : INetEventListener
             // Bugfix nach M5a: Respawn setzt CurrentHp = MaxHp (siehe World.Tick), ohne dieses Paket bliebe
             // die Leben-Anzeige beim Client auf 0 stehen (letzter Stand vor dem Tod).
             SendToVisible(entity.Id, new EntityHpChangedPacket { EntityId = entity.Id, CurrentHp = entity.CurrentHp, MaxHp = entity.MaxHp });
+            // M6a: Respawn heilt HP UND SP voll (siehe World.Tick) - CharacterStatsPacket nur an den
+            // Besitzer, nicht an AOI-Beobachter (anders als die beiden Pakete oben).
+            FindConnectionByEntityId(entity.Id)?.Peer.SendPacket(BuildCharacterStatsPacket(entity));
         }
+
+        // M6a: natürliche Regeneration (siehe World.RunRegeneration) - nur an den Besitzer, nur wenn sich
+        // HP/SP tatsächlich geändert haben (World filtert das schon, siehe Tick-Kommentar). Kein
+        // CharacterSaveRequest hier (bewusst kein Sofort-Speicher-Auslöser für Regeneration, siehe
+        // docs/tasks/M6a-progression.md Abschnitt 5 - periodischer/Disconnect-Save holt den Stand ein).
+        foreach (Entity entity in regeneratedPlayers)
+            FindConnectionByEntityId(entity.Id)?.Peer.SendPacket(BuildCharacterStatsPacket(entity));
 
         // Wander-KI (World.Tick) hat fälligen Monstern ein neues Ziel gesetzt - dieselbe EntityMove-
         // Benachrichtigung wie bei einem Spieler-MoveTo (HandleMoveTo), nur ohne eingehendes Paket als Auslöser.
@@ -368,6 +397,11 @@ public sealed class GameServer : INetEventListener
         {
             entity.LastSaveAtMs = now;
             _positionSaveChannel.Writer.TryWrite(new PositionSaveRequest(entity.CharacterId!.Value, entity.IntX, entity.IntY));
+
+            // M6a (siehe docs/tasks/M6a-progression.md Abschnitt 0b/5): dieselbe 30s-Fälligkeit wie Position -
+            // damit die kontinuierlichen HP/SP-Änderungen durch Kampf/Regeneration (bewusst OHNE eigenes
+            // sofortiges Save, siehe RunRegeneration/World.TryAttack) trotzdem regelmäßig persistiert werden.
+            _characterSaveChannel.Writer.TryWrite(BuildCharacterSaveRequest(entity));
         }
     }
 
@@ -556,6 +590,18 @@ public sealed class GameServer : INetEventListener
                     character.EquippedWeaponItemId = request.EquippedWeaponItemId == 0 ? null : request.EquippedWeaponItemId;
                     character.EquippedShieldItemId = request.EquippedShieldItemId == 0 ? null : request.EquippedShieldItemId;
 
+                    // M6a: voller Fortschritts-Stand, siehe CharacterSaveRequest-Kommentar.
+                    character.Level = request.Level;
+                    character.Xp = request.Xp;
+                    character.SpentSt = request.SpentSt;
+                    character.SpentHt = request.SpentHt;
+                    character.SpentDx = request.SpentDx;
+                    character.SpentIq = request.SpentIq;
+                    character.UnspentStatPoints = request.UnspentStatPoints;
+                    character.UnspentSkillPoints = request.UnspentSkillPoints;
+                    character.CurrentHp = request.CurrentHp;
+                    character.CurrentSp = request.CurrentSp;
+
                     db.CharacterInventoryItems.RemoveRange(character.InventoryItems);
                     foreach ((int slotIndex, int itemId) in request.Slots)
                         character.InventoryItems.Add(new CharacterInventoryItem { CharacterId = request.CharacterId, SlotIndex = slotIndex, ItemId = itemId });
@@ -564,7 +610,7 @@ public sealed class GameServer : INetEventListener
                 }
                 catch (Exception ex)
                 {
-                    _logger.Error($"Fehler beim Speichern von Yang+Inventar für Charakter {request.CharacterId}: {ex}");
+                    _logger.Error($"Fehler beim Speichern von Yang+Inventar+Fortschritt für Charakter {request.CharacterId}: {ex}");
                 }
             }
         }
@@ -640,8 +686,13 @@ public sealed class GameServer : INetEventListener
                 // Letzte Position sofort speichern statt auf den nächsten periodischen Save (30s) zu warten.
                 // CharacterId ist hier immer gesetzt: OnPeerDisconnected feuert nur für Verbindungen
                 // (conn.EntityId), Monster werden nie über eine Verbindung angelegt (siehe World.SpawnMonster).
+                // M6a: ebenso sofort der volle Fortschritts-Stand (siehe CharacterSaveRequest-Kommentar) -
+                // sonst könnte der letzte HP/SP-Stand vor dem Logout bis zu 30s verloren gehen.
                 if (_world.TryGet(entityId, out Entity? entity) && entity!.CharacterId.HasValue)
+                {
                     _positionSaveChannel.Writer.TryWrite(new PositionSaveRequest(entity.CharacterId.Value, entity.IntX, entity.IntY));
+                    _characterSaveChannel.Writer.TryWrite(BuildCharacterSaveRequest(entity));
+                }
 
                 _world.Remove(entityId);
                 BroadcastDespawn(entityId);
@@ -755,6 +806,12 @@ public sealed class GameServer : INetEventListener
                 break;
             case DebugGiveYangRequestPacket debugGiveYang:
                 HandleDebugGiveYangRequest(conn, debugGiveYang);
+                break;
+            case AllocateStatPointRequestPacket allocateStatPoint:
+                HandleAllocateStatPointRequest(conn, allocateStatPoint);
+                break;
+            case DebugSetLevelRequestPacket debugSetLevel:
+                HandleDebugSetLevelRequest(conn, debugSetLevel);
                 break;
             default:
                 _logger.Warn($"Unerwartetes Paket {packet.Id} von Verbindung {conn.Peer.Id}");
@@ -918,6 +975,12 @@ public sealed class GameServer : INetEventListener
         conn.Peer.SendPacket(new YangChangedPacket { NewTotal = entity.Yang });
         conn.Peer.SendPacket(new EntityHpChangedPacket { EntityId = entity.Id, CurrentHp = entity.CurrentHp, MaxHp = entity.MaxHp });
 
+        // M6a: derselbe Fehlerklasse wie oben - ohne dieses Paket zeigt der Client Level/XP/Werte erst nach
+        // der ersten Änderung an (siehe docs/tasks/M6a-progression.md Abschnitt 0f). Reihenfolge: nach
+        // JoinAccepted/InventorySync/YangChanged (EntityHpChanged dazwischen ist die schon bestehende
+        // Reihenfolge, siehe oben).
+        conn.Peer.SendPacket(BuildCharacterStatsPacket(entity));
+
         // Der Joiner bekommt nur die laut AOI-Radius ab seiner Startposition sichtbaren Entities (nicht mehr
         // alle), laufende Bewegungen zusätzlich als EntityMove ab aktueller Position. VisibleEntityIds wird
         // hier schon auf denselben Stand gebracht wie das Gesendete, damit der nächste UpdateVisibility-Tick
@@ -1045,6 +1108,14 @@ public sealed class GameServer : INetEventListener
     /// HandleAttackRequest (ohnehin nur relevant, wenn ein Spieler ein Monster tötet).</summary>
     private void BroadcastAttackResult(int attackerEntityId, int targetEntityId, AttackResult result)
     {
+        // M6a: Ausweichen ersetzt EntityDamaged komplett (kein Schaden, kein Tod möglich) - siehe
+        // World.TryAttack/EntityDodgedPacket-Kommentar.
+        if (result.Dodged)
+        {
+            SendToVisible(targetEntityId, new EntityDodgedPacket { AttackerEntityId = attackerEntityId, TargetEntityId = targetEntityId });
+            return;
+        }
+
         SendToVisible(targetEntityId, new EntityDamagedPacket
         {
             AttackerEntityId = attackerEntityId,
@@ -1094,6 +1165,17 @@ public sealed class GameServer : INetEventListener
                 _yangSaveChannel.Writer.TryWrite(new YangSaveRequest(characterId, attackerEntity.Yang));
         }
 
+        // M6a: XP am selben Punkt wie Yang/Drops (siehe World.TryAttack/AwardXp) - CharacterStatsPacket immer
+        // bei XP-Gewinn (auch ohne Levelaufstieg, XpToNext hat sich schließlich geändert), sofortiges Save
+        // aber nur bei tatsächlichem Levelaufstieg (siehe docs/tasks/M6a-progression.md Abschnitt 5 - sonst
+        // greift der periodische/Disconnect-Save wie bei jeder anderen HP/SP-Änderung durch Kampf).
+        if (result.XpAwarded > 0 && _world.TryGet(attackerId, out Entity? xpEntity))
+        {
+            conn.Peer.SendPacket(BuildCharacterStatsPacket(xpEntity!));
+            if (result.LeveledUp && xpEntity!.CharacterId is int levelCharacterId)
+                _characterSaveChannel.Writer.TryWrite(BuildCharacterSaveRequest(xpEntity));
+        }
+
         // M5a: Drops (siehe World.TryAttack) - bei Erfolg InventorySyncPacket an den Angreifer selbst (das
         // Inventar hat sich geändert), bei vollem Inventar zusätzlich/stattdessen InventoryActionFailedPacket
         // NUR als Info (kein harter Fehler, der Kill oben bleibt gültig). Persistenz (siehe docs/tasks/
@@ -1107,9 +1189,10 @@ public sealed class GameServer : INetEventListener
         if (result.ItemLostToFullInventory)
             conn.Peer.SendPacket(new InventoryActionFailedPacket { Reason = InventoryActionFailedReason.InventoryFull });
 
-        _logger.Info($"Entity {attackerId} trifft Entity {attack.TargetEntityId} ({result.Damage} Schaden)" +
+        _logger.Info($"Entity {attackerId} trifft Entity {attack.TargetEntityId} ({(result.Dodged ? "ausgewichen" : $"{result.Damage} Schaden")})" +
             (result.TargetDied ? ", Ziel gestorben" : "") +
             (result.YangAwarded > 0 ? $", +{result.YangAwarded} Yang" : "") +
+            (result.XpAwarded > 0 ? $", +{result.XpAwarded} XP" + (result.LeveledUp ? " (Levelaufstieg)" : "") : "") +
             (result.DroppedItemIds.Count > 0 ? $", Drop(s): {string.Join(",", result.DroppedItemIds)}" : "") +
             (result.ItemLostToFullInventory ? ", Drop verloren (Inventar voll)" : ""));
     }
@@ -1137,6 +1220,32 @@ public sealed class GameServer : INetEventListener
         return packet;
     }
 
+    /// <summary>M6a: baut den vollen eigenen Fortschritts-/Kampfwert-Stand (siehe CharacterStatsPacket-
+    /// Kommentar) - XpToNext kommt aus ProgressionCatalog (0 ohne Katalog oder auf MaxLevel).</summary>
+    private CharacterStatsPacket BuildCharacterStatsPacket(Entity entity)
+    {
+        return new CharacterStatsPacket
+        {
+            Level = entity.Level,
+            Xp = entity.Xp,
+            XpToNext = _progressionCatalog != null && entity.Level < _progressionCatalog.MaxLevel
+                ? _progressionCatalog.XpToNextLevel(entity.Level) : 0,
+            St = entity.St,
+            Ht = entity.Ht,
+            Dx = entity.Dx,
+            Iq = entity.Iq,
+            UnspentStatPoints = entity.UnspentStatPoints,
+            UnspentSkillPoints = entity.UnspentSkillPoints,
+            MaxHp = entity.MaxHp,
+            CurrentHp = entity.CurrentHp,
+            MaxSp = entity.MaxSp,
+            CurrentSp = entity.CurrentSp,
+            Attack = entity.Attack,
+            Defense = entity.Defense,
+            DodgeBp = entity.DodgeBp
+        };
+    }
+
     /// <summary>Baut den vollen Persistenz-Snapshot aus dem aktuellen Entity-Zustand (M5a, siehe
     /// InventorySaveRequest) - CharacterId muss gesetzt sein (nur Spieler-Entities lösen Inventaraktionen
     /// aus, siehe Handle-Methoden unten).</summary>
@@ -1155,7 +1264,8 @@ public sealed class GameServer : INetEventListener
     }
 
     /// <summary>M5b: wie BuildInventorySaveRequest, zusätzlich Yang - für den kombinierten
-    /// CharacterSaveRequest-Channel (Kauf/Verkauf, siehe SendShopActionSuccess).</summary>
+    /// CharacterSaveRequest-Channel (Kauf/Verkauf, Levelaufstieg/Punkteverteilung, periodisch, Disconnect -
+    /// siehe CharacterSaveRequest-Kommentar). Seit M6a zusätzlich der volle Fortschritts-Stand.</summary>
     private static CharacterSaveRequest BuildCharacterSaveRequest(Entity entity)
     {
         var slots = new List<(int SlotIndex, int ItemId)>();
@@ -1167,7 +1277,9 @@ public sealed class GameServer : INetEventListener
         }
 
         return new CharacterSaveRequest(entity.CharacterId!.Value, entity.Yang, slots,
-            entity.EquippedArmorItemId, entity.EquippedHelmetItemId, entity.EquippedWeaponItemId, entity.EquippedShieldItemId);
+            entity.EquippedArmorItemId, entity.EquippedHelmetItemId, entity.EquippedWeaponItemId, entity.EquippedShieldItemId,
+            entity.Level, entity.Xp, entity.SpentSt, entity.SpentHt, entity.SpentDx, entity.SpentIq,
+            entity.UnspentStatPoints, entity.UnspentSkillPoints, entity.CurrentHp, entity.CurrentSp);
     }
 
     /// <summary>EquipItemRequestPacket-Handler (M5a): ruft World.TryEquip auf. Erfolg: siehe
@@ -1241,6 +1353,11 @@ public sealed class GameServer : INetEventListener
             // Bugfix nach M5a: Heiltrank ändert CurrentHp ohne Treffer - ohne dieses Paket bliebe die
             // Leben-Anzeige beim Client (und bei allen AOI-Beobachtern) auf dem alten Wert stehen.
             SendToVisible(entityId, new EntityHpChangedPacket { EntityId = entityId, CurrentHp = entity!.CurrentHp, MaxHp = entity.MaxHp });
+            // M6a: CharacterStatsPacket trägt CurrentHp ebenfalls (siehe docs/tasks/M6a-progression.md
+            // Abschnitt 5) - kein sofortiges CharacterSaveRequest (Heiltrank ist wie jeder Treffer bewusst
+            // KEIN Sofort-Speicher-Auslöser, siehe RunRegeneration-Kommentar), der periodische/Disconnect-
+            // Save holt den neuen Stand ein.
+            conn.Peer.SendPacket(BuildCharacterStatsPacket(entity));
         }
     }
 
@@ -1256,6 +1373,10 @@ public sealed class GameServer : INetEventListener
         entity!.Appearance = ToAppearance(entity);
         conn.Peer.SendPacket(BuildInventorySyncPacket(entity));
         SendToVisible(entityId, new AppearanceChangedPacket { EntityId = entityId, Appearance = entity.Appearance });
+        // M6a: World.TryEquip/TryUnequip haben bereits RecomputeDerivedStats aufgerufen (Attack/Defense evtl.
+        // geändert, MaxHp/MaxSp/DodgeBp bleiben gleich - siehe RecomputeDerivedStats-Kommentar) - kein
+        // eigenes sofortiges CharacterSaveRequest nötig, Level/Xp/Werte/HP/SP ändern sich hier nie.
+        conn.Peer.SendPacket(BuildCharacterStatsPacket(entity));
         _inventorySaveChannel.Writer.TryWrite(BuildInventorySaveRequest(entity));
     }
 
@@ -1377,6 +1498,65 @@ public sealed class GameServer : INetEventListener
         _logger.Info($"Dev-Tools: Entity {entityId} bekommt {request.Amount} Yang (neuer Stand {entity.Yang})");
     }
 
+    /// <summary>AllocateStatPointRequestPacket-Handler (M6a): ruft World.TryAllocateStatPoint auf. Anders als
+    /// die meisten anderen Handler gibt es hier KEIN eigenes Fehlerpaket - eine ungültige Anfrage (keine
+    /// Punkte, unbekannter Stat) wird verworfen und geloggt, der Server antwortet in JEDEM Fall mit dem
+    /// aktuellen CharacterStatsPacket (bei Fehlschlag unverändert), siehe
+    /// docs/tasks/M6a-progression.md Abschnitt 5. Sofortiges Speichern nur bei tatsächlichem Erfolg.</summary>
+    private void HandleAllocateStatPointRequest(ConnectionState conn, AllocateStatPointRequestPacket request)
+    {
+        if (conn.EntityId is not int entityId)
+        {
+            _logger.Warn($"AllocateStatPointRequest vor Join von Verbindung {conn.Peer.Id}");
+            conn.Peer.Disconnect();
+            return;
+        }
+
+        bool success = _world.TryAllocateStatPoint(entityId, request.Stat);
+        if (!success)
+            _logger.Info($"AllocateStatPointRequest von Entity {entityId} (Stat {request.Stat}) abgelehnt (keine Punkte oder unbekannter Wert)");
+
+        if (!_world.TryGet(entityId, out Entity? entity)) return; // sollte nicht vorkommen.
+
+        conn.Peer.SendPacket(BuildCharacterStatsPacket(entity!));
+        if (success && entity!.CharacterId is int characterId)
+            _characterSaveChannel.Writer.TryWrite(BuildCharacterSaveRequest(entity));
+    }
+
+    /// <summary>Dev-Tool (siehe CLAUDE.md "Dev-Tools"): nur wirksam, wenn der Server mit
+    /// --allow-debug-commands gestartet wurde - sonst still verworfen, analog zu HandleDebugGiveYangRequest.
+    /// Ruft World.TryDebugSetLevel auf (Level/Xp/Spent* zurückgesetzt, Unspent* nachgezählt, HP/SP voll -
+    /// dient auch als Stat-Reset zum Testen). Sendet bei Erfolg CharacterStatsPacket und speichert sofort
+    /// (wie ein echter Levelaufstieg).</summary>
+    private void HandleDebugSetLevelRequest(ConnectionState conn, DebugSetLevelRequestPacket request)
+    {
+        if (!_config.AllowDebugCommands)
+        {
+            _logger.Warn($"DebugSetLevelRequest von Verbindung {conn.Peer.Id} ohne --allow-debug-commands ignoriert");
+            return;
+        }
+
+        if (conn.EntityId is not int entityId)
+        {
+            _logger.Warn($"DebugSetLevelRequest vor Join von Verbindung {conn.Peer.Id}");
+            return;
+        }
+
+        if (!_world.TryDebugSetLevel(entityId, request.Level))
+        {
+            _logger.Warn($"DebugSetLevelRequest mit ungültigem Level {request.Level} von Verbindung {conn.Peer.Id} ignoriert");
+            return;
+        }
+
+        if (!_world.TryGet(entityId, out Entity? entity)) return; // sollte nicht vorkommen.
+
+        conn.Peer.SendPacket(BuildCharacterStatsPacket(entity!));
+        if (entity!.CharacterId is int characterId)
+            _characterSaveChannel.Writer.TryWrite(BuildCharacterSaveRequest(entity));
+
+        _logger.Info($"Dev-Tools: Entity {entityId} auf Level {request.Level} gesetzt");
+    }
+
     /// <summary>Dev-Tools (siehe CLAUDE.md "Dev-Tools"): nur wirksam, wenn der Server mit
     /// --allow-debug-commands gestartet wurde - sonst wird das Paket still verworfen (geloggt, keine Antwort,
     /// keine Disconnect), als gäbe es diesen Befehl nicht (siehe ServerConfig.AllowDebugCommands-Kommentar).
@@ -1410,7 +1590,8 @@ public sealed class GameServer : INetEventListener
         _world.SpawnMonster(debugSpawn.MobId, mobDef.Name, x, y, mobDef.SpeedWire,
             mobDef.WanderRadiusWire, mobDef.WanderIntervalMinMs, mobDef.WanderIntervalMaxMs, _nowMs(),
             mobDef.MaxHp, mobDef.Attack, mobDef.Defense, mobDef.YangMin, mobDef.YangMax, // spawnPointId bewusst weggelassen (Default null).
-            drops: mobDef.Drops.Select(d => (d.ItemId, d.ChancePercent)).ToList());
+            drops: mobDef.Drops.Select(d => (d.ItemId, d.ChancePercent)).ToList(),
+            level: mobDef.Level, baseXp: mobDef.BaseXp); // M6a: Debug-Monster geben XP wie Katalog-Monster (0c/Abschnitt 5).
 
         _logger.Info($"Dev-Tools: {mobDef.Name} bei ({x},{y}) gespawnt (angefordert von Entity {senderId})");
     }
@@ -1453,5 +1634,20 @@ public sealed class GameServer : INetEventListener
             if (conn.EntityId == entityId || conn.VisibleEntityIds.Contains(entityId))
                 conn.Peer.Send(data, DeliveryMethod.ReliableOrdered);
         }
+    }
+
+    /// <summary>M6a: findet die Verbindung, die eine bestimmte Spieler-Entity hält - für Pakete, die NUR an
+    /// den Besitzer gehen (CharacterStatsPacket) und außerhalb eines eingehenden Pakets ausgelöst werden
+    /// (Respawn/Regeneration in RunTick, kein conn im Aufrufkontext vorhanden, anders als bei den
+    /// Request-Handlern). O(Verbindungen) - wie SendToVisible bei unserer Spielergrößenordnung
+    /// vernachlässigbar, nur für seltene Ereignisse pro Tick aufgerufen. Null, wenn die Entity keine
+    /// (mehr eine) Verbindung hat (sollte für die aktuellen Aufrufer nicht vorkommen).</summary>
+    private ConnectionState? FindConnectionByEntityId(int entityId)
+    {
+        foreach (ConnectionState conn in _connections.Values)
+        {
+            if (conn.EntityId == entityId) return conn;
+        }
+        return null;
     }
 }
