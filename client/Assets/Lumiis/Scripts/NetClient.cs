@@ -136,6 +136,23 @@ namespace Lumiis.Client
             Send(new DebugSetLevelRequestPacket { Level = level });
         }
 
+        /// <summary>M6b: Taste 1-4 (echte Spielsteuerung, siehe GameClient.HandleSkillHotkeys) - der Server
+        /// prüft alles serverautoritativ erneut (gelernt, SP, Skill-Cooldown, ggf. Ziel/Reichweite, siehe
+        /// World.TryUseSkill). targetEntityId 0 = kein Ziel/Selbstziel.</summary>
+        public void SendUseSkill(int skillId, int targetEntityId)
+        {
+            if (_peer == null || !IsConnected) return;
+            Send(new UseSkillRequestPacket { SkillId = skillId, TargetEntityId = targetEntityId });
+        }
+
+        /// <summary>M6b: "+"-Knopf im Skills-Bereich des Debug-Panels (siehe GameClient.DrawSkillsPanel) - der
+        /// Server prüft erneut, ob UnspentSkillPoints &gt; 0 und die aktuelle Stufe &lt; 17 sind.</summary>
+        public void SendAllocateSkillPoint(int skillId)
+        {
+            if (_peer == null || !IsConnected) return;
+            Send(new AllocateSkillPointRequestPacket { SkillId = skillId });
+        }
+
         private void Send(IPacket packet)
         {
             if (_peer == null) return;

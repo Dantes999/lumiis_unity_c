@@ -60,6 +60,10 @@ namespace Lumiis.Client
         public int Attack;
         public int Defense;
         public int DodgeBp;
+
+        /// <summary>M6b: gelernte Skillstufen (SkillId -> Level 1-17, kein Eintrag = nicht gelernt/Stufe 0) -
+        /// analog zum Rest von CharacterState, direkt aus CharacterStatsPacket.Skills übernommen.</summary>
+        public readonly Dictionary<int, int> Skills = new Dictionary<int, int>();
     }
 
     /// <summary>Reine Client-Weltsicht: verwaltet Entities aus Server-Paketen. Kennt kein UnityEngine, kein Time.* -
@@ -104,6 +108,7 @@ namespace Lumiis.Client
             CharacterStats.Attack = 0;
             CharacterStats.Defense = 0;
             CharacterStats.DodgeBp = 0;
+            CharacterStats.Skills.Clear();
             foreach (int id in ids) EntityDespawned?.Invoke(id);
         }
 
@@ -222,6 +227,11 @@ namespace Lumiis.Client
             CharacterStats.Attack = packet.Attack;
             CharacterStats.Defense = packet.Defense;
             CharacterStats.DodgeBp = packet.DodgeBp;
+
+            // M6b: voller Resync wie der Rest des Pakets, kein Delta.
+            CharacterStats.Skills.Clear();
+            foreach ((int skillId, int level) in packet.Skills)
+                CharacterStats.Skills[skillId] = level;
         }
 
         /// <summary>M4a: EntityDamaged geht dem hier immer voraus (siehe GameServer.HandleAttackRequest), das

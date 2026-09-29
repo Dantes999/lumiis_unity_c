@@ -25,6 +25,7 @@ namespace Lumiis.Client
         private Sprite _monsterTriangleSprite;
         private LookCatalogClient _lookCatalog;
         private ItemCatalogClient _itemCatalog;
+        private SkillCatalogClient _skillCatalog;
         private CachingSpriteProvider _spriteProvider;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private CharacterTestboard _testboard;
@@ -84,6 +85,24 @@ namespace Lumiis.Client
         private int _debugSetLevelValue = 1;
 #endif
 
+        // ---- Skills (M6b, Taste 1-4 - echte Spielsteuerung, siehe HandleSkillHotkeys/DrawSkillsLine) ----
+        // Feste Zuordnung Taste 1-4 -> SkillId (siehe data/skills.json: 1=Wuchtschlag/SingleStrike,
+        // 2=Kreisschlag/AreaAttack, 3=Kampfrausch/AttackBuff, 4=Hast/AttackSpeedBuff) - nur Wuchtschlag
+        // braucht ein Ziel (RequiresTarget). Genau diese vier Skills existieren in M6b, kein Katalog-Cycler
+        // wie beim Dev-Tools-Monster-Spawn nötig.
+        private static readonly (int SkillId, bool RequiresTarget)[] SkillHotkeys =
+        {
+            (1, true), (2, false), (3, false), (4, false)
+        };
+
+        // Lokale, optimistische Cooldown-Anzeige (Time.time-basiert) - gesetzt beim Senden, nicht vom Server
+        // bestätigt (der prüft ohnehin erneut serverautoritativ, siehe World.TryUseSkill). Aktive Buffs
+        // dagegen server-autoritativ: RemainingMs aus ActiveBuffsChangedPacket, hier nur lokal mit
+        // Time.deltaTime heruntergezählt (Projekt-Konvention: keine Client-Uhrensynchronisation).
+        private readonly Dictionary<int, float> _skillCooldownReadyAtTime = new Dictionary<int, float>();
+        private readonly Dictionary<BuffType, float> _activeBuffRemainingSeconds = new Dictionary<BuffType, float>();
+        private string _lastSkillFailedMessage = "";
+
         private const float MinZoom = 3f;
         private const float MaxZoom = 300f;
         private const float ZoomStep = 1f;
@@ -129,6 +148,17 @@ namespace Lumiis.Client
                 throw;
             }
 
+            try
+            {
+                _skillCatalog = SkillCatalogClient.LoadFromStreamingAssets();
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError("skills.json konnte nicht geladen werden (Assets/StreamingAssets/lumiis-data/skills.json). "
+                    + "Wurde 'cd server && dotnet build' vor dem Öffnen von Unity ausgeführt? " + ex);
+                throw;
+            }
+
             _world.EntitySpawned += OnEntitySpawned;
             _world.EntityDespawned += OnEntityDespawned;
             _world.Warning += OnWorldWarning;
@@ -167,10 +197,15 @@ namespace Lumiis.Client
                     kvp.Value.SetWorldPosition(entity.X / 100.0, entity.Y / 100.0);
             }
 
-            if (_inGame) HandleClickInput();
+            if (_inGame)
+            {
+                HandleClickInput();
+                HandleSkillHotkeys();
+            }
             HandleZoomInput();
             HandleDebugToggleInput();
             UpdateShopAutoClose();
+            TickBuffCountdowns();
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             HandleDebugHotkeys();
 #endif
@@ -214,6 +249,65 @@ namespace Lumiis.Client
             if (Keyboard.current == null) return;
             if (Keyboard.current.f1Key.wasPressedThisFrame)
                 _debugOverlayVisible = !_debugOverlayVisible;
+        }
+
+        /// <summary>M6b: Taste 1-4 (echte Spielsteuerung, siehe SkillHotkeys). Wuchtschlag (Index 0) nutzt das
+        /// aktuell per Rechtsklick anvisierte Ziel (_targetEntityId, -1 = keins -&gt; TargetEntityId 0, der
+        /// Server lehnt dann mit TargetRequired ab - kein eigener Vorab-Check nötig, siehe
+        /// docs/tasks/M6b-skills.md Abschnitt 6). Die anderen drei Skills brauchen kein Ziel.</summary>
+        private void HandleSkillHotkeys()
+        {
+            if (Keyboard.current == null || _world.LocalEntityId < 0) return;
+
+            if (Keyboard.current.digit1Key.wasPressedThisFrame) UseSkillHotkey(0);
+            if (Keyboard.current.digit2Key.wasPressedThisFrame) UseSkillHotkey(1);
+            if (Keyboard.current.digit3Key.wasPressedThisFrame) UseSkillHotkey(2);
+            if (Keyboard.current.digit4Key.wasPressedThisFrame) UseSkillHotkey(3);
+        }
+
+        private void UseSkillHotkey(int hotkeyIndex)
+        {
+            (int skillId, bool requiresTarget) = SkillHotkeys[hotkeyIndex];
+            int targetEntityId = requiresTarget && _targetEntityId >= 0 ? _targetEntityId : 0;
+            _netClient.SendUseSkill(skillId, targetEntityId);
+
+            // Optimistische lokale Cooldown-Anzeige (siehe SkillCooldownReadyAtTime-Kommentar) - nur wenn der
+            // Skill laut letztem CharacterStatsPacket tatsächlich gelernt ist, sonst gäbe es einen falschen
+            // Cooldown-Text für einen Skill, den der Server ohnehin mit NotLearned ablehnen wird.
+            if (_skillCatalog != null && _world.CharacterStats.Skills.TryGetValue(skillId, out int level) && level > 0)
+            {
+                int cooldownMs = _skillCatalog.CooldownMsForLevel(skillId, level);
+                if (cooldownMs > 0)
+                    _skillCooldownReadyAtTime[skillId] = Time.time + cooldownMs / 1000f;
+            }
+        }
+
+        /// <summary>M6b: lokale Restzeit aktiver Buffs herunterzählen (siehe ActiveBuffsChangedPacket-Handling
+        /// in OnPacketReceived, das die Startwerte setzt) - reine Anzeige, der Server ist weiterhin die
+        /// einzige Autorität über den tatsächlichen Ablauf (siehe World.Tick/BuffsExpired).</summary>
+        private void TickBuffCountdowns()
+        {
+            if (_activeBuffRemainingSeconds.Count == 0) return;
+
+            List<BuffType> expired = null;
+            List<BuffType> keys = new List<BuffType>(_activeBuffRemainingSeconds.Keys);
+            foreach (BuffType type in keys)
+            {
+                float remaining = _activeBuffRemainingSeconds[type] - Time.deltaTime;
+                if (remaining <= 0f)
+                {
+                    expired ??= new List<BuffType>();
+                    expired.Add(type);
+                }
+                else
+                {
+                    _activeBuffRemainingSeconds[type] = remaining;
+                }
+            }
+
+            if (expired == null) return;
+            foreach (BuffType type in expired)
+                _activeBuffRemainingSeconds.Remove(type);
         }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -360,6 +454,7 @@ namespace Lumiis.Client
             if (GUILayout.Button("+1000 Yang"))
                 _netClient.SendDebugGiveYang(1000);
             DrawCharacterPanel();
+            DrawSkillsPanel();
             DrawEquipmentPanel();
             DrawInventoryPanel();
             DrawShopPanel();
@@ -412,6 +507,31 @@ namespace Lumiis.Client
             GUILayout.EndHorizontal();
             if (GUILayout.Button("Level setzen (Dev-Tools)"))
                 _netClient.SendDebugSetLevel(_debugSetLevelValue);
+        }
+
+        /// <summary>M6b: alle vier Skills mit aktueller Stufe (0-17) und "+"-Knopf (nur aktiv bei
+        /// UnspentSkillPoints &gt; 0 UND Stufe &lt; 17) - analog zu DrawStatRow/TryAllocateStatPoint aus M6a.
+        /// SkillId kommt aus SkillHotkeys (dieselbe feste 1-4-Zuordnung wie die echten Tasten), Stufe aus
+        /// ClientWorld.CharacterStats.Skills (0 = kein Eintrag = nicht gelernt).</summary>
+        private void DrawSkillsPanel()
+        {
+            GUILayout.Space(6);
+            GUILayout.Label("Skills");
+
+            CharacterState stats = _world.CharacterStats;
+            foreach ((int skillId, bool _) in SkillHotkeys)
+            {
+                int level = stats.Skills.TryGetValue(skillId, out int lvl) ? lvl : 0;
+                string name = _skillCatalog != null ? _skillCatalog.DisplayName(skillId) : "Skill " + skillId;
+
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(name + ": Stufe " + level + "/" + SkillCatalogClient.MaxLevel, GUILayout.Width(190));
+                GUI.enabled = stats.UnspentSkillPoints > 0 && level < SkillCatalogClient.MaxLevel;
+                if (GUILayout.Button("+", GUILayout.Width(24)))
+                    _netClient.SendAllocateSkillPoint(skillId);
+                GUI.enabled = true;
+                GUILayout.EndHorizontal();
+            }
         }
 
         private void DrawStatRow(string label, StatKind stat, int value, int unspentStatPoints)
@@ -690,6 +810,9 @@ namespace Lumiis.Client
             _lastShopActionFailedMessage = "";
             _lastLevelUpMessage = "";
             _lastDodgeMessage = "";
+            _skillCooldownReadyAtTime.Clear();
+            _activeBuffRemainingSeconds.Clear();
+            _lastSkillFailedMessage = "";
         }
 
         private void OnPacketReceived(IPacket packet)
@@ -846,6 +969,22 @@ namespace Lumiis.Client
             {
                 if (dodged.TargetEntityId == _world.LocalEntityId) _lastDodgeMessage = "Ausgewichen!";
                 else if (dodged.AttackerEntityId == _world.LocalEntityId) _lastDodgeMessage = "Verfehlt!";
+                return;
+            }
+
+            UseSkillFailedPacket skillFailed = packet as UseSkillFailedPacket;
+            if (skillFailed != null)
+            {
+                _lastSkillFailedMessage = UseSkillFailedReasonText(skillFailed.Reason);
+                return;
+            }
+
+            ActiveBuffsChangedPacket activeBuffs = packet as ActiveBuffsChangedPacket;
+            if (activeBuffs != null)
+            {
+                _activeBuffRemainingSeconds.Clear();
+                foreach ((BuffType type, long remainingMs) in activeBuffs.Buffs)
+                    _activeBuffRemainingSeconds[type] = remainingMs / 1000f;
             }
         }
 
@@ -882,6 +1021,33 @@ namespace Lumiis.Client
                 case AttackFailedReason.TargetIsPlayer: return "Spieler können nicht angegriffen werden.";
                 case AttackFailedReason.TargetNotAttackable: return "Dieses Ziel kann nicht angegriffen werden.";
                 default: return "Angriff fehlgeschlagen.";
+            }
+        }
+
+        private static string UseSkillFailedReasonText(UseSkillFailedReason reason)
+        {
+            switch (reason)
+            {
+                case UseSkillFailedReason.NotLearned: return "Skill nicht erlernt.";
+                case UseSkillFailedReason.NotEnoughSp: return "Nicht genug SP.";
+                case UseSkillFailedReason.OnCooldown: return "Skill noch im Abklingen.";
+                case UseSkillFailedReason.TargetRequired: return "Ziel erforderlich.";
+                case UseSkillFailedReason.TargetNotFound: return "Ziel nicht gefunden.";
+                case UseSkillFailedReason.TargetAlreadyDead: return "Ziel ist bereits tot.";
+                case UseSkillFailedReason.OutOfRange: return "Ziel außer Reichweite.";
+                case UseSkillFailedReason.TargetIsPlayer: return "Spieler können nicht angegriffen werden.";
+                case UseSkillFailedReason.TargetNotAttackable: return "Dieses Ziel kann nicht angegriffen werden.";
+                default: return "Skill fehlgeschlagen.";
+            }
+        }
+
+        private static string BuffDisplayName(BuffType type)
+        {
+            switch (type)
+            {
+                case BuffType.AttackBuff: return "Kampfrausch";
+                case BuffType.AttackSpeedBuff: return "Hast";
+                default: return type.ToString();
             }
         }
 
@@ -1036,6 +1202,7 @@ namespace Lumiis.Client
             {
                 DrawStatusLine();
                 DrawCombatLine();
+                DrawSkillsLine();
                 DrawEntityList();
                 DrawEntityLabels();
             }
@@ -1081,6 +1248,33 @@ namespace Lumiis.Client
             GUI.Label(new Rect(10, 32, 700, 20), text);
         }
 
+        /// <summary>M6b: Tastenbelegung 1-4 mit Skill-Namen, dahinter (falls aktiv) lokale Cooldown-Restzeit
+        /// bzw. aktive Buffs (server-autoritative RemainingMs, siehe TickBuffCountdowns) sowie die letzte
+        /// UseSkillFailedPacket-Meldung. Echte Spielsteuerung, deshalb ungated (kein #if UNITY_EDITOR/
+        /// DEVELOPMENT_BUILD, anders als das Debug-Test-Panel).</summary>
+        private void DrawSkillsLine()
+        {
+            string text = "";
+            foreach ((int skillId, bool _) in SkillHotkeys)
+            {
+                string name = _skillCatalog != null ? _skillCatalog.DisplayName(skillId) : "Skill " + skillId;
+                string cooldownSuffix = "";
+                if (_skillCooldownReadyAtTime.TryGetValue(skillId, out float readyAt))
+                {
+                    float remaining = readyAt - Time.time;
+                    if (remaining > 0f) cooldownSuffix = " (" + remaining.ToString("0.0") + "s)";
+                }
+                text += skillId + ":" + name + cooldownSuffix + "   ";
+            }
+
+            foreach (KeyValuePair<BuffType, float> kvp in _activeBuffRemainingSeconds)
+                text += BuffDisplayName(kvp.Key) + ": " + kvp.Value.ToString("0.0") + "s   ";
+
+            if (!string.IsNullOrEmpty(_lastSkillFailedMessage)) text += "| " + _lastSkillFailedMessage;
+
+            GUI.Label(new Rect(10, 54, 760, 20), text);
+        }
+
         /// <summary>Liste aller Entities, nach Entfernung zum lokalen Spieler sortiert, maximal MaxDebugEntityRows Zeilen.
         /// Die Gesamtzahl bleibt unabhängig davon in DrawStatusLine sichtbar.</summary>
         private void DrawEntityList()
@@ -1091,7 +1285,7 @@ namespace Lumiis.Client
             List<ClientEntity> sorted = new List<ClientEntity>(_world.Entities.Values);
             sorted.Sort((a, b) => DistanceToLocal(local, a).CompareTo(DistanceToLocal(local, b)));
 
-            float y = 54f;
+            float y = 76f;
             int shown = 0;
             foreach (ClientEntity entity in sorted)
             {

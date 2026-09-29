@@ -15,6 +15,7 @@
       <UnityDataDir>$(MSBuildThisFileDirectory)../../../client/Assets/StreamingAssets/lumiis-data/</UnityDataDir>
       <LooksJsonSource>$(MSBuildThisFileDirectory)../../../data/looks.json</LooksJsonSource>
       <ItemsJsonSource>$(MSBuildThisFileDirectory)../../../data/items.json</ItemsJsonSource>
+      <SkillsJsonSource>$(MSBuildThisFileDirectory)../../../data/skills.json</SkillsJsonSource>
     </PropertyGroup>
     <ItemGroup>
       <UnityPluginFiles Include="$(TargetPath)" />
@@ -23,6 +24,7 @@
     <ItemGroup>
       <UnityDataFiles Include="$(LooksJsonSource)" Condition="Exists('$(LooksJsonSource)')" />
       <UnityDataFiles Include="$(ItemsJsonSource)" Condition="Exists('$(ItemsJsonSource)')" />
+      <UnityDataFiles Include="$(SkillsJsonSource)" Condition="Exists('$(SkillsJsonSource)')" />
     </ItemGroup>
     <Copy SourceFiles="@(UnityPluginFiles)" DestinationFolder="$(UnityPluginsDir)" SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(UnityDataFiles)" DestinationFolder="$(UnityDataDir)" SkipUnchangedFiles="true" />
