@@ -16,6 +16,7 @@ using Lumiis.Data.Maps;
 using Lumiis.Data.Mobs;
 using Lumiis.Data.Npcs;
 using Lumiis.Data.Progression;
+using Lumiis.Data.Skills;
 using Lumiis.Server.Game;
 using Lumiis.Server.Logging;
 using Lumiis.Server.Net;
@@ -87,11 +88,16 @@ public sealed class GameServer : INetEventListener
     /// gemeinsam (Levelaufstieg heilt z. B. voll), eine gemeinsame Transaktion ist deshalb weiterhin sinnvoll.
     /// Neue Auslöser seit M6a: periodisch wie Position (siehe EnqueueDuePositionSaves) und bei Disconnect
     /// (siehe OnPeerDisconnected) - diese beiden decken die kontinuierlichen HP/SP-Änderungen durch Kampf/
-    /// Regeneration ab, die bewusst KEIN eigenes sofortiges Save auslösen (siehe RunRegeneration/TryAttack).</summary>
+    /// Regeneration ab, die bewusst KEIN eigenes sofortiges Save auslösen (siehe RunRegeneration/TryAttack).
+    /// Seit M6b zusätzlich die gelernten Skillstufen (voller Snapshot wie Inventar, kein Delta) - Auslöser
+    /// dort: sofort bei AllocateSkillPoint (analog zu AllocateStatPoint), sonst über denselben periodischen/
+    /// Disconnect-Save wie der restliche Fortschritt (Skill-Cooldowns/aktive Buffs werden NICHT persistiert,
+    /// siehe Entity.ActiveBuffs-Kommentar).</summary>
     private readonly record struct CharacterSaveRequest(int CharacterId, long Yang, List<(int SlotIndex, int ItemId)> Slots,
         int EquippedArmorItemId, int EquippedHelmetItemId, int EquippedWeaponItemId, int EquippedShieldItemId,
         int Level, long Xp, int SpentSt, int SpentHt, int SpentDx, int SpentIq,
-        int UnspentStatPoints, int UnspentSkillPoints, int CurrentHp, int CurrentSp);
+        int UnspentStatPoints, int UnspentSkillPoints, int CurrentHp, int CurrentSp,
+        List<(int SkillId, int Level)> SkillLevels);
 
     private const int MaxConsecutiveFailedTicks = 50;
 
@@ -165,11 +171,14 @@ public sealed class GameServer : INetEventListener
     /// hier einmalig beim Serverstart angelegt, analog zu Monstern (siehe docs/tasks/M5b-shop.md).
     /// progressionCatalog: null bedeutet "kein XP-Gewinn/keine XpToNext-Angabe" (z. B. bestehende Tests ohne
     /// Fortschrittsbezug, siehe World-Konstruktor) - Program.cs lädt beim echten Serverstart immer eine
-    /// Instanz aus data/progression.json (M6a).</summary>
+    /// Instanz aus data/progression.json (M6a). skillCatalog: null bedeutet "keine Skills nutzbar" (z. B.
+    /// bestehende Tests ohne Skillbezug, siehe World-Konstruktor) - Program.cs lädt beim echten Serverstart
+    /// immer eine Instanz aus data/skills.json (M6b). Nur an World durchgereicht, GameServer selbst braucht
+    /// den Katalog nicht (anders als z. B. itemCatalog für ToAppearance).</summary>
     public GameServer(ServerConfig config, ILogger logger, TokenService tokenService, Func<LumiisDbContext> dbContextFactory,
         Func<long>? nowMs = null, CollisionMap? collisionMap = null, MobCatalog? mobCatalog = null, SpawnCatalog? spawnCatalog = null,
         ClassCatalog? classCatalog = null, ItemCatalog? itemCatalog = null, NpcCatalog? npcCatalog = null, NpcSpawnCatalog? npcSpawnCatalog = null,
-        ProgressionCatalog? progressionCatalog = null)
+        ProgressionCatalog? progressionCatalog = null, SkillCatalog? skillCatalog = null)
     {
         _config = config;
         _logger = logger;
@@ -179,7 +188,7 @@ public sealed class GameServer : INetEventListener
         _mobCatalog = mobCatalog;
         _itemCatalog = itemCatalog;
         _progressionCatalog = progressionCatalog;
-        _world = new World(config.MaxPlayers, collisionMap, itemCatalog: itemCatalog, progressionCatalog: progressionCatalog);
+        _world = new World(config.MaxPlayers, collisionMap, itemCatalog: itemCatalog, progressionCatalog: progressionCatalog, skillCatalog: skillCatalog);
         _netManager = new NetManager(this) { UpdateTime = 15 };
         _nowMs = nowMs ?? DefaultNowMs;
 
@@ -321,9 +330,10 @@ public sealed class GameServer : INetEventListener
         }
 
         double deltaSeconds = 1.0 / Protocol.TickRate;
+        long tickNowMs = _nowMs();
         (List<Entity> arrived, List<Entity> startedWandering, List<Entity> respawned, List<Entity> respawnedMonsters,
             List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> monsterAttacks, List<Entity> regeneratedPlayers,
-            List<Entity> buffsExpired) = _world.Tick(deltaSeconds, _nowMs());
+            List<Entity> buffsExpired) = _world.Tick(deltaSeconds, tickNowMs);
         foreach (Entity entity in arrived)
             SendToVisible(entity.Id, new EntityStopPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY });
 
@@ -347,6 +357,18 @@ public sealed class GameServer : INetEventListener
         // docs/tasks/M6a-progression.md Abschnitt 5 - periodischer/Disconnect-Save holt den Stand ein).
         foreach (Entity entity in regeneratedPlayers)
             FindConnectionByEntityId(entity.Id)?.Peer.SendPacket(BuildCharacterStatsPacket(entity));
+
+        // M6b: natürlich abgelaufene Buffs (siehe World.Tick) - ActiveBuffsChangedPacket mit dem
+        // aktualisierten (ggf. leeren) Stand, plus CharacterStatsPacket (Attack hat sich durch
+        // RecomputeDerivedStats in World.Tick bereits geändert, falls Kampfrausch betroffen war). Nur an den
+        // Besitzer, wie bei Regeneration/Respawn oben.
+        foreach (Entity entity in buffsExpired)
+        {
+            ConnectionState? conn = FindConnectionByEntityId(entity.Id);
+            if (conn == null) continue;
+            conn.Peer.SendPacket(BuildActiveBuffsChangedPacket(entity, tickNowMs));
+            conn.Peer.SendPacket(BuildCharacterStatsPacket(entity));
+        }
 
         // Wander-KI (World.Tick) hat fälligen Monstern ein neues Ziel gesetzt - dieselbe EntityMove-
         // Benachrichtigung wie bei einem Spieler-MoveTo (HandleMoveTo), nur ohne eingehendes Paket als Auslöser.
@@ -581,7 +603,7 @@ public sealed class GameServer : INetEventListener
                 try
                 {
                     await using LumiisDbContext db = _dbContextFactory();
-                    Character? character = await db.Characters.Include(c => c.InventoryItems)
+                    Character? character = await db.Characters.Include(c => c.InventoryItems).Include(c => c.SkillLevels)
                         .SingleOrDefaultAsync(c => c.Id == request.CharacterId, cancellationToken);
                     if (character == null) continue; // Charakter inzwischen gelöscht o. Ä. - kein Fehler, einfach überspringen.
 
@@ -607,11 +629,16 @@ public sealed class GameServer : INetEventListener
                     foreach ((int slotIndex, int itemId) in request.Slots)
                         character.InventoryItems.Add(new CharacterInventoryItem { CharacterId = request.CharacterId, SlotIndex = slotIndex, ItemId = itemId });
 
+                    // M6b: voller Skillstufen-Snapshot, kein Delta - gleiches Muster wie Inventar oben.
+                    db.CharacterSkillLevels.RemoveRange(character.SkillLevels);
+                    foreach ((int skillId, int level) in request.SkillLevels)
+                        character.SkillLevels.Add(new CharacterSkillLevel { CharacterId = request.CharacterId, SkillId = skillId, Level = level });
+
                     await db.SaveChangesAsync(cancellationToken);
                 }
                 catch (Exception ex)
                 {
-                    _logger.Error($"Fehler beim Speichern von Yang+Inventar+Fortschritt für Charakter {request.CharacterId}: {ex}");
+                    _logger.Error($"Fehler beim Speichern von Yang+Inventar+Fortschritt+Skills für Charakter {request.CharacterId}: {ex}");
                 }
             }
         }
@@ -814,6 +841,12 @@ public sealed class GameServer : INetEventListener
             case DebugSetLevelRequestPacket debugSetLevel:
                 HandleDebugSetLevelRequest(conn, debugSetLevel);
                 break;
+            case UseSkillRequestPacket useSkill:
+                HandleUseSkillRequest(conn, useSkill);
+                break;
+            case AllocateSkillPointRequestPacket allocateSkillPoint:
+                HandleAllocateSkillPointRequest(conn, allocateSkillPoint);
+                break;
             default:
                 _logger.Warn($"Unerwartetes Paket {packet.Id} von Verbindung {conn.Peer.Id}");
                 conn.Peer.Disconnect();
@@ -868,7 +901,7 @@ public sealed class GameServer : INetEventListener
             // Include bleibt die Navigation Collection leer, CompleteJoin würde das gesamte gespeicherte
             // Inventar beim nächsten Join stillschweigend verlieren (EquippedXItemId sind einfache Spalten
             // und wären davon NICHT betroffen - nur die separate CharacterInventoryItem-Tabelle).
-            Character? character = await db.Characters.AsNoTracking().Include(c => c.InventoryItems)
+            Character? character = await db.Characters.AsNoTracking().Include(c => c.InventoryItems).Include(c => c.SkillLevels)
                 .SingleOrDefaultAsync(c => c.Id == characterId);
 
             // Eigentümerschaft prüfen: die CharacterId muss zur AccountId aus dem Token gehören, sonst wie
@@ -958,6 +991,13 @@ public sealed class GameServer : INetEventListener
             if (inventoryItem.SlotIndex >= 0 && inventoryItem.SlotIndex < entity.Inventory.Length)
                 entity.Inventory[inventoryItem.SlotIndex] = inventoryItem.ItemId;
         }
+
+        // M6b: gelernte Skillstufen aus der Character-Zeile übertragen (kein Eintrag = Stufe 0/nicht gelernt,
+        // siehe CharacterSkillLevel-Kommentar) - vor RecomputeDerivedStats, auch wenn Skills selbst dort
+        // aktuell nichts beeinflussen (kein aktiver Buff direkt beim Join möglich, siehe Entity.ActiveBuffs).
+        foreach (CharacterSkillLevel skillLevel in character.SkillLevels)
+            entity.SkillLevels[skillLevel.SkillId] = skillLevel.Level;
+
         _world.RecomputeDerivedStats(entity.Id);
         entity.Appearance = ToAppearance(character);
 
@@ -1157,7 +1197,17 @@ public sealed class GameServer : INetEventListener
             return;
         }
 
-        BroadcastAttackResult(attackerId, attack.TargetEntityId, result);
+        ApplyAttackResult(conn, attackerId, attack.TargetEntityId, result);
+    }
+
+    /// <summary>M6b-Extraktion aus HandleAttackRequest (siehe docs/tasks/M6b-skills.md Abschnitt 5): die
+    /// komplette Netzwerk-/Persistenz-Seite EINES erfolgreichen Treffers (Pakete, Yang, XP, Drops, Logging) -
+    /// unverändert gegenüber vorher, nur ausgelagert, damit HandleUseSkillRequest denselben Weg für
+    /// Wuchtschlag (ein Treffer) UND Kreisschlag (mehrere Treffer, je Ziel ein Aufruf) wiederverwenden kann,
+    /// statt den Block zu duplizieren.</summary>
+    private void ApplyAttackResult(ConnectionState conn, int attackerId, int targetEntityId, AttackResult result)
+    {
+        BroadcastAttackResult(attackerId, targetEntityId, result);
 
         if (result.YangAwarded > 0 && _world.TryGet(attackerId, out Entity? attackerEntity))
         {
@@ -1190,12 +1240,80 @@ public sealed class GameServer : INetEventListener
         if (result.ItemLostToFullInventory)
             conn.Peer.SendPacket(new InventoryActionFailedPacket { Reason = InventoryActionFailedReason.InventoryFull });
 
-        _logger.Info($"Entity {attackerId} trifft Entity {attack.TargetEntityId} ({(result.Dodged ? "ausgewichen" : $"{result.Damage} Schaden")})" +
+        _logger.Info($"Entity {attackerId} trifft Entity {targetEntityId} ({(result.Dodged ? "ausgewichen" : $"{result.Damage} Schaden")})" +
             (result.TargetDied ? ", Ziel gestorben" : "") +
             (result.YangAwarded > 0 ? $", +{result.YangAwarded} Yang" : "") +
             (result.XpAwarded > 0 ? $", +{result.XpAwarded} XP" + (result.LeveledUp ? " (Levelaufstieg)" : "") : "") +
             (result.DroppedItemIds.Count > 0 ? $", Drop(s): {string.Join(",", result.DroppedItemIds)}" : "") +
             (result.ItemLostToFullInventory ? ", Drop verloren (Inventar voll)" : ""));
+    }
+
+    /// <summary>UseSkillRequestPacket-Handler (M6b, Taste 1-4 - echte Spielsteuerung, kein Debug-Feature):
+    /// ruft World.TryUseSkill auf. Erfolg bei Schadens-Skills (SingleStrike/AreaAttack): dieselbe Netzwerk-/
+    /// Persistenz-Seite wie ein normaler Angriff, einmal pro getroffenem Ziel (siehe ApplyAttackResult) -
+    /// AreaAttack kann mehrere Ziele gleichzeitig treffen, jedes bekommt seine eigenen Pakete. Erfolg bei
+    /// Buff-Skills (AttackBuff/AttackSpeedBuff): ActiveBuffsChangedPacket an den Nutzer selbst, dazu ein
+    /// CharacterStatsPacket - reicht laut Abschnitt-5-Ermessen aus, statt eines eigenen leichteren Pakets:
+    /// Attack ändert sich nur bei Kampfrausch (RecomputeDerivedStats bereits in World.TryUseSkill gelaufen),
+    /// der Client bekommt CharacterStatsPacket ohnehin schon nach jedem Levelaufstieg/Equip, ein weiteres
+    /// Format wäre nur Protokoll-Wildwuchs für denselben Zweck. Fehlschlag: UseSkillFailedPacket nur an den
+    /// Anfragenden, Verbindung bleibt bestehen.</summary>
+    private void HandleUseSkillRequest(ConnectionState conn, UseSkillRequestPacket request)
+    {
+        if (conn.EntityId is not int userId)
+        {
+            _logger.Warn($"UseSkillRequest vor Join von Verbindung {conn.Peer.Id}");
+            conn.Peer.Disconnect();
+            return;
+        }
+
+        long nowMs = _nowMs();
+        SkillUseResult result = _world.TryUseSkill(userId, request.SkillId, request.TargetEntityId, nowMs);
+
+        if (!result.Success)
+        {
+            conn.Peer.SendPacket(new UseSkillFailedPacket { Reason = result.Reason });
+            _logger.Info($"UseSkillRequest von Entity {userId} (Skill {request.SkillId}) abgelehnt ({result.Reason})");
+            return;
+        }
+
+        if (result.BuffApplied is BuffType buffType)
+        {
+            if (!_world.TryGet(userId, out Entity? user)) return; // sollte nicht vorkommen.
+            conn.Peer.SendPacket(BuildActiveBuffsChangedPacket(user!, nowMs));
+            conn.Peer.SendPacket(BuildCharacterStatsPacket(user!));
+            _logger.Info($"Entity {userId} setzt Skill {request.SkillId} ein (Buff {buffType})");
+            return;
+        }
+
+        foreach ((int targetEntityId, AttackResult hitResult) in result.Hits)
+            ApplyAttackResult(conn, userId, targetEntityId, hitResult);
+
+        _logger.Info($"Entity {userId} setzt Skill {request.SkillId} ein ({result.Hits.Count} Treffer)");
+    }
+
+    /// <summary>AllocateSkillPointRequestPacket-Handler (M6b): ruft World.TryAllocateSkillPoint auf - wie bei
+    /// AllocateStatPointRequestPacket (M6a) kein eigenes Fehlerpaket, eine ungültige Anfrage (keine Punkte,
+    /// unbekannter Skill, schon Stufe 17) wird verworfen und geloggt, der Server antwortet in JEDEM Fall mit
+    /// dem aktuellen CharacterStatsPacket. Sofortiges Speichern nur bei tatsächlichem Erfolg.</summary>
+    private void HandleAllocateSkillPointRequest(ConnectionState conn, AllocateSkillPointRequestPacket request)
+    {
+        if (conn.EntityId is not int entityId)
+        {
+            _logger.Warn($"AllocateSkillPointRequest vor Join von Verbindung {conn.Peer.Id}");
+            conn.Peer.Disconnect();
+            return;
+        }
+
+        bool success = _world.TryAllocateSkillPoint(entityId, request.SkillId);
+        if (!success)
+            _logger.Info($"AllocateSkillPointRequest von Entity {entityId} (Skill {request.SkillId}) abgelehnt (keine Punkte, unbekannter Skill oder bereits Stufe {SkillCatalog.MaxSkillLevel})");
+
+        if (!_world.TryGet(entityId, out Entity? entity)) return; // sollte nicht vorkommen.
+
+        conn.Peer.SendPacket(BuildCharacterStatsPacket(entity!));
+        if (success && entity!.CharacterId is int characterId)
+            _characterSaveChannel.Writer.TryWrite(BuildCharacterSaveRequest(entity));
     }
 
     /// <summary>Baut ein volles InventorySyncPacket aus dem aktuellen Entity-Zustand (M5a) - Resync, kein
@@ -1225,7 +1343,7 @@ public sealed class GameServer : INetEventListener
     /// Kommentar) - XpToNext kommt aus ProgressionCatalog (0 ohne Katalog oder auf MaxLevel).</summary>
     private CharacterStatsPacket BuildCharacterStatsPacket(Entity entity)
     {
-        return new CharacterStatsPacket
+        var packet = new CharacterStatsPacket
         {
             Level = entity.Level,
             Xp = entity.Xp,
@@ -1245,6 +1363,24 @@ public sealed class GameServer : INetEventListener
             Defense = entity.Defense,
             DodgeBp = entity.DodgeBp
         };
+
+        // M6b: alle gelernten Skills (Stufe > 0 - Entity.SkillLevels enthält per TryAllocateSkillPoint ohnehin
+        // nie eine 0-Stufe, siehe dort).
+        foreach (KeyValuePair<int, int> kvp in entity.SkillLevels)
+            packet.Skills.Add((kvp.Key, kvp.Value));
+
+        return packet;
+    }
+
+    /// <summary>M6b: voller eigener aktive-Buffs-Stand (siehe ActiveBuffsChangedPacket-Kommentar) - RemainingMs
+    /// statt eines absoluten Zeitstempels, deshalb braucht der Aufbau nowMs (Projekt-Konvention: keine
+    /// Client-Uhrensynchronisation). Leere Liste = keine aktiven Buffs (z. B. direkt nach Ablauf des letzten).</summary>
+    private static ActiveBuffsChangedPacket BuildActiveBuffsChangedPacket(Entity entity, long nowMs)
+    {
+        var packet = new ActiveBuffsChangedPacket();
+        foreach (KeyValuePair<BuffType, (int Strength, long ExpiresAtMs)> kvp in entity.ActiveBuffs)
+            packet.Buffs.Add((kvp.Key, Math.Max(0, kvp.Value.ExpiresAtMs - nowMs)));
+        return packet;
     }
 
     /// <summary>Baut den vollen Persistenz-Snapshot aus dem aktuellen Entity-Zustand (M5a, siehe
@@ -1277,10 +1413,14 @@ public sealed class GameServer : INetEventListener
                 slots.Add((slotIndex, itemId));
         }
 
+        var skillLevels = new List<(int SkillId, int Level)>();
+        foreach (KeyValuePair<int, int> kvp in entity.SkillLevels)
+            skillLevels.Add((kvp.Key, kvp.Value));
+
         return new CharacterSaveRequest(entity.CharacterId!.Value, entity.Yang, slots,
             entity.EquippedArmorItemId, entity.EquippedHelmetItemId, entity.EquippedWeaponItemId, entity.EquippedShieldItemId,
             entity.Level, entity.Xp, entity.SpentSt, entity.SpentHt, entity.SpentDx, entity.SpentIq,
-            entity.UnspentStatPoints, entity.UnspentSkillPoints, entity.CurrentHp, entity.CurrentSp);
+            entity.UnspentStatPoints, entity.UnspentSkillPoints, entity.CurrentHp, entity.CurrentSp, skillLevels);
     }
 
     /// <summary>EquipItemRequestPacket-Handler (M5a): ruft World.TryEquip auf. Erfolg: siehe

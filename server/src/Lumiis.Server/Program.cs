@@ -7,6 +7,7 @@ using Lumiis.Data.Maps;
 using Lumiis.Data.Mobs;
 using Lumiis.Data.Npcs;
 using Lumiis.Data.Progression;
+using Lumiis.Data.Skills;
 using Lumiis.Server;
 using Lumiis.Server.Logging;
 using Lumiis.Server.Net;
@@ -95,6 +96,19 @@ catch (Exception ex)
     return 1;
 }
 
+// M6b: vier Skills mit Stufen 1-17, siehe CLAUDE.md Abschnitt "Skills" - keine Querverweise gegen andere
+// Kataloge nötig (anders als items.json/looks.json), reine Validierung in sich (17 Stufen, positive Werte).
+SkillCatalog skillCatalog;
+try
+{
+    skillCatalog = SkillCatalog.LoadFromFile(Path.Combine(config.DataDir, "skills.json"));
+}
+catch (Exception ex)
+{
+    logger.Error($"Serverstart fehlgeschlagen (Skill-Daten): {ex.Message}");
+    return 1;
+}
+
 // looks.json wird nur zur Validierung von items.json gebraucht (jedes Ausrüstungs-Item braucht eine
 // existierende LookId im passenden Slot, siehe ItemCatalog.LoadFromJson) - der Server selbst löst Looks
 // seit M2b nicht mehr aus einem Katalog auf (Appearance kommt aus der DB-Zeile bzw. seit M5a zusätzlich
@@ -157,7 +171,7 @@ Console.CancelKeyPress += (_, eventArgs) =>
     cts.Cancel();
 };
 
-GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, collisionMap: collisionMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog, classCatalog: classCatalog, itemCatalog: itemCatalog, npcCatalog: npcCatalog, npcSpawnCatalog: npcSpawnCatalog, progressionCatalog: progressionCatalog);
+GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, collisionMap: collisionMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog, classCatalog: classCatalog, itemCatalog: itemCatalog, npcCatalog: npcCatalog, npcSpawnCatalog: npcSpawnCatalog, progressionCatalog: progressionCatalog, skillCatalog: skillCatalog);
 
 try
 {
