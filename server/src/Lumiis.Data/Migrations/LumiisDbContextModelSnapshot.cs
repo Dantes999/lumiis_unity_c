@@ -176,6 +176,31 @@ namespace Lumiis.Data.Migrations
                     b.ToTable("CharacterInventoryItems");
                 });
 
+            modelBuilder.Entity("Lumiis.Data.CharacterSkillLevel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CharacterId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Level")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SkillId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CharacterId", "SkillId")
+                        .IsUnique();
+
+                    b.ToTable("CharacterSkillLevels");
+                });
+
             modelBuilder.Entity("Lumiis.Data.Character", b =>
                 {
                     b.HasOne("Lumiis.Data.Account", "Account")
@@ -198,6 +223,17 @@ namespace Lumiis.Data.Migrations
                     b.Navigation("Character");
                 });
 
+            modelBuilder.Entity("Lumiis.Data.CharacterSkillLevel", b =>
+                {
+                    b.HasOne("Lumiis.Data.Character", "Character")
+                        .WithMany("SkillLevels")
+                        .HasForeignKey("CharacterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Character");
+                });
+
             modelBuilder.Entity("Lumiis.Data.Account", b =>
                 {
                     b.Navigation("Characters");
@@ -206,6 +242,8 @@ namespace Lumiis.Data.Migrations
             modelBuilder.Entity("Lumiis.Data.Character", b =>
                 {
                     b.Navigation("InventoryItems");
+
+                    b.Navigation("SkillLevels");
                 });
 #pragma warning restore 612, 618
         }

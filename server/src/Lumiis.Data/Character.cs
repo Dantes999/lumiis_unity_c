@@ -26,6 +26,9 @@ public sealed class Character
     /// <summary>Inventar-Slots (M5a) - siehe CharacterInventoryItem.</summary>
     public List<CharacterInventoryItem> InventoryItems { get; set; } = new();
 
+    /// <summary>Gelernte Skillstufen (M6b) - siehe CharacterSkillLevel. Kein Eintrag = Skill nicht gelernt.</summary>
+    public List<CharacterSkillLevel> SkillLevels { get; set; } = new();
+
     /// <summary>Null, solange der Charakter noch nie gespeichert wurde (z. B. direkt nach der Erstellung) -
     /// der Server setzt beim ersten Spawn dann eine Startposition, statt hier eine zu erfinden.</summary>
     public int? PositionX { get; set; }
