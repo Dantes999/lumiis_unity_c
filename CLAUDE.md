@@ -552,6 +552,11 @@ Aktuelle Aufgabe: keine - M6a ist fertig, für M6b gibt es noch keine Task-Datei
   oder in den Editor-Preferences unter "Interaction Mode" (Menüort kann je Unity-Version abweichen) auf
   "No Throttling" stellen. Ein Standalone-Build ist davon nicht betroffen (siehe Abschnitt "Client" -
   Development-Build für Tests ohne Fokus-Effekt).
+- Vereinzelter Timing-Flake bei `GameServerIntegrationTests.AfterBuy_DisconnectAndRejoin_YangAndInventoryPersistExactly`
+  (M5b) - reproduziert nicht isoliert (15/15 grün einzeln), nur gelegentlich im vollen `dotnet test`-Lauf; keine
+  gezielte Ursachendiagnose bisher, nur per Retry toleriert - vermutlich dieselbe grundsätzliche Klasse wie die
+  feste `Thread.Sleep(15)` in `Pump()` gegen `NetManager.UpdateTime` bei echten Sockets unter CPU-Last (siehe
+  `GameServerIntegrationTests.Pump`-Kommentar), aber nicht bestätigt.
 
 ## Bekannte Lücken
 - AOI (Sichtbarkeit): Aktuell sehen alle Verbindungen alle Entities, keine Kartenausschnitt-Filterung. Geplant für M3 (Grid, AOI, Mobs). Markiert mit TODO(M3) in `World.cs` und `GameServer.cs`.
