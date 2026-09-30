@@ -23,6 +23,14 @@ namespace Lumiis.Client
         private Sprite _localMarkerSprite;
         private Sprite _monsterCircleSprite;
         private Sprite _monsterTriangleSprite;
+
+        // ---- Kampf-Visualisierung (rein clientseitig/kosmetisch, siehe CLAUDE.md Abschnitt
+        // "Kampf-Visualisierung") ----
+        // Einheits-Ring (Durchmesser exakt 1 Weltenheit bei transform.localScale 1) - gemeinsame Sprite fuer
+        // Reichweitenring/Radius-Blitz/Buff-Ringe, Groesse jeweils ueber localScale gesteuert statt einer
+        // eigenen gebackenen Textur pro Verwendung (siehe RangeRingView/RadiusFlashView/BuffRingView).
+        private Sprite _unitRingSprite;
+        private RangeRingView _rangeRingView;
         private LookCatalogClient _lookCatalog;
         private ItemCatalogClient _itemCatalog;
         private SkillCatalogClient _skillCatalog;
@@ -125,6 +133,9 @@ namespace Lumiis.Client
             _localMarkerSprite = PlaceholderSprites.CreateRing();
             _monsterCircleSprite = PlaceholderSprites.CreateCircle();
             _monsterTriangleSprite = PlaceholderSprites.CreateTriangle();
+            // pixelsPerUnit == pixelSize: Durchmesser exakt 1 Weltenheit bei transform.localScale 1 (siehe
+            // RangeRingView-Klassenkommentar) - duenner Ring (innerRadiusFraction nah an 1).
+            _unitRingSprite = PlaceholderSprites.CreateRing(pixelSize: 64, innerRadiusFraction: 0.85f, pixelsPerUnit: 64);
 
             try
             {
@@ -208,6 +219,9 @@ namespace Lumiis.Client
                 if (_world.Entities.TryGetValue(kvp.Key, out entity))
                     kvp.Value.SetWorldPosition(entity.X / 100.0, entity.Y / 100.0);
             }
+
+            if (_rangeRingView != null && _world.LocalEntityId >= 0 && _world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity localForRing))
+                _rangeRingView.SetWorldPosition(localForRing.X / 100.0, localForRing.Y / 100.0);
 
             if (_inGame)
             {
@@ -1113,6 +1127,14 @@ namespace Lumiis.Client
                 markerGo.transform.SetParent(go.transform, false);
                 LocalPlayerMarker marker = markerGo.AddComponent<LocalPlayerMarker>();
                 marker.Initialize(_localMarkerSprite);
+
+                // Kampf-Visualisierung Abschnitt 2: Reichweitenring, unparented (siehe RangeRingView-
+                // Klassenkommentar) - Durchmesser = 2 * MeleeRangeWire (Radius), Wire -> Weltenheit /100.
+                var rangeRingGo = new GameObject("RangeRing");
+                _rangeRingView = rangeRingGo.AddComponent<RangeRingView>();
+                float rangeDiameter = 2f * _classCatalog.MeleeRangeWire / 100f;
+                _rangeRingView.Initialize(_unitRingSprite, rangeDiameter);
+                _rangeRingView.SetWorldPosition(entity.X / 100.0, entity.Y / 100.0);
             }
         }
 
@@ -1166,6 +1188,9 @@ namespace Lumiis.Client
             foreach (MonsterView monsterView in _monsterViews.Values)
                 if (monsterView != null) Destroy(monsterView.gameObject);
             _monsterViews.Clear();
+
+            if (_rangeRingView != null) Destroy(_rangeRingView.gameObject);
+            _rangeRingView = null;
 
             _world.Reset();
         }
