@@ -16,6 +16,7 @@
       <LooksJsonSource>$(MSBuildThisFileDirectory)../../../data/looks.json</LooksJsonSource>
       <ItemsJsonSource>$(MSBuildThisFileDirectory)../../../data/items.json</ItemsJsonSource>
       <SkillsJsonSource>$(MSBuildThisFileDirectory)../../../data/skills.json</SkillsJsonSource>
+      <ClassesJsonSource>$(MSBuildThisFileDirectory)../../../data/classes.json</ClassesJsonSource>
     </PropertyGroup>
     <ItemGroup>
       <UnityPluginFiles Include="$(TargetPath)" />
@@ -25,6 +26,7 @@
       <UnityDataFiles Include="$(LooksJsonSource)" Condition="Exists('$(LooksJsonSource)')" />
       <UnityDataFiles Include="$(ItemsJsonSource)" Condition="Exists('$(ItemsJsonSource)')" />
       <UnityDataFiles Include="$(SkillsJsonSource)" Condition="Exists('$(SkillsJsonSource)')" />
+      <UnityDataFiles Include="$(ClassesJsonSource)" Condition="Exists('$(ClassesJsonSource)')" />
     </ItemGroup>
     <Copy SourceFiles="@(UnityPluginFiles)" DestinationFolder="$(UnityPluginsDir)" SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(UnityDataFiles)" DestinationFolder="$(UnityDataDir)" SkipUnchangedFiles="true" />

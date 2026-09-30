@@ -23,6 +23,12 @@ namespace Lumiis.Client
     {
         public int id;
         public string name = "";
+
+        /// <summary>combat-visuals: nur bei AreaAttack-Skills (Kreisschlag) aussagekräftig, konstant über
+        /// alle Stufen - für den Radius-Blitz beim Senden (siehe GameClient.UseSkillHotkey). 0 bei anderen
+        /// Skill-Typen (Feld fehlt dann im JSON, JsonUtility lässt es beim int-Default 0).</summary>
+        public int radiusWire;
+
         public SkillLevelEntryJson[] levels = Array.Empty<SkillLevelEntryJson>();
     }
 
@@ -82,6 +88,13 @@ namespace Lumiis.Client
             int index = level - 1;
             if (index < 0 || index >= entry.levels.Length) return 0;
             return entry.levels[index].cooldownMs;
+        }
+
+        /// <summary>combat-visuals: RadiusWire eines AreaAttack-Skills (Kreisschlag) - 0 bei unbekannter
+        /// SkillId oder einem Skill ohne Radius (SingleStrike/Buff-Skills).</summary>
+        public int RadiusWire(int skillId)
+        {
+            return TryGet(skillId, out SkillEntryJson entry) ? entry.radiusWire : 0;
         }
     }
 }

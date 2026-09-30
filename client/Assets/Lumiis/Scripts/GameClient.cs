@@ -26,6 +26,7 @@ namespace Lumiis.Client
         private LookCatalogClient _lookCatalog;
         private ItemCatalogClient _itemCatalog;
         private SkillCatalogClient _skillCatalog;
+        private ClassCatalogClient _classCatalog;
         private CachingSpriteProvider _spriteProvider;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private CharacterTestboard _testboard;
@@ -155,6 +156,17 @@ namespace Lumiis.Client
             catch (System.Exception ex)
             {
                 Debug.LogError("skills.json konnte nicht geladen werden (Assets/StreamingAssets/lumiis-data/skills.json). "
+                    + "Wurde 'cd server && dotnet build' vor dem Öffnen von Unity ausgeführt? " + ex);
+                throw;
+            }
+
+            try
+            {
+                _classCatalog = ClassCatalogClient.LoadFromStreamingAssets();
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError("classes.json konnte nicht geladen werden (Assets/StreamingAssets/lumiis-data/classes.json). "
                     + "Wurde 'cd server && dotnet build' vor dem Öffnen von Unity ausgeführt? " + ex);
                 throw;
             }
