@@ -177,6 +177,18 @@ namespace Lumiis.Client
             entity.Y = y;
         }
 
+        /// <summary>combat-visuals Abschnitt 5: dreht eine Entity kurzzeitig zu einem Zielpunkt (z. B. beim
+        /// Senden eines Angriffs, bevor die Serverantwort da ist, oder reaktiv beim Verarbeiten eines
+        /// eingehenden Treffers/Ausweichens) - rein optischer Override, KEIN eigener Zustand/Timer: der
+        /// nächste HandleEntityMove-Aufruf für dieselbe Entity überschreibt die Blickrichtung ganz normal
+        /// wieder bewegungsbasiert (siehe dort), "kein dauerhafter Override" ist damit strukturell garantiert.
+        /// Unbekannte Entity-Id ist kein Fehler (z. B. bereits despawnt), analog zu ApplyHp.</summary>
+        public void SetFacingOverride(int entityId, int targetX, int targetY)
+        {
+            if (!_entities.TryGetValue(entityId, out ClientEntity entity)) return;
+            entity.Facing = FacingMath.FromDelta(targetX - entity.IntX, targetY - entity.IntY, entity.Facing);
+        }
+
         /// <summary>M4a: aktualisiert das bekannte Leben einer getroffenen Entity (Debug-Overlay, siehe
         /// GameClient) - unbekannte Entity-Id ist kein Fehler (z. B. Paket für eine Entity, die in derselben
         /// Tick-Runde bereits despawnt wurde), anders als bei Move/Stop keine Warnung nötig.</summary>

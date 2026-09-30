@@ -314,6 +314,14 @@ namespace Lumiis.Client
 
             if (skillId == AreaAttackSkillId)
                 TriggerAreaAttackFlash();
+
+            // Kampf-Visualisierung Abschnitt 5: Wuchtschlag ist der einzige zielgerichtete Skill (siehe
+            // SkillHotkeys) - sofort lokal zum Ziel drehen, analog zu HandleRightClickAttack.
+            if (skillId == SingleStrikeSkillId && targetEntityId != 0 && _world.LocalEntityId >= 0
+                && _world.Entities.TryGetValue(targetEntityId, out ClientEntity skillTarget))
+            {
+                _world.SetFacingOverride(_world.LocalEntityId, skillTarget.IntX, skillTarget.IntY);
+            }
         }
 
         /// <summary>Kampf-Visualisierung Abschnitt 3: kurzzeitiger Radius-Ring beim Ausloesen von Kreisschlag -
@@ -819,6 +827,10 @@ namespace Lumiis.Client
                 if (kvp.Value == null || !kvp.Value.ContainsWorldPoint(worldPos)) continue;
                 _targetEntityId = kvp.Key;
                 _netClient.SendAttack(kvp.Key);
+                // Kampf-Visualisierung Abschnitt 5: sofort lokal zum Ziel drehen, bevor die Serverantwort da
+                // ist - kein dauerhafter Override, der naechste HandleEntityMove ueberschreibt das wieder.
+                if (_world.LocalEntityId >= 0 && _world.Entities.TryGetValue(kvp.Key, out ClientEntity attackTarget))
+                    _world.SetFacingOverride(_world.LocalEntityId, attackTarget.IntX, attackTarget.IntY);
                 return;
             }
 
@@ -1071,6 +1083,12 @@ namespace Lumiis.Client
             var go = new GameObject("HitLine");
             var line = go.AddComponent<HitLineView>();
             line.Initialize(from, to, hit ? HitLineColor : DodgeLineColor, durationSeconds: 0.2f);
+
+            // Abschnitt 5 (optionale Erweiterung "ohne grossen Aufwand"): auch fuer fremde Angreifer
+            // (Monster gegen Spieler, anderer Spieler gegen Monster) reaktiv zum Ziel drehen - beide
+            // Positionen sind hier ohnehin schon bekannt. Fuer den lokalen Spieler redundant zur
+            // optimistischen Drehung beim Senden (HandleRightClickAttack/UseSkillHotkey), aber harmlos.
+            _world.SetFacingOverride(attackerEntityId, target.IntX, target.IntY);
         }
 
         private static string InventoryActionFailedReasonText(InventoryActionFailedReason reason)

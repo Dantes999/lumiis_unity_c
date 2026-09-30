@@ -212,5 +212,54 @@ namespace Lumiis.Tests.Client
 
             Assert.Equal(0, world.CharacterStats.Level); // Sentinel: noch kein Paket seit dem Reset erhalten.
         }
+
+        // ---- combat-visuals Abschnitt 5: SetFacingOverride ----
+
+        [Fact]
+        public void SetFacingOverride_TurnsEntityTowardsTarget()
+        {
+            var world = new ClientWorld();
+            world.HandleJoinAccepted(entityId: 1, x: 50000, y: 50000, localName: "Me", appearance: SomeAppearance);
+
+            world.SetFacingOverride(entityId: 1, targetX: 51000, targetY: 50000); // Ziel rechts -> Side, kein FlipX.
+
+            Assert.Equal(FacingDirection.Side, world.Entities[1].Facing.Direction);
+            Assert.False(world.Entities[1].Facing.FlipX);
+        }
+
+        [Fact]
+        public void SetFacingOverride_TargetToLeft_FlipsX()
+        {
+            var world = new ClientWorld();
+            world.HandleJoinAccepted(entityId: 1, x: 50000, y: 50000, localName: "Me", appearance: SomeAppearance);
+
+            world.SetFacingOverride(entityId: 1, targetX: 49000, targetY: 50000); // Ziel links -> Side + FlipX.
+
+            Assert.Equal(FacingDirection.Side, world.Entities[1].Facing.Direction);
+            Assert.True(world.Entities[1].Facing.FlipX);
+        }
+
+        [Fact]
+        public void SetFacingOverride_OverwrittenByNextMove_NoLastingOverride()
+        {
+            var world = new ClientWorld();
+            world.HandleJoinAccepted(entityId: 1, x: 50000, y: 50000, localName: "Me", appearance: SomeAppearance);
+
+            world.SetFacingOverride(entityId: 1, targetX: 49000, targetY: 50000); // kurzzeitig nach links drehen.
+            Assert.True(world.Entities[1].Facing.FlipX);
+
+            // Der naechste echte Move-Befehl (z. B. Server bestaetigt eine Bewegung nach unten) ueberschreibt
+            // die Blickrichtung wieder ganz normal bewegungsbasiert - kein dauerhafter Override.
+            world.HandleEntityMove(entityId: 1, startX: 50000, startY: 50000, targetX: 50000, targetY: 49000, speed: 500, receivedAtTime: 1.0);
+
+            Assert.Equal(FacingDirection.Down, world.Entities[1].Facing.Direction);
+        }
+
+        [Fact]
+        public void SetFacingOverride_UnknownEntity_DoesNotThrow()
+        {
+            var world = new ClientWorld();
+            world.SetFacingOverride(entityId: 999, targetX: 0, targetY: 0); // keine Exception, kein Effekt.
+        }
     }
 }
