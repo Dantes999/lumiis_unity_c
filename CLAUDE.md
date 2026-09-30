@@ -570,6 +570,39 @@ zusätzlich zu `looks.json`/`items.json`/`skills.json` nach
 eine Klasse, der Client nimmt deshalb bewusst den ersten Katalog-Eintrag statt einer echten
 Zuordnung, analog zur serverseitigen `GameServer.DefaultClassName`-Vereinfachung).
 
+## Escape-Menü
+Seit der Aufgabe `escape-menu.md` gibt es ein kleines Escape-Menü mit drei Aktionen - rein clientseitig,
+keine Protokolländerung:
+- Charakter wechseln: trennt die Spielverbindung, behält das Token, geht zurück zur Charakterauswahl und
+  lädt die Liste per `GET /characters` neu. Bei zwischenzeitlich abgelaufenem Token (401): automatischer
+  vollständiger Logout mit Meldung ("Sitzung abgelaufen, bitte erneut anmelden.").
+- Ausloggen: trennt die Verbindung und verwirft das Token - wie ein unfreiwilliger Disconnect, zurück zum
+  Login-Bildschirm (Benutzername bleibt vorausgefüllt, bestehendes Verhalten).
+- Beenden: `Application.Quit()`, im Editor stattdessen `UnityEditor.EditorApplication.isPlaying = false`
+  (damit Play im Editor sauber stoppt, statt den ganzen Editor zu beenden).
+
+Mechanik: `LoginFlow.SwitchCharacter()`/`Logout()` setzen den Zustand VOR dem eigentlichen
+`NetClient.Stop()`-Aufruf. `LoginFlow.OnDisconnected` behandelt sonst jeden Disconnect aus `InGame`
+unbedingt als unfreiwillig (Token verwerfen) - durch die vorgezogene Zustandsänderung sieht es beim
+anschließenden Disconnect nur noch den bereits erledigten Wechsel (bestehender No-Op-Zweig), das Token
+bleibt bei "Charakter wechseln" also tatsächlich erhalten. `NetClient.Stop()` (vormals privates
+`StopClient()`, nur für `OnDestroy`/`OnApplicationQuit`) ist jetzt öffentlich und über einen
+`IsRunning`-Guard nachweislich sicher mehrfach aufrufbar.
+
+`EscapeMenu.uxml` (`client/Assets/Resources/UI/`) nutzt dieselbe `Resources.Load<VisualTreeAsset>`+
+`CloneTree`-Mechanik wie Login/CharacterSelect - als DRITTE Wurzel im selben `UIDocument` (nach den beiden
+bestehenden, wichtig für `LoginControllerPlayModeTests`, die per `root[0]`/`root[1]` genau darauf
+zugreifen). Escape öffnet/schließt es, aber nur während `LoginFlowState.InGame`; `ApplyLoginFlowState()`
+schließt es zusätzlich bei JEDEM Zustandswechsel (z. B. nach Charakter wechseln/Ausloggen), damit es nie
+offen stehen bleibt. Solange es sichtbar ist, sperrt `GameClient.SetGameplayInputLocked(true)`
+Bewegungsklick, Angriff/Rechtsklick und Skills 1-4 (`HandleClickInput`/`HandleSkillHotkeys`) - Zoom und
+F1-Overlay-Umschaltung bleiben aktiv (keine Gameplay-Aktionen im engeren Sinn).
+
+Standalone-Builds starten seit dieser Aufgabe im Fenstermodus statt Vollbild (`ProjectSettings.asset`:
+`fullscreenMode: 3` = Windowed, `defaultScreenWidth`/`defaultScreenHeight` 1280x720, `resizableWindow: 1`)
+- betrifft nur echte Player-Builds (`client/Builds/<plattform>/`, siehe `tools/build-client.sh`), der
+Editor-Play-Modus läuft ohnehin schon in einem Fenster und ist unverändert.
+
 ## Client
 Setup nach dem Klonen (auch auf dem zweiten Rechner):
 1. `cd server && dotnet build` - baut Lumiis.Shared und kopiert dabei Lumiis.Shared.dll sowie die netstandard2.1-Variante von LiteNetLib.dll nach `client/Assets/Plugins/Lumiis/` (git-ignoriert, entsteht bei jedem Build neu).
@@ -826,6 +859,34 @@ Richtungen gibt es bisher eine Task-Datei unter docs/tasks/.
   552 Tests grün (548 + 4 neue `ClientWorldTests`), 5x stabil, Batchmode-Compile-Check nach jedem
   Abschnitt 0 Fehler, `tools/test-client-playmode.sh` 4/4 grün (bestehende Login-PlayMode-Tests laufen
   vor jedem Join ab, die neuen Visuals werden dabei nie instanziiert - keine Anpassung nötig).
+- Escape-Menü (docs/tasks/escape-menu.md, kein eigener Meilenstein) fertig, in 4 Commits (0 Review nur
+  berichtet, kein Commit; 4 Prüfung bestätigt bestehende Tests/PlayMode-Tests unverändert grün, kein
+  eigener Commit nötig): (1) `NetClient.StopClient()` (privat) zu öffentlichem `Stop()` gemacht, mit
+  `IsRunning`-Guard (per Reflection gegen die installierte LiteNetLib-DLL verifiziert: `NetManager.
+  IsRunning` existiert) - dadurch nachweislich sicher mehrfach aufrufbar. Neue `LoginFlow.
+  SwitchCharacter()` (State auf CharacterSelect, Token bleibt) - muss VOR dem tatsächlichen Trennen
+  aufgerufen werden, damit `OnDisconnected` (das jeden Disconnect aus InGame sonst als unfreiwillig
+  behandelt) nur noch einen No-Op sieht. `LoginController` bekommt drei neue öffentliche Methoden fürs
+  Escape-Menü: `SwitchCharacter()` (State setzen, `NetClient.Stop()`, `RefreshCharactersAsync` -
+  behandelt ein zwischenzeitlich abgelaufenes Token über den bestehenden 401-Pfad), `Logout()` (reine
+  Wiederverwendung des bestehenden `LoginFlow.Logout()`, gleiches Vorzieh-Prinzip), `QuitGame()`
+  (`Application.Quit()`, im Editor `EditorApplication.isPlaying = false`). Neuer `LoginFlowTests`-Test
+  (`SwitchCharacter_KeepsTokenAndReturnsToCharacterSelect`). (2) Neue `EscapeMenu.uxml` (drei Buttons,
+  wiederverwendet bestehende `.screen`/`.panel`/`.title`/`.button-row`-Klassen aus `lumiis.uss`, keine
+  neue CSS) - als DRITTE Wurzel NACH Login/CharacterSelect in `rootVisualElement` angehängt (die
+  bestehenden `LoginControllerPlayModeTests` greifen per `root[0]`/`root[1]` auf genau die ersten beiden
+  zu). Escape (nur `LoginFlowState.InGame`) öffnet/schließt es; `ApplyLoginFlowState()` schließt es
+  zusätzlich bei JEDEM Zustandswechsel. Neues `GameClient.SetGameplayInputLocked(bool)` sperrt
+  Bewegungsklick/Angriff/Skills 1-4, während es offen ist (Zoom/F1 bleiben aktiv). (3) `ProjectSettings.
+  asset`: `fullscreenMode` 1 (FullScreenWindow) -> 3 (Windowed), `defaultScreenWidth`/`defaultScreenHeight`
+  1920x1080 -> 1280x720, `resizableWindow` 0 -> 1 - nur Standalone-Builds betroffen, Editor-Play-Modus
+  unverändert. (5) Diese Doku-Aktualisierung (neuer Abschnitt "Escape-Menü", manuelle Prüf-Checkliste,
+  Status). 553 Tests grün (552 + 1 neuer LoginFlow-Test), mehrfach stabil (ein Fehlschlag bei
+  `LaterJoiner_SeesAlreadyDamagedMonster_ReceivesEntityHpChangedAfterSpawn` in einem vollen Lauf war
+  derselbe bereits dokumentierte CPU-Kontentions-Flake-Typ wie bei `AfterBuy_DisconnectAndRejoin...` -
+  5/5 grün in Isolation bestätigt, diese Aufgabe berührt keinerlei Server-/Shared-Code), Batchmode-
+  Compile-Check nach jedem Abschnitt 0 Fehler, `tools/test-client-playmode.sh` 4/4 grün (dritte UI-Wurzel
+  stört die bestehenden Tests nicht).
 
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client
 War kein Codefehler. User hat den Test mit fokussiertem Unity-Fenster wiederholt (Server, Unity Play, dann Bots
@@ -881,3 +942,13 @@ Waldschrat in Reichweite (Dev-Tools-Debug-Spawn oder ein regulärer Spawn-Punkt)
 - Taste 3 (Kampfrausch): ein rot-oranger Ring erscheint um die eigene Figur und bleibt für die Buff-Dauer sichtbar, verschwindet danach von selbst.
 - Taste 4 (Hast): ein gelber, größerer Ring erscheint zusätzlich/parallel - beide Ringe (Kampfrausch+Hast gleichzeitig aktiv) überschneiden sich nicht, keiner verdeckt den anderen.
 - Verbindung trennen und neu verbinden: keine "Geister"-Ringe/-Linien vom vorherigen Login bleiben sichtbar.
+
+### Noch zu prüfen (Escape-Menü, vom User)
+- Im Spiel Escape drücken: ein Menü mit drei Buttons ("Charakter wechseln", "Ausloggen", "Beenden") erscheint mittig, das Status-Overlay bleibt sichtbar.
+- Während das Menü offen ist: Linksklick auf den Boden bewegt die Figur NICHT, Rechtsklick auf ein Monster greift NICHT an, Tasten 1-4 lösen KEINEN Skill aus.
+- Escape erneut drücken: Menü schließt sich wieder, Eingaben funktionieren wieder normal.
+- "Charakter wechseln" klicken: zurück zur Charakterauswahl (kein erneuter Login nötig), die eigene Figur/alle anderen Entities verschwinden von der Karte, die Charakterliste zeigt weiterhin den/die bekannten Charakter(e).
+- Von der Charakterauswahl aus erneut denselben oder einen anderen Charakter wählen: verbindet normal.
+- "Ausloggen" klicken: zurück zum Login-Bildschirm, Benutzername ist noch ausgefüllt, Passwort leer.
+- "Beenden" klicken (im Editor): Play-Modus stoppt sauber, der Editor selbst bleibt offen.
+- Einen Standalone-Build erzeugen (`tools/build-client.sh`) und starten: läuft in einem Fenster (nicht Vollbild), Fenster ist in der Größe veränderbar.
