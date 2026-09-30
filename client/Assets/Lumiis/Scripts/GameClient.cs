@@ -924,6 +924,7 @@ namespace Lumiis.Client
             if (damaged != null)
             {
                 _world.HandleEntityDamaged(damaged.TargetEntityId, damaged.TargetHpAfter, damaged.TargetMaxHp);
+                SpawnHitLine(damaged.AttackerEntityId, damaged.TargetEntityId, hit: true);
                 return;
             }
 
@@ -1021,6 +1022,7 @@ namespace Lumiis.Client
             {
                 if (dodged.TargetEntityId == _world.LocalEntityId) _lastDodgeMessage = "Ausgewichen!";
                 else if (dodged.AttackerEntityId == _world.LocalEntityId) _lastDodgeMessage = "Verfehlt!";
+                SpawnHitLine(dodged.AttackerEntityId, dodged.TargetEntityId, hit: false);
                 return;
             }
 
@@ -1046,6 +1048,29 @@ namespace Lumiis.Client
         private void ApplyYang(long newTotal)
         {
             _yangTotal = newTotal;
+        }
+
+        // ---- Kampf-Visualisierung (rein clientseitig/kosmetisch, siehe CLAUDE.md Abschnitt
+        // "Kampf-Visualisierung") ----
+
+        private static readonly Color HitLineColor = new Color(0.9f, 0.15f, 0.15f, 0.9f);
+        private static readonly Color DodgeLineColor = new Color(0.4f, 0.6f, 0.9f, 0.9f);
+
+        /// <summary>Abschnitt 4: nur wenn BEIDE beteiligten Entities aktuell bekannte Positionen haben (auch
+        /// wenn keine davon der lokale Spieler ist, z. B. Monster gegen anderen Spieler) - sonst kein Effekt,
+        /// keine Fehlermeldung (analog zu ClientWorld.HandleEntityDamaged: unbekannte Id ist kein Fehler, nur
+        /// z. B. bereits despawnt). Treffer rot, Ausweichen blau-grau.</summary>
+        private void SpawnHitLine(int attackerEntityId, int targetEntityId, bool hit)
+        {
+            if (!_world.Entities.TryGetValue(attackerEntityId, out ClientEntity attacker)) return;
+            if (!_world.Entities.TryGetValue(targetEntityId, out ClientEntity target)) return;
+
+            Vector3 from = new Vector3((float)(attacker.X / 100.0), (float)(attacker.Y / 100.0), 0f);
+            Vector3 to = new Vector3((float)(target.X / 100.0), (float)(target.Y / 100.0), 0f);
+
+            var go = new GameObject("HitLine");
+            var line = go.AddComponent<HitLineView>();
+            line.Initialize(from, to, hit ? HitLineColor : DodgeLineColor, durationSeconds: 0.2f);
         }
 
         private static string InventoryActionFailedReasonText(InventoryActionFailedReason reason)
