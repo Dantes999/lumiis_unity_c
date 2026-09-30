@@ -104,6 +104,11 @@ namespace Lumiis.Client
             (1, true), (2, false), (3, false), (4, false)
         };
 
+        // Kampf-Visualisierung: dieselbe feste Zuordnung wie SkillHotkeys, nur für die zwei Skills, die
+        // einen eigenen visuellen Trigger brauchen (Radius-Blitz bzw. optimistische Blickrichtung).
+        private const int SingleStrikeSkillId = 1;
+        private const int AreaAttackSkillId = 2;
+
         // Lokale, optimistische Cooldown-Anzeige (Time.time-basiert) - gesetzt beim Senden, nicht vom Server
         // bestätigt (der prüft ohnehin erneut serverautoritativ, siehe World.TryUseSkill). Aktive Buffs
         // dagegen server-autoritativ: RemainingMs aus ActiveBuffsChangedPacket, hier nur lokal mit
@@ -306,6 +311,27 @@ namespace Lumiis.Client
                 if (cooldownMs > 0)
                     _skillCooldownReadyAtTime[skillId] = Time.time + cooldownMs / 1000f;
             }
+
+            if (skillId == AreaAttackSkillId)
+                TriggerAreaAttackFlash();
+        }
+
+        /// <summary>Kampf-Visualisierung Abschnitt 3: kurzzeitiger Radius-Ring beim Ausloesen von Kreisschlag -
+        /// optimistisch beim SENDEN ausgeloest (nicht reaktiv am EntityDamaged/EntityDodged), weil diese
+        /// Pakete keine Skill-Kennzeichnung tragen (keine Protokolländerung erlaubt) und ein Kreisschlag ohne
+        /// Ziel im Radius ohnehin kein Paket erzeugen würde - reaktiv wäre also nicht zuverlässig möglich.</summary>
+        private void TriggerAreaAttackFlash()
+        {
+            if (_world.LocalEntityId < 0 || !_world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity local)) return;
+
+            int radiusWire = _skillCatalog != null ? _skillCatalog.RadiusWire(AreaAttackSkillId) : 0;
+            if (radiusWire <= 0) return;
+
+            var go = new GameObject("AreaAttackFlash");
+            var flash = go.AddComponent<RadiusFlashView>();
+            Vector3 worldPos = new Vector3((float)(local.X / 100.0), (float)(local.Y / 100.0), 0f);
+            float diameter = 2f * radiusWire / 100f;
+            flash.Initialize(_unitRingSprite, worldPos, diameter, new Color(1f, 0.6f, 0.15f, 0.5f), durationSeconds: 0.35f);
         }
 
         /// <summary>M6b: lokale Restzeit aktiver Buffs herunterzählen (siehe ActiveBuffsChangedPacket-Handling
