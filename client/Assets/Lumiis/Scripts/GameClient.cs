@@ -31,6 +31,7 @@ namespace Lumiis.Client
         // eigenen gebackenen Textur pro Verwendung (siehe RangeRingView/RadiusFlashView/BuffRingView).
         private Sprite _unitRingSprite;
         private RangeRingView _rangeRingView;
+        private readonly Dictionary<BuffType, RangeRingView> _buffRingViews = new Dictionary<BuffType, RangeRingView>();
         private LookCatalogClient _lookCatalog;
         private ItemCatalogClient _itemCatalog;
         private SkillCatalogClient _skillCatalog;
@@ -225,8 +226,13 @@ namespace Lumiis.Client
                     kvp.Value.SetWorldPosition(entity.X / 100.0, entity.Y / 100.0);
             }
 
-            if (_rangeRingView != null && _world.LocalEntityId >= 0 && _world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity localForRing))
-                _rangeRingView.SetWorldPosition(localForRing.X / 100.0, localForRing.Y / 100.0);
+            if (_world.LocalEntityId >= 0 && _world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity localForRing))
+            {
+                if (_rangeRingView != null)
+                    _rangeRingView.SetWorldPosition(localForRing.X / 100.0, localForRing.Y / 100.0);
+                foreach (RangeRingView buffRing in _buffRingViews.Values)
+                    buffRing.SetWorldPosition(localForRing.X / 100.0, localForRing.Y / 100.0);
+            }
 
             if (_inGame)
             {
@@ -1051,6 +1057,51 @@ namespace Lumiis.Client
                 _activeBuffRemainingSeconds.Clear();
                 foreach ((BuffType type, long remainingMs) in activeBuffs.Buffs)
                     _activeBuffRemainingSeconds[type] = remainingMs / 1000f;
+                SyncBuffRings(activeBuffs.Buffs);
+            }
+        }
+
+        /// <summary>Kampf-Visualisierung Abschnitt 6: voller Resync wie das Paket selbst (kein Delta) - legt
+        /// fehlende Ringe fuer noch aktive Buffs an, entfernt Ringe fuer nicht mehr gelistete Buffs. "Ring
+        /// verschwindet exakt wenn ActiveBuffsChanged den Buff nicht mehr listet" (Aufgabenstellung) ist damit
+        /// woertlich erfuellt - kein eigener Timer, ausschliesslich paketgetrieben. ActiveBuffsChangedPacket
+        /// geht laut Protokoll nur an den Besitzer (siehe CLAUDE.md "Skills") - Buff-Ringe sind deshalb
+        /// strukturell auf den lokalen Spieler beschraenkt, keine Protokolländerung noetig/moeglich.</summary>
+        private void SyncBuffRings(List<(BuffType Type, long RemainingMs)> activeBuffs)
+        {
+            var stillActive = new HashSet<BuffType>();
+            foreach ((BuffType type, long _) in activeBuffs) stillActive.Add(type);
+
+            List<BuffType> toRemove = null;
+            foreach (BuffType existing in _buffRingViews.Keys)
+            {
+                if (stillActive.Contains(existing)) continue;
+                toRemove ??= new List<BuffType>();
+                toRemove.Add(existing);
+            }
+            if (toRemove != null)
+            {
+                foreach (BuffType type in toRemove)
+                {
+                    Destroy(_buffRingViews[type].gameObject);
+                    _buffRingViews.Remove(type);
+                }
+            }
+
+            foreach (BuffType type in stillActive)
+            {
+                if (_buffRingViews.ContainsKey(type)) continue;
+                if (_world.LocalEntityId < 0 || !_world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity local)) continue;
+
+                (Color color, float diameter) = type == BuffType.AttackBuff
+                    ? (KampfrauschRingColor, KampfrauschRingDiameter)
+                    : (HastRingColor, HastRingDiameter);
+
+                var go = new GameObject("BuffRing_" + type);
+                var ring = go.AddComponent<RangeRingView>();
+                ring.Initialize(_unitRingSprite, diameter, color, BuffRingSortingOrder);
+                ring.SetWorldPosition(local.X / 100.0, local.Y / 100.0);
+                _buffRingViews[type] = ring;
             }
         }
 
@@ -1065,8 +1116,20 @@ namespace Lumiis.Client
         // ---- Kampf-Visualisierung (rein clientseitig/kosmetisch, siehe CLAUDE.md Abschnitt
         // "Kampf-Visualisierung") ----
 
+        private const int RangeRingSortingOrder = -40;
+        private static readonly Color RangeRingColor = new Color(1f, 1f, 1f, 0.25f);
+
         private static readonly Color HitLineColor = new Color(0.9f, 0.15f, 0.15f, 0.9f);
         private static readonly Color DodgeLineColor = new Color(0.4f, 0.6f, 0.9f, 0.9f);
+
+        // Abschnitt 6: Kampfrausch (AttackBuff) rot-orange mit kleinerem Durchmesser, Hast (AttackSpeedBuff)
+        // gelb mit groesserem Durchmesser - konzentrisch, ueberschneiden sich dadurch nie (keine
+        // gegenseitige Verdeckung, auch wenn beide gleichzeitig aktiv sind).
+        private const int BuffRingSortingOrder = -30;
+        private static readonly Color KampfrauschRingColor = new Color(0.9f, 0.35f, 0.1f, 0.6f);
+        private static readonly Color HastRingColor = new Color(0.95f, 0.85f, 0.1f, 0.6f);
+        private const float KampfrauschRingDiameter = 2.6f;
+        private const float HastRingDiameter = 3.4f;
 
         /// <summary>Abschnitt 4: nur wenn BEIDE beteiligten Entities aktuell bekannte Positionen haben (auch
         /// wenn keine davon der lokale Spieler ist, z. B. Monster gegen anderen Spieler) - sonst kein Effekt,
@@ -1202,7 +1265,7 @@ namespace Lumiis.Client
                 var rangeRingGo = new GameObject("RangeRing");
                 _rangeRingView = rangeRingGo.AddComponent<RangeRingView>();
                 float rangeDiameter = 2f * _classCatalog.MeleeRangeWire / 100f;
-                _rangeRingView.Initialize(_unitRingSprite, rangeDiameter);
+                _rangeRingView.Initialize(_unitRingSprite, rangeDiameter, RangeRingColor, RangeRingSortingOrder);
                 _rangeRingView.SetWorldPosition(entity.X / 100.0, entity.Y / 100.0);
             }
         }
@@ -1260,6 +1323,10 @@ namespace Lumiis.Client
 
             if (_rangeRingView != null) Destroy(_rangeRingView.gameObject);
             _rangeRingView = null;
+
+            foreach (RangeRingView buffRing in _buffRingViews.Values)
+                Destroy(buffRing.gameObject);
+            _buffRingViews.Clear();
 
             _world.Reset();
         }
