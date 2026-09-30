@@ -313,5 +313,21 @@ namespace Lumiis.Tests.Client
             Assert.Equal(LoginFlowState.LoggedOut, flow.State);
             Assert.Null(flow.Token);
         }
+
+        [Fact]
+        public async Task SwitchCharacter_KeepsTokenAndReturnsToCharacterSelect()
+        {
+            var fake = new FakeAuthClient { LoginResult = AuthResult<string>.Success("tok") };
+            var flow = new LoginFlow(fake);
+            await flow.TryLoginAsync(AuthUrl, ValidUsername, ValidPassword);
+            flow.SelectCharacter(new CharacterInfo(1, "Held"));
+            flow.OnJoinAccepted();
+            Assert.Equal(LoginFlowState.InGame, flow.State);
+
+            flow.SwitchCharacter();
+
+            Assert.Equal(LoginFlowState.CharacterSelect, flow.State);
+            Assert.Equal("tok", flow.Token); // Token bleibt erhalten, anders als Logout.
+        }
     }
 }

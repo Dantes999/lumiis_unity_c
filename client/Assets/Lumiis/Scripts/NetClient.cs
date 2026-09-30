@@ -168,17 +168,21 @@ namespace Lumiis.Client
 
         private void OnDestroy()
         {
-            StopClient();
+            Stop();
         }
 
         private void OnApplicationQuit()
         {
-            StopClient();
+            Stop();
         }
 
-        private void StopClient()
+        /// <summary>escape-menu: auf Zuruf aufrufbar (Charakter wechseln/Ausloggen), zusätzlich weiterhin von
+        /// OnDestroy/OnApplicationQuit - der IsRunning-Guard macht mehrfaches Aufrufen (z. B. erst per
+        /// Escape-Menü-Aktion, danach beim Szenen-Teardown) nachweislich sicher, unabhängig davon, ob
+        /// NetManager.Stop() selbst intern idempotent ist.</summary>
+        public void Stop()
         {
-            if (_netManager != null) _netManager.Stop();
+            if (_netManager != null && _netManager.IsRunning) _netManager.Stop();
         }
 
         // ---- INetEventListener ----

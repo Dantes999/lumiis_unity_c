@@ -246,6 +246,40 @@ namespace Lumiis.Client
             ApplyLoginFlowState();
         }
 
+        // ---- escape-menu: Charakter wechseln / Ausloggen / Beenden (siehe docs/tasks/escape-menu.md) ----
+
+        /// <summary>Trennt die aktive Spielverbindung, behält das Token, wechselt zur Charakterauswahl und
+        /// lädt die Liste neu. Zustand wird VOR dem Trennen gesetzt (siehe LoginFlow.SwitchCharacter-
+        /// Kommentar), damit der anschließende NetClient.Stop()-Disconnect keine Token-Verwerfung auslöst.</summary>
+        public async void SwitchCharacter()
+        {
+            _loginFlow.SwitchCharacter();
+            ApplyLoginFlowState();
+            _netClient.Stop();
+            await _loginFlow.RefreshCharactersAsync(NormalizedAuthUrl());
+            ApplyLoginFlowState();
+        }
+
+        /// <summary>Trennt die Verbindung und verwirft das Token - reine Wiederverwendung des bestehenden
+        /// LoginFlow.Logout() (identisch zum unfreiwilligen Disconnect-Pfad), Zustand ebenfalls VOR dem
+        /// Trennen gesetzt (siehe SwitchCharacter-Kommentar).</summary>
+        public void Logout()
+        {
+            _loginFlow.Logout();
+            ApplyLoginFlowState();
+            _netClient.Stop();
+        }
+
+        /// <summary>Im Editor stoppt das nur den Play-Modus statt den ganzen Editor zu beenden.</summary>
+        public void QuitGame()
+        {
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
+        }
+
         // ---- Verbindung zum Spielserver (reines Transport-/UI-Wissen, siehe LoginFlow.CancelConnect) ----
 
         private void BeginConnect()

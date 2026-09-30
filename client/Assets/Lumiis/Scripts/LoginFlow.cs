@@ -289,6 +289,19 @@ namespace Lumiis.Client
             LoginErrorMessage = "";
         }
 
+        /// <summary>escape-menu "Charakter wechseln": wechselt NUR den Zustand, behält das Token (anders als
+        /// Logout). Muss vom Aufrufer VOR dem tatsächlichen Trennen der Spielverbindung aufgerufen werden -
+        /// OnDisconnected behandelt sonst jeden Disconnect aus InGame als unfreiwillig (Token verwerfen,
+        /// State auf LoggedOut), das wäre hier falsch. Der Aufrufer (LoginController) ruft danach
+        /// RefreshCharactersAsync auf, um die Liste neu zu laden - das behandelt ein zwischenzeitlich
+        /// abgelaufenes Token bereits korrekt (401 -> ExpireSession, siehe dort), kein eigener Codepfad
+        /// hier nötig.</summary>
+        public void SwitchCharacter()
+        {
+            State = LoginFlowState.CharacterSelect;
+            CharacterSelectErrorMessage = "";
+        }
+
         private void ExpireSession()
         {
             Token = null;
