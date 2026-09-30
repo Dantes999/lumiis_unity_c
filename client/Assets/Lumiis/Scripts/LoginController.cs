@@ -1,6 +1,7 @@
 using System.Collections;
 using Lumiis.Shared.Net;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UIElements;
 
 namespace Lumiis.Client
@@ -42,6 +43,13 @@ namespace Lumiis.Client
         private Button _logoutButton;
         private Label _characterSelectStatusLabel;
         private Label _characterSelectErrorLabel;
+
+        // ---- escape-menu (siehe docs/tasks/escape-menu.md) - eigene, dritte UI-Wurzel im selben UIDocument
+        // wie Login/CharacterSelect (siehe BuildUi). Bewusst NICHT über LoginFlowState gesteuert (das Menü
+        // ist eine reine Overlay-Sichtbarkeit ÜBER dem laufenden Spiel, kein eigener Login-Zustand) - eigenes
+        // bool, nur während State == InGame per Escape erreichbar (siehe Update).
+        private VisualElement _escapeMenuRoot;
+        private bool _escapeMenuOpen;
 
         /// <summary>authClient optional für PlayMode-Tests (siehe client/Assets/Lumiis/Tests/PlayMode) - im
         /// normalen Spielbetrieb (Bootstrap.cs) bleibt der Parameter weg, dann kommt die echte
@@ -92,14 +100,21 @@ namespace Lumiis.Client
 
             VisualTreeAsset loginAsset = Resources.Load<VisualTreeAsset>("UI/Login");
             VisualTreeAsset characterSelectAsset = Resources.Load<VisualTreeAsset>("UI/CharacterSelect");
+            VisualTreeAsset escapeMenuAsset = Resources.Load<VisualTreeAsset>("UI/EscapeMenu");
             _loginRoot = loginAsset.CloneTree();
             _characterSelectRoot = characterSelectAsset.CloneTree();
+            _escapeMenuRoot = escapeMenuAsset.CloneTree();
             _uiDocument.rootVisualElement.Add(_loginRoot);
             _uiDocument.rootVisualElement.Add(_characterSelectRoot);
+            // escape-menu ABSICHTLICH als dritter Eintrag NACH Login/CharacterSelect angehängt - die
+            // bestehenden LoginControllerPlayModeTests greifen per root[0]/root[1] auf genau diese beiden
+            // zu, eine andere Reihenfolge würde sie brechen.
+            _uiDocument.rootVisualElement.Add(_escapeMenuRoot);
             // Sofort auf den Anfangszustand (LoggedOut) einschränken, statt sich auf den direkt folgenden
             // ApplyLoginFlowState()-Aufruf des Callers zu verlassen - BuildUi() soll für sich allein schon nie
             // zwei sichtbare Wurzeln gleichzeitig erzeugen.
             _characterSelectRoot.style.display = DisplayStyle.None;
+            _escapeMenuRoot.style.display = DisplayStyle.None;
 
             _usernameField = _loginRoot.Q<TextField>("username-field");
             _passwordField = _loginRoot.Q<TextField>("password-field");
@@ -124,6 +139,43 @@ namespace Lumiis.Client
             _registerButton.clicked += OnRegisterButtonClicked;
             _createCharacterButton.clicked += OnCreateCharacterButtonClicked;
             _logoutButton.clicked += OnLogoutButtonClicked;
+
+            _escapeMenuRoot.Q<Button>("escape-switch-character-button").clicked += SwitchCharacter;
+            _escapeMenuRoot.Q<Button>("escape-logout-button").clicked += Logout;
+            _escapeMenuRoot.Q<Button>("escape-quit-button").clicked += QuitGame;
+        }
+
+        private void Update()
+        {
+            // Nur während eines laufenden Spiels erreichbar - Login/Charakterauswahl haben kein Escape-Menü.
+            if (_loginFlow.State != LoginFlowState.InGame) return;
+            if (Keyboard.current == null) return;
+            if (Keyboard.current.escapeKey.wasPressedThisFrame) ToggleEscapeMenu();
+        }
+
+        private void ToggleEscapeMenu()
+        {
+            if (_escapeMenuOpen) CloseEscapeMenu();
+            else OpenEscapeMenu();
+        }
+
+        private void OpenEscapeMenu()
+        {
+            _escapeMenuOpen = true;
+            _escapeMenuRoot.style.display = DisplayStyle.Flex;
+            _gameClient.SetGameplayInputLocked(true);
+        }
+
+        /// <summary>Auch von ApplyLoginFlowState() bei JEDEM Zustandswechsel aufgerufen (siehe dort) - ein
+        /// offenes Menü darf nie stehen bleiben, wenn sich der Login-Zustand ändert (z. B. nach
+        /// SwitchCharacter/Logout, oder bei einem tatsächlich unfreiwilligen Disconnect während offenem
+        /// Menü). No-op, falls ohnehin schon geschlossen.</summary>
+        private void CloseEscapeMenu()
+        {
+            if (!_escapeMenuOpen) return;
+            _escapeMenuOpen = false;
+            _escapeMenuRoot.style.display = DisplayStyle.None;
+            _gameClient.SetGameplayInputLocked(false);
         }
 
         // ---- LoginFlow -> UI: einziger Ort, der State/ErrorMessage liest und den Bildschirm danach ausrichtet.
@@ -133,6 +185,11 @@ namespace Lumiis.Client
 
         private void ApplyLoginFlowState()
         {
+            // Jeder Zustandswechsel schließt ein offenes escape-menu (z. B. nach SwitchCharacter/Logout,
+            // oder bei einem tatsächlich unfreiwilligen Disconnect während offenem Menü) - kein Zustand
+            // außer InGame soll es je sichtbar haben.
+            CloseEscapeMenu();
+
             switch (_loginFlow.State)
             {
                 case LoginFlowState.LoggedOut:

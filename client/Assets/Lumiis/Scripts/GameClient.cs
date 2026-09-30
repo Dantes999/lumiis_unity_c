@@ -62,6 +62,11 @@ namespace Lumiis.Client
         private string _statusMessage = "";
         private bool _debugOverlayVisible = true;
 
+        // escape-menu (siehe docs/tasks/escape-menu.md): von LoginController gesetzt, während das Menü
+        // sichtbar ist - sperrt nur die eigentlichen Gameplay-Eingaben (Bewegungsklick, Angriff/Rechtsklick,
+        // Skills 1-4), nicht Zoom/F1-Overlay-Umschaltung (keine Gameplay-Aktionen im engeren Sinn).
+        private bool _gameplayInputLocked;
+
         // ---- Kampf (M4a, Debug-Overlay-Text - siehe DrawStatusLine/DrawTargetLine) ----
         private int _targetEntityId = -1;
         private string _lastAttackFailedMessage = "";
@@ -129,6 +134,14 @@ namespace Lumiis.Client
         public void PrepareJoin(string characterName)
         {
             _pendingLoginName = characterName;
+        }
+
+        /// <summary>Von LoginController aufgerufen, während das escape-menu geöffnet/geschlossen wird (siehe
+        /// docs/tasks/escape-menu.md) - sperrt nur Bewegungsklick/Angriff/Rechtsklick und Skills 1-4 (siehe
+        /// Update-Kommentar), nicht Zoom/F1.</summary>
+        public void SetGameplayInputLocked(bool locked)
+        {
+            _gameplayInputLocked = locked;
         }
 
         public void Initialize(NetClient netClient, Camera camera)
@@ -234,7 +247,7 @@ namespace Lumiis.Client
                     buffRing.SetWorldPosition(localForRing.X / 100.0, localForRing.Y / 100.0);
             }
 
-            if (_inGame)
+            if (_inGame && !_gameplayInputLocked)
             {
                 HandleClickInput();
                 HandleSkillHotkeys();
