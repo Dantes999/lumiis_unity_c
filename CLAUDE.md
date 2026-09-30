@@ -524,6 +524,52 @@ zum Statuspunkte-Bereich aus M6a).
 Bewusst NICHT in M6b: Skillbücher, Meister-System nach Stufe 17 (später), Partikeleffekte/Animationen,
 Skill-Icons (Text/Name reicht, wie bei Health-Bars/Items/Shop).
 
+## Kampf-Visualisierung
+Seit der Aufgabe `combat-visuals.md` wird Kampf sichtbar gemacht - REIN CLIENTSEITIG UND KOSMETISCH,
+keine Protokolländerung, keine neue Serverwahrheit (der Server bleibt für jede Kampfaktion die
+einzige Autorität, siehe "Verbindliche Architektur" - alle unten genannten Effekte können jederzeit
+"falsch" liegen, z. B. bei Paketverlust oder einem abgelehnten Skill, das ist bewusst so und wird
+vom Server ohnehin unabhängig davon korrekt entschieden):
+- Reichweitenring: dünner, halbtransparenter Ring in `MeleeRangeWire` (neuer `ClassCatalogClient`,
+  lädt nur `meleeRangeWire` aus `classes.json`) um den lokalen Spieler, immer sichtbar solange
+  verbunden, unabhängig von Zielauswahl.
+- Radius-Aufblitzen: kurzzeitiger (~350ms) größerer Ring in `RadiusWire` (`SkillCatalogClient` um
+  dieses Feld erweitert) beim Auslösen von Kreisschlag - optimistisch beim SENDEN ausgelöst, nicht
+  reaktiv am eingehenden Paket: `EntityDamagedPacket`/`EntityDodgedPacket` tragen keine
+  Skill-Kennzeichnung, ein Kreisschlag ohne Ziel im Radius erzeugt ohnehin kein Paket - reaktiv wäre
+  also strukturell unzuverlässig.
+- Trefferlinie: kurzzeitige (~200ms) Linie zwischen Angreifer- und Zielposition bei jedem
+  `EntityDamagedPacket` (rot) und `EntityDodgedPacket` (blau-grau) - unabhängig davon, ob der lokale
+  Spieler beteiligt ist, solange beide EntityIds aktuell bekannte Positionen in `ClientWorld.Entities`
+  haben. Mehrere gleichzeitige Linien (z. B. Kreisschlag gegen mehrere Ziele) sind unabhängig
+  voneinander (je ein eigenes GameObject).
+- Blickrichtung beim Angreifen: dreht die angreifende Figur sofort lokal zum Ziel
+  (`ClientWorld.SetFacingOverride`, per `FacingMath.FromDelta`) - optimistisch beim Senden für den
+  lokalen Spieler (`AttackRequestPacket`, zielgerichtetes `UseSkillRequestPacket`/Wuchtschlag),
+  reaktiv für jeden anderen Angreifer beim Verarbeiten von `EntityDamagedPacket`/`EntityDodgedPacket`
+  (dieselbe Stelle wie die Trefferlinie, da beide Positionen dort ohnehin schon bekannt sind). Kein
+  eigener Zustand/Timer: der nächste echte `HandleEntityMove`-Aufruf überschreibt die Blickrichtung
+  wieder ganz normal bewegungsbasiert - "kein dauerhafter Override" ist damit strukturell garantiert.
+- Buff-Ring: solange Kampfrausch aktiv ist, ein rot-oranger Ring um den lokalen Spieler; solange
+  Hast aktiv ist, ein gelber Ring mit größerem Durchmesser (konzentrisch, überschneiden sich dadurch
+  nie, auch wenn beide gleichzeitig aktiv sind). Voller Resync bei jedem `ActiveBuffsChangedPacket`
+  (kein Delta, kein eigener Timer) - verschwindet exakt, wenn das Paket den Buff nicht mehr listet.
+  `ActiveBuffsChangedPacket` geht laut Protokoll nur an den Besitzer (siehe Abschnitt "Skills") -
+  Buff-Ringe sind deshalb strukturell auf den lokalen Spieler beschränkt, keine Protokolländerung
+  nötig oder möglich.
+
+Gemeinsame Basis: eine Einheits-Ring-Sprite (`PlaceholderSprites.CreateRing` mit `pixelsPerUnit ==
+pixelSize`, Durchmesser exakt 1 Weltenheit bei `transform.localScale` 1) wird von `RangeRingView`
+(Reichweitenring UND Buff-Ringe - nur Farbe/Sortierung/Durchmesser unterscheiden sich je Aufrufer)
+und `RadiusFlashView` (Kreisschlag) geteilt - Größe nur über `localScale` gesteuert, keine mehrfach
+gebackenen Texturen. `HitLineView` nutzt `LineRenderer`. Alle vier neuen View-Komponenten sind
+unparented (kein Kind der `CharacterView`) und rühren die bestehende SortingGroup/Rang-Sortierung
+der Charaktere nicht an (siehe Abschnitt "Client"). `classes.json` wird seit dieser Aufgabe
+zusätzlich zu `looks.json`/`items.json`/`skills.json` nach
+`client/Assets/StreamingAssets/lumiis-data/` kopiert (neuer `ClassCatalogClient` - Alpha kennt nur
+eine Klasse, der Client nimmt deshalb bewusst den ersten Katalog-Eintrag statt einer echten
+Zuordnung, analog zur serverseitigen `GameServer.DefaultClassName`-Vereinfachung).
+
 ## Client
 Setup nach dem Klonen (auch auf dem zweiten Rechner):
 1. `cd server && dotnet build` - baut Lumiis.Shared und kopiert dabei Lumiis.Shared.dll sowie die netstandard2.1-Variante von LiteNetLib.dll nach `client/Assets/Plugins/Lumiis/` (git-ignoriert, entsteht bei jedem Build neu).
@@ -750,6 +796,36 @@ Richtungen gibt es bisher eine Task-Datei unter docs/tasks/.
   (Bot selbst nutzt keine Skills, siehe "Fertig, wenn" in der Aufgabenstellung) sowie das Anwenden der
   Migration `AddCharacterSkillLevels` gegen ein echtes Postgres (bisher nur generiert, wie schon
   `AddCharacterProgression` aus M6a).
+- Kampf-Visualisierung (docs/tasks/combat-visuals.md, kein eigener Meilenstein) fertig, in 6 Commits
+  (0 Review nur berichtet, kein Commit; 7 Prüfung bestätigt bestehende Tests unverändert grün, kein
+  eigener Commit nötig): (1) `Lumiis.Shared.csproj` kopiert `classes.json` seit dieser Aufgabe
+  zusätzlich zu looks.json/items.json/skills.json; neue `ClassCatalogClient` (nur MeleeRangeWire,
+  erster Katalog-Eintrag statt echter Klassen-Zuordnung, analog `GameServer.DefaultClassName`);
+  `SkillCatalogClient` um `RadiusWire` je Skill erweitert. (2) Neue `RangeRingView` - dünner,
+  halbtransparenter Ring in MeleeRangeWire um den lokalen Spieler, immer sichtbar solange verbunden;
+  nutzt eine neu gebackene Einheits-Ring-Sprite (`pixelsPerUnit == pixelSize`, Durchmesser 1
+  Weltenheit bei `localScale` 1) - unparented, rührt die bestehende `CharacterView`-SortingGroup
+  nicht an. (3) Neue `RadiusFlashView` (transient, self-destructing, ~350ms Ein-/Ausblenden) - beim
+  Senden von Kreisschlag OPTIMISTISCH ausgelöst (nicht reaktiv am `EntityDamaged`/`EntityDodged`,
+  da diese Pakete keine Skill-Kennzeichnung tragen und ein Kreisschlag ohne Ziel im Radius ohnehin
+  kein Paket erzeugen würde - reaktiv also strukturell unzuverlässig, im Bericht begründet). (4) Neue
+  `HitLineView` (LineRenderer, transient, linear verblassend ~200ms) - bei jedem eingehenden
+  `EntityDamagedPacket` (rot) und `EntityDodgedPacket` (blau-grau), unabhängig davon ob der lokale
+  Spieler beteiligt ist, solange beide EntityIds bekannte Positionen haben; mehrere gleichzeitige
+  Linien unabhängig (je ein GameObject). (5) Neue `ClientWorld.SetFacingOverride` (UnityEngine-frei,
+  per `dotnet test` geprüft) - dreht eine Entity per `FacingMath.FromDelta` zum Ziel, kein eigener
+  Zustand/Timer (der nächste `HandleEntityMove`-Aufruf überschreibt wieder bewegungsbasiert); lokaler
+  Spieler optimistisch beim Senden (Rechtsklick-Angriff, zielgerichtetes Wuchtschlag), beliebiger
+  Angreifer reaktiv im selben Hook wie die Trefferlinie (Abschnitt 4) mitbedient - 4 neue
+  `ClientWorldTests`. (6) `RangeRingView` verallgemeinert (Farbe/Sortierung als Parameter statt
+  Konstanten) - trägt jetzt auch die neuen Buff-Ringe (`GameServer.SyncBuffRings`, voller Resync bei
+  jedem `ActiveBuffsChangedPacket`, Kampfrausch rot-orange/Hast gelb mit größerem Durchmesser,
+  konzentrisch überschneidungsfrei); `ActiveBuffsChangedPacket` geht laut Protokoll nur an den
+  Besitzer, Buff-Ringe sind deshalb strukturell auf den lokalen Spieler beschränkt. (8) Diese
+  Doku-Aktualisierung (neuer Abschnitt "Kampf-Visualisierung", manuelle Prüf-Checkliste, Status).
+  552 Tests grün (548 + 4 neue `ClientWorldTests`), 5x stabil, Batchmode-Compile-Check nach jedem
+  Abschnitt 0 Fehler, `tools/test-client-playmode.sh` 4/4 grün (bestehende Login-PlayMode-Tests laufen
+  vor jedem Join ab, die neuen Visuals werden dabei nie instanziiert - keine Anpassung nötig).
 
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client
 War kein Codefehler. User hat den Test mit fokussiertem Unity-Fenster wiederholt (Server, Unity Play, dann Bots
@@ -791,3 +867,17 @@ Lumiis.Auth läuft (`dotnet run --project server/src/Lumiis.Auth`), Lumiis.Serve
 - Zwei Unity-Instanzen (oder Unity + `Lumiis.Bot`) mit demselben Charakter gleichzeitig verbinden: die zweite bekommt "Dieser Charakter ist bereits online." im UI zu sehen, nicht nur im Log.
 - Server-Port im Bereich "Erweitert" auf einen falschen Wert ändern, einen Charakter wählen: Fehlermeldung zur fehlgeschlagenen Verbindung im UI (Charakterauswahl bleibt sichtbar, kein Hänger bei "Verbinde ...").
 - Nach erfolgreichem Join: Debug-Test-Panel (F2/F9/F3-F8 bzw. die Buttons rechts oben) funktioniert unverändert wie vor M2c.
+
+### Noch zu prüfen (Kampf-Visualisierung, vom User)
+Voraussetzung: laufender Server + eigener Charakter mit mindestens Wuchtschlag und Kreisschlag
+gelernt (Debug-Panel-Bereich "Skills", siehe Abschnitt "Skills") sowie mindestens ein Wildhund/
+Waldschrat in Reichweite (Dev-Tools-Debug-Spawn oder ein regulärer Spawn-Punkt).
+
+- Direkt nach dem Join: ein dünner, halbtransparenter Ring um die eigene Figur ist sichtbar, folgt ihr beim Laufen, bleibt auch ohne anvisiertes Ziel sichtbar.
+- Rechtsklick-Angriff auf ein Monster: die eigene Figur dreht sich sichtbar sofort zum Monster (noch bevor ein Treffer-/Ausweichen-Ergebnis ankommt), eine kurze rote (Treffer) oder blau-graue (Ausweichen) Linie zwischen eigener Figur und Monster blitzt kurz auf und verschwindet wieder.
+- Taste 1 (Wuchtschlag) auf ein anvisiertes Monster: gleiches Drehen+Linie wie beim normalen Angriff.
+- Taste 2 (Kreisschlag): ein größerer Ring blitzt kurz um die eigene Figur auf und verblasst wieder (auch wenn kein Monster in Reichweite ist) - bei mehreren Monstern im Radius kommen mehrere Trefferlinien gleichzeitig unabhängig voneinander an.
+- Ein aggressives Monster (z. B. Wildhund) neben sich angreifen lassen: auch beim GEGNERISCHEN Angriff erscheint eine Trefferlinie, und das Monster dreht sich sichtbar zur eigenen Figur (falls als Sprite mit Blickrichtung erkennbar - Monster haben aktuell keine eigene Blickrichtungsdarstellung, MonsterView zeigt das also nicht sichtbar an; bei einem ANDEREN Spieler als Angreifer wäre es sichtbar).
+- Taste 3 (Kampfrausch): ein rot-oranger Ring erscheint um die eigene Figur und bleibt für die Buff-Dauer sichtbar, verschwindet danach von selbst.
+- Taste 4 (Hast): ein gelber, größerer Ring erscheint zusätzlich/parallel - beide Ringe (Kampfrausch+Hast gleichzeitig aktiv) überschneiden sich nicht, keiner verdeckt den anderen.
+- Verbindung trennen und neu verbinden: keine "Geister"-Ringe/-Linien vom vorherigen Login bleiben sichtbar.
