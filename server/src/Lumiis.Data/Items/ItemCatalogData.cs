@@ -21,6 +21,23 @@ internal sealed class ItemEntryDto
 
     /// <summary>M5b: Verkaufspreis im Shop (0 = nicht verkäuflich, siehe World.TrySell).</summary>
     public long SellPrice { get; set; }
+
+    /// <summary>Client-Rendering (Paper Doll): Dateiname des statischen Waffen-PNGs unter
+    /// Resources/Sprites/Items/ (ohne Endung). Leer = Client nutzt den generierten Platzhalter.</summary>
+    public string SpriteKey { get; set; } = "";
+
+    /// <summary>Client-Rendering: Pixel-Korrektur des Waffen-Pivots relativ zum Griff (x/y).</summary>
+    public PivotOffsetDto? PivotOffset { get; set; }
+
+    /// <summary>Client-Rendering: Standard-Aufwertungsstufe der Item-Vorlage (0-9). Die tatsächliche
+    /// Instanzstufe kommt später aus dem Inventar; der Wert dient dem Testboard und als Fallback.</summary>
+    public int UpgradeLevel { get; set; }
+}
+
+internal sealed class PivotOffsetDto
+{
+    public float X { get; set; }
+    public float Y { get; set; }
 }
 
 internal sealed class ItemCatalogDto

@@ -15,12 +15,19 @@ namespace Lumiis.Client
         private readonly Dictionary<(CharacterSlot Slot, int LookId, FacingDirection Direction, string State, int Frame), Sprite> _cache
             = new Dictionary<(CharacterSlot, int, FacingDirection, string, int), Sprite>();
 
+        /// <summary>Getrennt vom Slot-Cache: Waffen-PNGs werden nach spriteKey (nicht nach LookId) gecacht.
+        /// Geladene Assets stammen aus Resources und werden von Unity selbst verwaltet - DestroyAll rührt sie
+        /// deshalb bewusst nicht an (nur die zur Laufzeit erzeugten Platzhalter-Texturen).</summary>
+        private readonly Dictionary<string, Sprite> _weaponCache = new Dictionary<string, Sprite>(System.StringComparer.Ordinal);
+
+        private const string WeaponResourcePath = "Sprites/Items/";
+
         public CachingSpriteProvider(ISpriteProvider inner)
         {
             _inner = inner;
         }
 
-        public int Count => _cache.Count;
+        public int Count => _cache.Count + _weaponCache.Count;
 
         public Sprite GetSprite(CharacterSlot slot, int lookId, FacingDirection direction, string state, int frame, Vector2 pivotNormalized)
         {
@@ -30,6 +37,22 @@ namespace Lumiis.Client
 
             Sprite sprite = _inner.GetSprite(slot, lookId, direction, state, frame, pivotNormalized);
             _cache[key] = sprite;
+            return sprite;
+        }
+
+        /// <summary>Lädt das statische Waffen-PNG gecacht aus Resources/Sprites/Items/. Ein leerer Schlüssel
+        /// oder ein fehlendes Asset ergibt null (CharacterView nutzt dann den Platzhalter); auch dieses
+        /// Ergebnis wird gecacht, damit bei jedem Ausrüsten kein erneuter Resources-Lookup nötig ist.</summary>
+        public Sprite LoadWeaponSprite(string spriteKey)
+        {
+            if (string.IsNullOrWhiteSpace(spriteKey)) return null;
+            if (_weaponCache.TryGetValue(spriteKey, out Sprite cached)) return cached;
+
+            Sprite sprite = _inner.LoadWeaponSprite(spriteKey);
+            if (sprite == null)
+                sprite = Resources.Load<Sprite>(WeaponResourcePath + spriteKey);
+
+            _weaponCache[spriteKey] = sprite;
             return sprite;
         }
 
@@ -43,6 +66,9 @@ namespace Lumiis.Client
                 if (texture != null) Object.Destroy(texture);
             }
             _cache.Clear();
+
+            // Weapon sprites are Resources assets (or null cache entries) - Unity owns their lifetime.
+            _weaponCache.Clear();
         }
     }
 }

@@ -15,6 +15,9 @@ namespace Lumiis.Client
     {
         private bool _armorGridBuilt;
         private bool _sortingTestBuilt;
+        private bool _weaponGridBuilt;
+        private readonly List<CharacterAnimator> _attackLoopAnimators = new List<CharacterAnimator>();
+        private float _nextAttackLoopAt;
 
         public void BuildArmorGrid(ISpriteProvider spriteProvider, LookCatalogClient lookCatalog, int bodyId, IReadOnlyList<int> armorIds)
         {
@@ -75,6 +78,70 @@ namespace Lumiis.Client
                 view.Initialize(-1, "SortTest" + i, spriteProvider, lookCatalog);
                 view.SetAppearance(new Appearance { BodyId = bodyId, ArmorId = armorId, HairStyleId = 1, HairColorId = (i % 2) + 1 });
                 view.SetFacing(facing);
+            }
+        }
+
+        /// <summary>Interaktives Waffen-Testfeld: eine Spalte je Aufwertungsstufe +0 bis +9, alle mit der
+        /// ersten Waffe aus items.json (spriteKey/pivotOffset). Die Figuren führen periodisch einen Schlag aus,
+        /// damit +7/+9-Glitzern, Socket-Pose und TrailRenderer sichtbar werden.</summary>
+        public void BuildWeaponUpgradeGrid(ISpriteProvider spriteProvider, LookCatalogClient lookCatalog,
+            ItemCatalogClient itemCatalog, int bodyId, int armorId)
+        {
+            if (_weaponGridBuilt) return;
+            _weaponGridBuilt = true;
+
+            ItemEntryJson weapon = itemCatalog != null ? itemCatalog.FirstOfType("Weapon") : null;
+            Sprite weaponSprite = weapon != null && spriteProvider != null
+                ? spriteProvider.LoadWeaponSprite(weapon.spriteKey)
+                : null;
+            Vector2 pivotOffset = weapon != null && weapon.pivotOffset != null
+                ? new Vector2(weapon.pivotOffset.x, weapon.pivotOffset.y)
+                : Vector2.zero;
+
+            const float spacingX = 1.4f;
+            var facing = new Facing(FacingDirection.Down, false);
+
+            for (int level = ItemEntryJson.MinUpgradeLevel; level <= ItemEntryJson.MaxUpgradeLevel; level++)
+            {
+                var go = new GameObject("WeaponUpgrade_+" + level);
+                go.transform.SetParent(transform, false);
+                go.transform.localPosition = new Vector3(level * spacingX, 0f, 0f);
+
+                var view = go.AddComponent<CharacterView>();
+                view.Initialize(-1, "WeaponTest+" + level, spriteProvider, lookCatalog);
+                view.SetAppearance(new Appearance { BodyId = bodyId, ArmorId = armorId, HairStyleId = 1, HairColorId = 1 });
+                view.SetFacing(facing);
+                view.SetWeapon(weaponSprite, pivotOffset, level);
+
+                var animator = go.AddComponent<CharacterAnimator>();
+                animator.Initialize(view);
+                _attackLoopAnimators.Add(animator);
+
+                var labelGo = new GameObject("LevelLabel");
+                labelGo.transform.SetParent(go.transform, false);
+                labelGo.transform.localPosition = new Vector3(0f, 1.3f, 0f);
+                var label = labelGo.AddComponent<TextMesh>();
+                label.text = "+" + level;
+                label.characterSize = 0.12f;
+                label.fontSize = 48;
+                label.anchor = TextAnchor.MiddleCenter;
+                label.color = level >= 9 ? new Color(0.45f, 0.7f, 1f) : (level >= 7 ? new Color(1f, 0.92f, 0.5f) : Color.white);
+
+                var labelRenderer = labelGo.GetComponent<MeshRenderer>();
+                if (labelRenderer != null) labelRenderer.sortingOrder = 100;
+            }
+        }
+
+        private void Update()
+        {
+            if (_attackLoopAnimators.Count == 0) return;
+            if (Time.time < _nextAttackLoopAt) return;
+
+            _nextAttackLoopAt = Time.time + 1.6f;
+            foreach (CharacterAnimator animator in _attackLoopAnimators)
+            {
+                if (animator != null)
+                    animator.PlayAttack();
             }
         }
     }

@@ -13,10 +13,14 @@
     { "id": 2, "slot": "Hair", "name": "Lang" },
     { "id": 3, "slot": "Hair", "name": "Zopf" },
 
-    { "id": 1, "slot": "Armor", "name": "Stoffgewand" },
-    { "id": 2, "slot": "Armor", "name": "Lederruestung" },
-    { "id": 3, "slot": "Armor", "name": "Kettenhemd" },
-    { "id": 4, "slot": "Armor", "name": "Plattenruestung" },
+    { "id": 1, "slot": "Armor", "name": "Stoffgewand",
+      "colors": { "primaryColor": "#8a6a45", "secondaryColor": "#5a4229", "accentColor": "#c9a86a" } },
+    { "id": 2, "slot": "Armor", "name": "Lederruestung",
+      "colors": { "primaryColor": "#6b4a2f", "secondaryColor": "#3f2a18", "accentColor": "#b98a4f" } },
+    { "id": 3, "slot": "Armor", "name": "Kettenhemd",
+      "colors": { "primaryColor": "#7d828c", "secondaryColor": "#4c5159", "accentColor": "#c3c8d2" } },
+    { "id": 4, "slot": "Armor", "name": "Plattenruestung",
+      "colors": { "primaryColor": "#a7adb8", "secondaryColor": "#5e6470", "accentColor": "#e2e7ef" } },
 
     { "id": 1, "slot": "Helmet", "name": "Lederkappe" },
     { "id": 2, "slot": "Helmet", "name": "Vollhelm", "hidesHair": true },

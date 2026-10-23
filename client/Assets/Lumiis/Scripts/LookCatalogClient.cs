@@ -31,6 +31,18 @@ namespace Lumiis.Client
     }
 
     [Serializable]
+    public class LookColorsJson
+    {
+        public string primaryColor = "";
+        public string secondaryColor = "";
+        public string accentColor = "";
+
+        public bool HasAny => !string.IsNullOrEmpty(primaryColor)
+            || !string.IsNullOrEmpty(secondaryColor)
+            || !string.IsNullOrEmpty(accentColor);
+    }
+
+    [Serializable]
     public class LookEntryJson
     {
         public int id;
@@ -38,6 +50,10 @@ namespace Lumiis.Client
         public string name = "";
         public bool hidesHair;
         public LookAnchorsJson anchors = new LookAnchorsJson();
+
+        /// <summary>Palette-Swapping für Rüstungs-Looks (Hex-Strings) - wird von CharacterView per
+        /// MaterialPropertyBlock an den Rüstungs-Renderer übergeben (siehe ApplyArmorColors).</summary>
+        public LookColorsJson colors = new LookColorsJson();
     }
 
     [Serializable]
@@ -88,6 +104,18 @@ namespace Lumiis.Client
         public bool TryGetEntry(string slot, int id, out LookEntryJson entry)
         {
             return _byKey.TryGetValue((slot, id), out entry);
+        }
+
+        /// <summary>Farbpalette eines Rüstungs-Looks - false, wenn der Look fehlt oder keine Farben
+        /// hinterlegt sind (CharacterView fällt dann auf Weiß/den Platzhalter-Farbton zurück).</summary>
+        public bool TryGetArmorColors(int armorId, out LookColorsJson colors)
+        {
+            colors = null;
+            if (armorId <= 0) return false;
+            if (!_byKey.TryGetValue(("Armor", armorId), out LookEntryJson entry)) return false;
+            if (entry.colors == null || !entry.colors.HasAny) return false;
+            colors = entry.colors;
+            return true;
         }
 
         public IReadOnlyList<int> GetIdsForSlot(string slot)

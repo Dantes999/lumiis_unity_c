@@ -36,8 +36,20 @@ public sealed class ItemDefinition
     /// <summary>M5b: Verkaufspreis im Shop - 0 bedeutet "nicht verkäuflich" (siehe World.TrySell).</summary>
     public long SellPrice { get; }
 
+    /// <summary>Client-Rendering: statischer Sprite-Dateiname unter Resources/Sprites/Items/ (ohne Endung),
+    /// leer = Platzhalter. Wird nur vom Client ausgewertet, der Server validiert lediglich die Stufe.</summary>
+    public string SpriteKey { get; }
+
+    /// <summary>Client-Rendering: Pixel-Korrektur des Waffen-Pivots (relativ zum Griff).</summary>
+    public float PivotOffsetX { get; }
+
+    public float PivotOffsetY { get; }
+
+    /// <summary>Client-Rendering: Standard-Aufwertungsstufe der Vorlage (0-9).</summary>
+    public int UpgradeLevel { get; }
+
     public ItemDefinition(int id, string name, ItemType itemType, int lookId, int attackBonus, int defenseBonus, int healAmount,
-        long buyPrice, long sellPrice)
+        long buyPrice, long sellPrice, string spriteKey = "", float pivotOffsetX = 0f, float pivotOffsetY = 0f, int upgradeLevel = 0)
     {
         Id = id;
         Name = name;
@@ -48,6 +60,10 @@ public sealed class ItemDefinition
         HealAmount = healAmount;
         BuyPrice = buyPrice;
         SellPrice = sellPrice;
+        SpriteKey = spriteKey;
+        PivotOffsetX = pivotOffsetX;
+        PivotOffsetY = pivotOffsetY;
+        UpgradeLevel = upgradeLevel;
     }
 
     /// <summary>Nur bei Armor/Helmet/Weapon/Shield true - Consumables können nicht angelegt werden.</summary>
@@ -134,8 +150,11 @@ public sealed class ItemCatalog
             if (entry.SellPrice < 0)
                 throw new ItemCatalogException($"items.json: Item {entry.Id} ({entry.Name}) hat sellPrice < 0.");
 
+            if (entry.UpgradeLevel < 0 || entry.UpgradeLevel > 9)
+                throw new ItemCatalogException($"items.json: Item {entry.Id} ({entry.Name}) hat upgradeLevel {entry.UpgradeLevel} (erlaubt: 0-9).");
+
             byId[entry.Id] = new ItemDefinition(entry.Id, entry.Name, itemType, entry.LookId, entry.AttackBonus, entry.DefenseBonus, entry.HealAmount,
-                entry.BuyPrice, entry.SellPrice);
+                entry.BuyPrice, entry.SellPrice, entry.SpriteKey ?? "", entry.PivotOffset?.X ?? 0f, entry.PivotOffset?.Y ?? 0f, entry.UpgradeLevel);
         }
 
         if (byId.Count == 0)

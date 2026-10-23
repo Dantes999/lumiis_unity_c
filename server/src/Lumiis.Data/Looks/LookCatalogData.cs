@@ -30,6 +30,17 @@ internal sealed class LookEntryDto
     public string Name { get; set; } = "";
     public bool HidesHair { get; set; }
     public LookAnchorsDto? Anchors { get; set; }
+
+    /// <summary>Palette-Swapping (Task 2/4): Farbwerte je Rüstungs-Look als Hex-Strings. Optional, damit
+    /// ältere/testspezifische Kataloge ohne Farben weiter geladen werden können.</summary>
+    public LookColorsDto? Colors { get; set; }
+}
+
+internal sealed class LookColorsDto
+{
+    public string PrimaryColor { get; set; } = "";
+    public string SecondaryColor { get; set; } = "";
+    public string AccentColor { get; set; } = "";
 }
 
 internal sealed class LookCatalogDto

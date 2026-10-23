@@ -40,7 +40,13 @@ namespace Lumiis.Client
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private CharacterTestboard _testboard;
         private CharacterTestboard _sortingTestboard;
+        private CharacterTestboard _weaponTestboard;
         private Vector2 _debugPanelScroll;
+
+        /// <summary>Lokaler Test-Override für die Waffen-Aufwertungsstufe (+0..+9), nur Debug/Editor. Die
+        /// echte Instanzstufe kommt erst mit M6c über das Inventar; bis dahin lässt sich das +7/+9-Glitzern
+        /// damit direkt an der eigenen Figur prüfen.</summary>
+        private int _debugWeaponUpgradeLevel;
 
         /// <summary>Bildschirmbereich des Debug-Test-Panels (siehe DrawDebugTestPanel) - wird dort jeden Frame
         /// aktualisiert. HandleClickInput prüft das, damit ein Klick auf einen Button im Panel nicht
@@ -320,6 +326,7 @@ namespace Lumiis.Client
             (int skillId, bool requiresTarget) = SkillHotkeys[hotkeyIndex];
             int targetEntityId = requiresTarget && _targetEntityId >= 0 ? _targetEntityId : 0;
             _netClient.SendUseSkill(skillId, targetEntityId);
+            PlayAttackAnimation(_world.LocalEntityId);
 
             // Optimistische lokale Cooldown-Anzeige (siehe SkillCooldownReadyAtTime-Kommentar) - nur wenn der
             // Skill laut letztem CharacterStatsPacket tatsächlich gelernt ist, sonst gäbe es einen falschen
@@ -440,6 +447,27 @@ namespace Lumiis.Client
             _sortingTestboard.gameObject.SetActive(!_sortingTestboard.gameObject.activeSelf);
         }
 
+        /// <summary>Waffen-Testfeld (+0..+9) inkl. Glitzern und Schlag-Trail. Nutzt die erste Waffe aus
+        /// items.json (spriteKey/pivotOffset/upgradeLevel) und die erste Rüstung für die Farbpalette.</summary>
+        private void ToggleWeaponTest()
+        {
+            if (_weaponTestboard == null)
+            {
+                var go = new GameObject("WeaponTestboard");
+                go.transform.position = new Vector3(GameConstants.MapWidth / 100f + 3f, GameConstants.MapHeight / 200f - 16f, 0f);
+                _weaponTestboard = go.AddComponent<CharacterTestboard>();
+
+                List<int> bodyIds = new List<int>(_lookCatalog.GetIdsForSlot("Body"));
+                int bodyId = bodyIds.Count > 0 ? bodyIds[0] : 1;
+                List<int> armorIds = new List<int>(_lookCatalog.GetIdsForSlot("Armor"));
+                int armorId = armorIds.Count > 0 ? armorIds[armorIds.Count - 1] : 0;
+                _weaponTestboard.BuildWeaponUpgradeGrid(_spriteProvider, _lookCatalog, _itemCatalog, bodyId, armorId);
+                go.SetActive(false);
+            }
+
+            _weaponTestboard.gameObject.SetActive(!_weaponTestboard.gameObject.activeSelf);
+        }
+
         /// <summary>Zyklus 0 (keine Ebene) -> erste Katalog-Id -> ... -> letzte -> zurück zu 0 (und umgekehrt
         /// rückwärts). Rein lokal, wird nicht an den Server geschickt.</summary>
         private void CycleLocalAppearanceSlot(string slot, bool forward)
@@ -458,7 +486,12 @@ namespace Lumiis.Client
             local.Appearance = appearance;
 
             if (_views.TryGetValue(local.Id, out CharacterView view))
+            {
+                // Rein lokaler Look-Test: die Item-Waffe (falls eine ausgerüstet ist) wieder durch den
+                // Appearance-Platzhalter ersetzen, sonst bliebe SetWeapon als Override aktiv.
+                if (slot == "Weapon") view.ClearWeapon();
                 view.SetAppearance(appearance);
+            }
         }
 
         private void CycleLocalHairColor(bool forward)
@@ -516,6 +549,8 @@ namespace Lumiis.Client
                 ToggleTestboard();
             if (GUILayout.Button("Sortier-Testfeld: " + (_sortingTestboard != null && _sortingTestboard.gameObject.activeSelf ? "an" : "aus")))
                 ToggleSortingTest();
+            if (GUILayout.Button("Waffen-Testfeld +0..+9: " + (_weaponTestboard != null && _weaponTestboard.gameObject.activeSelf ? "an" : "aus")))
+                ToggleWeaponTest();
 
             if (_world.LocalEntityId >= 0 && _world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity local))
             {
@@ -526,6 +561,7 @@ namespace Lumiis.Client
                 DrawCycleRow("Helm", "Helmet", appearance.HelmetId);
                 DrawCycleRow("Waffe", "Weapon", appearance.WeaponId);
                 DrawCycleRow("Schild", "Shield", appearance.ShieldId);
+                DrawWeaponUpgradeTestRow();
             }
 
             DrawDebugSpawnRow();
@@ -775,6 +811,26 @@ namespace Lumiis.Client
             GUILayout.EndHorizontal();
         }
 
+        /// <summary>Debug-Override der Waffenstufe (+0..+9), damit das +7/+9-Glitzern und der Schlag-Trail
+        /// ohne M6c-Upgrade-Serverlogik an der eigenen Figur geprüft werden können.</summary>
+        private void DrawWeaponUpgradeTestRow()
+        {
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Waffe +", GUILayout.Width(60));
+            if (GUILayout.Button("<", GUILayout.Width(24)) && _debugWeaponUpgradeLevel > 0)
+            {
+                _debugWeaponUpgradeLevel--;
+                ApplyLocalWeaponVisual();
+            }
+            GUILayout.Label(_debugWeaponUpgradeLevel.ToString(), GUILayout.Width(70));
+            if (GUILayout.Button(">", GUILayout.Width(24)) && _debugWeaponUpgradeLevel < ItemEntryJson.MaxUpgradeLevel)
+            {
+                _debugWeaponUpgradeLevel++;
+                ApplyLocalWeaponVisual();
+            }
+            GUILayout.EndHorizontal();
+        }
+
         private string DisplayNameFor(string slot, int id)
         {
             if (id <= 0) return "Keine";
@@ -846,6 +902,7 @@ namespace Lumiis.Client
                 if (kvp.Value == null || !kvp.Value.ContainsWorldPoint(worldPos)) continue;
                 _targetEntityId = kvp.Key;
                 _netClient.SendAttack(kvp.Key);
+                PlayAttackAnimation(_world.LocalEntityId);
                 // Kampf-Visualisierung Abschnitt 5: sofort lokal zum Ziel drehen, bevor die Serverantwort da
                 // ist - kein dauerhafter Override, der naechste HandleEntityMove ueberschreibt das wieder.
                 if (_world.LocalEntityId >= 0 && _world.Entities.TryGetValue(kvp.Key, out ClientEntity attackTarget))
@@ -956,6 +1013,7 @@ namespace Lumiis.Client
             {
                 _world.HandleEntityDamaged(damaged.TargetEntityId, damaged.TargetHpAfter, damaged.TargetMaxHp);
                 SpawnHitLine(damaged.AttackerEntityId, damaged.TargetEntityId, hit: true);
+                PlayAttackAnimation(damaged.AttackerEntityId);
                 return;
             }
 
@@ -997,6 +1055,7 @@ namespace Lumiis.Client
                 _equippedHelmetItemId = inventorySync.EquippedHelmetItemId;
                 _equippedWeaponItemId = inventorySync.EquippedWeaponItemId;
                 _equippedShieldItemId = inventorySync.EquippedShieldItemId;
+                ApplyLocalWeaponVisual();
                 return;
             }
 
@@ -1054,6 +1113,7 @@ namespace Lumiis.Client
                 if (dodged.TargetEntityId == _world.LocalEntityId) _lastDodgeMessage = "Ausgewichen!";
                 else if (dodged.AttackerEntityId == _world.LocalEntityId) _lastDodgeMessage = "Verfehlt!";
                 SpawnHitLine(dodged.AttackerEntityId, dodged.TargetEntityId, hit: false);
+                PlayAttackAnimation(dodged.AttackerEntityId);
                 return;
             }
 
@@ -1280,7 +1340,42 @@ namespace Lumiis.Client
                 float rangeDiameter = 2f * _classCatalog.MeleeRangeWire / 100f;
                 _rangeRingView.Initialize(_unitRingSprite, rangeDiameter, RangeRingColor, RangeRingSortingOrder);
                 _rangeRingView.SetWorldPosition(entity.X / 100.0, entity.Y / 100.0);
+
+                ApplyLocalWeaponVisual();
             }
+        }
+
+        /// <summary>Waffen-Rendering aus items.json: lädt das statische PNG (falls vorhanden) und übergibt
+        /// Pivot-Korrektur plus Aufwertungsstufe an CharacterView. Ohne Sprite-Key/Asset bleibt der
+        /// Appearance-Platzhalter sichtbar. Wird nach jedem InventorySync aufgerufen, weil der Server die
+        /// ausgerüstete Waffen-ItemId dort mitschickt.</summary>
+        private void ApplyLocalWeaponVisual()
+        {
+            if (_world.LocalEntityId < 0 || !_views.TryGetValue(_world.LocalEntityId, out CharacterView view)) return;
+
+            if (_equippedWeaponItemId == 0 || _itemCatalog == null || !_itemCatalog.TryGet(_equippedWeaponItemId, out ItemEntryJson entry))
+            {
+                view.ClearWeapon();
+                return;
+            }
+
+            Sprite weaponSprite = _spriteProvider != null ? _spriteProvider.LoadWeaponSprite(entry.spriteKey) : null;
+            Vector2 pivotOffset = entry.pivotOffset != null
+                ? new Vector2(entry.pivotOffset.x, entry.pivotOffset.y)
+                : Vector2.zero;
+
+            int upgradeLevel = entry.ClampedUpgradeLevel;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            upgradeLevel = _debugWeaponUpgradeLevel;
+#endif
+            view.SetWeapon(weaponSprite, pivotOffset, upgradeLevel);
+        }
+
+        private void PlayAttackAnimation(int entityId)
+        {
+            if (entityId <= 0) return;
+            if (_animators.TryGetValue(entityId, out CharacterAnimator animator) && animator != null)
+                animator.PlayAttack();
         }
 
         // Platzhalter-Zuordnung Form/Farbe je MobId (siehe data/mobs.json: 1=Wildhund, 2=Waldschrat) - der

@@ -570,6 +570,41 @@ zusätzlich zu `looks.json`/`items.json`/`skills.json` nach
 eine Klasse, der Client nimmt deshalb bewusst den ersten Katalog-Eintrag statt einer echten
 Zuordnung, analog zur serverseitigen `GameServer.DefaultClassName`-Vereinfachung).
 
+## Paper-Doll-Socketing, Waffen-VFX und Rüstungs-Palette
+Der Client rendert Waffen und Rüstungen seit dem Rendering-Umbau modular (weiterhin code-first, keine
+Protokolländerung, keine Serverwahrheit):
+- `data/items.json`: Waffen tragen zusätzlich `spriteKey` (PNG-Name unter
+  `client/Assets/Resources/Sprites/Items/`, ohne Endung), `pivotOffset` (`x`/`y` in Canvas-Pixeln relativ
+  zum Griff) und `upgradeLevel` (0-9, Vorlagen-/Fallback-Wert; die echte Instanzstufe kommt mit M6c aus
+  dem Inventar). `ItemCatalog` (Server, nur Validierung der Stufe) und `ItemCatalogClient` (Client,
+  inkl. `FirstOfType` fürs Testfeld) lesen die Felder.
+- `data/looks.json`: Rüstungs-Looks tragen `colors` (`primaryColor`/`secondaryColor`/`accentColor` als
+  Hex). `LookCatalogClient.TryGetArmorColors` liefert sie; `CharacterView.ApplyArmorColors` schreibt sie
+  per `MaterialPropertyBlock` auf `_Color_ArmorPrimary`, `_Color_ArmorSecondary`, `_Color_ArmorTrim`
+  (kein Material-Instanzieren, Draw Calls bleiben intakt). Die Rüstung nutzt dafür das gemeinsame
+  `Resources/Materials/CharacterArmor.mat` (Shader `Lumiis/CharacterArmor`, unlit/URP-2D-kompatibel);
+  ohne dieses Material dient `primaryColor` als sichtbarer `SpriteRenderer.color`-Fallback.
+- Hierarchie: `CharacterView -> Body (SpriteRenderer) -> WeaponSocket -> Weapon (SpriteRenderer)`.
+  `CharacterView.SetWeapon(Sprite, Vector2 pivotOffset, int upgradeLevel)` setzt die Item-Waffe,
+  `ClearWeapon()` fällt auf den Appearance-Platzhalter zurück. `ISpriteProvider.LoadWeaponSprite`
+  (synchron, `CachingSpriteProvider` cached nach `spriteKey`) lädt das PNG aus
+  `Resources/Sprites/Items/`; fehlt die Datei, bleibt der Platzhalter sichtbar.
+- `CharacterAnimator` nutzt `WeaponSocketFrameConfig` (ScriptableObject, `CreateAssetMenu`, für den
+  Platzhalterbetrieb per `CreateDefault()` erzeugt): je State/Frame und `WeaponFacing`
+  (Down/Up/Left/Right) werden `handOffset` (relativ zum Hand-Anker aus looks.json), `handRotation`
+  (Grad, bei Left gespiegelt) und `weaponSortingOrder` (relativ zur Körper-Ebene, Defaults folgen
+  `docs/sprite-spec.md`: Up -2, Down +3, Side +2) gespeichert. Bei jedem Frame-/Facing-Wechsel setzt
+  `CharacterView.ApplyWeaponSocketFrame` automatisch `WeaponSocket.localPosition`,
+  `localEulerAngles` und `WeaponRenderer.sortingOrder`.
+- Waffen-VFX: zwei Code-erzeugte `ParticleSystem`-Kinder am Socket (`Plus7Glow` gelb/weiß,
+  `Plus9Glow` dichter/blau) werden ab Stufe 7 bzw. 9 aktiviert. Der `TrailRenderer` an der Waffe
+  emittiert nur während der mittleren Schlagframes; `GameClient` startet den Schlagimpuls optimistisch
+  beim Senden von Angriff/Skill und reaktiv bei `EntityDamaged`/`EntityDodged` für den Angreifer.
+- Debug/Testboard: Button "Waffen-Testfeld +0..+9" (F2-Bereich) baut eine Spalte je Stufe mit
+  periodischem Schlag; zusätzlich zeigt das Panel "Waffe +N" einen lokalen Stufen-Override für die
+  eigene Figur (nur Editor/Development-Build, rein kosmetisch). Rüstungsfarben lassen sich über den
+  bestehenden Rüstungs-Cycler und das Rüstungs-Raster prüfen.
+
 ## Escape-Menü
 Seit der Aufgabe `escape-menu.md` gibt es ein kleines Escape-Menü mit drei Aktionen - rein clientseitig,
 keine Protokolländerung:
@@ -677,10 +712,9 @@ Map 1 (Startdorf + Feld), Krieger, Level 1-25, Monster/Bosse/Lumiis-Steine, Item
 
 ## Meilensteine
 M0 Fundament (fertig) | M1 Walking Skeleton (fertig, inkl. M1b Unity-Client, M1c Sichtbarkeit/Testing, M1c-layered-characters Paper-Doll-Charaktere) | M2 Account & Charakter (komplett fertig): M2a Datenbank & Auth-Dienst, M2b Server-Join über Account/Token/Charakter, M2c Unity-Login-UI (UI Toolkit) | M3 Welt (Grid, AOI, Mobs) komplett fertig: M3a Kartenkollision, M3b Sichtbarkeitsbereich (kein Grid - siehe Abschnitt "Sichtbarkeitsbereich (AOI)"), M3c Monster (Spawns, Wander-KI, AOI-Integration - siehe Abschnitt "Monster") | M4 Kampf komplett fertig (inkl. Gegenwehr): M4a Kampf-Grundlagen, M4b Monster-Respawn, M4c Monster-Aggro/Verfolgung/Leine (siehe Abschnitt "Kampf") | M5 Items komplett fertig: M5a Items/Inventar/Ausrüstung/Drops (siehe Abschnitt "Items und Inventar"), M5b Shop/NPCs (siehe Abschnitt "Shop und NPCs") | M6 Metin-Kern abgeschlossen: M6a Level/XP/Werte/SP/Ausweichen/Regeneration (siehe Abschnitt "Fortschritt: Level, XP, Werte"), M6b Skills (siehe Abschnitt "Skills") - die ursprünglich mitgeplanten M6c Upgrade/M6d Lumiis-Steine sind zurückgestellt (siehe "Aktuelle Aufgabe") | M7 Sozial | M8 Alpha-Betrieb.
-Aktuelle Aufgabe: keine - M6 (inkl. M6b) ist fertig. Offene Frage für die nächste Aufgabe (noch NICHT
-entschieden, siehe docs/tasks/M6b-skills.md Abschnitt 8): weiter mit M7 (Sozial/Chat/Gruppe) laut
-ursprünglichem Fahrplan, oder doch zuerst M6c Upgrade/M6d Lumiis-Steine nachholen - für keine der beiden
-Richtungen gibt es bisher eine Task-Datei unter docs/tasks/.
+Aktuelle Aufgabe: keine - der Paper-Doll-Rendering-Umbau (Socketing, Waffen-Sprites, Rüstungs-Palette,
++7/+9-VFX) ist umgesetzt (siehe Abschnitt "Paper-Doll-Socketing, Waffen-VFX und Rüstungs-Palette" und
+Status). M6c Upgrade/M6d Lumiis-Steine bleiben weiterhin zurückgestellt.
 
 ## Arbeitsweise
 - Kleine Schritte. Jeder endet mit grünem `dotnet test` und einem Commit (Präfix "M1: ...").
@@ -888,6 +922,23 @@ Richtungen gibt es bisher eine Task-Datei unter docs/tasks/.
   Compile-Check nach jedem Abschnitt 0 Fehler, `tools/test-client-playmode.sh` 4/4 grün (dritte UI-Wurzel
   stört die bestehenden Tests nicht).
 
+- Paper-Doll-Rendering-Umbau (Socketing, Waffen-Sprites, Rüstungs-Palette, +7/+9-VFX) fertig, in
+  einem Arbeitsblock: (1) `data/items.json` Waffen um `spriteKey`/`pivotOffset`/`upgradeLevel` (0-9)
+  erweitert, `data/looks.json` Rüstungs-Looks um `colors` (primary/secondary/accent als Hex);
+  Server-DTOs (`ItemCatalogData`/`LookCatalogData`) und `ItemCatalog` (Validierung 0-9) sowie
+  `ItemCatalogClient`/`LookCatalogClient` mitgezogen. (2) `ISpriteProvider.LoadWeaponSprite` +
+  `CachingSpriteProvider` (Resources/Sprites/Items/, Cache nach spriteKey, null-Cache bei fehlendem
+  Asset); `PlaceholderSpriteProvider` liefert bewusst null. (3) `CharacterView`-Hierarchie
+  Body -> WeaponSocket -> Weapon, `SetWeapon`/`ClearWeapon`, MaterialPropertyBlock-Farben
+  (`_Color_ArmorPrimary/Secondary/Trim`), gemeinsames `CharacterArmor.mat`/Shader, zwei
+  ParticleSysteme am Socket und TrailRenderer. (4) `CharacterAnimator` mit
+  `WeaponSocketFrameConfig` (Frame-Data je State/Frame/Facing) und Schlagimpuls; `GameClient` setzt
+  die Item-Waffe nach jedem InventorySync, triggert Schlaganimation/Trail bei Senden und bei
+  EntityDamaged/EntityDodged. (5) `CharacterTestboard` um +0..+9-Waffentestfeld (mit periodischem
+  Schlag) und Debug-Panel-Button/Stufen-Override erweitert. 555 Server-/Unit-Tests grün,
+  `tools/test-client-playmode.sh` 9/9 grün (4 bestehende + 5 neue CharacterView-PlayMode-Tests),
+  Batchmode-Kompilierung ohne Fehler. Manuelle Sichtprüfung der VFX/Farben steht noch aus (siehe
+  Checkliste unten).
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client
 War kein Codefehler. User hat den Test mit fokussiertem Unity-Fenster wiederholt (Server, Unity Play, dann Bots
 gestartet, ins Unity-Fenster geklickt): alle Spawns kamen an, auch mit 99 Bots. Wahrscheinliche Ursache war die
@@ -952,3 +1003,19 @@ Waldschrat in Reichweite (Dev-Tools-Debug-Spawn oder ein regulärer Spawn-Punkt)
 - "Ausloggen" klicken: zurück zum Login-Bildschirm, Benutzername ist noch ausgefüllt, Passwort leer.
 - "Beenden" klicken (im Editor): Play-Modus stoppt sauber, der Editor selbst bleibt offen.
 - Einen Standalone-Build erzeugen (`tools/build-client.sh`) und starten: läuft in einem Fenster (nicht Vollbild), Fenster ist in der Größe veränderbar.
+
+### Noch zu prüfen (Paper-Doll-Socketing/Waffen-VFX, vom User)
+Voraussetzung: laufender Server, Charakter mit ausgerüsteter Waffe (Startwaffe reicht); Editor-Play oder
+Development-Build (Debug-Panel sichtbar).
+- F7 (Waffen-Look-Cycler) bzw. der Waffen-Button im Panel: die Waffe bleibt am Griff auf Handhöhe, dreht
+  beim Laufen um den Hand-Anker und liegt je Richtung vor/hinter dem Körper (Up: hinter Körper/Schild).
+- Debug-Panel "Waffe +0..+9" auf +7 stellen: gelb-weißes Funkeln an der Waffe; auf +9: zusätzlich dichter
+  blauer Glanz. Auf +0..+6: kein Glitzern.
+- Rechtsklick-Angriff oder Taste 1/2: die Figur führt einen kurzen Schlag aus, die Waffe rotiert sichtbar,
+  und nur während der mittleren Schlagphase erscheint ein kurzer Trail an der Waffe.
+- Rüstungs-Cycler/F5: die Rüstung wechselt nicht nur die Form, sondern auch die Farbe (Palette aus
+  looks.json); der Körper bleibt unverändert.
+- Button "Waffen-Testfeld +0..+9": zehn Figuren mit steigender Stufe, die periodisch zuschlagen; ab +7/+9
+  ist das jeweilige Glitzern sichtbar, der Trail läuft synchron zur Schlaganimation.
+- Fehlt ein Waffen-PNG unter `Resources/Sprites/Items/`, bleibt das Spiel lauffähig und zeigt weiterhin
+  den Platzhalter (keine Exception, keine unsichtbare Waffe).

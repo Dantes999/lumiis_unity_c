@@ -8,6 +8,14 @@ namespace Lumiis.Client
     // JsonUtility gleicht Feldnamen exakt (case-sensitive) mit den JSON-Keys ab - deshalb lowerCamelCase
     // statt der sonst üblichen PascalCase-Konvention, analog zu LookCatalogClient.
 
+    /// <summary>Pixel-Korrektur des Waffen-Pivots relativ zum Griff (x/y, in Canvas-Pixeln).</summary>
+    [Serializable]
+    public class PivotOffsetJson
+    {
+        public float x;
+        public float y;
+    }
+
     [Serializable]
     public class ItemEntryJson
     {
@@ -23,6 +31,22 @@ namespace Lumiis.Client
         /// Verkaufspreise, nur BuyPrice über ShopContentPacket, siehe GameClient.DrawShopPanel). BuyPrice wird
         /// hier bewusst NICHT geladen - die kommt beim Kaufen ohnehin autoritativ vom Server.</summary>
         public long sellPrice;
+
+        /// <summary>Paper-Doll-Rendering: Dateiname (ohne Endung) des statischen Waffen-PNGs unter
+        /// Resources/Sprites/Items/. Leer = CharacterView nutzt den generierten Platzhalter.</summary>
+        public string spriteKey = "";
+
+        /// <summary>Paper-Doll-Rendering: Pixel-Korrektur des Waffen-Pivots relativ zum Griff.</summary>
+        public PivotOffsetJson pivotOffset = new PivotOffsetJson();
+
+        /// <summary>Paper-Doll-Rendering: Standard-Aufwertungsstufe der Vorlage (0-9). Die tatsächliche
+        /// Instanzstufe kommt später aus dem Inventar; aktuell nutzt der Client diesen Wert als Fallback.</summary>
+        public int upgradeLevel;
+
+        public int ClampedUpgradeLevel => Mathf.Clamp(upgradeLevel, MinUpgradeLevel, MaxUpgradeLevel);
+
+        public const int MinUpgradeLevel = 0;
+        public const int MaxUpgradeLevel = 9;
     }
 
     [Serializable]
@@ -33,20 +57,24 @@ namespace Lumiis.Client
 
     /// <summary>Lädt items.json aus StreamingAssets (JsonUtility, analog zu LookCatalogClient) - der Client
     /// braucht das für das Debug-Panel: Anzeigename und ItemType je ItemId (M5a, um zwischen "Anlegen" und
-    /// "Benutzen" zu entscheiden) sowie SellPrice (M5b, Shop-Panel). LookId/AttackBonus/DefenseBonus/
-    /// HealAmount werden hier bewusst NICHT gebraucht (keine echte Inventar-Grafik, kein clientseitiger
-    /// Schaden-/Heilungs-Vorschau-Text, siehe CLAUDE.md Abschnitt "Items und Inventar") - trotzdem
-    /// mitgeladen, um dieselbe Struktur wie data/items.json 1:1 abzubilden.</summary>
+    /// "Benutzen" zu entscheiden), SellPrice (M5b, Shop-Panel) sowie seit dem Paper-Doll-Umbau die
+    /// Rendering-Felder der Waffe (spriteKey/pivotOffset/upgradeLevel).</summary>
     public sealed class ItemCatalogClient
     {
         private readonly Dictionary<int, ItemEntryJson> _byId = new Dictionary<int, ItemEntryJson>();
+        private readonly List<ItemEntryJson> _entries = new List<ItemEntryJson>();
 
         public ItemCatalogClient(string json)
         {
             ItemCatalogJson data = JsonUtility.FromJson<ItemCatalogJson>(json) ?? new ItemCatalogJson();
             foreach (ItemEntryJson entry in data.items)
+            {
                 _byId[entry.id] = entry;
+                _entries.Add(entry);
+            }
         }
+
+        public IReadOnlyList<ItemEntryJson> Entries => _entries;
 
         /// <summary>Nur Desktop/Editor (File.ReadAllText auf StreamingAssets), analog zu
         /// LookCatalogClient.LoadFromStreamingAssets.</summary>
@@ -60,6 +88,18 @@ namespace Lumiis.Client
         public bool TryGet(int itemId, out ItemEntryJson entry)
         {
             return _byId.TryGetValue(itemId, out entry);
+        }
+
+        /// <summary>Erster Eintrag des angegebenen ItemTyps (Reihenfolge wie in items.json) - für das
+        /// Waffen-Testfeld, das ohne fest verdrahtete Item-Id auskommt.</summary>
+        public ItemEntryJson FirstOfType(string itemType)
+        {
+            foreach (ItemEntryJson entry in _entries)
+            {
+                if (string.Equals(entry.itemType, itemType, StringComparison.OrdinalIgnoreCase))
+                    return entry;
+            }
+            return null;
         }
 
         /// <summary>Anzeigename für einen belegten Slot - "#<id>" als Fallback, falls der Katalog (sollte bei

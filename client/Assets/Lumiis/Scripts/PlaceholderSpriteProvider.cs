@@ -43,6 +43,14 @@ namespace Lumiis.Client
             return Sprite.Create(texture, new Rect(0, 0, _canvasPx, _canvasPx), pivotNormalized, _ppu);
         }
 
+        /// <summary>Der Platzhalter-Provider kennt keine statischen PNGs; CharacterView fällt bei null auf
+        /// GetSprite(CharacterSlot.Weapon, ...) zurück. Der echte Ladevorgang steckt im CachingSpriteProvider
+        /// bzw. später in einem Atlas/Addressables-Provider.</summary>
+        public Sprite LoadWeaponSprite(string spriteKey)
+        {
+            return null;
+        }
+
         private void FillRect(Color32[] pixels, int x0, int y0, int width, int height, Color32 color)
         {
             for (int y = y0; y < y0 + height; y++)

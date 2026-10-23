@@ -91,5 +91,37 @@ namespace Lumiis.Tests.Data.Items
             const string json = @"{ ""items"": [] }";
             Assert.Throws<ItemCatalogException>(() => ItemCatalog.LoadFromJson(json, TestLookCatalogs.CreateMinimal()));
         }
+
+        [Fact]
+        public void LoadFromJson_WeaponRenderingFields_AreExposed()
+        {
+            const string json = @"{
+  ""items"": [
+    { ""id"": 1, ""name"": ""Testklinge"", ""itemType"": ""Weapon"", ""lookId"": 1,
+      ""spriteKey"": ""weapon_2_wood"", ""pivotOffset"": { ""x"": -2.5, ""y"": 4 },
+      ""upgradeLevel"": 7 }
+  ]
+}";
+
+            ItemCatalog catalog = ItemCatalog.LoadFromJson(json, TestLookCatalogs.CreateMinimal());
+            Assert.True(catalog.TryGet(1, out ItemDefinition weapon));
+            Assert.Equal("weapon_2_wood", weapon.SpriteKey);
+            Assert.Equal(-2.5f, weapon.PivotOffsetX);
+            Assert.Equal(4f, weapon.PivotOffsetY);
+            Assert.Equal(7, weapon.UpgradeLevel);
+        }
+
+        [Fact]
+        public void LoadFromJson_UpgradeLevelOutOfRange_Throws()
+        {
+            const string json = @"{
+  ""items"": [
+    { ""id"": 1, ""name"": ""Testklinge"", ""itemType"": ""Weapon"", ""lookId"": 1, ""upgradeLevel"": 10 }
+  ]
+}";
+
+            var ex = Assert.Throws<ItemCatalogException>(() => ItemCatalog.LoadFromJson(json, TestLookCatalogs.CreateMinimal()));
+            Assert.Contains("upgradeLevel", ex.Message);
+        }
     }
 }
