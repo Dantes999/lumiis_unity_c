@@ -3,6 +3,11 @@
 Stand: 2026-10-24  
 Status: Plan / Werkzeug-Grundlage; noch keine Änderung an `data/maps/village`.
 
+> Umgesetzt ist bereits eine **visuelle Vorschau** im Asset-Testlabor:
+> `tools/render-lumiis-map-preview.py` rendert `greenfield` nach
+> `Resources/Maps/greenfield.png`; der Button "Karten-Vorschau (Greenfield)"
+> zeigt sie als Weltbild. Die folgende Server-/Multi-Map-Integration ist noch offen.
+
 ## Befund
 
 Referenzkarten in `lumiis/packages/shared/maps`:

@@ -57,6 +57,13 @@ namespace Lumiis.Client
             yield return new WaitForEndOfFrame();
 
             _gameClient.DebugSetAssetLabUiVisible(false);
+            _gameClient.DebugShowAssetLabMapPreview();
+            if (mainCamera != null) mainCamera.orthographicSize = 12f;
+            yield return new WaitForSeconds(0.3f);
+            ScreenCapture.CaptureScreenshot("/tmp/lumiis-asset-lab-map.png", 1);
+            yield return new WaitForEndOfFrame();
+
+            _gameClient.DebugHideAssetLabMapPreview();
             _gameClient.DebugShowAssetLabGallery();
             if (mainCamera != null) mainCamera.orthographicSize = 3.2f;
             yield return new WaitForSeconds(0.4f);

@@ -561,6 +561,16 @@ namespace Lumiis.Client
             _assetTestLab?.DebugShowIconGallery(category, page);
         }
 
+        public void DebugShowAssetLabMapPreview()
+        {
+            _assetTestLab?.DebugShowMapPreview();
+        }
+
+        public void DebugHideAssetLabMapPreview()
+        {
+            _assetTestLab?.DebugHideMapPreview();
+        }
+
         /// <summary>Schneller Screenshot aus dem laufenden Play-Modus (F12 oder Testlabor-Button) - kein
         /// Unity-Neustart nötig. Schreibt nach /tmp/lumiis-screenshot-&lt;Zeitstempel&gt;.png.</summary>
         public void CaptureScreenshot()

@@ -85,6 +85,7 @@
             <ui:Label text="Szene" class="asset-lab-section" />
             <ui:Label text="Die Szene wird für das Labor aufgeräumt: drei Trainingspuppen, keine Monster, keine anderen Spieler." class="asset-lab-hint" />
             <ui:Button name="asset-lab-gallery" text="Charakter-Galerie zeigen" class="asset-lab-wide-button" />
+            <ui:Button name="asset-lab-map" text="Karten-Vorschau (Greenfield)" class="asset-lab-wide-button" />
             <ui:Button name="asset-lab-dummy-reset" text="Trainingspuppen neu platzieren" class="asset-lab-wide-button" />
             <ui:Button name="asset-lab-reset" text="Figur zurücksetzen" class="asset-lab-wide-button" />
             <ui:Button name="asset-lab-screenshot" text="Screenshot aufnehmen (F12)" class="asset-lab-wide-button" />

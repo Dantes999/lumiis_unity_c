@@ -636,6 +636,9 @@ Für die Asset-Prüfung ohne Server-/Monster-Gewimmel gibt es eine eigene UI-Too
 - "Charakter-Galerie" im Labor zeigt acht echte Lumiis-Figuren (Krieger/Ninja/Sura/Schamane, m/w)
   aus den Sheets (48×48-Zellen, 9 Spalten, 3 Ansichten, Fußpunkt 24/44). Der Screenshot-Lauf legt
   zusätzlich `/tmp/lumiis-asset-lab-characters.png` ab.
+- "Karten-Vorschau (Greenfield)" zeigt die aus den Lumiis-Tile-IDs gerenderte 80×80-Karte als
+  Weltbild (`Resources/Maps/greenfield.png`, `tools/render-lumiis-map-preview.py`); das ist eine
+  Vorschau, noch keine Multi-Map-Serverintegration (siehe `docs/map-import-plan.md`).
 - Feature-Gap und Kartenplanung: `docs/feature-gap-lumiis.md` (priorisierte Lücken gegenüber
   `lumiis`/`lumiis-2d`), `docs/icon-integration-plan.md`, `docs/map-import-plan.md`. Mehrkarten/
   Portale bleiben ein eigener Server-Umbau; der Plan beschreibt Konvertierung und MapCatalog.
@@ -988,8 +991,8 @@ Status). M6c Upgrade/M6d Lumiis-Steine bleiben weiterhin zurückgestellt.
   F12/Button im Labor, `ScreenshotRequestWatcher` + `tools/request-screenshot.sh` für laufende
   Play-Modi sowie `tools/capture-client-screenshots.sh` als einmaliger GUI-Lauf. 12/12 PlayMode-Tests
   grün; die automatisch erzeugten Bilder (`/tmp/lumiis-asset-lab-plus0.png`, `-plus9.png`, `-attack.png`,
-  `-icons.png`, `-characters.png`) zeigen Labor-UI, Vorschaufigur, Trainingspuppen, Waffe, +9-Glitzern, Trail und die
-  acht echten Lumiis-Charaktere.
+  `-icons.png`, `-map.png`, `-characters.png`) zeigen Labor-UI, Vorschaufigur, Trainingspuppen, Waffe,
+  +9-Glitzern, Trail, Icon-Galerie, Greenfield-Kartenvorschau und die acht echten Lumiis-Charaktere.
 - Lumiis-Referenz-Assets: (1) `tools/import-lumiis-assets.py` importiert 533 Icons (34 Kategorien)
   aus dem Asset-Archiv nach `Resources/Icons`, inkl. Windows-sauberer Dateinamen, Manifest,
   deterministischer `.meta`-Dateien und Provenance-Einträgen. (2) `ItemIconCatalog` + `iconKey`
@@ -1086,4 +1089,7 @@ Voraussetzung: laufender Server, Charakter ausgewählt; Editor-Play oder Develop
   Lumiis-Archiv angezeigt (533 Icons, 34 Kategorien).
 - "Charakter-Galerie zeigen": acht echte Lumiis-Figuren (Krieger/Ninja/Sura/Schamane, m/w) mit
   Waffe/Rüstung; der automatische Screenshot-Lauf legt `/tmp/lumiis-asset-lab-characters.png` ab.
+- "Karten-Vorschau (Greenfield)": zeigt die importierte 80×80-Karte als Weltbild; der automatische
+  Lauf legt `/tmp/lumiis-asset-lab-map.png` ab. Das ist nur eine Vorschau, noch keine spielbare
+  zweite Karte (Server-Multi-Map siehe `docs/map-import-plan.md`).
 - F1 zeigt außerhalb des Labors wieder das gewohnte Debug-Overlay und -Panel.

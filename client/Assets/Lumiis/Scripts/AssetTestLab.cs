@@ -73,6 +73,9 @@ namespace Lumiis.Client
         private CharacterSheetGallery _characterGallery;
         private GameObject _characterGalleryRoot;
         private bool _galleryVisible;
+        private GameObject _mapPreviewRoot;
+        private Sprite _mapPreviewSprite;
+        private bool _mapPreviewVisible;
         private Vector3 _previewPosition;
 
         private Sprite _dummyPostSprite;
@@ -231,6 +234,7 @@ namespace Lumiis.Client
             _root.Q<Button>("asset-lab-dummy-reset").clicked += RebuildDummies;
             _root.Q<Button>("asset-lab-reset").clicked += ResetLab;
             _root.Q<Button>("asset-lab-gallery").clicked += ToggleCharacterGallery;
+            _root.Q<Button>("asset-lab-map").clicked += ToggleMapPreview;
             _root.Q<Button>("asset-lab-screenshot").clicked += () => _gameClient.CaptureScreenshot();
             _root.Q<Button>("asset-lab-icon-category-prev").clicked += () => ChangeIconCategory(-1);
             _root.Q<Button>("asset-lab-icon-category-next").clicked += () => ChangeIconCategory(1);
@@ -304,6 +308,9 @@ namespace Lumiis.Client
             _characterGallery = null;
             _characterGalleryRoot = null;
             _galleryVisible = false;
+            _mapPreviewRoot = null;
+            _mapPreviewSprite = null;
+            _mapPreviewVisible = false;
 
             if (_root != null)
                 _root.style.display = DisplayStyle.None;
@@ -675,6 +682,81 @@ namespace Lumiis.Client
         {
             if (_root != null)
                 _root.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
+        private void ToggleMapPreview()
+        {
+            if (_mapPreviewVisible) HideMapPreview();
+            else ShowMapPreview();
+        }
+
+        private void ShowMapPreview()
+        {
+            if (_mapPreviewVisible || _labRoot == null) return;
+            HideCharacterGallery();
+            _mapPreviewVisible = true;
+
+            if (_previewView != null) _previewView.gameObject.SetActive(false);
+            foreach (Transform child in _labRoot.transform)
+            {
+                if (child.name.StartsWith("Trainingspuppe"))
+                    child.gameObject.SetActive(false);
+            }
+
+            Texture2D texture = Resources.Load<Texture2D>("Maps/greenfield");
+            if (texture == null)
+            {
+                Debug.LogWarning("Karten-Vorschau fehlt: Resources/Maps/greenfield.png");
+                _mapPreviewVisible = false;
+                if (_previewView != null) _previewView.gameObject.SetActive(true);
+                return;
+            }
+
+            _mapPreviewSprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f), 4f, 0, SpriteMeshType.FullRect);
+            _mapPreviewRoot = new GameObject("GreenfieldMapPreview");
+            _mapPreviewRoot.transform.SetParent(_labRoot.transform, false);
+            _mapPreviewRoot.transform.position = _previewPosition;
+            var renderer = _mapPreviewRoot.AddComponent<SpriteRenderer>();
+            renderer.sprite = _mapPreviewSprite;
+            renderer.sortingOrder = -60;
+
+            Button button = _root != null ? _root.Q<Button>("asset-lab-map") : null;
+            if (button != null) button.text = "Karten-Vorschau ausblenden";
+        }
+
+        private void HideMapPreview()
+        {
+            if (!_mapPreviewVisible) return;
+            _mapPreviewVisible = false;
+
+            if (_mapPreviewRoot != null) Destroy(_mapPreviewRoot);
+            _mapPreviewRoot = null;
+            if (_mapPreviewSprite != null) Destroy(_mapPreviewSprite);
+            _mapPreviewSprite = null;
+
+            if (_previewView != null) _previewView.gameObject.SetActive(true);
+            if (_labRoot != null)
+            {
+                foreach (Transform child in _labRoot.transform)
+                {
+                    if (child.name.StartsWith("Trainingspuppe"))
+                        child.gameObject.SetActive(true);
+                }
+            }
+
+            Button button = _root != null ? _root.Q<Button>("asset-lab-map") : null;
+            if (button != null) button.text = "Karten-Vorschau (Greenfield)";
+        }
+
+        public void DebugShowMapPreview()
+        {
+            ShowMapPreview();
+        }
+
+        public void DebugHideMapPreview()
+        {
+            HideMapPreview();
         }
 
         public void DebugShowIconGallery(string category, int page = 0)
