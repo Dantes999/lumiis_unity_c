@@ -70,6 +70,12 @@ namespace Lumiis.Client
             ScreenCapture.CaptureScreenshot("/tmp/lumiis-asset-lab-characters.png", 1);
             yield return new WaitForEndOfFrame();
 
+            _gameClient.DebugCloseAssetLab();
+            if (mainCamera != null) mainCamera.orthographicSize = 8f;
+            yield return new WaitForSeconds(0.5f);
+            ScreenCapture.CaptureScreenshot("/tmp/lumiis-hud.png", 1);
+            yield return new WaitForEndOfFrame();
+
             yield return new WaitForSeconds(0.5f);
             File.WriteAllText(MarkerPath, "done");
             Debug.Log("Asset-Testlabor-Screenshots geschrieben: /tmp/lumiis-asset-lab-*.png");

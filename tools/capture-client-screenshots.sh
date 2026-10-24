@@ -43,7 +43,7 @@ if [ $EXIT_CODE -ne 0 ]; then
     exit $EXIT_CODE
 fi
 
-for f in /tmp/lumiis-asset-lab-plus0.png /tmp/lumiis-asset-lab-plus9.png /tmp/lumiis-asset-lab-attack.png /tmp/lumiis-asset-lab-icons.png /tmp/lumiis-asset-lab-map.png /tmp/lumiis-asset-lab-characters.png; do
+for f in /tmp/lumiis-asset-lab-plus0.png /tmp/lumiis-asset-lab-plus9.png /tmp/lumiis-asset-lab-attack.png /tmp/lumiis-asset-lab-icons.png /tmp/lumiis-asset-lab-map.png /tmp/lumiis-asset-lab-characters.png /tmp/lumiis-hud.png; do
     if [ ! -f "$f" ]; then
         echo "Screenshot fehlt: $f (Log: $LOG_FILE)" >&2
         exit 1

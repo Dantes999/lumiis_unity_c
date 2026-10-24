@@ -42,6 +42,9 @@ public sealed class GameServer : INetEventListener
         /// gesendet wurden (siehe CompleteJoin) - der erste UpdateVisibility-Tick nach dem Join gleicht das an.</summary>
         public readonly HashSet<int> VisibleEntityIds = new();
 
+        /// <summary>M7-Chat: letzter akzeptierter Chat-Zeitpunkt (monotone Serverzeit) für das 400-ms-Limit.</summary>
+        public long LastChatAtMs;
+
         public ConnectionState(NetPeer peer, long closeAtMs)
         {
             Peer = peer;
@@ -847,6 +850,9 @@ public sealed class GameServer : INetEventListener
             case AllocateSkillPointRequestPacket allocateSkillPoint:
                 HandleAllocateSkillPointRequest(conn, allocateSkillPoint);
                 break;
+            case ChatRequestPacket chat:
+                HandleChatRequest(conn, chat);
+                break;
             default:
                 _logger.Warn($"Unerwartetes Paket {packet.Id} von Verbindung {conn.Peer.Id}");
                 conn.Peer.Disconnect();
@@ -1314,6 +1320,93 @@ public sealed class GameServer : INetEventListener
         conn.Peer.SendPacket(BuildCharacterStatsPacket(entity!));
         if (success && entity!.CharacterId is int characterId)
             _characterSaveChannel.Writer.TryWrite(BuildCharacterSaveRequest(entity));
+    }
+
+    private void HandleChatRequest(ConnectionState conn, ChatRequestPacket request)
+    {
+        if (conn.EntityId is not int entityId)
+        {
+            _logger.Warn($"ChatRequest vor Join von Verbindung {conn.Peer.Id}");
+            conn.Peer.Disconnect();
+            return;
+        }
+
+        if (!_world.TryGet(entityId, out Entity? sender) || sender == null)
+            return;
+
+        long now = _nowMs();
+        if (conn.LastChatAtMs != 0 && now - conn.LastChatAtMs < 400)
+            return; // Rate-Limit: still verwerfen, kein Disconnect.
+
+        string text = (request.Text ?? "").Trim();
+        if (text.Length == 0) return;
+        if (text.Length > 200) text = text.Substring(0, 200);
+        conn.LastChatAtMs = now;
+
+        ChatChannel channel = request.Channel;
+        if (channel == ChatChannel.System)
+            return; // Systemnachrichten kommen nur vom Server.
+
+        if (channel == ChatChannel.Whisper)
+        {
+            string targetName = (request.TargetName ?? "").Trim();
+            Entity? target = FindPlayerEntityByName(targetName);
+            if (target == null)
+            {
+                SendSystemChat(conn, "Spieler nicht gefunden: " + targetName);
+                return;
+            }
+
+            var whisper = new ChatMessagePacket
+            {
+                Channel = ChatChannel.Whisper,
+                SenderName = sender.Name,
+                Text = text
+            };
+            byte[] data = PacketCodec.Encode(whisper);
+            conn.Peer.Send(data, DeliveryMethod.ReliableOrdered);
+            FindConnectionByEntityId(target.Id)?.Peer.Send(data, DeliveryMethod.ReliableOrdered);
+            return;
+        }
+
+        var message = new ChatMessagePacket
+        {
+            Channel = channel,
+            SenderName = sender.Name,
+            Text = text
+        };
+        BroadcastChat(message);
+    }
+
+    private void BroadcastChat(ChatMessagePacket message)
+    {
+        byte[] data = PacketCodec.Encode(message);
+        foreach (ConnectionState conn in _connections.Values)
+        {
+            if (conn.EntityId == null) continue;
+            conn.Peer.Send(data, DeliveryMethod.ReliableOrdered);
+        }
+    }
+
+    private void SendSystemChat(ConnectionState conn, string text)
+    {
+        conn.Peer.SendPacket(new ChatMessagePacket
+        {
+            Channel = ChatChannel.System,
+            SenderName = "System",
+            Text = text
+        });
+    }
+
+    private Entity? FindPlayerEntityByName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return null;
+        foreach (Entity entity in _world.Entities)
+        {
+            if (entity.Kind == EntityKind.Player && string.Equals(entity.Name, name, StringComparison.OrdinalIgnoreCase))
+                return entity;
+        }
+        return null;
     }
 
     /// <summary>Baut ein volles InventorySyncPacket aus dem aktuellen Entity-Zustand (M5a) - Resync, kein

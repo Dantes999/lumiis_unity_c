@@ -392,4 +392,32 @@ namespace Lumiis.Shared.Net
             SkillId = reader.ReadInt32();
         }
     }
+
+    /// <summary>M7-Chat: Client->Server. Text wird serverseitig getrimmt/limitiert, SenderName kommt aus der
+    /// Entity (nicht aus dem Paket), Whisper benötigt TargetName. Rate-Limit im GameServer.</summary>
+    public sealed class ChatRequestPacket : IPacket
+    {
+        public ChatChannel Channel;
+        public string TargetName = "";
+        public string Text = "";
+
+        public PacketId Id
+        {
+            get { return PacketId.ChatRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteByte((byte)Channel);
+            writer.WriteString(TargetName);
+            writer.WriteString(Text);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            Channel = (ChatChannel)reader.ReadByte();
+            TargetName = reader.ReadString();
+            Text = reader.ReadString();
+        }
+    }
 }

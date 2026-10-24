@@ -153,6 +153,14 @@ namespace Lumiis.Client
             Send(new AllocateSkillPointRequestPacket { SkillId = skillId });
         }
 
+        /// <summary>M7-Chat: sendet eine Chat-Nachricht. SenderName wird nicht mitgeschickt (der Server nimmt
+        /// den Entity-Namen), Zielname nur bei Whisper relevant.</summary>
+        public void SendChat(ChatChannel channel, string targetName, string text)
+        {
+            if (_peer == null || !IsConnected) return;
+            Send(new ChatRequestPacket { Channel = channel, TargetName = targetName ?? "", Text = text ?? "" });
+        }
+
         private void Send(IPacket packet)
         {
             if (_peer == null) return;

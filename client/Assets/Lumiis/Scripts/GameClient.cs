@@ -19,6 +19,10 @@ namespace Lumiis.Client
         // Blickrichtung/Animation) - deshalb ein eigenes, kleineres Dictionary statt _views/_animators
         // mitzubenutzen (siehe MonsterView-Klassenkommentar).
         private readonly Dictionary<int, MonsterView> _monsterViews = new Dictionary<int, MonsterView>();
+
+        /// <summary>M7-Chat: eingehende ChatMessagePacket für die HUD-/Chat-UI. Reines Anzeige-Event,
+        /// der Client sendet nur ChatRequestPacket und berechnet keine Chat-Zustände.</summary>
+        public event System.Action<ChatMessagePacket> ChatMessageReceived;
         private Sprite _squareSprite;
         private Sprite _localMarkerSprite;
         private Sprite _monsterCircleSprite;
@@ -74,6 +78,10 @@ namespace Lumiis.Client
         // sichtbar ist - sperrt nur die eigentlichen Gameplay-Eingaben (Bewegungsklick, Angriff/Rechtsklick,
         // Skills 1-4), nicht Zoom/F1-Overlay-Umschaltung (keine Gameplay-Aktionen im engeren Sinn).
         private bool _gameplayInputLocked;
+
+        /// <summary>M7-Chat: UI-Textfeld hat den Fokus - dann dürfen Tasten 1-4 keine Skills auslösen und
+        /// Mausklicks nicht durch das Chat-Panel in die Welt gehen.</summary>
+        private bool _chatInputFocused;
 
         // Asset-Testlabor (nur Editor/Development): blendet Server-Figuren/Monster aus, sperrt Gameplay-Eingaben
         // und lässt GameClient.OnGUI das Debug-Overlay weglassen. Die UI selbst ist eine separate UI-Toolkit-
@@ -272,7 +280,7 @@ namespace Lumiis.Client
                     buffRing.SetWorldPosition(localForRing.X / 100.0, localForRing.Y / 100.0);
             }
 
-            if (_inGame && !_gameplayInputLocked && !_assetLabActive)
+            if (_inGame && !_gameplayInputLocked && !_assetLabActive && !_chatInputFocused)
             {
                 HandleClickInput();
                 HandleSkillHotkeys();
@@ -1263,6 +1271,14 @@ namespace Lumiis.Client
                 foreach ((BuffType type, long remainingMs) in activeBuffs.Buffs)
                     _activeBuffRemainingSeconds[type] = remainingMs / 1000f;
                 SyncBuffRings(activeBuffs.Buffs);
+                return;
+            }
+
+            ChatMessagePacket chat = packet as ChatMessagePacket;
+            if (chat != null)
+            {
+                ChatMessageReceived?.Invoke(chat);
+                return;
             }
         }
 
@@ -1519,6 +1535,52 @@ namespace Lumiis.Client
         }
 
         public bool HasLocalPlayer => _world.LocalEntityId >= 0 && _world.Entities.ContainsKey(_world.LocalEntityId);
+
+        // ---- HUD-/Chat-Daten (M7): nur lesende Sicht auf den bestehenden Client-Zustand ----
+        public ClientWorld World => _world;
+        public bool IsInGame => _inGame;
+        public bool IsAssetLabActive => _assetLabActive;
+        public int TargetEntityId => _targetEntityId;
+        public long YangTotal => _yangTotal;
+        public bool IsDead => _isDead;
+
+        public string CurrentHudMessage
+        {
+            get
+            {
+                if (_isDead) return "Du bist gestorben, Respawn in Kürze ...";
+                if (!string.IsNullOrEmpty(_lastLevelUpMessage)) return _lastLevelUpMessage;
+                if (!string.IsNullOrEmpty(_lastDodgeMessage)) return _lastDodgeMessage;
+                if (!string.IsNullOrEmpty(_lastAttackFailedMessage)) return _lastAttackFailedMessage;
+                if (!string.IsNullOrEmpty(_lastSkillFailedMessage)) return _lastSkillFailedMessage;
+                if (!string.IsNullOrEmpty(_lastInventoryActionFailedMessage)) return _lastInventoryActionFailedMessage;
+                if (!string.IsNullOrEmpty(_lastShopActionFailedMessage)) return _lastShopActionFailedMessage;
+                return "";
+            }
+        }
+
+        public string SkillDisplayName(int skillId)
+        {
+            return _skillCatalog != null ? _skillCatalog.DisplayName(skillId) : "Skill " + skillId;
+        }
+
+        public float SkillCooldownRemaining(int skillId)
+        {
+            if (!_skillCooldownReadyAtTime.TryGetValue(skillId, out float readyAt)) return 0f;
+            return Mathf.Max(0f, readyAt - Time.time);
+        }
+
+        public IReadOnlyDictionary<BuffType, float> ActiveBuffSeconds => _activeBuffRemainingSeconds;
+
+        public void SetChatInputFocused(bool focused)
+        {
+            _chatInputFocused = focused;
+        }
+
+        public void SendChat(ChatChannel channel, string targetName, string text)
+        {
+            _netClient?.SendChat(channel, targetName, text);
+        }
 
         public Vector3 LocalPlayerWorldPosition
         {

@@ -497,5 +497,25 @@ namespace Lumiis.Tests
                 Assert.Equal(id, packet.Id);
             }
         }
+
+        [Fact]
+        public void ChatRequest_RoundTrip()
+        {
+            var original = new ChatRequestPacket { Channel = ChatChannel.Whisper, TargetName = "Bob", Text = "Hallo Bob!" };
+            var decoded = Assert.IsType<ChatRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(ChatChannel.Whisper, decoded.Channel);
+            Assert.Equal("Bob", decoded.TargetName);
+            Assert.Equal("Hallo Bob!", decoded.Text);
+        }
+
+        [Fact]
+        public void ChatMessage_RoundTrip()
+        {
+            var original = new ChatMessagePacket { Channel = ChatChannel.Global, SenderName = "Alice", Text = "Hallo Welt" };
+            var decoded = Assert.IsType<ChatMessagePacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(ChatChannel.Global, decoded.Channel);
+            Assert.Equal("Alice", decoded.SenderName);
+            Assert.Equal("Hallo Welt", decoded.Text);
+        }
     }
 }

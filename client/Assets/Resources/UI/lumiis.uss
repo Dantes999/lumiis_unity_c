@@ -235,3 +235,236 @@ Button:disabled {
     width: 32px;
     height: 32px;
 }
+
+/* ---- M7-HUD: dauerhaftes Spieler-/Ziel-/Skill-/Chat-Overlay ---- */
+
+.hud-root {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+}
+
+.hud-player {
+    position: absolute;
+    left: 10px;
+    top: 10px;
+    width: 270px;
+    padding: 8px;
+    background-color: rgba(15, 17, 22, 0.88);
+    border-width: 1px;
+    border-color: rgb(65, 75, 92);
+    border-radius: 4px;
+}
+
+.hud-player-name {
+    color: rgb(240, 240, 245);
+    font-size: 15px;
+    -unity-font-style: bold;
+    margin-bottom: 4px;
+}
+
+.hud-bar-row {
+    flex-direction: row;
+    align-items: center;
+    margin: 2px 0;
+}
+
+.hud-bar-label {
+    width: 34px;
+    color: rgb(180, 185, 195);
+    font-size: 10px;
+}
+
+.hud-bar-bg {
+    flex-grow: 1;
+    height: 10px;
+    background-color: rgb(30, 30, 36);
+    border-width: 1px;
+    border-color: rgb(55, 60, 70);
+    margin-right: 4px;
+}
+
+.hud-bar-fill {
+    height: 8px;
+    width: 100%;
+}
+
+.hud-bar-hp { background-color: rgb(190, 45, 45); }
+.hud-bar-sp { background-color: rgb(50, 95, 190); }
+.hud-bar-xp { background-color: rgb(180, 150, 45); }
+.hud-bar-target { background-color: rgb(210, 70, 55); }
+
+.hud-bar-text {
+    width: 76px;
+    color: rgb(205, 210, 220);
+    font-size: 10px;
+    -unity-text-align: middle-right;
+}
+
+.hud-yang {
+    color: rgb(225, 195, 95);
+    font-size: 11px;
+    margin-top: 2px;
+}
+
+.hud-target {
+    position: absolute;
+    left: 50%;
+    top: 10px;
+    margin-left: -130px;
+    width: 260px;
+    padding: 6px 8px;
+    background-color: rgba(15, 17, 22, 0.88);
+    border-width: 1px;
+    border-color: rgb(90, 62, 62);
+    border-radius: 4px;
+}
+
+.hud-target-name {
+    color: rgb(240, 220, 200);
+    font-size: 13px;
+    -unity-text-align: middle-center;
+    margin-bottom: 3px;
+}
+
+.hud-message {
+    position: absolute;
+    left: 50%;
+    top: 86px;
+    margin-left: -220px;
+    width: 440px;
+    color: rgb(240, 220, 150);
+    font-size: 12px;
+    -unity-text-align: middle-center;
+    white-space: normal;
+}
+
+.hud-skills {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    width: 460px;
+    align-items: center;
+}
+
+.hud-skill-slots {
+    flex-direction: row;
+    justify-content: center;
+}
+
+.hud-skill-slot {
+    width: 110px;
+    margin: 0 2px;
+    padding: 4px;
+    background-color: rgba(15, 17, 22, 0.88);
+    border-width: 1px;
+    border-color: rgb(65, 75, 92);
+    border-radius: 3px;
+    align-items: center;
+}
+
+.hud-skill-key {
+    color: rgb(235, 205, 110);
+    font-size: 11px;
+    -unity-font-style: bold;
+}
+
+.hud-skill-name {
+    color: rgb(225, 230, 240);
+    font-size: 10px;
+    -unity-text-align: middle-center;
+}
+
+.hud-skill-cd {
+    color: rgb(150, 190, 255);
+    font-size: 10px;
+    min-height: 12px;
+}
+
+.hud-buffs {
+    color: rgb(210, 210, 220);
+    font-size: 10px;
+    margin-top: 3px;
+    -unity-text-align: middle-center;
+}
+
+.hud-chat {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    width: 360px;
+    height: 210px;
+    padding: 6px;
+    background-color: rgba(15, 17, 22, 0.86);
+    border-width: 1px;
+    border-color: rgb(55, 65, 80);
+    border-radius: 4px;
+}
+
+.hud-chat-log {
+    height: 132px;
+    background-color: rgba(8, 9, 12, 0.55);
+    padding: 3px;
+    margin-bottom: 3px;
+}
+
+.hud-chat-input-row {
+    flex-direction: row;
+    align-items: center;
+}
+
+.hud-chat-target {
+    width: 74px;
+    margin-right: 3px;
+}
+
+.hud-chat-input {
+    flex-grow: 1;
+    margin-right: 3px;
+}
+
+.hud-chat-channel-label {
+    color: rgb(160, 170, 185);
+    font-size: 10px;
+    margin-right: 4px;
+}
+
+.hud-chat-channels {
+    flex-direction: row;
+    align-items: center;
+    margin-top: 2px;
+}
+
+.hud-chat-target, .hud-chat-input {
+    min-height: 24px;
+}
+
+.hud-chat-target .unity-text-field__input, .hud-chat-input .unity-text-field__input {
+    min-height: 22px;
+    font-size: 11px;
+}
+
+.hud-chat-target .unity-text-field__label {
+    min-width: 18px;
+    font-size: 10px;
+}
+
+.hud-chat-send, .hud-chat-channel-button {
+    min-width: 50px;
+    min-height: 24px;
+    padding: 1px 6px;
+    margin: 1px;
+    font-size: 10px;
+}
+
+.hud-chat-line {
+    color: rgb(220, 225, 235);
+    font-size: 11px;
+    white-space: normal;
+}
+
+.hud-chat-system { color: rgb(235, 205, 110); }
+.hud-chat-whisper { color: rgb(180, 210, 255); }
+.hud-chat-global { color: rgb(160, 225, 180); }

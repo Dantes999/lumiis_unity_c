@@ -166,6 +166,46 @@ namespace Lumiis.Tests.Integration
         }
 
         [Fact]
+        public void Chat_MapAndWhisper_ReachExpectedClients()
+        {
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var clientA = new TestClient();
+                using var clientB = new TestClient();
+                clientA.Connect(server.ListenPort);
+                clientB.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, clientA, clientB));
+
+                (int aliceId, string aliceToken) = fixture.CreateCharacter("Alice");
+                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = aliceToken, CharacterId = aliceId });
+                Assert.True(Pump(() => clientA.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
+
+                (int bobId, string bobToken) = fixture.CreateCharacter("Bob");
+                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = bobToken, CharacterId = bobId });
+                Assert.True(Pump(() => clientB.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
+
+                clientA.Send(new ChatRequestPacket { Channel = ChatChannel.Map, Text = "Hallo Karte" });
+                Assert.True(Pump(() => clientB.Received.OfType<ChatMessagePacket>()
+                    .Any(p => p.Channel == ChatChannel.Map && p.SenderName == "Alice" && p.Text == "Hallo Karte"), server, clientA, clientB));
+                Assert.Contains(clientA.Received.OfType<ChatMessagePacket>(),
+                    p => p.Channel == ChatChannel.Map && p.SenderName == "Alice" && p.Text == "Hallo Karte");
+
+                clientB.Send(new ChatRequestPacket { Channel = ChatChannel.Whisper, TargetName = "Alice", Text = "Nur für Alice" });
+                Assert.True(Pump(() => clientA.Received.OfType<ChatMessagePacket>()
+                    .Any(p => p.Channel == ChatChannel.Whisper && p.SenderName == "Bob" && p.Text == "Nur für Alice"), server, clientA, clientB));
+                Assert.Contains(clientB.Received.OfType<ChatMessagePacket>(),
+                    p => p.Channel == ChatChannel.Whisper && p.SenderName == "Bob" && p.Text == "Nur für Alice");
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
         public void TwoClients_JoinAndSeeEachOthersSpawn()
         {
             var fixture = new ServerFixture();

@@ -723,4 +723,43 @@ namespace Lumiis.Shared.Net
             }
         }
     }
+
+    /// <summary>M7-Chat: Kanal einer Chat-Nachricht. Map/Global sind aktuell dieselbe Broadcast-Gruppe
+    /// (eine Karte), bleiben aber getrennt, damit später Karten-/Weltkanäle ohne Wire-Bruch möglich sind.
+    /// System ist nur Server->Client. Whisper braucht einen Zielnamen.</summary>
+    public enum ChatChannel : byte
+    {
+        Map = 0,
+        Global = 1,
+        Whisper = 2,
+        System = 3
+    }
+
+    /// <summary>M7-Chat: eine Chat-Nachricht vom Server. SenderName kommt immer vom Server (Entity-Name), nie
+    /// aus dem Client-Paket - der Client kann seinen Absendernamen nicht fälschen.</summary>
+    public sealed class ChatMessagePacket : IPacket
+    {
+        public ChatChannel Channel;
+        public string SenderName;
+        public string Text;
+
+        public PacketId Id
+        {
+            get { return PacketId.ChatMessage; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteByte((byte)Channel);
+            writer.WriteString(SenderName);
+            writer.WriteString(Text);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            Channel = (ChatChannel)reader.ReadByte();
+            SenderName = reader.ReadString();
+            Text = reader.ReadString();
+        }
+    }
 }

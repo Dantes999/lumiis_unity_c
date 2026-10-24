@@ -19,6 +19,9 @@ namespace Lumiis.Client
             var gameClient = root.AddComponent<GameClient>();
             gameClient.Initialize(netClient, camera);
 
+            var hudController = root.AddComponent<HudController>();
+            hudController.Initialize(gameClient);
+
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             // Nur für automatisierte Screenshot-Läufe (tools/capture-client-screenshots.sh): Login
             // überspringen und direkt eine lokale Testlabor-Vorschau starten.

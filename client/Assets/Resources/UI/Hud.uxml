@@ -1,0 +1,75 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <Style src="lumiis.uss" />
+    <ui:VisualElement name="hud-root" class="hud-root">
+        <ui:VisualElement class="hud-player">
+            <ui:Label name="hud-player-name" text="-" class="hud-player-name" />
+            <ui:VisualElement class="hud-bar-row">
+                <ui:Label text="HP" class="hud-bar-label" />
+                <ui:VisualElement class="hud-bar-bg"><ui:VisualElement name="hud-hp-fill" class="hud-bar-fill hud-bar-hp" /></ui:VisualElement>
+                <ui:Label name="hud-hp-text" text="-" class="hud-bar-text" />
+            </ui:VisualElement>
+            <ui:VisualElement class="hud-bar-row">
+                <ui:Label text="SP" class="hud-bar-label" />
+                <ui:VisualElement class="hud-bar-bg"><ui:VisualElement name="hud-sp-fill" class="hud-bar-fill hud-bar-sp" /></ui:VisualElement>
+                <ui:Label name="hud-sp-text" text="-" class="hud-bar-text" />
+            </ui:VisualElement>
+            <ui:VisualElement class="hud-bar-row">
+                <ui:Label text="EXP" class="hud-bar-label" />
+                <ui:VisualElement class="hud-bar-bg"><ui:VisualElement name="hud-xp-fill" class="hud-bar-fill hud-bar-xp" /></ui:VisualElement>
+                <ui:Label name="hud-xp-text" text="-" class="hud-bar-text" />
+            </ui:VisualElement>
+            <ui:Label name="hud-yang" text="Yang: 0" class="hud-yang" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="hud-target" class="hud-target">
+            <ui:Label name="hud-target-name" text="" class="hud-target-name" />
+            <ui:VisualElement class="hud-bar-row">
+                <ui:VisualElement class="hud-bar-bg"><ui:VisualElement name="hud-target-hp-fill" class="hud-bar-fill hud-bar-target" /></ui:VisualElement>
+                <ui:Label name="hud-target-hp-text" text="" class="hud-bar-text" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:Label name="hud-message" text="" class="hud-message" />
+
+        <ui:VisualElement class="hud-skills">
+            <ui:VisualElement class="hud-skill-slots">
+                <ui:VisualElement class="hud-skill-slot">
+                    <ui:Label text="1" class="hud-skill-key" />
+                    <ui:Label name="hud-skill-1" text="Wuchtschlag" class="hud-skill-name" />
+                    <ui:Label name="hud-skill-1-cd" text="" class="hud-skill-cd" />
+                </ui:VisualElement>
+                <ui:VisualElement class="hud-skill-slot">
+                    <ui:Label text="2" class="hud-skill-key" />
+                    <ui:Label name="hud-skill-2" text="Kreisschlag" class="hud-skill-name" />
+                    <ui:Label name="hud-skill-2-cd" text="" class="hud-skill-cd" />
+                </ui:VisualElement>
+                <ui:VisualElement class="hud-skill-slot">
+                    <ui:Label text="3" class="hud-skill-key" />
+                    <ui:Label name="hud-skill-3" text="Kampfrausch" class="hud-skill-name" />
+                    <ui:Label name="hud-skill-3-cd" text="" class="hud-skill-cd" />
+                </ui:VisualElement>
+                <ui:VisualElement class="hud-skill-slot">
+                    <ui:Label text="4" class="hud-skill-key" />
+                    <ui:Label name="hud-skill-4" text="Hast" class="hud-skill-name" />
+                    <ui:Label name="hud-skill-4-cd" text="" class="hud-skill-cd" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:Label name="hud-buffs" text="" class="hud-buffs" />
+        </ui:VisualElement>
+
+        <ui:VisualElement class="hud-chat">
+            <ui:ScrollView name="hud-chat-log" class="hud-chat-log" />
+            <ui:VisualElement class="hud-chat-input-row">
+                <ui:TextField name="hud-chat-target" label="An" class="hud-chat-target" />
+                <ui:TextField name="hud-chat-input" class="hud-chat-input" />
+                <ui:Button name="hud-chat-send" text="Senden" class="hud-chat-send" />
+            </ui:VisualElement>
+            <ui:VisualElement class="hud-chat-channels">
+                <ui:Label name="hud-chat-channel-label" text="Kanal: Karte" class="hud-chat-channel-label" />
+                <ui:Button name="hud-chat-map" text="Karte" class="hud-chat-channel-button" />
+                <ui:Button name="hud-chat-global" text="Global" class="hud-chat-channel-button" />
+                <ui:Button name="hud-chat-whisper" text="Flüstern" class="hud-chat-channel-button" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

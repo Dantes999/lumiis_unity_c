@@ -39,6 +39,9 @@ namespace Lumiis.Shared.Net
         /// <summary>M6b: ein Fertigkeitspunkt wird auf einen Skill verteilt.</summary>
         AllocateSkillPointRequest = 15,
 
+        /// <summary>M7-Chat: Chat-Nachricht senden (Karte/Global/Flüstern).</summary>
+        ChatRequest = 16,
+
         // Server -> Client: ab 1000
         JoinAccepted = 1000,
         JoinRejected = 1001,
@@ -85,6 +88,9 @@ namespace Lumiis.Shared.Net
         /// <summary>M6b: der eigene aktive-Buffs-Stand hat sich geändert (Skill gewirkt oder Buff
         /// abgelaufen) - nur an den Besitzer.</summary>
         ActiveBuffsChanged = 1019,
+
+        /// <summary>M7-Chat: Chat-Nachricht (Karte/Global/Flüstern/System).</summary>
+        ChatMessage = 1020,
     }
 
     /// <summary>Jede neue PacketId braucht hier eine Zeile (ein Test prüft das).</summary>
@@ -129,6 +135,8 @@ namespace Lumiis.Shared.Net
                 case PacketId.AllocateSkillPointRequest: return new AllocateSkillPointRequestPacket();
                 case PacketId.UseSkillFailed: return new UseSkillFailedPacket();
                 case PacketId.ActiveBuffsChanged: return new ActiveBuffsChangedPacket();
+                case PacketId.ChatRequest: return new ChatRequestPacket();
+                case PacketId.ChatMessage: return new ChatMessagePacket();
                 default: return null;
             }
         }

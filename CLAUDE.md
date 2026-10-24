@@ -643,6 +643,26 @@ Für die Asset-Prüfung ohne Server-/Monster-Gewimmel gibt es eine eigene UI-Too
   `lumiis`/`lumiis-2d`), `docs/icon-integration-plan.md`, `docs/map-import-plan.md`. Mehrkarten/
   Portale bleiben ein eigener Server-Umbau; der Plan beschreibt Konvertierung und MapCatalog.
 
+## M7-HUD und Chat
+Seit 2026-10-24 gibt es ein dauerhaftes UI-Toolkit-HUD (`Hud.uxml`, `HudController`) und den Chat-MVP
+(Protocol.Version 13):
+- HUD links oben: Name/Level, HP-/SP-/EXP-Balken und Yang. Mitte oben: Zielname + HP, darunter die
+  letzte Kampf-/Level-/Ausweich-Meldung. Unten rechts: vier Skill-Slots (1-4) mit Name, gelernter Stufe
+  und lokaler Cooldown-Anzeige, darunter aktive Buffs (Kampfrausch/Hast mit Restzeit). Das HUD liest
+  ausschließlich den bestehenden `GameClient`/`ClientWorld`-Zustand; das alte IMGUI-Overlay bleibt als
+  F1-Debugansicht.
+- Chat links unten: Scrollback (max. 60 Zeilen), Kanäle Karte/Global/Flüstern, Whisper-Zielfeld,
+  Enter öffnet/sendet, Escape verlässt das Eingabefeld. Während das Chatfeld fokussiert ist, sind
+  Bewegungsklick und Skills 1-4 gesperrt (`GameClient.SetChatInputFocused`), damit Tippen keine
+  Spielaktionen auslöst.
+- Server: `ChatRequestPacket` (Client->Server, ID 16) und `ChatMessagePacket` (Server->Client, ID 1020),
+  `ChatChannel` Map/Global/Whisper/System. SenderName kommt immer aus der Entity, nie aus dem Paket;
+  Text wird getrimmt und auf 200 Zeichen begrenzt; pro Verbindung gilt ein 400-ms-Rate-Limit (still
+  verworfen, kein Disconnect). Karte und Global broadcasten aktuell an alle verbundenen Spieler (eine
+  Karte); Whisper geht an Ziel und Absender. Systemmeldungen kommen nur vom Server.
+- `JoinAccepted`/Entity-Spawns bleiben unverändert; Chat ist nicht persistent. `Protocol.Version` 13,
+  Roundtrip-Tests für beide Chat-Pakete und ein LiteNetLib-Integrationstest (Karte + Whisper) sind grün.
+
 ## Escape-Menü
 Seit der Aufgabe `escape-menu.md` gibt es ein kleines Escape-Menü mit drei Aktionen - rein clientseitig,
 keine Protokolländerung:
@@ -1001,7 +1021,16 @@ Status). M6c Upgrade/M6d Lumiis-Steine bleiben weiterhin zurückgestellt.
   unter `Resources/Characters`; `CharacterSheetGallery` zeigt Krieger/Ninja/Sura/Schamane (m/w) im
   Labor und der Screenshot-Lauf legt `/tmp/lumiis-asset-lab-characters.png` ab. (4) Feature-Gap-,
   Icon- und Kartenplanung als `docs/feature-gap-lumiis.md`, `docs/icon-integration-plan.md`,
-  `docs/map-import-plan.md`. 555 Server-/Unit-Tests und 12 PlayMode-Tests grün.
+  `docs/map-import-plan.md`. 558 Server-/Unit-Tests und 13 PlayMode-Tests grün.
+- M7-HUD + Chat-MVP: (1) `Hud.uxml`/`HudController` zeigen Name/Level, HP/SP/EXP/Yang, Ziel + HP,
+  Meldungen, vier Skill-Slots mit Cooldowns, aktive Buffs und einen Chat mit Karte/Global/Flüstern.
+  Das alte IMGUI-Overlay bleibt F1-Debug. (2) Chat-Protokoll: `ChatRequestPacket` (16),
+  `ChatMessagePacket` (1020), `ChatChannel`, `Protocol.Version` 13; 400-ms-Rate-Limit pro Verbindung,
+  Textlimit 200 Zeichen, SenderName serverseitig aus der Entity. (3) Chat-UI sperrt während der
+  Eingabe Bewegung/Skills (`SetChatInputFocused`), Echo für Whisper, Systemmeldung bei unbekanntem Ziel.
+  (4) Roundtrip-Tests, HUD-PlayMode-Test und LiteNetLib-Integrationstest (Karte + Whisper) ergänzt.
+- Offen als nächster M7-Block: Gruppe (Einladen/Verlassen, max. 8, EXP-Teilen) + Party-UI und
+  soziale Integrationstests; siehe `docs/feature-gap-lumiis.md`.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client
 War kein Codefehler. User hat den Test mit fokussiertem Unity-Fenster wiederholt (Server, Unity Play, dann Bots
 gestartet, ins Unity-Fenster geklickt): alle Spawns kamen an, auch mit 99 Bots. Wahrscheinliche Ursache war die
@@ -1066,6 +1095,17 @@ Waldschrat in Reichweite (Dev-Tools-Debug-Spawn oder ein regulärer Spawn-Punkt)
 - "Ausloggen" klicken: zurück zum Login-Bildschirm, Benutzername ist noch ausgefüllt, Passwort leer.
 - "Beenden" klicken (im Editor): Play-Modus stoppt sauber, der Editor selbst bleibt offen.
 - Einen Standalone-Build erzeugen (`tools/build-client.sh`) und starten: läuft in einem Fenster (nicht Vollbild), Fenster ist in der Größe veränderbar.
+
+### Noch zu prüfen (M7-HUD/Chat, vom User)
+- Nach dem Join: links oben Name/Level, HP/SP/EXP-Balken und Yang; unten rechts vier Skill-Slots mit
+  Tasten 1-4, Stufe/Cooldown; bei aktivem Kampfrausch/Hast erscheint die Restzeit.
+- Rechtsklick auf ein Monster: Zielname + HP erscheinen oben in der Mitte.
+- Enter öffnet das Chatfeld; „Hallo“ + Enter senden: Nachricht erscheint links unten mit `[Karte] Name:`.
+- „Global“ auswählen und senden: Nachricht erscheint bei allen verbundenen Clients.
+- „Flüstern“ auswählen, Zielnamen eintragen, senden: nur Ziel und Absender sehen die Nachricht.
+- Bei unbekanntem Flüsterziel erscheint eine Systemmeldung; während des Tippens bewegt sich die Figur
+  nicht und Taste 1-4 löst keinen Skill aus.
+- Zwei Clients/Bots schnell hintereinander senden: Das 400-ms-Limit verwirft die zweite Nachricht still.
 
 ### Noch zu prüfen (Asset-Testlabor/Paper-Doll, vom User)
 Voraussetzung: laufender Server, Charakter ausgewählt; Editor-Play oder Development-Build.
