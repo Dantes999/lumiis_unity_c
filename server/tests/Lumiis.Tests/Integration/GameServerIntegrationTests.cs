@@ -206,6 +206,52 @@ namespace Lumiis.Tests.Integration
         }
 
         [Fact]
+        public void Party_InviteAcceptLeave_UpdatesBothClients()
+        {
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var clientA = new TestClient();
+                using var clientB = new TestClient();
+                clientA.Connect(server.ListenPort);
+                clientB.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, clientA, clientB));
+
+                (int aliceId, string aliceToken) = fixture.CreateCharacter("Alice");
+                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = aliceToken, CharacterId = aliceId });
+                Assert.True(Pump(() => clientA.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
+
+                (int bobId, string bobToken) = fixture.CreateCharacter("Bob");
+                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = bobToken, CharacterId = bobId });
+                Assert.True(Pump(() => clientB.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
+
+                clientA.Send(new ChatRequestPacket { Channel = ChatChannel.Map, Text = "/invite Bob" });
+                Assert.True(Pump(() => clientB.Received.OfType<ChatMessagePacket>()
+                    .Any(p => p.Channel == ChatChannel.System && p.Text.Contains("lädt dich")), server, clientA, clientB));
+
+                clientB.Send(new ChatRequestPacket { Channel = ChatChannel.Map, Text = "/accept" });
+                Assert.True(Pump(() => clientA.Received.OfType<PartyChangedPacket>()
+                    .Any(p => p.Members.Count == 2), server, clientA, clientB));
+                PartyChangedPacket party = clientA.Received.OfType<PartyChangedPacket>().Last(p => p.Members.Count == 2);
+                Assert.Contains(party.Members, m => m.Name == "Alice");
+                Assert.Contains(party.Members, m => m.Name == "Bob");
+
+                PumpForDuration(TimeSpan.FromMilliseconds(450), server, clientA, clientB);
+                clientB.Send(new ChatRequestPacket { Channel = ChatChannel.Map, Text = "/leave" });
+                Assert.True(Pump(() => clientA.Received.OfType<PartyChangedPacket>()
+                    .Any(p => p.Members.Count == 1), server, clientA, clientB));
+                Assert.True(Pump(() => clientB.Received.OfType<PartyChangedPacket>()
+                    .Any(p => p.Members.Count == 0), server, clientA, clientB));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
         public void TwoClients_JoinAndSeeEachOthersSpawn()
         {
             var fixture = new ServerFixture();
@@ -217,7 +263,6 @@ namespace Lumiis.Tests.Integration
                 using var clientB = new TestClient();
                 clientA.Connect(server.ListenPort);
                 clientB.Connect(server.ListenPort);
-
                 Assert.True(WaitConnected(server, clientA, clientB));
 
                 (int aliceId, string aliceToken) = fixture.CreateCharacter("Alice");

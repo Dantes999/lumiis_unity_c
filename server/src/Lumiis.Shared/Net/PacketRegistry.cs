@@ -91,6 +91,9 @@ namespace Lumiis.Shared.Net
 
         /// <summary>M7-Chat: Chat-Nachricht (Karte/Global/Flüstern/System).</summary>
         ChatMessage = 1020,
+
+        /// <summary>M7-Party: voller Gruppenstand (Resync).</summary>
+        PartyChanged = 1021,
     }
 
     /// <summary>Jede neue PacketId braucht hier eine Zeile (ein Test prüft das).</summary>
@@ -137,6 +140,7 @@ namespace Lumiis.Shared.Net
                 case PacketId.ActiveBuffsChanged: return new ActiveBuffsChangedPacket();
                 case PacketId.ChatRequest: return new ChatRequestPacket();
                 case PacketId.ChatMessage: return new ChatMessagePacket();
+                case PacketId.PartyChanged: return new PartyChangedPacket();
                 default: return null;
             }
         }

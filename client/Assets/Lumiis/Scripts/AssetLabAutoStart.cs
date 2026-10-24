@@ -72,6 +72,7 @@ namespace Lumiis.Client
 
             _gameClient.DebugCloseAssetLab();
             if (mainCamera != null) mainCamera.orthographicSize = 8f;
+            _gameClient.DebugShowPartyPreview();
             yield return new WaitForSeconds(0.5f);
             ScreenCapture.CaptureScreenshot("/tmp/lumiis-hud.png", 1);
             yield return new WaitForEndOfFrame();

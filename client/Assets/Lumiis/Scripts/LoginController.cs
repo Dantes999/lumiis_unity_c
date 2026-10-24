@@ -150,6 +150,7 @@ namespace Lumiis.Client
             // Nur während eines laufenden Spiels erreichbar - Login/Charakterauswahl haben kein Escape-Menü.
             if (_loginFlow.State != LoginFlowState.InGame) return;
             if (Keyboard.current == null) return;
+            if (_gameClient != null && _gameClient.IsChatInputFocused) return;
             if (Keyboard.current.escapeKey.wasPressedThisFrame) ToggleEscapeMenu();
         }
 

@@ -29,6 +29,13 @@
             </ui:VisualElement>
         </ui:VisualElement>
 
+        <ui:VisualElement name="hud-party" class="hud-party">
+            <ui:Label text="Gruppe" class="hud-party-title" />
+            <ui:VisualElement name="hud-party-members" class="hud-party-members" />
+            <ui:Button name="hud-party-leave" text="Gruppe verlassen" class="hud-party-leave" />
+            <ui:Label text="Chat: /invite Name · /accept · /decline · /leave" class="hud-party-hint" />
+        </ui:VisualElement>
+
         <ui:Label name="hud-message" text="" class="hud-message" />
 
         <ui:VisualElement class="hud-skills">

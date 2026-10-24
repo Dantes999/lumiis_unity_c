@@ -762,4 +762,47 @@ namespace Lumiis.Shared.Net
             Text = reader.ReadString();
         }
     }
+
+    /// <summary>M7-Party: voller Gruppenstand (Resync, kein Delta). Members enthält Leader und Mitglieder
+    /// in stabiler Reihenfolge; eine leere Liste bedeutet "keine Gruppe" (Panel ausblenden).</summary>
+    public sealed class PartyChangedPacket : IPacket
+    {
+        public int LeaderEntityId;
+        public List<(int EntityId, string Name, int Level, int Hp, int MaxHp)> Members = new List<(int, string, int, int, int)>();
+
+        public PacketId Id
+        {
+            get { return PacketId.PartyChanged; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteInt32(LeaderEntityId);
+            writer.WriteByte((byte)Members.Count);
+            foreach ((int entityId, string name, int level, int hp, int maxHp) in Members)
+            {
+                writer.WriteInt32(entityId);
+                writer.WriteString(name);
+                writer.WriteInt32(level);
+                writer.WriteInt32(hp);
+                writer.WriteInt32(maxHp);
+            }
+        }
+
+        public void Read(PacketReader reader)
+        {
+            LeaderEntityId = reader.ReadInt32();
+            int count = reader.ReadByte();
+            Members = new List<(int, string, int, int, int)>(count);
+            for (int i = 0; i < count; i++)
+            {
+                int entityId = reader.ReadInt32();
+                string name = reader.ReadString();
+                int level = reader.ReadInt32();
+                int hp = reader.ReadInt32();
+                int maxHp = reader.ReadInt32();
+                Members.Add((entityId, name, level, hp, maxHp));
+            }
+        }
+    }
 }

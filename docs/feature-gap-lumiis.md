@@ -21,13 +21,13 @@ Gruppe, keine Quests, keine Lumiis-Steine, keine Bosse, kein Audio, keine echten
 
 ## P0 – spielbarer Alpha-Test / M7
 
-**Stand 2026-10-24:** HUD und Chat-MVP sind umgesetzt (`HudController`, `ChatRequest/ChatMessage`, Protocol.Version 13). Offen sind noch Gruppe, soziale Integrationstests und der Yang-Join-Check (YangChanged beim Join ist bereits im Code).
+**Stand 2026-10-24:** HUD, Chat-MVP und Gruppen-MVP (Chat-Befehle, PartyChanged, HUD-Panel) sind umgesetzt; Protocol.Version 14. Offen: EXP-Teilen in der Gruppe, Party-Rollen/Persistenz, weitere soziale Integrationstests. YangChanged beim Join ist bereits im Code.
 
 | Feature | Warum | Beleg | Aufwand |
 |---|---|---|---|
 | Echte HUD-UI (HP/SP/EXP/Yang/Level, Ziel, Skills 1–4 mit Cooldowns, Buffs) | **umgesetzt** (`Hud.uxml`, `HudController`) | `lumiis/packages/client/src/ui/hud.ts` | – |
 | Chat (Karte/Global/Flüstern, Systemzeilen, 400-ms-Limit) | **umgesetzt** (`ChatRequest/ChatMessage`, HUD-Chat, Rate-Limit) | `lumiis/packages/shared/src/protocol.ts` (`chat`) | – |
-| Gruppe MVP (einladen/annehmen/verlassen, max. 8, EXP-Teilen, Leiter) | M7-Kern; fehlt komplett | `lumiis-2d/shared/party.js`, `server/party.js`, `client/partyui.js` | M–L |
+| Gruppe MVP (einladen/annehmen/verlassen, max. 8, Leiter) | **umgesetzt** (Chat-Befehle, `PartyChangedPacket`, HUD-Panel); EXP-Teilen offen | `lumiis-2d/shared/party.js` | – |
 | YangChangedPacket beim Join | Debug-Anzeige zeigt bis zum ersten Yang-Ereignis 0 | `GameServer.CompleteJoin` sendet kein YangChangedPacket | S |
 | Soziale Integrationstests (zwei Clients/Bots: Chat, Flüstern, Gruppe, EXP) | Neue Pakete brauchen Roundtrip-/Loopback-Tests | `PacketRegistry`, `GameServerIntegrationTests` | S–M |
 

@@ -23,6 +23,9 @@ namespace Lumiis.Client
         /// <summary>M7-Chat: eingehende ChatMessagePacket für die HUD-/Chat-UI. Reines Anzeige-Event,
         /// der Client sendet nur ChatRequestPacket und berechnet keine Chat-Zustände.</summary>
         public event System.Action<ChatMessagePacket> ChatMessageReceived;
+
+        /// <summary>M7-Party: voller Gruppenstand (Resync) für das HUD.</summary>
+        public event System.Action<PartyChangedPacket> PartyChangedReceived;
         private Sprite _squareSprite;
         private Sprite _localMarkerSprite;
         private Sprite _monsterCircleSprite;
@@ -572,6 +575,17 @@ namespace Lumiis.Client
         public void DebugShowAssetLabMapPreview()
         {
             _assetTestLab?.DebugShowMapPreview();
+        }
+
+        public void DebugShowPartyPreview()
+        {
+            if (_world.LocalEntityId < 0 || !_world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity local))
+                return;
+
+            var packet = new PartyChangedPacket { LeaderEntityId = local.Id };
+            packet.Members.Add((local.Id, local.Name, _world.CharacterStats.Level, Mathf.Max(0, local.CurrentHp), Mathf.Max(0, local.MaxHp)));
+            packet.Members.Add((local.Id + 1, "Bob", 12, 200, 240));
+            PartyChangedReceived?.Invoke(packet);
         }
 
         public void DebugHideAssetLabMapPreview()
@@ -1280,6 +1294,13 @@ namespace Lumiis.Client
                 ChatMessageReceived?.Invoke(chat);
                 return;
             }
+
+            PartyChangedPacket party = packet as PartyChangedPacket;
+            if (party != null)
+            {
+                PartyChangedReceived?.Invoke(party);
+                return;
+            }
         }
 
         /// <summary>Kampf-Visualisierung Abschnitt 6: voller Resync wie das Paket selbst (kein Delta) - legt
@@ -1576,6 +1597,8 @@ namespace Lumiis.Client
         {
             _chatInputFocused = focused;
         }
+
+        public bool IsChatInputFocused => _chatInputFocused;
 
         public void SendChat(ChatChannel channel, string targetName, string text)
         {

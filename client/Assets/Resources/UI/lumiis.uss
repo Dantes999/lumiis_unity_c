@@ -468,3 +468,42 @@ Button:disabled {
 .hud-chat-system { color: rgb(235, 205, 110); }
 .hud-chat-whisper { color: rgb(180, 210, 255); }
 .hud-chat-global { color: rgb(160, 225, 180); }
+
+.hud-party {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    width: 270px;
+    padding: 6px 8px;
+    background-color: rgba(15, 17, 22, 0.88);
+    border-width: 1px;
+    border-color: rgb(65, 75, 92);
+    border-radius: 4px;
+}
+
+.hud-party-title {
+    color: rgb(150, 190, 255);
+    font-size: 12px;
+    -unity-font-style: bold;
+    margin-bottom: 3px;
+}
+
+.hud-party-members {
+    flex-direction: column;
+}
+
+.hud-party-hint {
+    color: rgb(150, 155, 165);
+    font-size: 9px;
+    white-space: normal;
+    margin-top: 2px;
+}
+
+.hud-party-leave {
+    min-width: 80px;
+    min-height: 22px;
+    padding: 1px 6px;
+    margin: 3px 0 0 0;
+    font-size: 10px;
+    background-color: rgb(95, 55, 55);
+}

@@ -46,6 +46,7 @@ namespace Lumiis.Client.Tests.PlayMode
             Assert.IsNotNull(document.rootVisualElement.Q<Label>("hud-skill-1"), "Skill 1 fehlt.");
             Assert.IsNotNull(document.rootVisualElement.Q<ScrollView>("hud-chat-log"), "Chat-Log fehlt.");
             Assert.IsNotNull(document.rootVisualElement.Q<TextField>("hud-chat-input"), "Chat-Eingabe fehlt.");
+            Assert.IsNotNull(document.rootVisualElement.Q<VisualElement>("hud-party"), "Party-Panel fehlt.");
         }
 
         [UnityTearDown]

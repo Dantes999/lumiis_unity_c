@@ -643,9 +643,9 @@ Für die Asset-Prüfung ohne Server-/Monster-Gewimmel gibt es eine eigene UI-Too
   `lumiis`/`lumiis-2d`), `docs/icon-integration-plan.md`, `docs/map-import-plan.md`. Mehrkarten/
   Portale bleiben ein eigener Server-Umbau; der Plan beschreibt Konvertierung und MapCatalog.
 
-## M7-HUD und Chat
-Seit 2026-10-24 gibt es ein dauerhaftes UI-Toolkit-HUD (`Hud.uxml`, `HudController`) und den Chat-MVP
-(Protocol.Version 13):
+## M7-HUD, Chat und Gruppe
+Seit 2026-10-24 gibt es ein dauerhaftes UI-Toolkit-HUD (`Hud.uxml`, `HudController`), den Chat-MVP und
+eine Gruppen-MVP (Protocol.Version 14):
 - HUD links oben: Name/Level, HP-/SP-/EXP-Balken und Yang. Mitte oben: Zielname + HP, darunter die
   letzte Kampf-/Level-/Ausweich-Meldung. Unten rechts: vier Skill-Slots (1-4) mit Name, gelernter Stufe
   und lokaler Cooldown-Anzeige, darunter aktive Buffs (Kampfrausch/Hast mit Restzeit). Das HUD liest
@@ -660,8 +660,15 @@ Seit 2026-10-24 gibt es ein dauerhaftes UI-Toolkit-HUD (`Hud.uxml`, `HudControll
   Text wird getrimmt und auf 200 Zeichen begrenzt; pro Verbindung gilt ein 400-ms-Rate-Limit (still
   verworfen, kein Disconnect). Karte und Global broadcasten aktuell an alle verbundenen Spieler (eine
   Karte); Whisper geht an Ziel und Absender. Systemmeldungen kommen nur vom Server.
-- `JoinAccepted`/Entity-Spawns bleiben unverändert; Chat ist nicht persistent. `Protocol.Version` 13,
-  Roundtrip-Tests für beide Chat-Pakete und ein LiteNetLib-Integrationstest (Karte + Whisper) sind grün.
+- `JoinAccepted`/Entity-Spawns bleiben unverändert; Chat ist nicht persistent. Chat kam mit
+  Protocol.Version 13, aktuell ist 14 (Gruppe). Roundtrip-Tests für beide Chat-Pakete und ein
+  LiteNetLib-Integrationstest (Karte + Whisper) sind grün.
+- Gruppe (Alpha-MVP, Protocol.Version 14): Chat-Befehle `/invite Name`, `/accept`, `/decline`, `/leave`,
+  `/party`; max. 8 Mitglieder, Einladender wird Leiter. Server hält die Gruppe nur im Speicher
+  (`PartyState`, `EntityId -> Party`), Leiterwechsel beim Verlassen; `PartyChangedPacket` (1021) ist ein
+  voller Resync (LeaderEntityId + Name/Level/HP der Mitglieder). Das HUD zeigt ein Party-Panel mit
+  Leader-Markierung, HP und Verlassen-Knopf; HP wird bei Treffern/Heilung/Respawn aktualisiert.
+  Kein DB-Save, keine Rollen, keine EXP-Teilung in diesem MVP.
 
 ## Escape-Menü
 Seit der Aufgabe `escape-menu.md` gibt es ein kleines Escape-Menü mit drei Aktionen - rein clientseitig,
@@ -1011,8 +1018,9 @@ Status). M6c Upgrade/M6d Lumiis-Steine bleiben weiterhin zurückgestellt.
   F12/Button im Labor, `ScreenshotRequestWatcher` + `tools/request-screenshot.sh` für laufende
   Play-Modi sowie `tools/capture-client-screenshots.sh` als einmaliger GUI-Lauf. 12/12 PlayMode-Tests
   grün; die automatisch erzeugten Bilder (`/tmp/lumiis-asset-lab-plus0.png`, `-plus9.png`, `-attack.png`,
-  `-icons.png`, `-map.png`, `-characters.png`) zeigen Labor-UI, Vorschaufigur, Trainingspuppen, Waffe,
-  +9-Glitzern, Trail, Icon-Galerie, Greenfield-Kartenvorschau und die acht echten Lumiis-Charaktere.
+  `-icons.png`, `-map.png`, `-characters.png`, `-hud.png`) zeigen Labor-UI, Vorschaufigur,
+  Trainingspuppen, Waffe, +9-Glitzern, Trail, Icon-Galerie, Greenfield-Kartenvorschau, die acht echten
+  Lumiis-Charaktere und das HUD mit Demo-Gruppe.
 - Lumiis-Referenz-Assets: (1) `tools/import-lumiis-assets.py` importiert 533 Icons (34 Kategorien)
   aus dem Asset-Archiv nach `Resources/Icons`, inkl. Windows-sauberer Dateinamen, Manifest,
   deterministischer `.meta`-Dateien und Provenance-Einträgen. (2) `ItemIconCatalog` + `iconKey`
@@ -1021,16 +1029,21 @@ Status). M6c Upgrade/M6d Lumiis-Steine bleiben weiterhin zurückgestellt.
   unter `Resources/Characters`; `CharacterSheetGallery` zeigt Krieger/Ninja/Sura/Schamane (m/w) im
   Labor und der Screenshot-Lauf legt `/tmp/lumiis-asset-lab-characters.png` ab. (4) Feature-Gap-,
   Icon- und Kartenplanung als `docs/feature-gap-lumiis.md`, `docs/icon-integration-plan.md`,
-  `docs/map-import-plan.md`. 558 Server-/Unit-Tests und 13 PlayMode-Tests grün.
+  `docs/map-import-plan.md`. 560 Server-/Unit-Tests und 13 PlayMode-Tests grün.
 - M7-HUD + Chat-MVP: (1) `Hud.uxml`/`HudController` zeigen Name/Level, HP/SP/EXP/Yang, Ziel + HP,
   Meldungen, vier Skill-Slots mit Cooldowns, aktive Buffs und einen Chat mit Karte/Global/Flüstern.
   Das alte IMGUI-Overlay bleibt F1-Debug. (2) Chat-Protokoll: `ChatRequestPacket` (16),
-  `ChatMessagePacket` (1020), `ChatChannel`, `Protocol.Version` 13; 400-ms-Rate-Limit pro Verbindung,
+  `ChatMessagePacket` (1020), `ChatChannel`, `Protocol.Version` 13/14; 400-ms-Rate-Limit pro Verbindung,
   Textlimit 200 Zeichen, SenderName serverseitig aus der Entity. (3) Chat-UI sperrt während der
   Eingabe Bewegung/Skills (`SetChatInputFocused`), Echo für Whisper, Systemmeldung bei unbekanntem Ziel.
   (4) Roundtrip-Tests, HUD-PlayMode-Test und LiteNetLib-Integrationstest (Karte + Whisper) ergänzt.
-- Offen als nächster M7-Block: Gruppe (Einladen/Verlassen, max. 8, EXP-Teilen) + Party-UI und
-  soziale Integrationstests; siehe `docs/feature-gap-lumiis.md`.
+- M7-Gruppen-MVP: Chat-Befehle `/invite Name`, `/accept`, `/decline`, `/leave`, `/party`; max. 8,
+  Leader = Einladender, Leaderwechsel beim Verlassen. `PartyChangedPacket` (1021) ist ein voller
+  Resync; das HUD zeigt Leader/Name/Level/HP und einen Verlassen-Knopf, HP wird bei Treffer/Heilung/
+  Respawn nachgezogen. Kein DB-Save, keine Rollen, keine EXP-Teilung. Integrationstest mit zwei Clients
+  (Invite → Accept → Leave) ist grün.
+- Offen als nächster M7-Block: EXP-Teilen in der Gruppe, Party-Persistenz/Rollen und weitere soziale
+  Integrationstests; siehe `docs/feature-gap-lumiis.md`.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client
 War kein Codefehler. User hat den Test mit fokussiertem Unity-Fenster wiederholt (Server, Unity Play, dann Bots
 gestartet, ins Unity-Fenster geklickt): alle Spawns kamen an, auch mit 99 Bots. Wahrscheinliche Ursache war die
@@ -1106,6 +1119,10 @@ Waldschrat in Reichweite (Dev-Tools-Debug-Spawn oder ein regulärer Spawn-Punkt)
 - Bei unbekanntem Flüsterziel erscheint eine Systemmeldung; während des Tippens bewegt sich die Figur
   nicht und Taste 1-4 löst keinen Skill aus.
 - Zwei Clients/Bots schnell hintereinander senden: Das 400-ms-Limit verwirft die zweite Nachricht still.
+- Gruppe: `/invite Bob` senden, Bob bekommt die Einladung im Chat; Bob sendet `/accept`, beide sehen das
+  Party-Panel mit Leader-Markierung und HP. Bob sendet `/leave` (oder klickt „Gruppe verlassen“), Alice
+  sieht nur noch sich, Bobs Panel verschwindet.
+- Gruppe mit mehr als 8 Spielern: die neunte Einladung wird mit „Gruppe ist voll“ abgelehnt.
 
 ### Noch zu prüfen (Asset-Testlabor/Paper-Doll, vom User)
 Voraussetzung: laufender Server, Charakter ausgewählt; Editor-Play oder Development-Build.

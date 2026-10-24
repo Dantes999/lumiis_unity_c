@@ -34,6 +34,8 @@ namespace Lumiis.Client
         private VisualElement _targetHpFill;
         private Label _message;
         private Label _buffs;
+        private VisualElement _partyRoot;
+        private VisualElement _partyMembers;
         private readonly Label[] _skillNames = new Label[4];
         private readonly Label[] _skillCooldowns = new Label[4];
 
@@ -49,6 +51,7 @@ namespace Lumiis.Client
         {
             _gameClient = gameClient;
             _gameClient.ChatMessageReceived += OnChatMessage;
+            _gameClient.PartyChangedReceived += OnPartyChanged;
             StartCoroutine(BuildUiNextFrame());
         }
 
@@ -96,6 +99,11 @@ namespace Lumiis.Client
             _targetHpFill = _root.Q<VisualElement>("hud-target-hp-fill");
             _message = _root.Q<Label>("hud-message");
             _buffs = _root.Q<Label>("hud-buffs");
+            _partyRoot = _root.Q<VisualElement>("hud-party");
+            _partyMembers = _root.Q<VisualElement>("hud-party-members");
+            _partyRoot.style.display = DisplayStyle.None;
+            _root.Q<Button>("hud-party-leave").clicked += () =>
+                _gameClient.SendChat(ChatChannel.Map, "", "/leave");
 
             _skillNames[0] = _root.Q<Label>("hud-skill-1");
             _skillNames[1] = _root.Q<Label>("hud-skill-2");
@@ -140,6 +148,7 @@ namespace Lumiis.Client
             if (!visible)
             {
                 if (_chatInput != null && _chatFocused) _chatInput.Blur();
+                if (_partyRoot != null) _partyRoot.style.display = DisplayStyle.None;
                 return;
             }
 
@@ -276,6 +285,21 @@ namespace Lumiis.Client
             AddChatLine(packet.SenderName, packet.Text, packet.Channel);
         }
 
+        private void OnPartyChanged(PartyChangedPacket packet)
+        {
+            if (_partyRoot == null) return;
+            _partyMembers.Clear();
+            _partyRoot.style.display = packet.Members.Count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+
+            foreach ((int entityId, string name, int level, int hp, int maxHp) in packet.Members)
+            {
+                string prefix = entityId == packet.LeaderEntityId ? "★ " : "· ";
+                var label = new Label(prefix + name + "  Lv " + level + "  HP " + hp + "/" + maxHp);
+                label.AddToClassList("hud-chat-line");
+                _partyMembers.Add(label);
+            }
+        }
+
         private void AddChatLine(string sender, string text, ChatChannel channel)
         {
             if (_chatLog == null) return;
@@ -332,7 +356,10 @@ namespace Lumiis.Client
         private void OnDestroy()
         {
             if (_gameClient != null)
+            {
                 _gameClient.ChatMessageReceived -= OnChatMessage;
+                _gameClient.PartyChangedReceived -= OnPartyChanged;
+            }
             if (_panelSettings != null)
                 Destroy(_panelSettings);
         }

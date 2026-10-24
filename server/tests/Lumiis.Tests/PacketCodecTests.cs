@@ -517,5 +517,18 @@ namespace Lumiis.Tests
             Assert.Equal("Alice", decoded.SenderName);
             Assert.Equal("Hallo Welt", decoded.Text);
         }
+
+        [Fact]
+        public void PartyChanged_RoundTrip()
+        {
+            var original = new PartyChangedPacket { LeaderEntityId = 1 };
+            original.Members.Add((1, "Alice", 12, 200, 240));
+            original.Members.Add((2, "Bob", 10, 150, 200));
+            var decoded = Assert.IsType<PartyChangedPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(1, decoded.LeaderEntityId);
+            Assert.Equal(2, decoded.Members.Count);
+            Assert.Equal((1, "Alice", 12, 200, 240), decoded.Members[0]);
+            Assert.Equal((2, "Bob", 10, 150, 200), decoded.Members[1]);
+        }
     }
 }
