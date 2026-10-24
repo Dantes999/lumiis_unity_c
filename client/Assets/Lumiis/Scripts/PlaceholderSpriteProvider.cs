@@ -128,14 +128,33 @@ namespace Lumiis.Client
         /// auseinanderziehen.</summary>
         private void DrawWeapon(Color32[] pixels, int lookId, Vector2 pivotNormalized)
         {
+            Color32 handle = new Color32(92, 58, 34, 255);
+            Color32 guard = new Color32(196, 150, 52, 255);
             Color32 blade = new Color32(200, 200, 210, 255);
+            Color32 bladeHighlight = new Color32(232, 235, 242, 255);
+
             int handX = Mathf.RoundToInt(pivotNormalized.x * _canvasPx);
             int handY = Mathf.RoundToInt(pivotNormalized.y * _canvasPx);
             int length = _canvasPx * 2 / 5;
-            FillRect(pixels, handX - 2, handY, 4, length, blade);
 
-            if (lookId == 3) // Axt: zusätzlicher Klingenkopf oben
-                FillRect(pixels, handX - 8, handY + length - 10, 16, 12, blade);
+            // Griff + Knauf
+            FillRect(pixels, handX - 2, handY, 4, 12, handle);
+            FillRect(pixels, handX - 7, handY + 12, 14, 3, guard);
+            FillRect(pixels, handX - 2, handY - 3, 4, 3, guard);
+
+            if (lookId == 3) // Axt: breiter Klingenkopf oben
+            {
+                FillRect(pixels, handX - 2, handY + 15, 4, length, handle);
+                FillRect(pixels, handX + 2, handY + 15 + length - 16, 22, 16, blade);
+                FillRect(pixels, handX + 20, handY + 15 + length - 16, 4, 16, bladeHighlight);
+            }
+            else // Schwert/Dolch/Speer: schmale Klinge mit Spitze
+            {
+                FillRect(pixels, handX - 3, handY + 15, 6, length, blade);
+                FillRect(pixels, handX - 1, handY + 15, 2, length, bladeHighlight);
+                FillRect(pixels, handX - 2, handY + 15 + length, 4, 3, blade);
+                FillRect(pixels, handX - 1, handY + 15 + length + 3, 2, 2, bladeHighlight);
+            }
         }
 
         private void DrawShield(Color32[] pixels, FacingDirection direction)

@@ -130,3 +130,85 @@ Button:disabled {
 .new-character-row .unity-text-field {
     flex-grow: 1;
 }
+
+/* ---- Asset-Testlabor (Editor/Development, F10) ---- */
+
+.asset-lab-root {
+    position: absolute;
+    left: 12px;
+    top: 12px;
+    width: 390px;
+    height: 92%;
+}
+
+.asset-lab-scroll {
+    flex-grow: 1;
+    height: 100%;
+    background-color: rgba(18, 18, 24, 0.95);
+    border-width: 1px;
+    border-color: rgb(72, 82, 104);
+    padding: 12px;
+}
+
+.asset-lab-title {
+    font-size: 21px;
+    color: rgb(235, 238, 245);
+    -unity-font-style: bold;
+    margin-bottom: 4px;
+}
+
+.asset-lab-hint {
+    color: rgb(155, 160, 175);
+    font-size: 11px;
+    white-space: normal;
+    margin-bottom: 6px;
+}
+
+.asset-lab-section {
+    color: rgb(150, 190, 255);
+    font-size: 13px;
+    -unity-font-style: bold;
+    margin-top: 12px;
+    margin-bottom: 3px;
+}
+
+.asset-lab-row {
+    flex-direction: row;
+    align-items: center;
+    margin: 2px 0;
+}
+
+.asset-lab-label {
+    width: 80px;
+    color: rgb(205, 210, 220);
+    font-size: 12px;
+}
+
+.asset-lab-value {
+    flex-grow: 1;
+    color: rgb(240, 240, 245);
+    font-size: 12px;
+    -unity-text-align: middle-left;
+    white-space: normal;
+}
+
+.compact-button {
+    min-width: 28px;
+    min-height: 24px;
+    padding: 1px 6px;
+    margin: 2px;
+    font-size: 12px;
+}
+
+.asset-lab-wide-button {
+    min-height: 30px;
+    margin: 5px 2px 0 2px;
+}
+
+.asset-lab-close {
+    background-color: rgb(120, 52, 52);
+}
+
+.asset-lab-close:hover {
+    background-color: rgb(150, 64, 64);
+}

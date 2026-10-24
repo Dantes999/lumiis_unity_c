@@ -54,6 +54,7 @@ namespace Lumiis.Client
         public bool IsPlus7GlowActive => _plus7Glow != null && _plus7Glow.gameObject.activeSelf;
         public bool IsPlus9GlowActive => _plus9Glow != null && _plus9Glow.gameObject.activeSelf;
         public bool IsAttackTrailEmitting => _weaponTrail != null && _weaponTrail.emitting;
+        public int TrailPositionCount => _weaponTrail != null ? _weaponTrail.positionCount : 0;
 
         private ISpriteProvider _spriteProvider;
         private LookCatalogClient _lookCatalog;
@@ -85,7 +86,10 @@ namespace Lumiis.Client
         private ParticleSystem _plus7Glow;
         private ParticleSystem _plus9Glow;
         private TrailRenderer _weaponTrail;
+        private Transform _weaponTrailAnchor;
         private Material _weaponVfxMaterial;
+        private Material _particleMaterial;
+        private Texture2D _particleTexture;
 
         public void Initialize(int entityId, string entityName, ISpriteProvider spriteProvider, LookCatalogClient lookCatalog)
         {
@@ -182,6 +186,7 @@ namespace Lumiis.Client
                 _weaponRenderer.enabled = true;
                 _weaponRenderer.sprite = weaponSprite;
                 SetWeaponPixelOffset();
+                UpdateTrailAnchor();
             }
             else
             {
@@ -276,6 +281,7 @@ namespace Lumiis.Client
                 _weaponRenderer.enabled = true;
                 _weaponRenderer.sprite = _weaponOverrideSprite;
                 SetWeaponPixelOffset();
+                UpdateTrailAnchor();
             }
             else
             {
@@ -300,6 +306,7 @@ namespace Lumiis.Client
             renderer.enabled = true;
             renderer.sprite = _spriteProvider.GetSprite(slot, lookId, _facing.Direction, "idle", 0, pivot);
             renderer.color = tint ?? Color.white;
+            if (slot == CharacterSlot.Weapon) UpdateTrailAnchor();
         }
 
         private void ApplyFlip()
@@ -482,29 +489,80 @@ namespace Lumiis.Client
         {
             Shader spriteShader = Shader.Find("Sprites/Default");
             _weaponVfxMaterial = spriteShader != null ? new Material(spriteShader) : null;
+            if (_weaponVfxMaterial != null)
+                _weaponVfxMaterial.mainTexture = Texture2D.whiteTexture;
 
-            _plus7Glow = CreateGlow("Plus7Glow", new Color(1f, 0.92f, 0.45f, 1f), rateOverTime: 7f, startSize: 0.07f);
-            _plus9Glow = CreateGlow("Plus9Glow", new Color(0.35f, 0.6f, 1f, 1f), rateOverTime: 18f, startSize: 0.09f);
+            _particleTexture = CreateSoftCircleTexture(32);
+            _particleMaterial = spriteShader != null ? new Material(spriteShader) : null;
+            if (_particleMaterial != null)
+                _particleMaterial.mainTexture = _particleTexture;
 
-            var trail = _weaponRenderer.gameObject.AddComponent<TrailRenderer>();
+            _plus7Glow = CreateGlow("Plus7Glow", new Color(1f, 0.92f, 0.45f, 1f), rateOverTime: 9f, startSize: 0.13f);
+            _plus9Glow = CreateGlow("Plus9Glow", new Color(0.35f, 0.6f, 1f, 1f), rateOverTime: 22f, startSize: 0.18f);
+
+            var trailAnchorGo = new GameObject("TrailAnchor");
+            trailAnchorGo.transform.SetParent(_weaponRenderer.transform, false);
+            _weaponTrailAnchor = trailAnchorGo.transform;
+
+            var trail = trailAnchorGo.AddComponent<TrailRenderer>();
             trail.material = _weaponVfxMaterial;
-            trail.time = 0.18f;
-            trail.minVertexDistance = 0.04f;
-            trail.startWidth = 0.11f;
-            trail.endWidth = 0.01f;
-            trail.startColor = new Color(1f, 1f, 1f, 0.75f);
-            trail.endColor = new Color(1f, 1f, 1f, 0f);
+            trail.time = 0.35f;
+            trail.minVertexDistance = 0.02f;
+            trail.startWidth = 0.24f;
+            trail.endWidth = 0.02f;
+            trail.startColor = new Color(0.75f, 0.92f, 1f, 0.95f);
+            trail.endColor = new Color(0.75f, 0.92f, 1f, 0f);
             trail.emitting = false;
             trail.autodestruct = false;
             trail.textureMode = LineTextureMode.Stretch;
             trail.alignment = LineAlignment.View;
             _weaponTrail = trail;
+            UpdateTrailAnchor();
+        }
+
+        private void UpdateTrailAnchor()
+        {
+            if (_weaponTrailAnchor == null) return;
+            float length = _weaponRenderer != null && _weaponRenderer.sprite != null
+                ? _weaponRenderer.sprite.bounds.max.y
+                : 1.2f;
+            _weaponTrailAnchor.localPosition = new Vector3(0f, Mathf.Max(0.5f, length * 0.88f), 0f);
         }
 
         private void OnDestroy()
         {
             if (_weaponVfxMaterial != null)
                 Destroy(_weaponVfxMaterial);
+            if (_particleMaterial != null)
+                Destroy(_particleMaterial);
+            if (_particleTexture != null)
+                Destroy(_particleTexture);
+        }
+
+        private static Texture2D CreateSoftCircleTexture(int size)
+        {
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            texture.filterMode = FilterMode.Bilinear;
+            texture.wrapMode = TextureWrapMode.Clamp;
+
+            float center = (size - 1) / 2f;
+            float radius = size / 2f;
+            var pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = x - center;
+                    float dy = y - center;
+                    float alpha = Mathf.Clamp01(1f - Mathf.Sqrt(dx * dx + dy * dy) / radius);
+                    alpha *= alpha;
+                    pixels[y * size + x] = new Color32(255, 255, 255, (byte)(alpha * 255f));
+                }
+            }
+
+            texture.SetPixels32(pixels);
+            texture.Apply();
+            return texture;
         }
 
         private ParticleSystem CreateGlow(string name, Color color, float rateOverTime, float startSize)
@@ -534,7 +592,7 @@ namespace Lumiis.Client
             shape.radius = 0.16f;
 
             var renderer = go.GetComponent<ParticleSystemRenderer>();
-            renderer.material = _weaponVfxMaterial;
+            renderer.material = _particleMaterial;
             renderer.renderMode = ParticleSystemRenderMode.Billboard;
 
             particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);

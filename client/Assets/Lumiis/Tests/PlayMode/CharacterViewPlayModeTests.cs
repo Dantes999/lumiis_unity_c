@@ -4,6 +4,7 @@ using Lumiis.Shared.Net;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
+using UnityEngine.UIElements;
 
 namespace Lumiis.Client.Tests.PlayMode
 {
@@ -82,6 +83,18 @@ namespace Lumiis.Client.Tests.PlayMode
             Material material = Resources.Load<Material>("Materials/CharacterArmor");
             Assert.IsNotNull(material, "CharacterArmor.mat fehlt unter Assets/Resources/Materials/.");
             Assert.AreEqual("Lumiis/CharacterArmor", material.shader.name);
+        }
+
+        [Test]
+        public void AssetLabUi_AndWeaponSprites_AreAvailable()
+        {
+            Assert.IsNotNull(Resources.Load<VisualTreeAsset>("UI/AssetTestLab"), "AssetTestLab.uxml fehlt unter Assets/Resources/UI/.");
+
+            Sprite ironSword = Resources.Load<Sprite>("Sprites/Items/weapon_2_iron");
+            Assert.IsNotNull(ironSword, "weapon_2_iron.png wurde nicht als Sprite importiert.");
+            Assert.AreEqual(64f, ironSword.pixelsPerUnit, 0.01f);
+            Assert.AreEqual(0.5f, ironSword.pivot.x / ironSword.rect.width, 0.01f);
+            Assert.AreEqual(0.125f, ironSword.pivot.y / ironSword.rect.height, 0.01f);
         }
 
         [Test]

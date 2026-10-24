@@ -605,6 +605,30 @@ Protokolländerung, keine Serverwahrheit):
   eigene Figur (nur Editor/Development-Build, rein kosmetisch). Rüstungsfarben lassen sich über den
   bestehenden Rüstungs-Cycler und das Rüstungs-Raster prüfen.
 
+## Asset-Testlabor (F10, nur Editor/Development)
+Für die Asset-Prüfung ohne Server-/Monster-Gewimmel gibt es eine eigene UI-Toolkit-Oberfläche
+(`AssetTestLab.uxml`, geöffnet mit **F10** oder dem Button "Asset-Testlabor" im Debug-Panel):
+- Beim Öffnen wird die Szene aufgeräumt: Server-Figuren, Monster, NPCs, Reichweiten-/Buff-Ringe und die
+  alten F2/F9-Testboards werden nur deaktiviert (nicht zerstört) und beim Schließen wieder aktiviert.
+  Das IMGUI-Debug-Overlay ist währenddessen aus; F1 zeigt es außerhalb des Labors wieder an (Default ist
+  jetzt aus, damit die Szene beim Spielen sauber bleibt).
+- Eine lokale Vorschaufigur (eigene `CharacterView`/`CharacterAnimator`, kein Server-Entity) steht an der
+  Spielerposition, umgeben von drei Trainingspuppen (Holzposten/Stroh, eigene Laufzeitform aus
+  `PlaceholderSprites`).
+- Die UI bietet: Waffenwahl aus `items.json` (inkl. Anzeige, ob das erwartete PNG unter
+  `Resources/Sprites/Items/` existiert oder der Platzhalter greift), Waffenstufe +0..+9, Rüstung/Helm/
+  Schild/Frisur/Haarfarbe, Blickrichtung (Down/Up/Left/Right), Idle/Lauf-Demo/Angriff sowie
+  "Trainingspuppen neu platzieren"/"Figur zurücksetzen".
+- Die drei Waffen-Platzhalter `weapon_2_wood.png`, `weapon_2_iron.png`, `weapon_3_axe.png` werden
+  reproduzierbar mit `tools/generate-placeholder-weapons.py` erzeugt (eigene Formen, Pivot am Griff,
+  PPU 64); Herkunft in `docs/art-provenance.md`. Fehlt eine Datei, fällt die Vorschau weiterhin auf
+  `PlaceholderSpriteProvider` zurück.
+- Screenshot ohne Unity-Neustart: **F12** im Play-Modus oder "Screenshot aufnehmen" in der Labor-UI.
+  Für externe/automatisierte Aufnahmen aus einem bereits laufenden Play-Modus:
+  `tools/request-screenshot.sh /tmp/mein-bild.png` (schreibt eine Request-Datei, `ScreenshotRequestWatcher`
+  nimmt sie beim nächsten Frame auf). Nur der komplett kalte Lauf
+  `tools/capture-client-screenshots.sh` startet Unity einmalig im GUI-Modus und beendet es danach.
+
 ## Escape-Menü
 Seit der Aufgabe `escape-menu.md` gibt es ein kleines Escape-Menü mit drei Aktionen - rein clientseitig,
 keine Protokolländerung:
@@ -654,10 +678,11 @@ Domain-Reload-Verhalten):
 - `NetClient.cs`: dünner LiteNetLib-Adapter (MonoBehaviour) - Connect(host, port, token, characterId)/JoinRequest (M2b-Protokoll: Token+CharacterId statt Name), PacketCodec.Decode, C#-Events für Connected/Disconnected/Paket.
 - `LoginController.cs`: Login/Registrierung/Charakterauswahl gegen Lumiis.Auth (HTTP, UnityWebRequest), eigenes UIDocument (UI Toolkit, code-first erzeugt - siehe `client/Assets/Resources/UI/`). Zustände LoggedOut -> LoggingIn -> CharacterSelect -> Connecting -> InGame -> (Disconnect) zurück zu LoggedOut. Ruft nach Charakterwahl `GameClient.PrepareJoin(characterName)` und `NetClient.Connect(...)` auf. Details siehe Abschnitt "Datenbank & Auth-Dienst".
 - `ClientWorld.cs`: reine Weltsicht ohne UnityEngine-Bezug und ohne `Time.*`; Bewegung wird über `MovementMath` (Shared) anhand einer von außen übergebenen Zeit interpoliert (Client-Empfangszeit, keine Uhrensynchronisation in M1b), Blickrichtung über `FacingMath` (Shared) aus dem Bewegungsvektor. JoinAccepted (eigene Figur) und EntitySpawn (andere) laufen beide durch denselben `ApplyAppearance`-Pfad.
-- `GameClient.cs`: Orchestrierung - Views, Klick-Eingabe (New Input System, `Mouse.current`), Mausrad-Zoom, Kamera-Folgen, IMGUI-Debug-Overlay (Statuszeile, Entity-Liste, F1-Umschaltung) und F2-Testboard/F3-F8-Look-Hotkeys (nur Editor/Development-Build) - alles erst sichtbar nach erfolgreichem Join (`_inGame`-Flag, von LoginController unabhängig gepflegt). Login/Charakterauswahl selbst sind seit M2c LoginControllers Sache, nicht mehr Teil von GameClient.
+- `GameClient.cs`: Orchestrierung - Views, Klick-Eingabe (New Input System, `Mouse.current`), Mausrad-Zoom, Kamera-Folgen, IMGUI-Debug-Overlay (Statuszeile, Entity-Liste, F1-Umschaltung; Default aus) und F2-Testboard/F3-F8-Look-Hotkeys/F10-Asset-Testlabor (nur Editor/Development-Build) - alles erst sichtbar nach erfolgreichem Join (`_inGame`-Flag, von LoginController unabhängig gepflegt). Login/Charakterauswahl selbst sind seit M2c LoginControllers Sache, nicht mehr Teil von GameClient.
 - `LookCatalogClient.cs`: lädt `looks.json` aus StreamingAssets (JsonUtility).
 - `ISpriteProvider.cs`/`PlaceholderSpriteProvider.cs`: liefert Sprites je Ebene/Richtung; aktuell zur Laufzeit erzeugte Formen, später ein `AtlasSpriteProvider` mit echten PNGs.
 - `CharacterView.cs`/`CharacterAnimator.cs`/`CharacterTestboard.cs`: Paper-Doll-Zusammensetzung (Sortierung, Spiegeln, Anker, Tönung), prozedurale Idle-/Lauf-Animation, F2-Debug-Raster.
+- `AssetTestLab.cs` (+ `Resources/UI/AssetTestLab.uxml`): F10-Testlabor (nur Editor/Development) mit echter UI-Toolkit-Oberfläche, lokaler Vorschaufigur und Trainingspuppen; blendet Server-Figuren/Monster/altes Debug-Overlay während des Testens aus.
 - `PlaceholderSprites.cs`: Boden-Raster, Kartenbegrenzung, Ring-Marker für den lokalen Spieler (zur Laufzeit erzeugt, keine Kunst-Assets).
 - `LocalPlayerMarker.cs`: Ring am Fußpunkt der eigenen Figur; der eigene Name wird zusätzlich gelb gezeichnet (in `GameClient.DrawEntityLabels`) - keine Ebenen-Tönung, keine Protokolländerung.
 - `Editor/BuildScript.cs` (Namespace `Lumiis.Editor`, liegt im Ordner `Editor` - von Unity automatisch aus allen Player-Builds ausgeschlossen): `BuildScript.BuildDevelopment` baut einen Development-Standalone-Build für die aktuelle Plattform nach `client/Builds/<plattform>/` (git-ignoriert, vom bestehenden Muster `client/[Bb]uild*/` abgedeckt).
@@ -672,7 +697,7 @@ Demo-Ablauf:
 2. Unity-Projekt öffnen, Play drücken. Im Login-Fenster registrieren oder anmelden (Benutzername/Passwort), danach in der Charakterauswahl einen Charakter wählen oder neu erstellen - verbindet danach automatisch zum Spielserver.
 3. Linksklick auf den Boden bewegt die eigene Figur dorthin, sichtbar interpoliert und mit Blickrichtungswechsel. Die eigene Figur ist am gelben Namen und am Ring unter den Füßen erkennbar.
 4. Bots dazuholen: `dotnet run --project server/src/Lumiis.Bot -- --count 6` - melden sich selbst per HTTP bei Lumiis.Auth an (Login-oder-Registrieren, legen bei Bedarf einen Charakter an) und erscheinen dann mit dem beim Anlegen vergebenen Aussehen (siehe `LookCatalog.CreateDefaultAppearance`).
-5. Rechts oben zeigt das Debug-Test-Panel (nur Editor/Development-Build) Buttons für Testboard/Sortier-Testfeld sowie "<"/">"-Paare für Frisur/Haarfarbe/Rüstung/Helm/Waffe/Schild der eigenen Figur (rein kosmetisch, nicht gesendet) - primärer Weg zum Durchklicken. F2/F3-F8/F9 bleiben als Tastatur-Shortcuts zusätzlich nutzbar.
+5. Debug-Werkzeuge (nur Editor/Development-Build): **F1** blendet Status-/Debug-Panel ein (Default aus), dort liegen Testboard/Sortier-Testfeld und Look-Cycler. **F10** öffnet das aufgeräumte Asset-Testlabor mit Vorschaufigur, Trainingspuppen und UI für Waffe/Stufe/Rüstung/Facing/Animation (siehe Abschnitt "Asset-Testlabor"). F2/F3-F8/F9 bleiben als Tastatur-Shortcuts zusätzlich nutzbar.
 
 Zwei Clients gleichzeitig testen: Editor plus Build. Der Play-Modus im Editor drosselt ohne Fensterfokus (siehe
 "Bekannte Eigenheiten"), was bei mehreren gleichzeitigen Clients stört. Alternative: `tools/build-client.sh`
@@ -939,6 +964,20 @@ Status). M6c Upgrade/M6d Lumiis-Steine bleiben weiterhin zurückgestellt.
   `tools/test-client-playmode.sh` 9/9 grün (4 bestehende + 5 neue CharacterView-PlayMode-Tests),
   Batchmode-Kompilierung ohne Fehler. Manuelle Sichtprüfung der VFX/Farben steht noch aus (siehe
   Checkliste unten).
+- Asset-Testlabor + aufgeräumte Testsicht: (1) `AssetTestLab` (nur Editor/Development, F10) baut eine
+  eigene UI-Toolkit-Oberfläche (`AssetTestLab.uxml`) mit Waffen-/Stufen-/Rüstungs-/Facing-/
+  Animationssteuerung; blendet Server-Figuren, Monster, NPCs, Ringe und die alten Testboards aus und
+  stellt eine lokale Vorschaufigur plus drei Trainingspuppen auf. (2) `GameClient` bekam dafür
+  `SetAssetLabMode`/`LocalPlayerWorldPosition`; das IMGUI-Debug-Overlay ist standardmäßig aus und wird
+  mit F1 wieder eingeblendet, neue Entities werden während des Labors ebenfalls versteckt. (3) Drei
+  reproduzierbare Platzhalter-Waffen-PNGs (`weapon_2_wood`, `weapon_2_iron`, `weapon_3_axe`) inkl.
+  Import-Metadaten, Generator `tools/generate-placeholder-weapons.py` und Art-Provenance-Einträgen.
+  (4) `PlaceholderSpriteProvider.DrawWeapon` zeichnet jetzt Griff/Parierstange/Klinge statt eines
+  dünnen Rechtecks, falls ein PNG fehlt. (5) Schnelle Screenshot-Verifikation ohne Unity-Neustart:
+  F12/Button im Labor, `ScreenshotRequestWatcher` + `tools/request-screenshot.sh` für laufende
+  Play-Modi sowie `tools/capture-client-screenshots.sh` als einmaliger GUI-Lauf. 11/11 PlayMode-Tests
+  grün; die automatisch erzeugten Bilder (`/tmp/lumiis-asset-lab-plus0.png`, `-plus9.png`, `-attack.png`)
+  zeigen Labor-UI, Vorschaufigur, Trainingspuppen, Waffe, +9-Glitzern und Trail.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client
 War kein Codefehler. User hat den Test mit fokussiertem Unity-Fenster wiederholt (Server, Unity Play, dann Bots
 gestartet, ins Unity-Fenster geklickt): alle Spawns kamen an, auch mit 99 Bots. Wahrscheinliche Ursache war die
@@ -1004,18 +1043,22 @@ Waldschrat in Reichweite (Dev-Tools-Debug-Spawn oder ein regulärer Spawn-Punkt)
 - "Beenden" klicken (im Editor): Play-Modus stoppt sauber, der Editor selbst bleibt offen.
 - Einen Standalone-Build erzeugen (`tools/build-client.sh`) und starten: läuft in einem Fenster (nicht Vollbild), Fenster ist in der Größe veränderbar.
 
-### Noch zu prüfen (Paper-Doll-Socketing/Waffen-VFX, vom User)
-Voraussetzung: laufender Server, Charakter mit ausgerüsteter Waffe (Startwaffe reicht); Editor-Play oder
-Development-Build (Debug-Panel sichtbar).
-- F7 (Waffen-Look-Cycler) bzw. der Waffen-Button im Panel: die Waffe bleibt am Griff auf Handhöhe, dreht
-  beim Laufen um den Hand-Anker und liegt je Richtung vor/hinter dem Körper (Up: hinter Körper/Schild).
-- Debug-Panel "Waffe +0..+9" auf +7 stellen: gelb-weißes Funkeln an der Waffe; auf +9: zusätzlich dichter
-  blauer Glanz. Auf +0..+6: kein Glitzern.
-- Rechtsklick-Angriff oder Taste 1/2: die Figur führt einen kurzen Schlag aus, die Waffe rotiert sichtbar,
-  und nur während der mittleren Schlagphase erscheint ein kurzer Trail an der Waffe.
-- Rüstungs-Cycler/F5: die Rüstung wechselt nicht nur die Form, sondern auch die Farbe (Palette aus
-  looks.json); der Körper bleibt unverändert.
-- Button "Waffen-Testfeld +0..+9": zehn Figuren mit steigender Stufe, die periodisch zuschlagen; ab +7/+9
-  ist das jeweilige Glitzern sichtbar, der Trail läuft synchron zur Schlaganimation.
-- Fehlt ein Waffen-PNG unter `Resources/Sprites/Items/`, bleibt das Spiel lauffähig und zeigt weiterhin
-  den Platzhalter (keine Exception, keine unsichtbare Waffe).
+### Noch zu prüfen (Asset-Testlabor/Paper-Doll, vom User)
+Voraussetzung: laufender Server, Charakter ausgewählt; Editor-Play oder Development-Build.
+
+- **F10** drücken oder im Debug-Panel (F1) "Asset-Testlabor" klicken: Die Szene ist aufgeräumt (keine
+  Monster, NPCs, anderen Spieler, Ringe oder Testboards), links erscheint die Testlabor-UI, in der Mitte
+  eine Vorschaufigur mit drei Trainingspuppen.
+- Waffe durchklicken: Holzschwert/Eisenschwert/Kriegsaxt werden aus
+  `Resources/Sprites/Items/` geladen; die UI zeigt den PNG-Pfad bzw. einen Hinweis, falls der Platzhalter
+  greift. Waffe bleibt am Griff, rotiert beim Schlag und liegt je Richtung vor/hinter dem Körper.
+- Stufe auf +7: gelb-weißes Funkeln; +9: zusätzlich dichter blauer Glanz; +0..+6: kein Glitzern.
+- "Laufen" und "Angriff" testen: Lauf-Demo-Wippen, Schlagrotation, Trail nur in der aktiven Schlagphase.
+- Rüstung/Helm/Schild/Frisur/Haarfarbe durchklicken; Rüstung wechselt Form und Farbe, der Körper bleibt
+  unverändert.
+- Blickrichtung Unten/Oben/Links/Rechts testen (Links ist gespiegelt).
+- "Trainingspuppen neu platzieren" und "Figur zurücksetzen" funktionieren; F10 schließt das Labor, danach
+  sind Server-Figuren/Monster wieder normal sichtbar.
+- **F12** oder "Screenshot aufnehmen" im Labor erzeugt sofort ein PNG unter `/tmp`; alternativ
+  `tools/request-screenshot.sh` aus einer Shell, während Unity im Play-Modus läuft (kein Neustart).
+- F1 zeigt außerhalb des Labors wieder das gewohnte Debug-Overlay und -Panel.

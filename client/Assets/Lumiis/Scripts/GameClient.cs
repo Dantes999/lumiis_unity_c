@@ -41,6 +41,7 @@ namespace Lumiis.Client
         private CharacterTestboard _testboard;
         private CharacterTestboard _sortingTestboard;
         private CharacterTestboard _weaponTestboard;
+        private AssetTestLab _assetTestLab;
         private Vector2 _debugPanelScroll;
 
         /// <summary>Lokaler Test-Override für die Waffen-Aufwertungsstufe (+0..+9), nur Debug/Editor. Die
@@ -66,12 +67,18 @@ namespace Lumiis.Client
         private bool _inGame;
         private string _pendingLoginName = "";
         private string _statusMessage = "";
-        private bool _debugOverlayVisible = true;
+        private bool _debugOverlayVisible;
 
         // escape-menu (siehe docs/tasks/escape-menu.md): von LoginController gesetzt, während das Menü
         // sichtbar ist - sperrt nur die eigentlichen Gameplay-Eingaben (Bewegungsklick, Angriff/Rechtsklick,
         // Skills 1-4), nicht Zoom/F1-Overlay-Umschaltung (keine Gameplay-Aktionen im engeren Sinn).
         private bool _gameplayInputLocked;
+
+        // Asset-Testlabor (nur Editor/Development): blendet Server-Figuren/Monster aus, sperrt Gameplay-Eingaben
+        // und lässt GameClient.OnGUI das Debug-Overlay weglassen. Die UI selbst ist eine separate UI-Toolkit-
+        // Wurzel in AssetTestLab.
+        private bool _assetLabActive;
+        private readonly List<GameObject> _assetLabHiddenObjects = new List<GameObject>();
 
         // ---- Kampf (M4a, Debug-Overlay-Text - siehe DrawStatusLine/DrawTargetLine) ----
         private int _targetEntityId = -1;
@@ -215,10 +222,19 @@ namespace Lumiis.Client
             _netClient.PacketReceived += OnPacketReceived;
 
             CreateFloorAndBoundary();
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            _assetTestLab = gameObject.AddComponent<AssetTestLab>();
+            _assetTestLab.Initialize(this, _spriteProvider, _lookCatalog, _itemCatalog);
+            gameObject.AddComponent<ScreenshotRequestWatcher>();
+#endif
         }
 
         private void OnDestroy()
         {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (_assetTestLab != null) _assetTestLab.Close();
+#endif
             _spriteProvider?.DestroyAll();
         }
 
@@ -253,7 +269,7 @@ namespace Lumiis.Client
                     buffRing.SetWorldPosition(localForRing.X / 100.0, localForRing.Y / 100.0);
             }
 
-            if (_inGame && !_gameplayInputLocked)
+            if (_inGame && !_gameplayInputLocked && !_assetLabActive)
             {
                 HandleClickInput();
                 HandleSkillHotkeys();
@@ -401,6 +417,18 @@ namespace Lumiis.Client
         {
             if (Keyboard.current == null) return;
 
+            if (Keyboard.current.f10Key.wasPressedThisFrame)
+            {
+                ToggleAssetLab();
+                return;
+            }
+            if (Keyboard.current.f12Key.wasPressedThisFrame)
+            {
+                CaptureScreenshot();
+                return;
+            }
+            if (_assetLabActive) return;
+
             if (Keyboard.current.f2Key.wasPressedThisFrame) ToggleTestboard();
             if (Keyboard.current.f9Key.wasPressedThisFrame) ToggleSortingTest();
 
@@ -466,6 +494,62 @@ namespace Lumiis.Client
             }
 
             _weaponTestboard.gameObject.SetActive(!_weaponTestboard.gameObject.activeSelf);
+        }
+
+        private void ToggleAssetLab()
+        {
+            if (_assetTestLab == null) return;
+            _assetTestLab.Toggle();
+        }
+
+        /// <summary>Nur für PlayMode-/Screenshot-Tests: legt eine lokale Spielerfigur ohne Server an,
+        /// damit das Asset-Testlabor geöffnet werden kann.</summary>
+        public void DebugPrepareAssetLabLocalPlayer()
+        {
+            if (HasLocalPlayer) return;
+
+            int bodyId = 1;
+            foreach (int id in _lookCatalog.GetIdsForSlot("Body"))
+            {
+                bodyId = id;
+                break;
+            }
+
+            _world.HandleJoinAccepted(9000, 50000, 50000, "AssetLab",
+                new Appearance { BodyId = bodyId, HairStyleId = 1, HairColorId = 1, ArmorId = 1, WeaponId = 2 });
+            _inGame = true;
+        }
+
+        public void DebugOpenAssetLab()
+        {
+            _assetTestLab?.Open();
+        }
+
+        public void DebugCloseAssetLab()
+        {
+            _assetTestLab?.Close();
+        }
+
+        public void DebugSetAssetLabUpgrade(int level)
+        {
+            _assetTestLab?.DebugSetUpgradeLevel(level);
+        }
+
+        public void DebugPlayAssetLabAttack()
+        {
+            _assetTestLab?.DebugPlayAttack();
+        }
+
+        public bool DebugAssetLabTrailEmitting => _assetTestLab != null && _assetTestLab.DebugTrailEmitting;
+        public int DebugAssetLabTrailPositionCount => _assetTestLab != null ? _assetTestLab.DebugTrailPositionCount : 0;
+
+        /// <summary>Schneller Screenshot aus dem laufenden Play-Modus (F12 oder Testlabor-Button) - kein
+        /// Unity-Neustart nötig. Schreibt nach /tmp/lumiis-screenshot-&lt;Zeitstempel&gt;.png.</summary>
+        public void CaptureScreenshot()
+        {
+            string path = "/tmp/lumiis-screenshot-" + System.DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".png";
+            ScreenCapture.CaptureScreenshot(path, 1);
+            Debug.Log("Screenshot: " + path);
         }
 
         /// <summary>Zyklus 0 (keine Ebene) -> erste Katalog-Id -> ... -> letzte -> zurück zu 0 (und umgekehrt
@@ -545,6 +629,8 @@ namespace Lumiis.Client
 
             GUILayout.Label("Debug-Test (F-Tasten bleiben aktiv)");
 
+            if (GUILayout.Button("Asset-Testlabor (F10)"))
+                ToggleAssetLab();
             if (GUILayout.Button("Testboard: " + (_testboard != null && _testboard.gameObject.activeSelf ? "an" : "aus")))
                 ToggleTestboard();
             if (GUILayout.Button("Sortier-Testfeld: " + (_sortingTestboard != null && _sortingTestboard.gameObject.activeSelf ? "an" : "aus")))
@@ -1311,6 +1397,7 @@ namespace Lumiis.Client
                 monsterView.Initialize(MonsterShapeFor(entity.TypeId), MonsterColorFor(entity.TypeId));
                 monsterView.SetWorldPosition(entity.X / 100.0, entity.Y / 100.0);
                 _monsterViews[entity.Id] = monsterView;
+                if (_assetLabActive) HideForAssetLab(monsterGo);
                 return;
             }
 
@@ -1342,6 +1429,13 @@ namespace Lumiis.Client
                 _rangeRingView.SetWorldPosition(entity.X / 100.0, entity.Y / 100.0);
 
                 ApplyLocalWeaponVisual();
+            }
+
+            if (_assetLabActive)
+            {
+                HideForAssetLab(go);
+                if (entity.Id == _world.LocalEntityId && _rangeRingView != null)
+                    HideForAssetLab(_rangeRingView.gameObject);
             }
         }
 
@@ -1376,6 +1470,61 @@ namespace Lumiis.Client
             if (entityId <= 0) return;
             if (_animators.TryGetValue(entityId, out CharacterAnimator animator) && animator != null)
                 animator.PlayAttack();
+        }
+
+        public bool HasLocalPlayer => _world.LocalEntityId >= 0 && _world.Entities.ContainsKey(_world.LocalEntityId);
+
+        public Vector3 LocalPlayerWorldPosition
+        {
+            get
+            {
+                if (_world.LocalEntityId >= 0 && _world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity local))
+                    return new Vector3((float)(local.X / 100.0), (float)(local.Y / 100.0), 0f);
+                return Vector3.zero;
+            }
+        }
+
+        /// <summary>Räumt für das Asset-Testlabor die Szene auf: Server-Figuren, Monster, Ringe und die alten
+        /// Debug-Testboards werden ausgeblendet (nicht zerstört), damit beim Schließen alles unverändert
+        /// zurückkommt. Neue Entities, die während des Labors spawnen, werden in OnEntitySpawned ebenfalls
+        /// versteckt.</summary>
+        public void SetAssetLabMode(bool active)
+        {
+            if (active)
+            {
+                _assetLabActive = true;
+
+                HideForAssetLab(_rangeRingView != null ? _rangeRingView.gameObject : null);
+                foreach (RangeRingView buffRing in _buffRingViews.Values)
+                    HideForAssetLab(buffRing != null ? buffRing.gameObject : null);
+                foreach (CharacterView view in _views.Values)
+                    HideForAssetLab(view != null ? view.gameObject : null);
+                foreach (MonsterView monsterView in _monsterViews.Values)
+                    HideForAssetLab(monsterView != null ? monsterView.gameObject : null);
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                HideForAssetLab(_testboard != null ? _testboard.gameObject : null);
+                HideForAssetLab(_sortingTestboard != null ? _sortingTestboard.gameObject : null);
+                HideForAssetLab(_weaponTestboard != null ? _weaponTestboard.gameObject : null);
+#endif
+            }
+            else
+            {
+                _assetLabActive = false;
+                foreach (GameObject go in _assetLabHiddenObjects)
+                {
+                    if (go != null)
+                        go.SetActive(true);
+                }
+                _assetLabHiddenObjects.Clear();
+            }
+        }
+
+        private void HideForAssetLab(GameObject go)
+        {
+            if (go == null || !go.activeSelf) return;
+            go.SetActive(false);
+            _assetLabHiddenObjects.Add(go);
         }
 
         // Platzhalter-Zuordnung Form/Farbe je MobId (siehe data/mobs.json: 1=Wildhund, 2=Waldschrat) - der
@@ -1420,6 +1569,10 @@ namespace Lumiis.Client
 
         private void CleanupEntities()
         {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (_assetTestLab != null) _assetTestLab.Close();
+#endif
+
             foreach (CharacterView view in _views.Values)
                 if (view != null) Destroy(view.gameObject);
             _views.Clear();
@@ -1478,6 +1631,7 @@ namespace Lumiis.Client
         private void OnGUI()
         {
             if (!_inGame) return;
+            if (_assetLabActive) return; // Im Testlabor übernimmt die UI-Toolkit-Oberfläche.
 
             if (_debugOverlayVisible)
             {
@@ -1486,10 +1640,10 @@ namespace Lumiis.Client
                 DrawSkillsLine();
                 DrawEntityList();
                 DrawEntityLabels();
-            }
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-            DrawDebugTestPanel();
+                DrawDebugTestPanel();
 #endif
+            }
         }
 
         private void DrawStatusLine()

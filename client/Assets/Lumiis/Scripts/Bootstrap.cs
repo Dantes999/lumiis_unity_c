@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace Lumiis.Client
@@ -17,6 +18,17 @@ namespace Lumiis.Client
             var netClient = root.AddComponent<NetClient>();
             var gameClient = root.AddComponent<GameClient>();
             gameClient.Initialize(netClient, camera);
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // Nur für automatisierte Screenshot-Läufe (tools/capture-client-screenshots.sh): Login
+            // überspringen und direkt eine lokale Testlabor-Vorschau starten.
+            if (Array.Exists(Environment.GetCommandLineArgs(), arg => arg == "-lumiisAssetLab"))
+            {
+                var autoLab = root.AddComponent<AssetLabAutoStart>();
+                autoLab.Initialize(gameClient);
+                return;
+            }
+#endif
 
             var loginController = root.AddComponent<LoginController>();
             loginController.Initialize(netClient, gameClient);
