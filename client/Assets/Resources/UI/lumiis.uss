@@ -212,3 +212,26 @@ Button:disabled {
 .asset-lab-close:hover {
     background-color: rgb(150, 64, 64);
 }
+
+.asset-lab-icon-grid {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-top: 4px;
+    margin-bottom: 6px;
+}
+
+.asset-lab-icon-cell {
+    width: 40px;
+    height: 40px;
+    margin: 1px;
+    align-items: center;
+    justify-content: center;
+    background-color: rgb(32, 34, 42);
+    border-width: 1px;
+    border-color: rgb(60, 65, 78);
+}
+
+.asset-lab-icon-cell Image {
+    width: 32px;
+    height: 32px;
+}

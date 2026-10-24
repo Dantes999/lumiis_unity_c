@@ -48,8 +48,12 @@ public sealed class ItemDefinition
     /// <summary>Client-Rendering: Standard-Aufwertungsstufe der Vorlage (0-9).</summary>
     public int UpgradeLevel { get; }
 
+    /// <summary>Client-Rendering: Icon-Schlüssel aus dem Lumiis-Asset-Archiv (optional).</summary>
+    public string IconKey { get; }
+
     public ItemDefinition(int id, string name, ItemType itemType, int lookId, int attackBonus, int defenseBonus, int healAmount,
-        long buyPrice, long sellPrice, string spriteKey = "", float pivotOffsetX = 0f, float pivotOffsetY = 0f, int upgradeLevel = 0)
+        long buyPrice, long sellPrice, string spriteKey = "", float pivotOffsetX = 0f, float pivotOffsetY = 0f, int upgradeLevel = 0,
+        string iconKey = "")
     {
         Id = id;
         Name = name;
@@ -64,6 +68,7 @@ public sealed class ItemDefinition
         PivotOffsetX = pivotOffsetX;
         PivotOffsetY = pivotOffsetY;
         UpgradeLevel = upgradeLevel;
+        IconKey = iconKey;
     }
 
     /// <summary>Nur bei Armor/Helmet/Weapon/Shield true - Consumables können nicht angelegt werden.</summary>
@@ -154,7 +159,8 @@ public sealed class ItemCatalog
                 throw new ItemCatalogException($"items.json: Item {entry.Id} ({entry.Name}) hat upgradeLevel {entry.UpgradeLevel} (erlaubt: 0-9).");
 
             byId[entry.Id] = new ItemDefinition(entry.Id, entry.Name, itemType, entry.LookId, entry.AttackBonus, entry.DefenseBonus, entry.HealAmount,
-                entry.BuyPrice, entry.SellPrice, entry.SpriteKey ?? "", entry.PivotOffset?.X ?? 0f, entry.PivotOffset?.Y ?? 0f, entry.UpgradeLevel);
+                entry.BuyPrice, entry.SellPrice, entry.SpriteKey ?? "", entry.PivotOffset?.X ?? 0f, entry.PivotOffset?.Y ?? 0f, entry.UpgradeLevel,
+                entry.IconKey ?? "");
         }
 
         if (byId.Count == 0)

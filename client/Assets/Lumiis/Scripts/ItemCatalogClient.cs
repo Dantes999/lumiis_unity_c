@@ -43,6 +43,9 @@ namespace Lumiis.Client
         /// Instanzstufe kommt später aus dem Inventar; aktuell nutzt der Client diesen Wert als Fallback.</summary>
         public int upgradeLevel;
 
+        /// <summary>Icon-Schlüssel aus dem Lumiis-Asset-Archiv (z. B. "sword_30", "armor_ninja_1").</summary>
+        public string iconKey = "";
+
         public int ClampedUpgradeLevel => Mathf.Clamp(upgradeLevel, MinUpgradeLevel, MaxUpgradeLevel);
 
         public const int MinUpgradeLevel = 0;

@@ -51,6 +51,18 @@ namespace Lumiis.Client
             ScreenCapture.CaptureScreenshot("/tmp/lumiis-asset-lab-attack.png", 1);
             yield return new WaitForEndOfFrame();
 
+            _gameClient.DebugShowAssetLabIconGallery("weapon");
+            yield return new WaitForSeconds(0.3f);
+            ScreenCapture.CaptureScreenshot("/tmp/lumiis-asset-lab-icons.png", 1);
+            yield return new WaitForEndOfFrame();
+
+            _gameClient.DebugSetAssetLabUiVisible(false);
+            _gameClient.DebugShowAssetLabGallery();
+            if (mainCamera != null) mainCamera.orthographicSize = 3.2f;
+            yield return new WaitForSeconds(0.4f);
+            ScreenCapture.CaptureScreenshot("/tmp/lumiis-asset-lab-characters.png", 1);
+            yield return new WaitForEndOfFrame();
+
             yield return new WaitForSeconds(0.5f);
             File.WriteAllText(MarkerPath, "done");
             Debug.Log("Asset-Testlabor-Screenshots geschrieben: /tmp/lumiis-asset-lab-*.png");

@@ -34,6 +34,7 @@ namespace Lumiis.Client
         private readonly Dictionary<BuffType, RangeRingView> _buffRingViews = new Dictionary<BuffType, RangeRingView>();
         private LookCatalogClient _lookCatalog;
         private ItemCatalogClient _itemCatalog;
+        private ItemIconCatalog _iconCatalog;
         private SkillCatalogClient _skillCatalog;
         private ClassCatalogClient _classCatalog;
         private CachingSpriteProvider _spriteProvider;
@@ -192,6 +193,8 @@ namespace Lumiis.Client
                 throw;
             }
 
+            _iconCatalog = ItemIconCatalog.LoadFromResources();
+
             try
             {
                 _skillCatalog = SkillCatalogClient.LoadFromStreamingAssets();
@@ -225,7 +228,7 @@ namespace Lumiis.Client
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             _assetTestLab = gameObject.AddComponent<AssetTestLab>();
-            _assetTestLab.Initialize(this, _spriteProvider, _lookCatalog, _itemCatalog);
+            _assetTestLab.Initialize(this, _spriteProvider, _lookCatalog, _itemCatalog, _iconCatalog);
             gameObject.AddComponent<ScreenshotRequestWatcher>();
 #endif
         }
@@ -543,6 +546,21 @@ namespace Lumiis.Client
         public bool DebugAssetLabTrailEmitting => _assetTestLab != null && _assetTestLab.DebugTrailEmitting;
         public int DebugAssetLabTrailPositionCount => _assetTestLab != null ? _assetTestLab.DebugTrailPositionCount : 0;
 
+        public void DebugShowAssetLabGallery()
+        {
+            _assetTestLab?.DebugShowCharacterGallery();
+        }
+
+        public void DebugSetAssetLabUiVisible(bool visible)
+        {
+            _assetTestLab?.DebugSetUiVisible(visible);
+        }
+
+        public void DebugShowAssetLabIconGallery(string category, int page = 0)
+        {
+            _assetTestLab?.DebugShowIconGallery(category, page);
+        }
+
         /// <summary>Schneller Screenshot aus dem laufenden Play-Modus (F12 oder Testlabor-Button) - kein
         /// Unity-Neustart nötig. Schreibt nach /tmp/lumiis-screenshot-&lt;Zeitstempel&gt;.png.</summary>
         public void CaptureScreenshot()
@@ -762,13 +780,28 @@ namespace Lumiis.Client
         private void DrawEquipmentRow(string label, EquipmentSlot slot, int equippedItemId)
         {
             GUILayout.BeginHorizontal();
+            DrawItemIcon(equippedItemId);
             string itemName = equippedItemId == 0 ? "leer" : _itemCatalog.DisplayName(equippedItemId);
-            GUILayout.Label(label + ": " + itemName, GUILayout.Width(150));
+            GUILayout.Label(label + ": " + itemName, GUILayout.Width(140));
             GUI.enabled = equippedItemId != 0;
             if (GUILayout.Button("Ablegen", GUILayout.Width(60)))
                 _netClient.SendUnequipItem(slot);
             GUI.enabled = true;
             GUILayout.EndHorizontal();
+        }
+
+        private void DrawItemIcon(int itemId)
+        {
+            Texture2D icon = itemId != 0 && _iconCatalog != null
+                ? _iconCatalog.GetTextureForItem(itemId, _itemCatalog)
+                : null;
+            if (icon != null)
+            {
+                float width = Mathf.Clamp(24f * icon.width / icon.height, 8f, 24f);
+                GUILayout.Box(icon, GUILayout.Width(width), GUILayout.Height(24));
+            }
+            else
+                GUILayout.Space(26);
         }
 
         /// <summary>M5a: 20 Zeilen (Slot-Nummer + Item-Name oder "leer"). Klick auf einen belegten Slot löst
@@ -783,9 +816,10 @@ namespace Lumiis.Client
             {
                 int itemId = FindItemInSlot(slotIndex);
                 GUILayout.BeginHorizontal();
+                DrawItemIcon(itemId);
                 string text = slotIndex + ": " + (itemId == 0 ? "leer" : _itemCatalog.DisplayName(itemId));
                 GUI.enabled = itemId != 0;
-                if (GUILayout.Button(text, GUILayout.Width(210)))
+                if (GUILayout.Button(text, GUILayout.Width(186)))
                     HandleInventorySlotClick(slotIndex, itemId);
                 GUI.enabled = true;
                 GUILayout.EndHorizontal();
@@ -828,7 +862,8 @@ namespace Lumiis.Client
             foreach ((int itemId, long buyPrice) in _shopItems)
             {
                 GUILayout.BeginHorizontal();
-                GUILayout.Label(_itemCatalog.DisplayName(itemId) + " (" + buyPrice + " Yang)", GUILayout.Width(170));
+                DrawItemIcon(itemId);
+                GUILayout.Label(_itemCatalog.DisplayName(itemId) + " (" + buyPrice + " Yang)", GUILayout.Width(160));
                 if (GUILayout.Button("Kaufen", GUILayout.Width(60)))
                     _netClient.SendBuyItem(_shopOpenNpcEntityId, itemId);
                 GUILayout.EndHorizontal();
@@ -843,7 +878,8 @@ namespace Lumiis.Client
                 if (!_itemCatalog.TryGet(itemId, out ItemEntryJson entry) || entry.sellPrice <= 0) continue;
 
                 GUILayout.BeginHorizontal();
-                GUILayout.Label(entry.name + " (" + entry.sellPrice + " Yang)", GUILayout.Width(170));
+                DrawItemIcon(itemId);
+                GUILayout.Label(entry.name + " (" + entry.sellPrice + " Yang)", GUILayout.Width(160));
                 if (GUILayout.Button("Verkaufen", GUILayout.Width(70)))
                     _netClient.SendSellItem(_shopOpenNpcEntityId, slotIndex);
                 GUILayout.EndHorizontal();

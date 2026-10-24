@@ -1,0 +1,3735 @@
+{
+ "icons": [
+  {
+   "key": "yang_boden",
+   "sourceKey": "yang_boden",
+   "category": "",
+   "file": "yang_boden.png",
+   "resource": "Icons/yang_boden"
+  },
+  {
+   "key": "cloak",
+   "sourceKey": "cloak",
+   "category": "align",
+   "file": "align/cloak.png",
+   "resource": "Icons/align/cloak"
+  },
+  {
+   "key": "life_fruit",
+   "sourceKey": "life_fruit",
+   "category": "align",
+   "file": "align/life_fruit.png",
+   "resource": "Icons/align/life_fruit"
+  },
+  {
+   "key": "wise_glove",
+   "sourceKey": "wise_glove",
+   "category": "align",
+   "file": "align/wise_glove.png",
+   "resource": "Icons/align/wise_glove"
+  },
+  {
+   "key": "wise_symbol",
+   "sourceKey": "wise_symbol",
+   "category": "align",
+   "file": "align/wise_symbol.png",
+   "resource": "Icons/align/wise_symbol"
+  },
+  {
+   "key": "zen_bean",
+   "sourceKey": "zen_bean",
+   "category": "align",
+   "file": "align/zen_bean.png",
+   "resource": "Icons/align/zen_bean"
+  },
+  {
+   "key": "armor_ninja_1",
+   "sourceKey": "armor_ninja_1",
+   "category": "armor",
+   "file": "armor/armor_ninja_1.png",
+   "resource": "Icons/armor/armor_ninja_1"
+  },
+  {
+   "key": "armor_ninja_18",
+   "sourceKey": "armor_ninja_18",
+   "category": "armor",
+   "file": "armor/armor_ninja_18.png",
+   "resource": "Icons/armor/armor_ninja_18"
+  },
+  {
+   "key": "armor_ninja_26",
+   "sourceKey": "armor_ninja_26",
+   "category": "armor",
+   "file": "armor/armor_ninja_26.png",
+   "resource": "Icons/armor/armor_ninja_26"
+  },
+  {
+   "key": "armor_ninja_34",
+   "sourceKey": "armor_ninja_34",
+   "category": "armor",
+   "file": "armor/armor_ninja_34.png",
+   "resource": "Icons/armor/armor_ninja_34"
+  },
+  {
+   "key": "armor_ninja_42",
+   "sourceKey": "armor_ninja_42",
+   "category": "armor",
+   "file": "armor/armor_ninja_42.png",
+   "resource": "Icons/armor/armor_ninja_42"
+  },
+  {
+   "key": "armor_ninja_48",
+   "sourceKey": "armor_ninja_48",
+   "category": "armor",
+   "file": "armor/armor_ninja_48.png",
+   "resource": "Icons/armor/armor_ninja_48"
+  },
+  {
+   "key": "armor_ninja_54",
+   "sourceKey": "armor_ninja_54",
+   "category": "armor",
+   "file": "armor/armor_ninja_54.png",
+   "resource": "Icons/armor/armor_ninja_54"
+  },
+  {
+   "key": "armor_ninja_61",
+   "sourceKey": "armor_ninja_61",
+   "category": "armor",
+   "file": "armor/armor_ninja_61.png",
+   "resource": "Icons/armor/armor_ninja_61"
+  },
+  {
+   "key": "armor_ninja_66",
+   "sourceKey": "armor_ninja_66",
+   "category": "armor",
+   "file": "armor/armor_ninja_66.png",
+   "resource": "Icons/armor/armor_ninja_66"
+  },
+  {
+   "key": "armor_ninja_80",
+   "sourceKey": "armor_ninja_80",
+   "category": "armor",
+   "file": "armor/armor_ninja_80.png",
+   "resource": "Icons/armor/armor_ninja_80"
+  },
+  {
+   "key": "armor_ninja_9",
+   "sourceKey": "armor_ninja_9",
+   "category": "armor",
+   "file": "armor/armor_ninja_9.png",
+   "resource": "Icons/armor/armor_ninja_9"
+  },
+  {
+   "key": "armor_shaman_1",
+   "sourceKey": "armor_shaman_1",
+   "category": "armor",
+   "file": "armor/armor_shaman_1.png",
+   "resource": "Icons/armor/armor_shaman_1"
+  },
+  {
+   "key": "armor_shaman_18",
+   "sourceKey": "armor_shaman_18",
+   "category": "armor",
+   "file": "armor/armor_shaman_18.png",
+   "resource": "Icons/armor/armor_shaman_18"
+  },
+  {
+   "key": "armor_shaman_26",
+   "sourceKey": "armor_shaman_26",
+   "category": "armor",
+   "file": "armor/armor_shaman_26.png",
+   "resource": "Icons/armor/armor_shaman_26"
+  },
+  {
+   "key": "armor_shaman_34",
+   "sourceKey": "armor_shaman_34",
+   "category": "armor",
+   "file": "armor/armor_shaman_34.png",
+   "resource": "Icons/armor/armor_shaman_34"
+  },
+  {
+   "key": "armor_shaman_42",
+   "sourceKey": "armor_shaman_42",
+   "category": "armor",
+   "file": "armor/armor_shaman_42.png",
+   "resource": "Icons/armor/armor_shaman_42"
+  },
+  {
+   "key": "armor_shaman_48",
+   "sourceKey": "armor_shaman_48",
+   "category": "armor",
+   "file": "armor/armor_shaman_48.png",
+   "resource": "Icons/armor/armor_shaman_48"
+  },
+  {
+   "key": "armor_shaman_54",
+   "sourceKey": "armor_shaman_54",
+   "category": "armor",
+   "file": "armor/armor_shaman_54.png",
+   "resource": "Icons/armor/armor_shaman_54"
+  },
+  {
+   "key": "armor_shaman_61",
+   "sourceKey": "armor_shaman_61",
+   "category": "armor",
+   "file": "armor/armor_shaman_61.png",
+   "resource": "Icons/armor/armor_shaman_61"
+  },
+  {
+   "key": "armor_shaman_66",
+   "sourceKey": "armor_shaman_66",
+   "category": "armor",
+   "file": "armor/armor_shaman_66.png",
+   "resource": "Icons/armor/armor_shaman_66"
+  },
+  {
+   "key": "armor_shaman_80",
+   "sourceKey": "armor_shaman_80",
+   "category": "armor",
+   "file": "armor/armor_shaman_80.png",
+   "resource": "Icons/armor/armor_shaman_80"
+  },
+  {
+   "key": "armor_shaman_9",
+   "sourceKey": "armor_shaman_9",
+   "category": "armor",
+   "file": "armor/armor_shaman_9.png",
+   "resource": "Icons/armor/armor_shaman_9"
+  },
+  {
+   "key": "armor_sura_1",
+   "sourceKey": "armor_sura_1",
+   "category": "armor",
+   "file": "armor/armor_sura_1.png",
+   "resource": "Icons/armor/armor_sura_1"
+  },
+  {
+   "key": "armor_sura_18",
+   "sourceKey": "armor_sura_18",
+   "category": "armor",
+   "file": "armor/armor_sura_18.png",
+   "resource": "Icons/armor/armor_sura_18"
+  },
+  {
+   "key": "armor_sura_26",
+   "sourceKey": "armor_sura_26",
+   "category": "armor",
+   "file": "armor/armor_sura_26.png",
+   "resource": "Icons/armor/armor_sura_26"
+  },
+  {
+   "key": "armor_sura_34",
+   "sourceKey": "armor_sura_34",
+   "category": "armor",
+   "file": "armor/armor_sura_34.png",
+   "resource": "Icons/armor/armor_sura_34"
+  },
+  {
+   "key": "armor_sura_42",
+   "sourceKey": "armor_sura_42",
+   "category": "armor",
+   "file": "armor/armor_sura_42.png",
+   "resource": "Icons/armor/armor_sura_42"
+  },
+  {
+   "key": "armor_sura_48",
+   "sourceKey": "armor_sura_48",
+   "category": "armor",
+   "file": "armor/armor_sura_48.png",
+   "resource": "Icons/armor/armor_sura_48"
+  },
+  {
+   "key": "armor_sura_54",
+   "sourceKey": "armor_sura_54",
+   "category": "armor",
+   "file": "armor/armor_sura_54.png",
+   "resource": "Icons/armor/armor_sura_54"
+  },
+  {
+   "key": "armor_sura_61",
+   "sourceKey": "armor_sura_61",
+   "category": "armor",
+   "file": "armor/armor_sura_61.png",
+   "resource": "Icons/armor/armor_sura_61"
+  },
+  {
+   "key": "armor_sura_66",
+   "sourceKey": "armor_sura_66",
+   "category": "armor",
+   "file": "armor/armor_sura_66.png",
+   "resource": "Icons/armor/armor_sura_66"
+  },
+  {
+   "key": "armor_sura_80",
+   "sourceKey": "armor_sura_80",
+   "category": "armor",
+   "file": "armor/armor_sura_80.png",
+   "resource": "Icons/armor/armor_sura_80"
+  },
+  {
+   "key": "armor_sura_9",
+   "sourceKey": "armor_sura_9",
+   "category": "armor",
+   "file": "armor/armor_sura_9.png",
+   "resource": "Icons/armor/armor_sura_9"
+  },
+  {
+   "key": "armor_warrior_34",
+   "sourceKey": "armor_warrior_34",
+   "category": "armor",
+   "file": "armor/armor_warrior_34.png",
+   "resource": "Icons/armor/armor_warrior_34"
+  },
+  {
+   "key": "armor_warrior_42",
+   "sourceKey": "armor_warrior_42",
+   "category": "armor",
+   "file": "armor/armor_warrior_42.png",
+   "resource": "Icons/armor/armor_warrior_42"
+  },
+  {
+   "key": "armor_warrior_48",
+   "sourceKey": "armor_warrior_48",
+   "category": "armor",
+   "file": "armor/armor_warrior_48.png",
+   "resource": "Icons/armor/armor_warrior_48"
+  },
+  {
+   "key": "armor_warrior_54",
+   "sourceKey": "armor_warrior_54",
+   "category": "armor",
+   "file": "armor/armor_warrior_54.png",
+   "resource": "Icons/armor/armor_warrior_54"
+  },
+  {
+   "key": "armor_warrior_61",
+   "sourceKey": "armor_warrior_61",
+   "category": "armor",
+   "file": "armor/armor_warrior_61.png",
+   "resource": "Icons/armor/armor_warrior_61"
+  },
+  {
+   "key": "armor_warrior_66",
+   "sourceKey": "armor_warrior_66",
+   "category": "armor",
+   "file": "armor/armor_warrior_66.png",
+   "resource": "Icons/armor/armor_warrior_66"
+  },
+  {
+   "key": "armor_warrior_80",
+   "sourceKey": "armor_warrior_80",
+   "category": "armor",
+   "file": "armor/armor_warrior_80.png",
+   "resource": "Icons/armor/armor_warrior_80"
+  },
+  {
+   "key": "gold_bar_1m",
+   "sourceKey": "gold_bar_1m",
+   "category": "bar",
+   "file": "bar/gold_bar_1m.png",
+   "resource": "Icons/bar/gold_bar_1m"
+  },
+  {
+   "key": "gold_bar_2m",
+   "sourceKey": "gold_bar_2m",
+   "category": "bar",
+   "file": "bar/gold_bar_2m.png",
+   "resource": "Icons/bar/gold_bar_2m"
+  },
+  {
+   "key": "gold_bar_500k",
+   "sourceKey": "gold_bar_500k",
+   "category": "bar",
+   "file": "bar/gold_bar_500k.png",
+   "resource": "Icons/bar/gold_bar_500k"
+  },
+  {
+   "key": "silver_bar_100k",
+   "sourceKey": "silver_bar_100k",
+   "category": "bar",
+   "file": "bar/silver_bar_100k.png",
+   "resource": "Icons/bar/silver_bar_100k"
+  },
+  {
+   "key": "silver_bar_50k",
+   "sourceKey": "silver_bar_50k",
+   "category": "bar",
+   "file": "bar/silver_bar_50k.png",
+   "resource": "Icons/bar/silver_bar_50k"
+  },
+  {
+   "key": "belt_15",
+   "sourceKey": "belt_15",
+   "category": "belt",
+   "file": "belt/belt_15.png",
+   "resource": "Icons/belt/belt_15"
+  },
+  {
+   "key": "belt_5",
+   "sourceKey": "belt_5",
+   "category": "belt",
+   "file": "belt/belt_5.png",
+   "resource": "Icons/belt/belt_5"
+  },
+  {
+   "key": "bind_scroll",
+   "sourceKey": "bind_scroll",
+   "category": "bind",
+   "file": "bind/bind_scroll.png",
+   "resource": "Icons/bind/bind_scroll"
+  },
+  {
+   "key": "unbind_scroll",
+   "sourceKey": "unbind_scroll",
+   "category": "bind",
+   "file": "bind/unbind_scroll.png",
+   "resource": "Icons/bind/unbind_scroll"
+  },
+  {
+   "key": "bonus_add",
+   "sourceKey": "bonus_add",
+   "category": "bonus",
+   "file": "bonus/bonus_add.png",
+   "resource": "Icons/bonus/bonus_add"
+  },
+  {
+   "key": "bonus_switch",
+   "sourceKey": "bonus_switch",
+   "category": "bonus",
+   "file": "bonus/bonus_switch.png",
+   "resource": "Icons/bonus/bonus_switch"
+  },
+  {
+   "key": "book_ambush",
+   "sourceKey": "book:ambush",
+   "category": "book",
+   "file": "book/book_ambush.png",
+   "resource": "Icons/book/book_ambush"
+  },
+  {
+   "key": "book_arrow_shower",
+   "sourceKey": "book:arrow_shower",
+   "category": "book",
+   "file": "book/book_arrow_shower.png",
+   "resource": "Icons/book/book_arrow_shower"
+  },
+  {
+   "key": "book_attack_up",
+   "sourceKey": "book:attack_up",
+   "category": "book",
+   "file": "book/book_attack_up.png",
+   "resource": "Icons/book/book_attack_up"
+  },
+  {
+   "key": "book_aura_sword",
+   "sourceKey": "book:aura_sword",
+   "category": "book",
+   "file": "book/book_aura_sword.png",
+   "resource": "Icons/book/book_aura_sword"
+  },
+  {
+   "key": "book_bash",
+   "sourceKey": "book:bash",
+   "category": "book",
+   "file": "book/book_bash.png",
+   "resource": "Icons/book/book_bash"
+  },
+  {
+   "key": "book_berserk",
+   "sourceKey": "book:berserk",
+   "category": "book",
+   "file": "book/book_berserk.png",
+   "resource": "Icons/book/book_berserk"
+  },
+  {
+   "key": "book_blessing",
+   "sourceKey": "book:blessing",
+   "category": "book",
+   "file": "book/book_blessing.png",
+   "resource": "Icons/book/book_blessing"
+  },
+  {
+   "key": "book_camouflage",
+   "sourceKey": "book:camouflage",
+   "category": "book",
+   "file": "book/book_camouflage.png",
+   "resource": "Icons/book/book_camouflage"
+  },
+  {
+   "key": "book_cure",
+   "sourceKey": "book:cure",
+   "category": "book",
+   "file": "book/book_cure.png",
+   "resource": "Icons/book/book_cure"
+  },
+  {
+   "key": "book_dagger_spin",
+   "sourceKey": "book:dagger_spin",
+   "category": "book",
+   "file": "book/book_dagger_spin.png",
+   "resource": "Icons/book/book_dagger_spin"
+  },
+  {
+   "key": "book_dark_orb",
+   "sourceKey": "book:dark_orb",
+   "category": "book",
+   "file": "book/book_dark_orb.png",
+   "resource": "Icons/book/book_dark_orb"
+  },
+  {
+   "key": "book_dark_protection",
+   "sourceKey": "book:dark_protection",
+   "category": "book",
+   "file": "book/book_dark_protection.png",
+   "resource": "Icons/book/book_dark_protection"
+  },
+  {
+   "key": "book_dark_stone",
+   "sourceKey": "book:dark_stone",
+   "category": "book",
+   "file": "book/book_dark_stone.png",
+   "resource": "Icons/book/book_dark_stone"
+  },
+  {
+   "key": "book_dark_strike",
+   "sourceKey": "book:dark_strike",
+   "category": "book",
+   "file": "book/book_dark_strike.png",
+   "resource": "Icons/book/book_dark_strike"
+  },
+  {
+   "key": "book_dash",
+   "sourceKey": "book:dash",
+   "category": "book",
+   "file": "book/book_dash.png",
+   "resource": "Icons/book/book_dash"
+  },
+  {
+   "key": "book_dispel",
+   "sourceKey": "book:dispel",
+   "category": "book",
+   "file": "book/book_dispel.png",
+   "resource": "Icons/book/book_dispel"
+  },
+  {
+   "key": "book_dragon_roar",
+   "sourceKey": "book:dragon_roar",
+   "category": "book",
+   "file": "book/book_dragon_roar.png",
+   "resource": "Icons/book/book_dragon_roar"
+  },
+  {
+   "key": "book_dragon_shooter",
+   "sourceKey": "book:dragon_shooter",
+   "category": "book",
+   "file": "book/book_dragon_shooter.png",
+   "resource": "Icons/book/book_dragon_shooter"
+  },
+  {
+   "key": "book_dragon_swirl",
+   "sourceKey": "book:dragon_swirl",
+   "category": "book",
+   "file": "book/book_dragon_swirl.png",
+   "resource": "Icons/book/book_dragon_swirl"
+  },
+  {
+   "key": "book_dragons_aid",
+   "sourceKey": "book:dragons_aid",
+   "category": "book",
+   "file": "book/book_dragons_aid.png",
+   "resource": "Icons/book/book_dragons_aid"
+  },
+  {
+   "key": "book_enchanted_armor",
+   "sourceKey": "book:enchanted_armor",
+   "category": "book",
+   "file": "book/book_enchanted_armor.png",
+   "resource": "Icons/book/book_enchanted_armor"
+  },
+  {
+   "key": "book_enchanted_blade",
+   "sourceKey": "book:enchanted_blade",
+   "category": "book",
+   "file": "book/book_enchanted_blade.png",
+   "resource": "Icons/book/book_enchanted_blade"
+  },
+  {
+   "key": "book_fast_attack",
+   "sourceKey": "book:fast_attack",
+   "category": "book",
+   "file": "book/book_fast_attack.png",
+   "resource": "Icons/book/book_fast_attack"
+  },
+  {
+   "key": "book_fear",
+   "sourceKey": "book:fear",
+   "category": "book",
+   "file": "book/book_fear.png",
+   "resource": "Icons/book/book_fear"
+  },
+  {
+   "key": "book_feather_walk",
+   "sourceKey": "book:feather_walk",
+   "category": "book",
+   "file": "book/book_feather_walk.png",
+   "resource": "Icons/book/book_feather_walk"
+  },
+  {
+   "key": "book_finger_strike",
+   "sourceKey": "book:finger_strike",
+   "category": "book",
+   "file": "book/book_finger_strike.png",
+   "resource": "Icons/book/book_finger_strike"
+  },
+  {
+   "key": "book_fire_arrow",
+   "sourceKey": "book:fire_arrow",
+   "category": "book",
+   "file": "book/book_fire_arrow.png",
+   "resource": "Icons/book/book_fire_arrow"
+  },
+  {
+   "key": "book_flame_spirit",
+   "sourceKey": "book:flame_spirit",
+   "category": "book",
+   "file": "book/book_flame_spirit.png",
+   "resource": "Icons/book/book_flame_spirit"
+  },
+  {
+   "key": "book_flame_strike",
+   "sourceKey": "book:flame_strike",
+   "category": "book",
+   "file": "book/book_flame_strike.png",
+   "resource": "Icons/book/book_flame_strike"
+  },
+  {
+   "key": "book_flying_talisman",
+   "sourceKey": "book:flying_talisman",
+   "category": "book",
+   "file": "book/book_flying_talisman.png",
+   "resource": "Icons/book/book_flying_talisman"
+  },
+  {
+   "key": "book_insidious_poison",
+   "sourceKey": "book:insidious_poison",
+   "category": "book",
+   "file": "book/book_insidious_poison.png",
+   "resource": "Icons/book/book_insidious_poison"
+  },
+  {
+   "key": "book_life_force",
+   "sourceKey": "book:life_force",
+   "category": "book",
+   "file": "book/book_life_force.png",
+   "resource": "Icons/book/book_life_force"
+  },
+  {
+   "key": "book_lightning_claw",
+   "sourceKey": "book:lightning_claw",
+   "category": "book",
+   "file": "book/book_lightning_claw.png",
+   "resource": "Icons/book/book_lightning_claw"
+  },
+  {
+   "key": "book_lightning_throw",
+   "sourceKey": "book:lightning_throw",
+   "category": "book",
+   "file": "book/book_lightning_throw.png",
+   "resource": "Icons/book/book_lightning_throw"
+  },
+  {
+   "key": "book_poison_arrow",
+   "sourceKey": "book:poison_arrow",
+   "category": "book",
+   "file": "book/book_poison_arrow.png",
+   "resource": "Icons/book/book_poison_arrow"
+  },
+  {
+   "key": "book_poison_cloud",
+   "sourceKey": "book:poison_cloud",
+   "category": "book",
+   "file": "book/book_poison_cloud.png",
+   "resource": "Icons/book/book_poison_cloud"
+  },
+  {
+   "key": "book_reflect",
+   "sourceKey": "book:reflect",
+   "category": "book",
+   "file": "book/book_reflect.png",
+   "resource": "Icons/book/book_reflect"
+  },
+  {
+   "key": "book_repetition_shot",
+   "sourceKey": "book:repetition_shot",
+   "category": "book",
+   "file": "book/book_repetition_shot.png",
+   "resource": "Icons/book/book_repetition_shot"
+  },
+  {
+   "key": "book_spark",
+   "sourceKey": "book:spark",
+   "category": "book",
+   "file": "book/book_spark.png",
+   "resource": "Icons/book/book_spark"
+  },
+  {
+   "key": "book_spirit_strike",
+   "sourceKey": "book:spirit_strike",
+   "category": "book",
+   "file": "book/book_spirit_strike.png",
+   "resource": "Icons/book/book_spirit_strike"
+  },
+  {
+   "key": "book_stomp",
+   "sourceKey": "book:stomp",
+   "category": "book",
+   "file": "book/book_stomp.png",
+   "resource": "Icons/book/book_stomp"
+  },
+  {
+   "key": "book_strong_body",
+   "sourceKey": "book:strong_body",
+   "category": "book",
+   "file": "book/book_strong_body.png",
+   "resource": "Icons/book/book_strong_body"
+  },
+  {
+   "key": "book_summon_lightning",
+   "sourceKey": "book:summon_lightning",
+   "category": "book",
+   "file": "book/book_summon_lightning.png",
+   "resource": "Icons/book/book_summon_lightning"
+  },
+  {
+   "key": "book_swiftness",
+   "sourceKey": "book:swiftness",
+   "category": "book",
+   "file": "book/book_swiftness.png",
+   "resource": "Icons/book/book_swiftness"
+  },
+  {
+   "key": "book_sword_orb",
+   "sourceKey": "book:sword_orb",
+   "category": "book",
+   "file": "book/book_sword_orb.png",
+   "resource": "Icons/book/book_sword_orb"
+  },
+  {
+   "key": "book_sword_spin",
+   "sourceKey": "book:sword_spin",
+   "category": "book",
+   "file": "book/book_sword_spin.png",
+   "resource": "Icons/book/book_sword_spin"
+  },
+  {
+   "key": "book_sword_strike",
+   "sourceKey": "book:sword_strike",
+   "category": "book",
+   "file": "book/book_sword_strike.png",
+   "resource": "Icons/book/book_sword_strike"
+  },
+  {
+   "key": "book_three_way",
+   "sourceKey": "book:three_way",
+   "category": "book",
+   "file": "book/book_three_way.png",
+   "resource": "Icons/book/book_three_way"
+  },
+  {
+   "key": "bracelet_1",
+   "sourceKey": "bracelet_1",
+   "category": "bracelet",
+   "file": "bracelet/bracelet_1.png",
+   "resource": "Icons/bracelet/bracelet_1"
+  },
+  {
+   "key": "bracelet_10",
+   "sourceKey": "bracelet_10",
+   "category": "bracelet",
+   "file": "bracelet/bracelet_10.png",
+   "resource": "Icons/bracelet/bracelet_10"
+  },
+  {
+   "key": "bracelet_20",
+   "sourceKey": "bracelet_20",
+   "category": "bracelet",
+   "file": "bracelet/bracelet_20.png",
+   "resource": "Icons/bracelet/bracelet_20"
+  },
+  {
+   "key": "bracelet_22",
+   "sourceKey": "bracelet_22",
+   "category": "bracelet",
+   "file": "bracelet/bracelet_22.png",
+   "resource": "Icons/bracelet/bracelet_22"
+  },
+  {
+   "key": "bracelet_28",
+   "sourceKey": "bracelet_28",
+   "category": "bracelet",
+   "file": "bracelet/bracelet_28.png",
+   "resource": "Icons/bracelet/bracelet_28"
+  },
+  {
+   "key": "bracelet_33",
+   "sourceKey": "bracelet_33",
+   "category": "bracelet",
+   "file": "bracelet/bracelet_33.png",
+   "resource": "Icons/bracelet/bracelet_33"
+  },
+  {
+   "key": "bracelet_38",
+   "sourceKey": "bracelet_38",
+   "category": "bracelet",
+   "file": "bracelet/bracelet_38.png",
+   "resource": "Icons/bracelet/bracelet_38"
+  },
+  {
+   "key": "bracelet_42",
+   "sourceKey": "bracelet_42",
+   "category": "bracelet",
+   "file": "bracelet/bracelet_42.png",
+   "resource": "Icons/bracelet/bracelet_42"
+  },
+  {
+   "key": "bracelet_46",
+   "sourceKey": "bracelet_46",
+   "category": "bracelet",
+   "file": "bracelet/bracelet_46.png",
+   "resource": "Icons/bracelet/bracelet_46"
+  },
+  {
+   "key": "bracelet_50",
+   "sourceKey": "bracelet_50",
+   "category": "bracelet",
+   "file": "bracelet/bracelet_50.png",
+   "resource": "Icons/bracelet/bracelet_50"
+  },
+  {
+   "key": "bracelet_54",
+   "sourceKey": "bracelet_54",
+   "category": "bracelet",
+   "file": "bracelet/bracelet_54.png",
+   "resource": "Icons/bracelet/bracelet_54"
+  },
+  {
+   "key": "bracelet_58",
+   "sourceKey": "bracelet_58",
+   "category": "bracelet",
+   "file": "bracelet/bracelet_58.png",
+   "resource": "Icons/bracelet/bracelet_58"
+  },
+  {
+   "key": "bundle",
+   "sourceKey": "bundle",
+   "category": "bundle",
+   "file": "bundle/bundle.png",
+   "resource": "Icons/bundle/bundle"
+  },
+  {
+   "key": "azrael_chest",
+   "sourceKey": "azrael_chest",
+   "category": "chest",
+   "file": "chest/azrael_chest.png",
+   "resource": "Icons/chest/azrael_chest"
+  },
+  {
+   "key": "bio_chest_blue",
+   "sourceKey": "bio_chest_blue",
+   "category": "chest",
+   "file": "chest/bio_chest_blue.png",
+   "resource": "Icons/chest/bio_chest_blue"
+  },
+  {
+   "key": "bio_chest_green",
+   "sourceKey": "bio_chest_green",
+   "category": "chest",
+   "file": "chest/bio_chest_green.png",
+   "resource": "Icons/chest/bio_chest_green"
+  },
+  {
+   "key": "bio_chest_lightgreen",
+   "sourceKey": "bio_chest_lightgreen",
+   "category": "chest",
+   "file": "chest/bio_chest_lightgreen.png",
+   "resource": "Icons/chest/bio_chest_lightgreen"
+  },
+  {
+   "key": "bio_chest_luxury",
+   "sourceKey": "bio_chest_luxury",
+   "category": "chest",
+   "file": "chest/bio_chest_luxury.png",
+   "resource": "Icons/chest/bio_chest_luxury"
+  },
+  {
+   "key": "bio_chest_purple",
+   "sourceKey": "bio_chest_purple",
+   "category": "chest",
+   "file": "chest/bio_chest_purple.png",
+   "resource": "Icons/chest/bio_chest_purple"
+  },
+  {
+   "key": "bio_chest_red",
+   "sourceKey": "bio_chest_red",
+   "category": "chest",
+   "file": "chest/bio_chest_red.png",
+   "resource": "Icons/chest/bio_chest_red"
+  },
+  {
+   "key": "bio_chest_yellow",
+   "sourceKey": "bio_chest_yellow",
+   "category": "chest",
+   "file": "chest/bio_chest_yellow.png",
+   "resource": "Icons/chest/bio_chest_yellow"
+  },
+  {
+   "key": "dark_leader_chest",
+   "sourceKey": "dark_leader_chest",
+   "category": "chest",
+   "file": "chest/dark_leader_chest.png",
+   "resource": "Icons/chest/dark_leader_chest"
+  },
+  {
+   "key": "demon_king_chest",
+   "sourceKey": "demon_king_chest",
+   "category": "chest",
+   "file": "chest/demon_king_chest.png",
+   "resource": "Icons/chest/demon_king_chest"
+  },
+  {
+   "key": "dt_old_chest",
+   "sourceKey": "dt_old_chest",
+   "category": "chest",
+   "file": "chest/dt_old_chest.png",
+   "resource": "Icons/chest/dt_old_chest"
+  },
+  {
+   "key": "flame_king_chest",
+   "sourceKey": "flame_king_chest",
+   "category": "chest",
+   "file": "chest/flame_king_chest.png",
+   "resource": "Icons/chest/flame_king_chest"
+  },
+  {
+   "key": "giant_desert_tortoise_chest",
+   "sourceKey": "giant_desert_tortoise_chest",
+   "category": "chest",
+   "file": "chest/giant_desert_tortoise_chest.png",
+   "resource": "Icons/chest/giant_desert_tortoise_chest"
+  },
+  {
+   "key": "iron_box",
+   "sourceKey": "iron_box",
+   "category": "chest",
+   "file": "chest/iron_box.png",
+   "resource": "Icons/chest/iron_box"
+  },
+  {
+   "key": "iron_cassette",
+   "sourceKey": "iron_cassette",
+   "category": "chest",
+   "file": "chest/iron_cassette.png",
+   "resource": "Icons/chest/iron_cassette"
+  },
+  {
+   "key": "iron_chest",
+   "sourceKey": "iron_chest",
+   "category": "chest",
+   "file": "chest/iron_chest.png",
+   "resource": "Icons/chest/iron_chest"
+  },
+  {
+   "key": "nine_tails_chest",
+   "sourceKey": "nine_tails_chest",
+   "category": "chest",
+   "file": "chest/nine_tails_chest.png",
+   "resource": "Icons/chest/nine_tails_chest"
+  },
+  {
+   "key": "orc_chief_chest",
+   "sourceKey": "orc_chief_chest",
+   "category": "chest",
+   "file": "chest/orc_chief_chest.png",
+   "resource": "Icons/chest/orc_chief_chest"
+  },
+  {
+   "key": "queen_spider_chest",
+   "sourceKey": "queen_spider_chest",
+   "category": "chest",
+   "file": "chest/queen_spider_chest.png",
+   "resource": "Icons/chest/queen_spider_chest"
+  },
+  {
+   "key": "reaper_chest",
+   "sourceKey": "reaper_chest",
+   "category": "chest",
+   "file": "chest/reaper_chest.png",
+   "resource": "Icons/chest/reaper_chest"
+  },
+  {
+   "key": "rotten_wood_box",
+   "sourceKey": "rotten_wood_box",
+   "category": "chest",
+   "file": "chest/rotten_wood_box.png",
+   "resource": "Icons/chest/rotten_wood_box"
+  },
+  {
+   "key": "yellow_tiger_chest",
+   "sourceKey": "yellow_tiger_chest",
+   "category": "chest",
+   "file": "chest/yellow_tiger_chest.png",
+   "resource": "Icons/chest/yellow_tiger_chest"
+  },
+  {
+   "key": "costume_avalon_red",
+   "sourceKey": "costume_avalon_red",
+   "category": "costume",
+   "file": "costume/costume_avalon_red.png",
+   "resource": "Icons/costume/costume_avalon_red"
+  },
+  {
+   "key": "costume_avalon_red_plus",
+   "sourceKey": "costume_avalon_red_plus",
+   "category": "costume",
+   "file": "costume/costume_avalon_red_plus.png",
+   "resource": "Icons/costume/costume_avalon_red_plus"
+  },
+  {
+   "key": "costume_avalon_silver",
+   "sourceKey": "costume_avalon_silver",
+   "category": "costume",
+   "file": "costume/costume_avalon_silver.png",
+   "resource": "Icons/costume/costume_avalon_silver"
+  },
+  {
+   "key": "costume_avalon_silver_plus",
+   "sourceKey": "costume_avalon_silver_plus",
+   "category": "costume",
+   "file": "costume/costume_avalon_silver_plus.png",
+   "resource": "Icons/costume/costume_avalon_silver_plus"
+  },
+  {
+   "key": "costume_pharao_red",
+   "sourceKey": "costume_pharao_red",
+   "category": "costume",
+   "file": "costume/costume_pharao_red.png",
+   "resource": "Icons/costume/costume_pharao_red"
+  },
+  {
+   "key": "costume_pharao_red_plus",
+   "sourceKey": "costume_pharao_red_plus",
+   "category": "costume",
+   "file": "costume/costume_pharao_red_plus.png",
+   "resource": "Icons/costume/costume_pharao_red_plus"
+  },
+  {
+   "key": "costume_pharao_teal",
+   "sourceKey": "costume_pharao_teal",
+   "category": "costume",
+   "file": "costume/costume_pharao_teal.png",
+   "resource": "Icons/costume/costume_pharao_teal"
+  },
+  {
+   "key": "costume_pharao_teal_plus",
+   "sourceKey": "costume_pharao_teal_plus",
+   "category": "costume",
+   "file": "costume/costume_pharao_teal_plus.png",
+   "resource": "Icons/costume/costume_pharao_teal_plus"
+  },
+  {
+   "key": "costume_qipao_red",
+   "sourceKey": "costume_qipao_red",
+   "category": "costume",
+   "file": "costume/costume_qipao_red.png",
+   "resource": "Icons/costume/costume_qipao_red"
+  },
+  {
+   "key": "costume_qipao_red_plus",
+   "sourceKey": "costume_qipao_red_plus",
+   "category": "costume",
+   "file": "costume/costume_qipao_red_plus.png",
+   "resource": "Icons/costume/costume_qipao_red_plus"
+  },
+  {
+   "key": "costume_samurai_blue",
+   "sourceKey": "costume_samurai_blue",
+   "category": "costume",
+   "file": "costume/costume_samurai_blue.png",
+   "resource": "Icons/costume/costume_samurai_blue"
+  },
+  {
+   "key": "costume_samurai_blue_plus",
+   "sourceKey": "costume_samurai_blue_plus",
+   "category": "costume",
+   "file": "costume/costume_samurai_blue_plus.png",
+   "resource": "Icons/costume/costume_samurai_blue_plus"
+  },
+  {
+   "key": "costume_samurai_red",
+   "sourceKey": "costume_samurai_red",
+   "category": "costume",
+   "file": "costume/costume_samurai_red.png",
+   "resource": "Icons/costume/costume_samurai_red"
+  },
+  {
+   "key": "costume_samurai_red_plus",
+   "sourceKey": "costume_samurai_red_plus",
+   "category": "costume",
+   "file": "costume/costume_samurai_red_plus.png",
+   "resource": "Icons/costume/costume_samurai_red_plus"
+  },
+  {
+   "key": "costume_soutane_phoenix",
+   "sourceKey": "costume_soutane_phoenix",
+   "category": "costume",
+   "file": "costume/costume_soutane_phoenix.png",
+   "resource": "Icons/costume/costume_soutane_phoenix"
+  },
+  {
+   "key": "costume_soutane_phoenix_plus",
+   "sourceKey": "costume_soutane_phoenix_plus",
+   "category": "costume",
+   "file": "costume/costume_soutane_phoenix_plus.png",
+   "resource": "Icons/costume/costume_soutane_phoenix_plus"
+  },
+  {
+   "key": "costume_enchant",
+   "sourceKey": "costume_enchant",
+   "category": "ctool",
+   "file": "ctool/costume_enchant.png",
+   "resource": "Icons/ctool/costume_enchant"
+  },
+  {
+   "key": "costume_transform",
+   "sourceKey": "costume_transform",
+   "category": "ctool",
+   "file": "ctool/costume_transform.png",
+   "resource": "Icons/ctool/costume_transform"
+  },
+  {
+   "key": "goddess_tear",
+   "sourceKey": "goddess_tear",
+   "category": "death",
+   "file": "death/goddess_tear.png",
+   "resource": "Icons/death/goddess_tear"
+  },
+  {
+   "key": "medal_dragon",
+   "sourceKey": "medal_dragon",
+   "category": "death",
+   "file": "death/medal_dragon.png",
+   "resource": "Icons/death/medal_dragon"
+  },
+  {
+   "key": "medal_dragon_plus",
+   "sourceKey": "medal_dragon_plus",
+   "category": "death",
+   "file": "death/medal_dragon_plus.png",
+   "resource": "Icons/death/medal_dragon_plus"
+  },
+  {
+   "key": "earrings_1",
+   "sourceKey": "earrings_1",
+   "category": "earrings",
+   "file": "earrings/earrings_1.png",
+   "resource": "Icons/earrings/earrings_1"
+  },
+  {
+   "key": "earrings_10",
+   "sourceKey": "earrings_10",
+   "category": "earrings",
+   "file": "earrings/earrings_10.png",
+   "resource": "Icons/earrings/earrings_10"
+  },
+  {
+   "key": "earrings_20",
+   "sourceKey": "earrings_20",
+   "category": "earrings",
+   "file": "earrings/earrings_20.png",
+   "resource": "Icons/earrings/earrings_20"
+  },
+  {
+   "key": "earrings_22",
+   "sourceKey": "earrings_22",
+   "category": "earrings",
+   "file": "earrings/earrings_22.png",
+   "resource": "Icons/earrings/earrings_22"
+  },
+  {
+   "key": "earrings_28",
+   "sourceKey": "earrings_28",
+   "category": "earrings",
+   "file": "earrings/earrings_28.png",
+   "resource": "Icons/earrings/earrings_28"
+  },
+  {
+   "key": "earrings_33",
+   "sourceKey": "earrings_33",
+   "category": "earrings",
+   "file": "earrings/earrings_33.png",
+   "resource": "Icons/earrings/earrings_33"
+  },
+  {
+   "key": "earrings_38",
+   "sourceKey": "earrings_38",
+   "category": "earrings",
+   "file": "earrings/earrings_38.png",
+   "resource": "Icons/earrings/earrings_38"
+  },
+  {
+   "key": "earrings_42",
+   "sourceKey": "earrings_42",
+   "category": "earrings",
+   "file": "earrings/earrings_42.png",
+   "resource": "Icons/earrings/earrings_42"
+  },
+  {
+   "key": "earrings_46",
+   "sourceKey": "earrings_46",
+   "category": "earrings",
+   "file": "earrings/earrings_46.png",
+   "resource": "Icons/earrings/earrings_46"
+  },
+  {
+   "key": "earrings_50",
+   "sourceKey": "earrings_50",
+   "category": "earrings",
+   "file": "earrings/earrings_50.png",
+   "resource": "Icons/earrings/earrings_50"
+  },
+  {
+   "key": "earrings_54",
+   "sourceKey": "earrings_54",
+   "category": "earrings",
+   "file": "earrings/earrings_54.png",
+   "resource": "Icons/earrings/earrings_54"
+  },
+  {
+   "key": "earrings_62",
+   "sourceKey": "earrings_62",
+   "category": "earrings",
+   "file": "earrings/earrings_62.png",
+   "resource": "Icons/earrings/earrings_62"
+  },
+  {
+   "key": "bio_elixir",
+   "sourceKey": "bio_elixir",
+   "category": "elixir",
+   "file": "elixir/bio_elixir.png",
+   "resource": "Icons/elixir/bio_elixir"
+  },
+  {
+   "key": "hairdo_avalon_helm_red",
+   "sourceKey": "hairdo_avalon_helm_red",
+   "category": "hairdo",
+   "file": "hairdo/hairdo_avalon_helm_red.png",
+   "resource": "Icons/hairdo/hairdo_avalon_helm_red"
+  },
+  {
+   "key": "hairdo_avalon_helm_red_plus",
+   "sourceKey": "hairdo_avalon_helm_red_plus",
+   "category": "hairdo",
+   "file": "hairdo/hairdo_avalon_helm_red_plus.png",
+   "resource": "Icons/hairdo/hairdo_avalon_helm_red_plus"
+  },
+  {
+   "key": "hairdo_avalon_helm_silver",
+   "sourceKey": "hairdo_avalon_helm_silver",
+   "category": "hairdo",
+   "file": "hairdo/hairdo_avalon_helm_silver.png",
+   "resource": "Icons/hairdo/hairdo_avalon_helm_silver"
+  },
+  {
+   "key": "hairdo_avalon_helm_silver_plus",
+   "sourceKey": "hairdo_avalon_helm_silver_plus",
+   "category": "hairdo",
+   "file": "hairdo/hairdo_avalon_helm_silver_plus.png",
+   "resource": "Icons/hairdo/hairdo_avalon_helm_silver_plus"
+  },
+  {
+   "key": "hairdo_dragon_bun",
+   "sourceKey": "hairdo_dragon_bun",
+   "category": "hairdo",
+   "file": "hairdo/hairdo_dragon_bun.png",
+   "resource": "Icons/hairdo/hairdo_dragon_bun"
+  },
+  {
+   "key": "hairdo_dragon_bun_plus",
+   "sourceKey": "hairdo_dragon_bun_plus",
+   "category": "hairdo",
+   "file": "hairdo/hairdo_dragon_bun_plus.png",
+   "resource": "Icons/hairdo/hairdo_dragon_bun_plus"
+  },
+  {
+   "key": "hairdo_pharao_crown_red",
+   "sourceKey": "hairdo_pharao_crown_red",
+   "category": "hairdo",
+   "file": "hairdo/hairdo_pharao_crown_red.png",
+   "resource": "Icons/hairdo/hairdo_pharao_crown_red"
+  },
+  {
+   "key": "hairdo_pharao_crown_red_plus",
+   "sourceKey": "hairdo_pharao_crown_red_plus",
+   "category": "hairdo",
+   "file": "hairdo/hairdo_pharao_crown_red_plus.png",
+   "resource": "Icons/hairdo/hairdo_pharao_crown_red_plus"
+  },
+  {
+   "key": "hairdo_pharao_crown_teal",
+   "sourceKey": "hairdo_pharao_crown_teal",
+   "category": "hairdo",
+   "file": "hairdo/hairdo_pharao_crown_teal.png",
+   "resource": "Icons/hairdo/hairdo_pharao_crown_teal"
+  },
+  {
+   "key": "hairdo_pharao_crown_teal_plus",
+   "sourceKey": "hairdo_pharao_crown_teal_plus",
+   "category": "hairdo",
+   "file": "hairdo/hairdo_pharao_crown_teal_plus.png",
+   "resource": "Icons/hairdo/hairdo_pharao_crown_teal_plus"
+  },
+  {
+   "key": "hairdo_samurai_knot",
+   "sourceKey": "hairdo_samurai_knot",
+   "category": "hairdo",
+   "file": "hairdo/hairdo_samurai_knot.png",
+   "resource": "Icons/hairdo/hairdo_samurai_knot"
+  },
+  {
+   "key": "hairdo_samurai_knot_plus",
+   "sourceKey": "hairdo_samurai_knot_plus",
+   "category": "hairdo",
+   "file": "hairdo/hairdo_samurai_knot_plus.png",
+   "resource": "Icons/hairdo/hairdo_samurai_knot_plus"
+  },
+  {
+   "key": "helmet_ninja_1",
+   "sourceKey": "helmet_ninja_1",
+   "category": "helmet",
+   "file": "helmet/helmet_ninja_1.png",
+   "resource": "Icons/helmet/helmet_ninja_1"
+  },
+  {
+   "key": "helmet_ninja_21",
+   "sourceKey": "helmet_ninja_21",
+   "category": "helmet",
+   "file": "helmet/helmet_ninja_21.png",
+   "resource": "Icons/helmet/helmet_ninja_21"
+  },
+  {
+   "key": "helmet_ninja_41",
+   "sourceKey": "helmet_ninja_41",
+   "category": "helmet",
+   "file": "helmet/helmet_ninja_41.png",
+   "resource": "Icons/helmet/helmet_ninja_41"
+  },
+  {
+   "key": "helmet_ninja_60",
+   "sourceKey": "helmet_ninja_60",
+   "category": "helmet",
+   "file": "helmet/helmet_ninja_60.png",
+   "resource": "Icons/helmet/helmet_ninja_60"
+  },
+  {
+   "key": "helmet_ninja_80",
+   "sourceKey": "helmet_ninja_80",
+   "category": "helmet",
+   "file": "helmet/helmet_ninja_80.png",
+   "resource": "Icons/helmet/helmet_ninja_80"
+  },
+  {
+   "key": "helmet_shaman_1",
+   "sourceKey": "helmet_shaman_1",
+   "category": "helmet",
+   "file": "helmet/helmet_shaman_1.png",
+   "resource": "Icons/helmet/helmet_shaman_1"
+  },
+  {
+   "key": "helmet_shaman_21",
+   "sourceKey": "helmet_shaman_21",
+   "category": "helmet",
+   "file": "helmet/helmet_shaman_21.png",
+   "resource": "Icons/helmet/helmet_shaman_21"
+  },
+  {
+   "key": "helmet_shaman_41",
+   "sourceKey": "helmet_shaman_41",
+   "category": "helmet",
+   "file": "helmet/helmet_shaman_41.png",
+   "resource": "Icons/helmet/helmet_shaman_41"
+  },
+  {
+   "key": "helmet_shaman_60",
+   "sourceKey": "helmet_shaman_60",
+   "category": "helmet",
+   "file": "helmet/helmet_shaman_60.png",
+   "resource": "Icons/helmet/helmet_shaman_60"
+  },
+  {
+   "key": "helmet_shaman_80",
+   "sourceKey": "helmet_shaman_80",
+   "category": "helmet",
+   "file": "helmet/helmet_shaman_80.png",
+   "resource": "Icons/helmet/helmet_shaman_80"
+  },
+  {
+   "key": "helmet_sura_1",
+   "sourceKey": "helmet_sura_1",
+   "category": "helmet",
+   "file": "helmet/helmet_sura_1.png",
+   "resource": "Icons/helmet/helmet_sura_1"
+  },
+  {
+   "key": "helmet_sura_21",
+   "sourceKey": "helmet_sura_21",
+   "category": "helmet",
+   "file": "helmet/helmet_sura_21.png",
+   "resource": "Icons/helmet/helmet_sura_21"
+  },
+  {
+   "key": "helmet_sura_41",
+   "sourceKey": "helmet_sura_41",
+   "category": "helmet",
+   "file": "helmet/helmet_sura_41.png",
+   "resource": "Icons/helmet/helmet_sura_41"
+  },
+  {
+   "key": "helmet_sura_60",
+   "sourceKey": "helmet_sura_60",
+   "category": "helmet",
+   "file": "helmet/helmet_sura_60.png",
+   "resource": "Icons/helmet/helmet_sura_60"
+  },
+  {
+   "key": "helmet_sura_80",
+   "sourceKey": "helmet_sura_80",
+   "category": "helmet",
+   "file": "helmet/helmet_sura_80.png",
+   "resource": "Icons/helmet/helmet_sura_80"
+  },
+  {
+   "key": "helmet_warrior_1",
+   "sourceKey": "helmet_warrior_1",
+   "category": "helmet",
+   "file": "helmet/helmet_warrior_1.png",
+   "resource": "Icons/helmet/helmet_warrior_1"
+  },
+  {
+   "key": "helmet_warrior_21",
+   "sourceKey": "helmet_warrior_21",
+   "category": "helmet",
+   "file": "helmet/helmet_warrior_21.png",
+   "resource": "Icons/helmet/helmet_warrior_21"
+  },
+  {
+   "key": "helmet_warrior_41",
+   "sourceKey": "helmet_warrior_41",
+   "category": "helmet",
+   "file": "helmet/helmet_warrior_41.png",
+   "resource": "Icons/helmet/helmet_warrior_41"
+  },
+  {
+   "key": "helmet_warrior_60",
+   "sourceKey": "helmet_warrior_60",
+   "category": "helmet",
+   "file": "helmet/helmet_warrior_60.png",
+   "resource": "Icons/helmet/helmet_warrior_60"
+  },
+  {
+   "key": "helmet_warrior_80",
+   "sourceKey": "helmet_warrior_80",
+   "category": "helmet",
+   "file": "helmet/helmet_warrior_80.png",
+   "resource": "Icons/helmet/helmet_warrior_80"
+  },
+  {
+   "key": "carrot",
+   "sourceKey": "carrot",
+   "category": "horse",
+   "file": "horse/carrot.png",
+   "resource": "Icons/horse/carrot"
+  },
+  {
+   "key": "hay",
+   "sourceKey": "hay",
+   "category": "horse",
+   "file": "horse/hay.png",
+   "resource": "Icons/horse/hay"
+  },
+  {
+   "key": "herb_heavy",
+   "sourceKey": "herb_heavy",
+   "category": "horse",
+   "file": "horse/herb_heavy.png",
+   "resource": "Icons/horse/herb_heavy"
+  },
+  {
+   "key": "herb_light",
+   "sourceKey": "herb_light",
+   "category": "horse",
+   "file": "horse/herb_light.png",
+   "resource": "Icons/horse/herb_light"
+  },
+  {
+   "key": "herb_normal",
+   "sourceKey": "herb_normal",
+   "category": "horse",
+   "file": "horse/herb_normal.png",
+   "resource": "Icons/horse/herb_normal"
+  },
+  {
+   "key": "horse_book_military",
+   "sourceKey": "horse_book_military",
+   "category": "horse",
+   "file": "horse/horse_book_military.png",
+   "resource": "Icons/horse/horse_book_military"
+  },
+  {
+   "key": "horse_book_weapon",
+   "sourceKey": "horse_book_weapon",
+   "category": "horse",
+   "file": "horse/horse_book_weapon.png",
+   "resource": "Icons/horse/horse_book_weapon"
+  },
+  {
+   "key": "horse_medal",
+   "sourceKey": "horse_medal",
+   "category": "horse",
+   "file": "horse/horse_medal.png",
+   "resource": "Icons/horse/horse_medal"
+  },
+  {
+   "key": "horse_picture",
+   "sourceKey": "horse_picture",
+   "category": "horse",
+   "file": "horse/horse_picture.png",
+   "resource": "Icons/horse/horse_picture"
+  },
+  {
+   "key": "red_ginseng",
+   "sourceKey": "red_ginseng",
+   "category": "horse",
+   "file": "horse/red_ginseng.png",
+   "resource": "Icons/horse/red_ginseng"
+  },
+  {
+   "key": "ride_card",
+   "sourceKey": "ride_card",
+   "category": "horse",
+   "file": "horse/ride_card.png",
+   "resource": "Icons/horse/ride_card"
+  },
+  {
+   "key": "riding_book",
+   "sourceKey": "riding_book",
+   "category": "horse",
+   "file": "horse/riding_book.png",
+   "resource": "Icons/horse/riding_book"
+  },
+  {
+   "key": "seal_boar",
+   "sourceKey": "seal_boar",
+   "category": "horse",
+   "file": "horse/seal_boar.png",
+   "resource": "Icons/horse/seal_boar"
+  },
+  {
+   "key": "seal_lion",
+   "sourceKey": "seal_lion",
+   "category": "horse",
+   "file": "horse/seal_lion.png",
+   "resource": "Icons/horse/seal_lion"
+  },
+  {
+   "key": "seal_tiger",
+   "sourceKey": "seal_tiger",
+   "category": "horse",
+   "file": "horse/seal_tiger.png",
+   "resource": "Icons/horse/seal_tiger"
+  },
+  {
+   "key": "seal_wolf",
+   "sourceKey": "seal_wolf",
+   "category": "horse",
+   "file": "horse/seal_wolf.png",
+   "resource": "Icons/horse/seal_wolf"
+  },
+  {
+   "key": "arachnid_key",
+   "sourceKey": "arachnid_key",
+   "category": "key",
+   "file": "key/arachnid_key.png",
+   "resource": "Icons/key/arachnid_key"
+  },
+  {
+   "key": "key_bongin",
+   "sourceKey": "key_bongin",
+   "category": "key",
+   "file": "key/key_bongin.png",
+   "resource": "Icons/key/key_bongin"
+  },
+  {
+   "key": "key_stone",
+   "sourceKey": "key_stone",
+   "category": "key",
+   "file": "key/key_stone.png",
+   "resource": "Icons/key/key_stone"
+  },
+  {
+   "key": "key_zin_bongin",
+   "sourceKey": "key_zin_bongin",
+   "category": "key",
+   "file": "key/key_zin_bongin.png",
+   "resource": "Icons/key/key_zin_bongin"
+  },
+  {
+   "key": "soul_crystal_key",
+   "sourceKey": "soul_crystal_key",
+   "category": "key",
+   "file": "key/soul_crystal_key.png",
+   "resource": "Icons/key/soul_crystal_key"
+  },
+  {
+   "key": "twisted_key",
+   "sourceKey": "twisted_key",
+   "category": "key",
+   "file": "key/twisted_key.png",
+   "resource": "Icons/key/twisted_key"
+  },
+  {
+   "key": "book_sunzi",
+   "sourceKey": "book_sunzi",
+   "category": "lead",
+   "file": "lead/book_sunzi.png",
+   "resource": "Icons/lead/book_sunzi"
+  },
+  {
+   "key": "book_weiliao",
+   "sourceKey": "book_weiliao",
+   "category": "lead",
+   "file": "lead/book_weiliao.png",
+   "resource": "Icons/lead/book_weiliao"
+  },
+  {
+   "key": "book_wuzi",
+   "sourceKey": "book_wuzi",
+   "category": "lead",
+   "file": "lead/book_wuzi.png",
+   "resource": "Icons/lead/book_wuzi"
+  },
+  {
+   "key": "map_sagui",
+   "sourceKey": "map_sagui",
+   "category": "map",
+   "file": "map/map_sagui.png",
+   "resource": "Icons/map/map_sagui"
+  },
+  {
+   "key": "map_zin",
+   "sourceKey": "map_zin",
+   "category": "map",
+   "file": "map/map_zin.png",
+   "resource": "Icons/map/map_zin"
+  },
+  {
+   "key": "bear_gall",
+   "sourceKey": "bear_gall",
+   "category": "material",
+   "file": "material/bear_gall.png",
+   "resource": "Icons/material/bear_gall"
+  },
+  {
+   "key": "blessing_scroll",
+   "sourceKey": "blessing_scroll",
+   "category": "material",
+   "file": "material/blessing_scroll.png",
+   "resource": "Icons/material/blessing_scroll"
+  },
+  {
+   "key": "blue_crystal",
+   "sourceKey": "blue_crystal",
+   "category": "material",
+   "file": "material/blue_crystal.png",
+   "resource": "Icons/material/blue_crystal"
+  },
+  {
+   "key": "cloth_plus",
+   "sourceKey": "cloth_plus",
+   "category": "material",
+   "file": "material/cloth_plus.png",
+   "resource": "Icons/material/cloth_plus"
+  },
+  {
+   "key": "curse_book_plus",
+   "sourceKey": "curse_book_plus",
+   "category": "material",
+   "file": "material/curse_book_plus.png",
+   "resource": "Icons/material/curse_book_plus"
+  },
+  {
+   "key": "demon_ash",
+   "sourceKey": "demon_ash",
+   "category": "material",
+   "file": "material/demon_ash.png",
+   "resource": "Icons/material/demon_ash"
+  },
+  {
+   "key": "demon_gem",
+   "sourceKey": "demon_gem",
+   "category": "material",
+   "file": "material/demon_gem.png",
+   "resource": "Icons/material/demon_gem"
+  },
+  {
+   "key": "demon_gem_plus",
+   "sourceKey": "demon_gem_plus",
+   "category": "material",
+   "file": "material/demon_gem_plus.png",
+   "resource": "Icons/material/demon_gem_plus"
+  },
+  {
+   "key": "demon_keepsake",
+   "sourceKey": "demon_keepsake",
+   "category": "material",
+   "file": "material/demon_keepsake.png",
+   "resource": "Icons/material/demon_keepsake"
+  },
+  {
+   "key": "demon_keepsake_plus",
+   "sourceKey": "demon_keepsake_plus",
+   "category": "material",
+   "file": "material/demon_keepsake_plus.png",
+   "resource": "Icons/material/demon_keepsake_plus"
+  },
+  {
+   "key": "dragon_claw",
+   "sourceKey": "dragon_claw",
+   "category": "material",
+   "file": "material/dragon_claw.png",
+   "resource": "Icons/material/dragon_claw"
+  },
+  {
+   "key": "dragon_scale",
+   "sourceKey": "dragon_scale",
+   "category": "material",
+   "file": "material/dragon_scale.png",
+   "resource": "Icons/material/dragon_scale"
+  },
+  {
+   "key": "fencing_treatise",
+   "sourceKey": "fencing_treatise",
+   "category": "material",
+   "file": "material/fencing_treatise.png",
+   "resource": "Icons/material/fencing_treatise"
+  },
+  {
+   "key": "finger_bone",
+   "sourceKey": "finger_bone",
+   "category": "material",
+   "file": "material/finger_bone.png",
+   "resource": "Icons/material/finger_bone"
+  },
+  {
+   "key": "fish_bones",
+   "sourceKey": "fish_bones",
+   "category": "material",
+   "file": "material/fish_bones.png",
+   "resource": "Icons/material/fish_bones"
+  },
+  {
+   "key": "flame_mane",
+   "sourceKey": "flame_mane",
+   "category": "material",
+   "file": "material/flame_mane.png",
+   "resource": "Icons/material/flame_mane"
+  },
+  {
+   "key": "frog_leg",
+   "sourceKey": "frog_leg",
+   "category": "material",
+   "file": "material/frog_leg.png",
+   "resource": "Icons/material/frog_leg"
+  },
+  {
+   "key": "frog_tongue",
+   "sourceKey": "frog_tongue",
+   "category": "material",
+   "file": "material/frog_tongue.png",
+   "resource": "Icons/material/frog_tongue"
+  },
+  {
+   "key": "ice_marble",
+   "sourceKey": "ice_marble",
+   "category": "material",
+   "file": "material/ice_marble.png",
+   "resource": "Icons/material/ice_marble"
+  },
+  {
+   "key": "ice_marble_plus",
+   "sourceKey": "ice_marble_plus",
+   "category": "material",
+   "file": "material/ice_marble_plus.png",
+   "resource": "Icons/material/ice_marble_plus"
+  },
+  {
+   "key": "ice_piece_plus",
+   "sourceKey": "ice_piece_plus",
+   "category": "material",
+   "file": "material/ice_piece_plus.png",
+   "resource": "Icons/material/ice_piece_plus"
+  },
+  {
+   "key": "ice_whale_horn",
+   "sourceKey": "ice_whale_horn",
+   "category": "material",
+   "file": "material/ice_whale_horn.png",
+   "resource": "Icons/material/ice_whale_horn"
+  },
+  {
+   "key": "leaf",
+   "sourceKey": "leaf",
+   "category": "material",
+   "file": "material/leaf.png",
+   "resource": "Icons/material/leaf"
+  },
+  {
+   "key": "magic_seeds",
+   "sourceKey": "magic_seeds",
+   "category": "material",
+   "file": "material/magic_seeds.png",
+   "resource": "Icons/material/magic_seeds"
+  },
+  {
+   "key": "magic_stone",
+   "sourceKey": "magic_stone",
+   "category": "material",
+   "file": "material/magic_stone.png",
+   "resource": "Icons/material/magic_stone"
+  },
+  {
+   "key": "milk_sap",
+   "sourceKey": "milk_sap",
+   "category": "material",
+   "file": "material/milk_sap.png",
+   "resource": "Icons/material/milk_sap"
+  },
+  {
+   "key": "orc_club",
+   "sourceKey": "orc_club",
+   "category": "material",
+   "file": "material/orc_club.png",
+   "resource": "Icons/material/orc_club"
+  },
+  {
+   "key": "pearl_blue",
+   "sourceKey": "pearl_blue",
+   "category": "material",
+   "file": "material/pearl_blue.png",
+   "resource": "Icons/material/pearl_blue"
+  },
+  {
+   "key": "pearl_red",
+   "sourceKey": "pearl_red",
+   "category": "material",
+   "file": "material/pearl_red.png",
+   "resource": "Icons/material/pearl_red"
+  },
+  {
+   "key": "pearl_white",
+   "sourceKey": "pearl_white",
+   "category": "material",
+   "file": "material/pearl_white.png",
+   "resource": "Icons/material/pearl_white"
+  },
+  {
+   "key": "quartz_sand",
+   "sourceKey": "quartz_sand",
+   "category": "material",
+   "file": "material/quartz_sand.png",
+   "resource": "Icons/material/quartz_sand"
+  },
+  {
+   "key": "rusty_blade",
+   "sourceKey": "rusty_blade",
+   "category": "material",
+   "file": "material/rusty_blade.png",
+   "resource": "Icons/material/rusty_blade"
+  },
+  {
+   "key": "shell",
+   "sourceKey": "shell",
+   "category": "material",
+   "file": "material/shell.png",
+   "resource": "Icons/material/shell"
+  },
+  {
+   "key": "shuriken_plus",
+   "sourceKey": "shuriken_plus",
+   "category": "material",
+   "file": "material/shuriken_plus.png",
+   "resource": "Icons/material/shuriken_plus"
+  },
+  {
+   "key": "snake_skin",
+   "sourceKey": "snake_skin",
+   "category": "material",
+   "file": "material/snake_skin.png",
+   "resource": "Icons/material/snake_skin"
+  },
+  {
+   "key": "snake_tail",
+   "sourceKey": "snake_tail",
+   "category": "material",
+   "file": "material/snake_tail.png",
+   "resource": "Icons/material/snake_tail"
+  },
+  {
+   "key": "snake_tail_plus",
+   "sourceKey": "snake_tail_plus",
+   "category": "material",
+   "file": "material/snake_tail_plus.png",
+   "resource": "Icons/material/snake_tail_plus"
+  },
+  {
+   "key": "spider_egg_sack",
+   "sourceKey": "spider_egg_sack",
+   "category": "material",
+   "file": "material/spider_egg_sack.png",
+   "resource": "Icons/material/spider_egg_sack"
+  },
+  {
+   "key": "spider_eyes",
+   "sourceKey": "spider_eyes",
+   "category": "material",
+   "file": "material/spider_eyes.png",
+   "resource": "Icons/material/spider_eyes"
+  },
+  {
+   "key": "spider_legs",
+   "sourceKey": "spider_legs",
+   "category": "material",
+   "file": "material/spider_legs.png",
+   "resource": "Icons/material/spider_legs"
+  },
+  {
+   "key": "spider_poison_sack",
+   "sourceKey": "spider_poison_sack",
+   "category": "material",
+   "file": "material/spider_poison_sack.png",
+   "resource": "Icons/material/spider_poison_sack"
+  },
+  {
+   "key": "spider_web",
+   "sourceKey": "spider_web",
+   "category": "material",
+   "file": "material/spider_web.png",
+   "resource": "Icons/material/spider_web"
+  },
+  {
+   "key": "spirit_shard",
+   "sourceKey": "spirit_shard",
+   "category": "material",
+   "file": "material/spirit_shard.png",
+   "resource": "Icons/material/spirit_shard"
+  },
+  {
+   "key": "talisman_plus",
+   "sourceKey": "talisman_plus",
+   "category": "material",
+   "file": "material/talisman_plus.png",
+   "resource": "Icons/material/talisman_plus"
+  },
+  {
+   "key": "tiger_fang",
+   "sourceKey": "tiger_fang",
+   "category": "material",
+   "file": "material/tiger_fang.png",
+   "resource": "Icons/material/tiger_fang"
+  },
+  {
+   "key": "tiger_pelt",
+   "sourceKey": "tiger_pelt",
+   "category": "material",
+   "file": "material/tiger_pelt.png",
+   "resource": "Icons/material/tiger_pelt"
+  },
+  {
+   "key": "unknown_medicine",
+   "sourceKey": "unknown_medicine",
+   "category": "material",
+   "file": "material/unknown_medicine.png",
+   "resource": "Icons/material/unknown_medicine"
+  },
+  {
+   "key": "unknown_medicine_plus",
+   "sourceKey": "unknown_medicine_plus",
+   "category": "material",
+   "file": "material/unknown_medicine_plus.png",
+   "resource": "Icons/material/unknown_medicine_plus"
+  },
+  {
+   "key": "warrior_symbol",
+   "sourceKey": "warrior_symbol",
+   "category": "material",
+   "file": "material/warrior_symbol.png",
+   "resource": "Icons/material/warrior_symbol"
+  },
+  {
+   "key": "water_crystal",
+   "sourceKey": "water_crystal",
+   "category": "material",
+   "file": "material/water_crystal.png",
+   "resource": "Icons/material/water_crystal"
+  },
+  {
+   "key": "yeti_fur",
+   "sourceKey": "yeti_fur",
+   "category": "material",
+   "file": "material/yeti_fur.png",
+   "resource": "Icons/material/yeti_fur"
+  },
+  {
+   "key": "yeti_fur_plus",
+   "sourceKey": "yeti_fur_plus",
+   "category": "material",
+   "file": "material/yeti_fur_plus.png",
+   "resource": "Icons/material/yeti_fur_plus"
+  },
+  {
+   "key": "necklace_1",
+   "sourceKey": "necklace_1",
+   "category": "necklace",
+   "file": "necklace/necklace_1.png",
+   "resource": "Icons/necklace/necklace_1"
+  },
+  {
+   "key": "necklace_10",
+   "sourceKey": "necklace_10",
+   "category": "necklace",
+   "file": "necklace/necklace_10.png",
+   "resource": "Icons/necklace/necklace_10"
+  },
+  {
+   "key": "necklace_20",
+   "sourceKey": "necklace_20",
+   "category": "necklace",
+   "file": "necklace/necklace_20.png",
+   "resource": "Icons/necklace/necklace_20"
+  },
+  {
+   "key": "necklace_22",
+   "sourceKey": "necklace_22",
+   "category": "necklace",
+   "file": "necklace/necklace_22.png",
+   "resource": "Icons/necklace/necklace_22"
+  },
+  {
+   "key": "necklace_28",
+   "sourceKey": "necklace_28",
+   "category": "necklace",
+   "file": "necklace/necklace_28.png",
+   "resource": "Icons/necklace/necklace_28"
+  },
+  {
+   "key": "necklace_33",
+   "sourceKey": "necklace_33",
+   "category": "necklace",
+   "file": "necklace/necklace_33.png",
+   "resource": "Icons/necklace/necklace_33"
+  },
+  {
+   "key": "necklace_38",
+   "sourceKey": "necklace_38",
+   "category": "necklace",
+   "file": "necklace/necklace_38.png",
+   "resource": "Icons/necklace/necklace_38"
+  },
+  {
+   "key": "necklace_42",
+   "sourceKey": "necklace_42",
+   "category": "necklace",
+   "file": "necklace/necklace_42.png",
+   "resource": "Icons/necklace/necklace_42"
+  },
+  {
+   "key": "necklace_46",
+   "sourceKey": "necklace_46",
+   "category": "necklace",
+   "file": "necklace/necklace_46.png",
+   "resource": "Icons/necklace/necklace_46"
+  },
+  {
+   "key": "necklace_50",
+   "sourceKey": "necklace_50",
+   "category": "necklace",
+   "file": "necklace/necklace_50.png",
+   "resource": "Icons/necklace/necklace_50"
+  },
+  {
+   "key": "necklace_54",
+   "sourceKey": "necklace_54",
+   "category": "necklace",
+   "file": "necklace/necklace_54.png",
+   "resource": "Icons/necklace/necklace_54"
+  },
+  {
+   "key": "necklace_60",
+   "sourceKey": "necklace_60",
+   "category": "necklace",
+   "file": "necklace/necklace_60.png",
+   "resource": "Icons/necklace/necklace_60"
+  },
+  {
+   "key": "leader_book",
+   "sourceKey": "leader_book",
+   "category": "party",
+   "file": "party/leader_book.png",
+   "resource": "Icons/party/leader_book"
+  },
+  {
+   "key": "blue_l",
+   "sourceKey": "blue_l",
+   "category": "potion",
+   "file": "potion/blue_l.png",
+   "resource": "Icons/potion/blue_l"
+  },
+  {
+   "key": "blue_m",
+   "sourceKey": "blue_m",
+   "category": "potion",
+   "file": "potion/blue_m.png",
+   "resource": "Icons/potion/blue_m"
+  },
+  {
+   "key": "blue_s",
+   "sourceKey": "blue_s",
+   "category": "potion",
+   "file": "potion/blue_s.png",
+   "resource": "Icons/potion/blue_s"
+  },
+  {
+   "key": "red_l",
+   "sourceKey": "red_l",
+   "category": "potion",
+   "file": "potion/red_l.png",
+   "resource": "Icons/potion/red_l"
+  },
+  {
+   "key": "red_m",
+   "sourceKey": "red_m",
+   "category": "potion",
+   "file": "potion/red_m.png",
+   "resource": "Icons/potion/red_m"
+  },
+  {
+   "key": "red_s",
+   "sourceKey": "red_s",
+   "category": "potion",
+   "file": "potion/red_s.png",
+   "resource": "Icons/potion/red_s"
+  },
+  {
+   "key": "arachnid_flute",
+   "sourceKey": "arachnid_flute",
+   "category": "quest",
+   "file": "quest/arachnid_flute.png",
+   "resource": "Icons/quest/arachnid_flute"
+  },
+  {
+   "key": "baljit_tears",
+   "sourceKey": "baljit_tears",
+   "category": "quest",
+   "file": "quest/baljit_tears.png",
+   "resource": "Icons/quest/baljit_tears"
+  },
+  {
+   "key": "bellflower",
+   "sourceKey": "bellflower",
+   "category": "quest",
+   "file": "quest/bellflower.png",
+   "resource": "Icons/quest/bellflower"
+  },
+  {
+   "key": "blood_drop",
+   "sourceKey": "blood_drop",
+   "category": "quest",
+   "file": "quest/blood_drop.png",
+   "resource": "Icons/quest/blood_drop"
+  },
+  {
+   "key": "blood_stone",
+   "sourceKey": "blood_stone",
+   "category": "quest",
+   "file": "quest/blood_stone.png",
+   "resource": "Icons/quest/blood_stone"
+  },
+  {
+   "key": "curse_book",
+   "sourceKey": "curse_book",
+   "category": "quest",
+   "file": "quest/curse_book.png",
+   "resource": "Icons/quest/curse_book"
+  },
+  {
+   "key": "gango_root",
+   "sourceKey": "gango_root",
+   "category": "quest",
+   "file": "quest/gango_root.png",
+   "resource": "Icons/quest/gango_root"
+  },
+  {
+   "key": "ghost_branch",
+   "sourceKey": "ghost_branch",
+   "category": "quest",
+   "file": "quest/ghost_branch.png",
+   "resource": "Icons/quest/ghost_branch"
+  },
+  {
+   "key": "inscription_copy",
+   "sourceKey": "inscription_copy",
+   "category": "quest",
+   "file": "quest/inscription_copy.png",
+   "resource": "Icons/quest/inscription_copy"
+  },
+  {
+   "key": "jewel_envy",
+   "sourceKey": "jewel_envy",
+   "category": "quest",
+   "file": "quest/jewel_envy.png",
+   "resource": "Icons/quest/jewel_envy"
+  },
+  {
+   "key": "leader_notes",
+   "sourceKey": "leader_notes",
+   "category": "quest",
+   "file": "quest/leader_notes.png",
+   "resource": "Icons/quest/leader_notes"
+  },
+  {
+   "key": "lilac",
+   "sourceKey": "lilac",
+   "category": "quest",
+   "file": "quest/lilac.png",
+   "resource": "Icons/quest/lilac"
+  },
+  {
+   "key": "orc_tooth",
+   "sourceKey": "orc_tooth",
+   "category": "quest",
+   "file": "quest/orc_tooth.png",
+   "resource": "Icons/quest/orc_tooth"
+  },
+  {
+   "key": "pass_ticket",
+   "sourceKey": "pass_ticket",
+   "category": "quest",
+   "file": "quest/pass_ticket.png",
+   "resource": "Icons/quest/pass_ticket"
+  },
+  {
+   "key": "peach_blossom",
+   "sourceKey": "peach_blossom",
+   "category": "quest",
+   "file": "quest/peach_blossom.png",
+   "resource": "Icons/quest/peach_blossom"
+  },
+  {
+   "key": "persimmon_blossom",
+   "sourceKey": "persimmon_blossom",
+   "category": "quest",
+   "file": "quest/persimmon_blossom.png",
+   "resource": "Icons/quest/persimmon_blossom"
+  },
+  {
+   "key": "petrified_tear",
+   "sourceKey": "petrified_tear",
+   "category": "quest",
+   "file": "quest/petrified_tear.png",
+   "resource": "Icons/quest/petrified_tear"
+  },
+  {
+   "key": "queen_poison",
+   "sourceKey": "queen_poison",
+   "category": "quest",
+   "file": "quest/queen_poison.png",
+   "resource": "Icons/quest/queen_poison"
+  },
+  {
+   "key": "shrunken_head",
+   "sourceKey": "shrunken_head",
+   "category": "quest",
+   "file": "quest/shrunken_head.png",
+   "resource": "Icons/quest/shrunken_head"
+  },
+  {
+   "key": "soul_aurtumryu",
+   "sourceKey": "soul_aurtumryu",
+   "category": "quest",
+   "file": "quest/soul_aurtumryu.png",
+   "resource": "Icons/quest/soul_aurtumryu"
+  },
+  {
+   "key": "soul_forest_spirit",
+   "sourceKey": "soul_forest_spirit",
+   "category": "quest",
+   "file": "quest/soul_forest_spirit.png",
+   "resource": "Icons/quest/soul_forest_spirit"
+  },
+  {
+   "key": "soul_gyimok",
+   "sourceKey": "soul_gyimok",
+   "category": "quest",
+   "file": "quest/soul_gyimok.png",
+   "resource": "Icons/quest/soul_gyimok"
+  },
+  {
+   "key": "soul_jinunggyi",
+   "sourceKey": "soul_jinunggyi",
+   "category": "quest",
+   "file": "quest/soul_jinunggyi.png",
+   "resource": "Icons/quest/soul_jinunggyi"
+  },
+  {
+   "key": "soul_leader",
+   "sourceKey": "soul_leader",
+   "category": "quest",
+   "file": "quest/soul_leader.png",
+   "resource": "Icons/quest/soul_leader"
+  },
+  {
+   "key": "soul_sagyi",
+   "sourceKey": "soul_sagyi",
+   "category": "quest",
+   "file": "quest/soul_sagyi.png",
+   "resource": "Icons/quest/soul_sagyi"
+  },
+  {
+   "key": "soul_temple",
+   "sourceKey": "soul_temple",
+   "category": "quest",
+   "file": "quest/soul_temple.png",
+   "resource": "Icons/quest/soul_temple"
+  },
+  {
+   "key": "soul_tugyi",
+   "sourceKey": "soul_tugyi",
+   "category": "quest",
+   "file": "quest/soul_tugyi.png",
+   "resource": "Icons/quest/soul_tugyi"
+  },
+  {
+   "key": "tue_mushroom",
+   "sourceKey": "tue_mushroom",
+   "category": "quest",
+   "file": "quest/tue_mushroom.png",
+   "resource": "Icons/quest/tue_mushroom"
+  },
+  {
+   "key": "tugyi_tablet",
+   "sourceKey": "tugyi_tablet",
+   "category": "quest",
+   "file": "quest/tugyi_tablet.png",
+   "resource": "Icons/quest/tugyi_tablet"
+  },
+  {
+   "key": "volcanic_glass",
+   "sourceKey": "volcanic_glass",
+   "category": "quest",
+   "file": "quest/volcanic_glass.png",
+   "resource": "Icons/quest/volcanic_glass"
+  },
+  {
+   "key": "zelkova_branch",
+   "sourceKey": "zelkova_branch",
+   "category": "quest",
+   "file": "quest/zelkova_branch.png",
+   "resource": "Icons/quest/zelkova_branch"
+  },
+  {
+   "key": "exp_ring",
+   "sourceKey": "exp_ring",
+   "category": "ring",
+   "file": "ring/exp_ring.png",
+   "resource": "Icons/ring/exp_ring"
+  },
+  {
+   "key": "lucy_ring",
+   "sourceKey": "lucy_ring",
+   "category": "ring",
+   "file": "ring/lucy_ring.png",
+   "resource": "Icons/ring/lucy_ring"
+  },
+  {
+   "key": "thief_glove",
+   "sourceKey": "thief_glove",
+   "category": "ring",
+   "file": "ring/thief_glove.png",
+   "resource": "Icons/ring/thief_glove"
+  },
+  {
+   "key": "shield_1",
+   "sourceKey": "shield_1",
+   "category": "shield",
+   "file": "shield/shield_1.png",
+   "resource": "Icons/shield/shield_1"
+  },
+  {
+   "key": "shield_21",
+   "sourceKey": "shield_21",
+   "category": "shield",
+   "file": "shield/shield_21.png",
+   "resource": "Icons/shield/shield_21"
+  },
+  {
+   "key": "shield_41",
+   "sourceKey": "shield_41",
+   "category": "shield",
+   "file": "shield/shield_41.png",
+   "resource": "Icons/shield/shield_41"
+  },
+  {
+   "key": "shield_61_ninja",
+   "sourceKey": "shield_61_ninja",
+   "category": "shield",
+   "file": "shield/shield_61_ninja.png",
+   "resource": "Icons/shield/shield_61_ninja"
+  },
+  {
+   "key": "shield_61_shaman",
+   "sourceKey": "shield_61_shaman",
+   "category": "shield",
+   "file": "shield/shield_61_shaman.png",
+   "resource": "Icons/shield/shield_61_shaman"
+  },
+  {
+   "key": "shield_61_sura",
+   "sourceKey": "shield_61_sura",
+   "category": "shield",
+   "file": "shield/shield_61_sura.png",
+   "resource": "Icons/shield/shield_61_sura"
+  },
+  {
+   "key": "shield_61_warrior",
+   "sourceKey": "shield_61_warrior",
+   "category": "shield",
+   "file": "shield/shield_61_warrior.png",
+   "resource": "Icons/shield/shield_61_warrior"
+  },
+  {
+   "key": "shield_81",
+   "sourceKey": "shield_81",
+   "category": "shield",
+   "file": "shield/shield_81.png",
+   "resource": "Icons/shield/shield_81"
+  },
+  {
+   "key": "shoes_1",
+   "sourceKey": "shoes_1",
+   "category": "shoes",
+   "file": "shoes/shoes_1.png",
+   "resource": "Icons/shoes/shoes_1"
+  },
+  {
+   "key": "shoes_12",
+   "sourceKey": "shoes_12",
+   "category": "shoes",
+   "file": "shoes/shoes_12.png",
+   "resource": "Icons/shoes/shoes_12"
+  },
+  {
+   "key": "shoes_22",
+   "sourceKey": "shoes_22",
+   "category": "shoes",
+   "file": "shoes/shoes_22.png",
+   "resource": "Icons/shoes/shoes_22"
+  },
+  {
+   "key": "shoes_23",
+   "sourceKey": "shoes_23",
+   "category": "shoes",
+   "file": "shoes/shoes_23.png",
+   "resource": "Icons/shoes/shoes_23"
+  },
+  {
+   "key": "shoes_29",
+   "sourceKey": "shoes_29",
+   "category": "shoes",
+   "file": "shoes/shoes_29.png",
+   "resource": "Icons/shoes/shoes_29"
+  },
+  {
+   "key": "shoes_34",
+   "sourceKey": "shoes_34",
+   "category": "shoes",
+   "file": "shoes/shoes_34.png",
+   "resource": "Icons/shoes/shoes_34"
+  },
+  {
+   "key": "shoes_39",
+   "sourceKey": "shoes_39",
+   "category": "shoes",
+   "file": "shoes/shoes_39.png",
+   "resource": "Icons/shoes/shoes_39"
+  },
+  {
+   "key": "shoes_43",
+   "sourceKey": "shoes_43",
+   "category": "shoes",
+   "file": "shoes/shoes_43.png",
+   "resource": "Icons/shoes/shoes_43"
+  },
+  {
+   "key": "shoes_47",
+   "sourceKey": "shoes_47",
+   "category": "shoes",
+   "file": "shoes/shoes_47.png",
+   "resource": "Icons/shoes/shoes_47"
+  },
+  {
+   "key": "shoes_51",
+   "sourceKey": "shoes_51",
+   "category": "shoes",
+   "file": "shoes/shoes_51.png",
+   "resource": "Icons/shoes/shoes_51"
+  },
+  {
+   "key": "shoes_55",
+   "sourceKey": "shoes_55",
+   "category": "shoes",
+   "file": "shoes/shoes_55.png",
+   "resource": "Icons/shoes/shoes_55"
+  },
+  {
+   "key": "shoes_59",
+   "sourceKey": "shoes_59",
+   "category": "shoes",
+   "file": "shoes/shoes_59.png",
+   "resource": "Icons/shoes/shoes_59"
+  },
+  {
+   "key": "shoes_65",
+   "sourceKey": "shoes_65",
+   "category": "shoes",
+   "file": "shoes/shoes_65.png",
+   "resource": "Icons/shoes/shoes_65"
+  },
+  {
+   "key": "shoes_65b",
+   "sourceKey": "shoes_65b",
+   "category": "shoes",
+   "file": "shoes/shoes_65b.png",
+   "resource": "Icons/shoes/shoes_65b"
+  },
+  {
+   "key": "shoes_65c",
+   "sourceKey": "shoes_65c",
+   "category": "shoes",
+   "file": "shoes/shoes_65c.png",
+   "resource": "Icons/shoes/shoes_65c"
+  },
+  {
+   "key": "shoes_65d",
+   "sourceKey": "shoes_65d",
+   "category": "shoes",
+   "file": "shoes/shoes_65d.png",
+   "resource": "Icons/shoes/shoes_65d"
+  },
+  {
+   "key": "soul",
+   "sourceKey": "soul",
+   "category": "soul",
+   "file": "soul/soul.png",
+   "resource": "Icons/soul/soul"
+  },
+  {
+   "key": "spirit_crit_0",
+   "sourceKey": "spirit_crit_0",
+   "category": "spirit",
+   "file": "spirit/spirit_crit_0.png",
+   "resource": "Icons/spirit/spirit_crit_0"
+  },
+  {
+   "key": "spirit_crit_1",
+   "sourceKey": "spirit_crit_1",
+   "category": "spirit",
+   "file": "spirit/spirit_crit_1.png",
+   "resource": "Icons/spirit/spirit_crit_1"
+  },
+  {
+   "key": "spirit_crit_2",
+   "sourceKey": "spirit_crit_2",
+   "category": "spirit",
+   "file": "spirit/spirit_crit_2.png",
+   "resource": "Icons/spirit/spirit_crit_2"
+  },
+  {
+   "key": "spirit_crit_3",
+   "sourceKey": "spirit_crit_3",
+   "category": "spirit",
+   "file": "spirit/spirit_crit_3.png",
+   "resource": "Icons/spirit/spirit_crit_3"
+  },
+  {
+   "key": "spirit_crit_4",
+   "sourceKey": "spirit_crit_4",
+   "category": "spirit",
+   "file": "spirit/spirit_crit_4.png",
+   "resource": "Icons/spirit/spirit_crit_4"
+  },
+  {
+   "key": "spirit_evasion_0",
+   "sourceKey": "spirit_evasion_0",
+   "category": "spirit",
+   "file": "spirit/spirit_evasion_0.png",
+   "resource": "Icons/spirit/spirit_evasion_0"
+  },
+  {
+   "key": "spirit_evasion_1",
+   "sourceKey": "spirit_evasion_1",
+   "category": "spirit",
+   "file": "spirit/spirit_evasion_1.png",
+   "resource": "Icons/spirit/spirit_evasion_1"
+  },
+  {
+   "key": "spirit_evasion_2",
+   "sourceKey": "spirit_evasion_2",
+   "category": "spirit",
+   "file": "spirit/spirit_evasion_2.png",
+   "resource": "Icons/spirit/spirit_evasion_2"
+  },
+  {
+   "key": "spirit_evasion_3",
+   "sourceKey": "spirit_evasion_3",
+   "category": "spirit",
+   "file": "spirit/spirit_evasion_3.png",
+   "resource": "Icons/spirit/spirit_evasion_3"
+  },
+  {
+   "key": "spirit_evasion_4",
+   "sourceKey": "spirit_evasion_4",
+   "category": "spirit",
+   "file": "spirit/spirit_evasion_4.png",
+   "resource": "Icons/spirit/spirit_evasion_4"
+  },
+  {
+   "key": "spirit_haste_0",
+   "sourceKey": "spirit_haste_0",
+   "category": "spirit",
+   "file": "spirit/spirit_haste_0.png",
+   "resource": "Icons/spirit/spirit_haste_0"
+  },
+  {
+   "key": "spirit_haste_1",
+   "sourceKey": "spirit_haste_1",
+   "category": "spirit",
+   "file": "spirit/spirit_haste_1.png",
+   "resource": "Icons/spirit/spirit_haste_1"
+  },
+  {
+   "key": "spirit_haste_2",
+   "sourceKey": "spirit_haste_2",
+   "category": "spirit",
+   "file": "spirit/spirit_haste_2.png",
+   "resource": "Icons/spirit/spirit_haste_2"
+  },
+  {
+   "key": "spirit_haste_3",
+   "sourceKey": "spirit_haste_3",
+   "category": "spirit",
+   "file": "spirit/spirit_haste_3.png",
+   "resource": "Icons/spirit/spirit_haste_3"
+  },
+  {
+   "key": "spirit_haste_4",
+   "sourceKey": "spirit_haste_4",
+   "category": "spirit",
+   "file": "spirit/spirit_haste_4.png",
+   "resource": "Icons/spirit/spirit_haste_4"
+  },
+  {
+   "key": "spirit_life_0",
+   "sourceKey": "spirit_life_0",
+   "category": "spirit",
+   "file": "spirit/spirit_life_0.png",
+   "resource": "Icons/spirit/spirit_life_0"
+  },
+  {
+   "key": "spirit_life_1",
+   "sourceKey": "spirit_life_1",
+   "category": "spirit",
+   "file": "spirit/spirit_life_1.png",
+   "resource": "Icons/spirit/spirit_life_1"
+  },
+  {
+   "key": "spirit_life_2",
+   "sourceKey": "spirit_life_2",
+   "category": "spirit",
+   "file": "spirit/spirit_life_2.png",
+   "resource": "Icons/spirit/spirit_life_2"
+  },
+  {
+   "key": "spirit_life_3",
+   "sourceKey": "spirit_life_3",
+   "category": "spirit",
+   "file": "spirit/spirit_life_3.png",
+   "resource": "Icons/spirit/spirit_life_3"
+  },
+  {
+   "key": "spirit_life_4",
+   "sourceKey": "spirit_life_4",
+   "category": "spirit",
+   "file": "spirit/spirit_life_4.png",
+   "resource": "Icons/spirit/spirit_life_4"
+  },
+  {
+   "key": "spirit_monster_0",
+   "sourceKey": "spirit_monster_0",
+   "category": "spirit",
+   "file": "spirit/spirit_monster_0.png",
+   "resource": "Icons/spirit/spirit_monster_0"
+  },
+  {
+   "key": "spirit_monster_1",
+   "sourceKey": "spirit_monster_1",
+   "category": "spirit",
+   "file": "spirit/spirit_monster_1.png",
+   "resource": "Icons/spirit/spirit_monster_1"
+  },
+  {
+   "key": "spirit_monster_2",
+   "sourceKey": "spirit_monster_2",
+   "category": "spirit",
+   "file": "spirit/spirit_monster_2.png",
+   "resource": "Icons/spirit/spirit_monster_2"
+  },
+  {
+   "key": "spirit_monster_3",
+   "sourceKey": "spirit_monster_3",
+   "category": "spirit",
+   "file": "spirit/spirit_monster_3.png",
+   "resource": "Icons/spirit/spirit_monster_3"
+  },
+  {
+   "key": "spirit_monster_4",
+   "sourceKey": "spirit_monster_4",
+   "category": "spirit",
+   "file": "spirit/spirit_monster_4.png",
+   "resource": "Icons/spirit/spirit_monster_4"
+  },
+  {
+   "key": "spirit_pierce_0",
+   "sourceKey": "spirit_pierce_0",
+   "category": "spirit",
+   "file": "spirit/spirit_pierce_0.png",
+   "resource": "Icons/spirit/spirit_pierce_0"
+  },
+  {
+   "key": "spirit_pierce_1",
+   "sourceKey": "spirit_pierce_1",
+   "category": "spirit",
+   "file": "spirit/spirit_pierce_1.png",
+   "resource": "Icons/spirit/spirit_pierce_1"
+  },
+  {
+   "key": "spirit_pierce_2",
+   "sourceKey": "spirit_pierce_2",
+   "category": "spirit",
+   "file": "spirit/spirit_pierce_2.png",
+   "resource": "Icons/spirit/spirit_pierce_2"
+  },
+  {
+   "key": "spirit_pierce_3",
+   "sourceKey": "spirit_pierce_3",
+   "category": "spirit",
+   "file": "spirit/spirit_pierce_3.png",
+   "resource": "Icons/spirit/spirit_pierce_3"
+  },
+  {
+   "key": "spirit_pierce_4",
+   "sourceKey": "spirit_pierce_4",
+   "category": "spirit",
+   "file": "spirit/spirit_pierce_4.png",
+   "resource": "Icons/spirit/spirit_pierce_4"
+  },
+  {
+   "key": "spirit_vsninja_0",
+   "sourceKey": "spirit_vsninja_0",
+   "category": "spirit",
+   "file": "spirit/spirit_vsninja_0.png",
+   "resource": "Icons/spirit/spirit_vsninja_0"
+  },
+  {
+   "key": "spirit_vsninja_1",
+   "sourceKey": "spirit_vsninja_1",
+   "category": "spirit",
+   "file": "spirit/spirit_vsninja_1.png",
+   "resource": "Icons/spirit/spirit_vsninja_1"
+  },
+  {
+   "key": "spirit_vsninja_2",
+   "sourceKey": "spirit_vsninja_2",
+   "category": "spirit",
+   "file": "spirit/spirit_vsninja_2.png",
+   "resource": "Icons/spirit/spirit_vsninja_2"
+  },
+  {
+   "key": "spirit_vsninja_3",
+   "sourceKey": "spirit_vsninja_3",
+   "category": "spirit",
+   "file": "spirit/spirit_vsninja_3.png",
+   "resource": "Icons/spirit/spirit_vsninja_3"
+  },
+  {
+   "key": "spirit_vsninja_4",
+   "sourceKey": "spirit_vsninja_4",
+   "category": "spirit",
+   "file": "spirit/spirit_vsninja_4.png",
+   "resource": "Icons/spirit/spirit_vsninja_4"
+  },
+  {
+   "key": "spirit_vsshaman_0",
+   "sourceKey": "spirit_vsshaman_0",
+   "category": "spirit",
+   "file": "spirit/spirit_vsshaman_0.png",
+   "resource": "Icons/spirit/spirit_vsshaman_0"
+  },
+  {
+   "key": "spirit_vsshaman_1",
+   "sourceKey": "spirit_vsshaman_1",
+   "category": "spirit",
+   "file": "spirit/spirit_vsshaman_1.png",
+   "resource": "Icons/spirit/spirit_vsshaman_1"
+  },
+  {
+   "key": "spirit_vsshaman_2",
+   "sourceKey": "spirit_vsshaman_2",
+   "category": "spirit",
+   "file": "spirit/spirit_vsshaman_2.png",
+   "resource": "Icons/spirit/spirit_vsshaman_2"
+  },
+  {
+   "key": "spirit_vsshaman_3",
+   "sourceKey": "spirit_vsshaman_3",
+   "category": "spirit",
+   "file": "spirit/spirit_vsshaman_3.png",
+   "resource": "Icons/spirit/spirit_vsshaman_3"
+  },
+  {
+   "key": "spirit_vsshaman_4",
+   "sourceKey": "spirit_vsshaman_4",
+   "category": "spirit",
+   "file": "spirit/spirit_vsshaman_4.png",
+   "resource": "Icons/spirit/spirit_vsshaman_4"
+  },
+  {
+   "key": "spirit_vssura_0",
+   "sourceKey": "spirit_vssura_0",
+   "category": "spirit",
+   "file": "spirit/spirit_vssura_0.png",
+   "resource": "Icons/spirit/spirit_vssura_0"
+  },
+  {
+   "key": "spirit_vssura_1",
+   "sourceKey": "spirit_vssura_1",
+   "category": "spirit",
+   "file": "spirit/spirit_vssura_1.png",
+   "resource": "Icons/spirit/spirit_vssura_1"
+  },
+  {
+   "key": "spirit_vssura_2",
+   "sourceKey": "spirit_vssura_2",
+   "category": "spirit",
+   "file": "spirit/spirit_vssura_2.png",
+   "resource": "Icons/spirit/spirit_vssura_2"
+  },
+  {
+   "key": "spirit_vssura_3",
+   "sourceKey": "spirit_vssura_3",
+   "category": "spirit",
+   "file": "spirit/spirit_vssura_3.png",
+   "resource": "Icons/spirit/spirit_vssura_3"
+  },
+  {
+   "key": "spirit_vssura_4",
+   "sourceKey": "spirit_vssura_4",
+   "category": "spirit",
+   "file": "spirit/spirit_vssura_4.png",
+   "resource": "Icons/spirit/spirit_vssura_4"
+  },
+  {
+   "key": "spirit_vswarrior_0",
+   "sourceKey": "spirit_vswarrior_0",
+   "category": "spirit",
+   "file": "spirit/spirit_vswarrior_0.png",
+   "resource": "Icons/spirit/spirit_vswarrior_0"
+  },
+  {
+   "key": "spirit_vswarrior_1",
+   "sourceKey": "spirit_vswarrior_1",
+   "category": "spirit",
+   "file": "spirit/spirit_vswarrior_1.png",
+   "resource": "Icons/spirit/spirit_vswarrior_1"
+  },
+  {
+   "key": "spirit_vswarrior_2",
+   "sourceKey": "spirit_vswarrior_2",
+   "category": "spirit",
+   "file": "spirit/spirit_vswarrior_2.png",
+   "resource": "Icons/spirit/spirit_vswarrior_2"
+  },
+  {
+   "key": "spirit_vswarrior_3",
+   "sourceKey": "spirit_vswarrior_3",
+   "category": "spirit",
+   "file": "spirit/spirit_vswarrior_3.png",
+   "resource": "Icons/spirit/spirit_vswarrior_3"
+  },
+  {
+   "key": "spirit_vswarrior_4",
+   "sourceKey": "spirit_vswarrior_4",
+   "category": "spirit",
+   "file": "spirit/spirit_vswarrior_4.png",
+   "resource": "Icons/spirit/spirit_vswarrior_4"
+  },
+  {
+   "key": "spirit_ward_0",
+   "sourceKey": "spirit_ward_0",
+   "category": "spirit",
+   "file": "spirit/spirit_ward_0.png",
+   "resource": "Icons/spirit/spirit_ward_0"
+  },
+  {
+   "key": "spirit_ward_1",
+   "sourceKey": "spirit_ward_1",
+   "category": "spirit",
+   "file": "spirit/spirit_ward_1.png",
+   "resource": "Icons/spirit/spirit_ward_1"
+  },
+  {
+   "key": "spirit_ward_2",
+   "sourceKey": "spirit_ward_2",
+   "category": "spirit",
+   "file": "spirit/spirit_ward_2.png",
+   "resource": "Icons/spirit/spirit_ward_2"
+  },
+  {
+   "key": "spirit_ward_3",
+   "sourceKey": "spirit_ward_3",
+   "category": "spirit",
+   "file": "spirit/spirit_ward_3.png",
+   "resource": "Icons/spirit/spirit_ward_3"
+  },
+  {
+   "key": "spirit_ward_4",
+   "sourceKey": "spirit_ward_4",
+   "category": "spirit",
+   "file": "spirit/spirit_ward_4.png",
+   "resource": "Icons/spirit/spirit_ward_4"
+  },
+  {
+   "key": "spirit_wind_0",
+   "sourceKey": "spirit_wind_0",
+   "category": "spirit",
+   "file": "spirit/spirit_wind_0.png",
+   "resource": "Icons/spirit/spirit_wind_0"
+  },
+  {
+   "key": "spirit_wind_1",
+   "sourceKey": "spirit_wind_1",
+   "category": "spirit",
+   "file": "spirit/spirit_wind_1.png",
+   "resource": "Icons/spirit/spirit_wind_1"
+  },
+  {
+   "key": "spirit_wind_2",
+   "sourceKey": "spirit_wind_2",
+   "category": "spirit",
+   "file": "spirit/spirit_wind_2.png",
+   "resource": "Icons/spirit/spirit_wind_2"
+  },
+  {
+   "key": "spirit_wind_3",
+   "sourceKey": "spirit_wind_3",
+   "category": "spirit",
+   "file": "spirit/spirit_wind_3.png",
+   "resource": "Icons/spirit/spirit_wind_3"
+  },
+  {
+   "key": "spirit_wind_4",
+   "sourceKey": "spirit_wind_4",
+   "category": "spirit",
+   "file": "spirit/spirit_wind_4.png",
+   "resource": "Icons/spirit/spirit_wind_4"
+  },
+  {
+   "key": "grimace_totem",
+   "sourceKey": "grimace_totem",
+   "category": "totem",
+   "file": "totem/grimace_totem.png",
+   "resource": "Icons/totem/grimace_totem"
+  },
+  {
+   "key": "loc_scroll",
+   "sourceKey": "loc_scroll",
+   "category": "warp",
+   "file": "warp/loc_scroll.png",
+   "resource": "Icons/warp/loc_scroll"
+  },
+  {
+   "key": "town_scroll",
+   "sourceKey": "town_scroll",
+   "category": "warp",
+   "file": "warp/town_scroll.png",
+   "resource": "Icons/warp/town_scroll"
+  },
+  {
+   "key": "tp_ring",
+   "sourceKey": "tp_ring",
+   "category": "warp",
+   "file": "warp/tp_ring.png",
+   "resource": "Icons/warp/tp_ring"
+  },
+  {
+   "key": "bell_10",
+   "sourceKey": "bell_10",
+   "category": "weapon",
+   "file": "weapon/bell_10.png",
+   "resource": "Icons/weapon/bell_10"
+  },
+  {
+   "key": "bell_15",
+   "sourceKey": "bell_15",
+   "category": "weapon",
+   "file": "weapon/bell_15.png",
+   "resource": "Icons/weapon/bell_15"
+  },
+  {
+   "key": "bell_20",
+   "sourceKey": "bell_20",
+   "category": "weapon",
+   "file": "weapon/bell_20.png",
+   "resource": "Icons/weapon/bell_20"
+  },
+  {
+   "key": "bell_30",
+   "sourceKey": "bell_30",
+   "category": "weapon",
+   "file": "weapon/bell_30.png",
+   "resource": "Icons/weapon/bell_30"
+  },
+  {
+   "key": "bell_32",
+   "sourceKey": "bell_32",
+   "category": "weapon",
+   "file": "weapon/bell_32.png",
+   "resource": "Icons/weapon/bell_32"
+  },
+  {
+   "key": "bell_36",
+   "sourceKey": "bell_36",
+   "category": "weapon",
+   "file": "weapon/bell_36.png",
+   "resource": "Icons/weapon/bell_36"
+  },
+  {
+   "key": "bell_40",
+   "sourceKey": "bell_40",
+   "category": "weapon",
+   "file": "weapon/bell_40.png",
+   "resource": "Icons/weapon/bell_40"
+  },
+  {
+   "key": "bell_50",
+   "sourceKey": "bell_50",
+   "category": "weapon",
+   "file": "weapon/bell_50.png",
+   "resource": "Icons/weapon/bell_50"
+  },
+  {
+   "key": "bell_55",
+   "sourceKey": "bell_55",
+   "category": "weapon",
+   "file": "weapon/bell_55.png",
+   "resource": "Icons/weapon/bell_55"
+  },
+  {
+   "key": "bell_60",
+   "sourceKey": "bell_60",
+   "category": "weapon",
+   "file": "weapon/bell_60.png",
+   "resource": "Icons/weapon/bell_60"
+  },
+  {
+   "key": "bell_65",
+   "sourceKey": "bell_65",
+   "category": "weapon",
+   "file": "weapon/bell_65.png",
+   "resource": "Icons/weapon/bell_65"
+  },
+  {
+   "key": "bell_65b",
+   "sourceKey": "bell_65b",
+   "category": "weapon",
+   "file": "weapon/bell_65b.png",
+   "resource": "Icons/weapon/bell_65b"
+  },
+  {
+   "key": "bell_75",
+   "sourceKey": "bell_75",
+   "category": "weapon",
+   "file": "weapon/bell_75.png",
+   "resource": "Icons/weapon/bell_75"
+  },
+  {
+   "key": "bell_80",
+   "sourceKey": "bell_80",
+   "category": "weapon",
+   "file": "weapon/bell_80.png",
+   "resource": "Icons/weapon/bell_80"
+  },
+  {
+   "key": "bow_1",
+   "sourceKey": "bow_1",
+   "category": "weapon",
+   "file": "weapon/bow_1.png",
+   "resource": "Icons/weapon/bow_1"
+  },
+  {
+   "key": "bow_10",
+   "sourceKey": "bow_10",
+   "category": "weapon",
+   "file": "weapon/bow_10.png",
+   "resource": "Icons/weapon/bow_10"
+  },
+  {
+   "key": "bow_15",
+   "sourceKey": "bow_15",
+   "category": "weapon",
+   "file": "weapon/bow_15.png",
+   "resource": "Icons/weapon/bow_15"
+  },
+  {
+   "key": "bow_20",
+   "sourceKey": "bow_20",
+   "category": "weapon",
+   "file": "weapon/bow_20.png",
+   "resource": "Icons/weapon/bow_20"
+  },
+  {
+   "key": "bow_25",
+   "sourceKey": "bow_25",
+   "category": "weapon",
+   "file": "weapon/bow_25.png",
+   "resource": "Icons/weapon/bow_25"
+  },
+  {
+   "key": "bow_30",
+   "sourceKey": "bow_30",
+   "category": "weapon",
+   "file": "weapon/bow_30.png",
+   "resource": "Icons/weapon/bow_30"
+  },
+  {
+   "key": "bow_32",
+   "sourceKey": "bow_32",
+   "category": "weapon",
+   "file": "weapon/bow_32.png",
+   "resource": "Icons/weapon/bow_32"
+  },
+  {
+   "key": "bow_36",
+   "sourceKey": "bow_36",
+   "category": "weapon",
+   "file": "weapon/bow_36.png",
+   "resource": "Icons/weapon/bow_36"
+  },
+  {
+   "key": "bow_40",
+   "sourceKey": "bow_40",
+   "category": "weapon",
+   "file": "weapon/bow_40.png",
+   "resource": "Icons/weapon/bow_40"
+  },
+  {
+   "key": "bow_45",
+   "sourceKey": "bow_45",
+   "category": "weapon",
+   "file": "weapon/bow_45.png",
+   "resource": "Icons/weapon/bow_45"
+  },
+  {
+   "key": "bow_5",
+   "sourceKey": "bow_5",
+   "category": "weapon",
+   "file": "weapon/bow_5.png",
+   "resource": "Icons/weapon/bow_5"
+  },
+  {
+   "key": "bow_50",
+   "sourceKey": "bow_50",
+   "category": "weapon",
+   "file": "weapon/bow_50.png",
+   "resource": "Icons/weapon/bow_50"
+  },
+  {
+   "key": "bow_55",
+   "sourceKey": "bow_55",
+   "category": "weapon",
+   "file": "weapon/bow_55.png",
+   "resource": "Icons/weapon/bow_55"
+  },
+  {
+   "key": "bow_60",
+   "sourceKey": "bow_60",
+   "category": "weapon",
+   "file": "weapon/bow_60.png",
+   "resource": "Icons/weapon/bow_60"
+  },
+  {
+   "key": "bow_65",
+   "sourceKey": "bow_65",
+   "category": "weapon",
+   "file": "weapon/bow_65.png",
+   "resource": "Icons/weapon/bow_65"
+  },
+  {
+   "key": "bow_65b",
+   "sourceKey": "bow_65b",
+   "category": "weapon",
+   "file": "weapon/bow_65b.png",
+   "resource": "Icons/weapon/bow_65b"
+  },
+  {
+   "key": "bow_70",
+   "sourceKey": "bow_70",
+   "category": "weapon",
+   "file": "weapon/bow_70.png",
+   "resource": "Icons/weapon/bow_70"
+  },
+  {
+   "key": "bow_75",
+   "sourceKey": "bow_75",
+   "category": "weapon",
+   "file": "weapon/bow_75.png",
+   "resource": "Icons/weapon/bow_75"
+  },
+  {
+   "key": "bow_80",
+   "sourceKey": "bow_80",
+   "category": "weapon",
+   "file": "weapon/bow_80.png",
+   "resource": "Icons/weapon/bow_80"
+  },
+  {
+   "key": "dagger_1",
+   "sourceKey": "dagger_1",
+   "category": "weapon",
+   "file": "weapon/dagger_1.png",
+   "resource": "Icons/weapon/dagger_1"
+  },
+  {
+   "key": "dagger_10",
+   "sourceKey": "dagger_10",
+   "category": "weapon",
+   "file": "weapon/dagger_10.png",
+   "resource": "Icons/weapon/dagger_10"
+  },
+  {
+   "key": "dagger_15",
+   "sourceKey": "dagger_15",
+   "category": "weapon",
+   "file": "weapon/dagger_15.png",
+   "resource": "Icons/weapon/dagger_15"
+  },
+  {
+   "key": "dagger_20",
+   "sourceKey": "dagger_20",
+   "category": "weapon",
+   "file": "weapon/dagger_20.png",
+   "resource": "Icons/weapon/dagger_20"
+  },
+  {
+   "key": "dagger_25",
+   "sourceKey": "dagger_25",
+   "category": "weapon",
+   "file": "weapon/dagger_25.png",
+   "resource": "Icons/weapon/dagger_25"
+  },
+  {
+   "key": "dagger_30",
+   "sourceKey": "dagger_30",
+   "category": "weapon",
+   "file": "weapon/dagger_30.png",
+   "resource": "Icons/weapon/dagger_30"
+  },
+  {
+   "key": "dagger_32",
+   "sourceKey": "dagger_32",
+   "category": "weapon",
+   "file": "weapon/dagger_32.png",
+   "resource": "Icons/weapon/dagger_32"
+  },
+  {
+   "key": "dagger_36",
+   "sourceKey": "dagger_36",
+   "category": "weapon",
+   "file": "weapon/dagger_36.png",
+   "resource": "Icons/weapon/dagger_36"
+  },
+  {
+   "key": "dagger_40",
+   "sourceKey": "dagger_40",
+   "category": "weapon",
+   "file": "weapon/dagger_40.png",
+   "resource": "Icons/weapon/dagger_40"
+  },
+  {
+   "key": "dagger_45",
+   "sourceKey": "dagger_45",
+   "category": "weapon",
+   "file": "weapon/dagger_45.png",
+   "resource": "Icons/weapon/dagger_45"
+  },
+  {
+   "key": "dagger_5",
+   "sourceKey": "dagger_5",
+   "category": "weapon",
+   "file": "weapon/dagger_5.png",
+   "resource": "Icons/weapon/dagger_5"
+  },
+  {
+   "key": "dagger_50",
+   "sourceKey": "dagger_50",
+   "category": "weapon",
+   "file": "weapon/dagger_50.png",
+   "resource": "Icons/weapon/dagger_50"
+  },
+  {
+   "key": "dagger_55",
+   "sourceKey": "dagger_55",
+   "category": "weapon",
+   "file": "weapon/dagger_55.png",
+   "resource": "Icons/weapon/dagger_55"
+  },
+  {
+   "key": "dagger_60",
+   "sourceKey": "dagger_60",
+   "category": "weapon",
+   "file": "weapon/dagger_60.png",
+   "resource": "Icons/weapon/dagger_60"
+  },
+  {
+   "key": "dagger_65",
+   "sourceKey": "dagger_65",
+   "category": "weapon",
+   "file": "weapon/dagger_65.png",
+   "resource": "Icons/weapon/dagger_65"
+  },
+  {
+   "key": "dagger_65b",
+   "sourceKey": "dagger_65b",
+   "category": "weapon",
+   "file": "weapon/dagger_65b.png",
+   "resource": "Icons/weapon/dagger_65b"
+  },
+  {
+   "key": "dagger_70",
+   "sourceKey": "dagger_70",
+   "category": "weapon",
+   "file": "weapon/dagger_70.png",
+   "resource": "Icons/weapon/dagger_70"
+  },
+  {
+   "key": "dagger_75",
+   "sourceKey": "dagger_75",
+   "category": "weapon",
+   "file": "weapon/dagger_75.png",
+   "resource": "Icons/weapon/dagger_75"
+  },
+  {
+   "key": "dagger_80",
+   "sourceKey": "dagger_80",
+   "category": "weapon",
+   "file": "weapon/dagger_80.png",
+   "resource": "Icons/weapon/dagger_80"
+  },
+  {
+   "key": "fan_1",
+   "sourceKey": "fan_1",
+   "category": "weapon",
+   "file": "weapon/fan_1.png",
+   "resource": "Icons/weapon/fan_1"
+  },
+  {
+   "key": "fan_10",
+   "sourceKey": "fan_10",
+   "category": "weapon",
+   "file": "weapon/fan_10.png",
+   "resource": "Icons/weapon/fan_10"
+  },
+  {
+   "key": "fan_15",
+   "sourceKey": "fan_15",
+   "category": "weapon",
+   "file": "weapon/fan_15.png",
+   "resource": "Icons/weapon/fan_15"
+  },
+  {
+   "key": "fan_20",
+   "sourceKey": "fan_20",
+   "category": "weapon",
+   "file": "weapon/fan_20.png",
+   "resource": "Icons/weapon/fan_20"
+  },
+  {
+   "key": "fan_25",
+   "sourceKey": "fan_25",
+   "category": "weapon",
+   "file": "weapon/fan_25.png",
+   "resource": "Icons/weapon/fan_25"
+  },
+  {
+   "key": "fan_30",
+   "sourceKey": "fan_30",
+   "category": "weapon",
+   "file": "weapon/fan_30.png",
+   "resource": "Icons/weapon/fan_30"
+  },
+  {
+   "key": "fan_32",
+   "sourceKey": "fan_32",
+   "category": "weapon",
+   "file": "weapon/fan_32.png",
+   "resource": "Icons/weapon/fan_32"
+  },
+  {
+   "key": "fan_36",
+   "sourceKey": "fan_36",
+   "category": "weapon",
+   "file": "weapon/fan_36.png",
+   "resource": "Icons/weapon/fan_36"
+  },
+  {
+   "key": "fan_40",
+   "sourceKey": "fan_40",
+   "category": "weapon",
+   "file": "weapon/fan_40.png",
+   "resource": "Icons/weapon/fan_40"
+  },
+  {
+   "key": "fan_45",
+   "sourceKey": "fan_45",
+   "category": "weapon",
+   "file": "weapon/fan_45.png",
+   "resource": "Icons/weapon/fan_45"
+  },
+  {
+   "key": "fan_5",
+   "sourceKey": "fan_5",
+   "category": "weapon",
+   "file": "weapon/fan_5.png",
+   "resource": "Icons/weapon/fan_5"
+  },
+  {
+   "key": "fan_50",
+   "sourceKey": "fan_50",
+   "category": "weapon",
+   "file": "weapon/fan_50.png",
+   "resource": "Icons/weapon/fan_50"
+  },
+  {
+   "key": "fan_55",
+   "sourceKey": "fan_55",
+   "category": "weapon",
+   "file": "weapon/fan_55.png",
+   "resource": "Icons/weapon/fan_55"
+  },
+  {
+   "key": "fan_60",
+   "sourceKey": "fan_60",
+   "category": "weapon",
+   "file": "weapon/fan_60.png",
+   "resource": "Icons/weapon/fan_60"
+  },
+  {
+   "key": "fan_65",
+   "sourceKey": "fan_65",
+   "category": "weapon",
+   "file": "weapon/fan_65.png",
+   "resource": "Icons/weapon/fan_65"
+  },
+  {
+   "key": "fan_65b",
+   "sourceKey": "fan_65b",
+   "category": "weapon",
+   "file": "weapon/fan_65b.png",
+   "resource": "Icons/weapon/fan_65b"
+  },
+  {
+   "key": "fan_70",
+   "sourceKey": "fan_70",
+   "category": "weapon",
+   "file": "weapon/fan_70.png",
+   "resource": "Icons/weapon/fan_70"
+  },
+  {
+   "key": "fan_80",
+   "sourceKey": "fan_80",
+   "category": "weapon",
+   "file": "weapon/fan_80.png",
+   "resource": "Icons/weapon/fan_80"
+  },
+  {
+   "key": "sword_30",
+   "sourceKey": "sword_30",
+   "category": "weapon",
+   "file": "weapon/sword_30.png",
+   "resource": "Icons/weapon/sword_30"
+  },
+  {
+   "key": "sword_32",
+   "sourceKey": "sword_32",
+   "category": "weapon",
+   "file": "weapon/sword_32.png",
+   "resource": "Icons/weapon/sword_32"
+  },
+  {
+   "key": "sword_36",
+   "sourceKey": "sword_36",
+   "category": "weapon",
+   "file": "weapon/sword_36.png",
+   "resource": "Icons/weapon/sword_36"
+  },
+  {
+   "key": "sword_40",
+   "sourceKey": "sword_40",
+   "category": "weapon",
+   "file": "weapon/sword_40.png",
+   "resource": "Icons/weapon/sword_40"
+  },
+  {
+   "key": "sword_45",
+   "sourceKey": "sword_45",
+   "category": "weapon",
+   "file": "weapon/sword_45.png",
+   "resource": "Icons/weapon/sword_45"
+  },
+  {
+   "key": "sword_50",
+   "sourceKey": "sword_50",
+   "category": "weapon",
+   "file": "weapon/sword_50.png",
+   "resource": "Icons/weapon/sword_50"
+  },
+  {
+   "key": "sword_55",
+   "sourceKey": "sword_55",
+   "category": "weapon",
+   "file": "weapon/sword_55.png",
+   "resource": "Icons/weapon/sword_55"
+  },
+  {
+   "key": "sword_60",
+   "sourceKey": "sword_60",
+   "category": "weapon",
+   "file": "weapon/sword_60.png",
+   "resource": "Icons/weapon/sword_60"
+  },
+  {
+   "key": "sword_65",
+   "sourceKey": "sword_65",
+   "category": "weapon",
+   "file": "weapon/sword_65.png",
+   "resource": "Icons/weapon/sword_65"
+  },
+  {
+   "key": "sword_65b",
+   "sourceKey": "sword_65b",
+   "category": "weapon",
+   "file": "weapon/sword_65b.png",
+   "resource": "Icons/weapon/sword_65b"
+  },
+  {
+   "key": "sword_70",
+   "sourceKey": "sword_70",
+   "category": "weapon",
+   "file": "weapon/sword_70.png",
+   "resource": "Icons/weapon/sword_70"
+  },
+  {
+   "key": "sword_75",
+   "sourceKey": "sword_75",
+   "category": "weapon",
+   "file": "weapon/sword_75.png",
+   "resource": "Icons/weapon/sword_75"
+  },
+  {
+   "key": "sword_80",
+   "sourceKey": "sword_80",
+   "category": "weapon",
+   "file": "weapon/sword_80.png",
+   "resource": "Icons/weapon/sword_80"
+  },
+  {
+   "key": "sword_sura_65",
+   "sourceKey": "sword_sura_65",
+   "category": "weapon",
+   "file": "weapon/sword_sura_65.png",
+   "resource": "Icons/weapon/sword_sura_65"
+  },
+  {
+   "key": "sword_sura_65b",
+   "sourceKey": "sword_sura_65b",
+   "category": "weapon",
+   "file": "weapon/sword_sura_65b.png",
+   "resource": "Icons/weapon/sword_sura_65b"
+  },
+  {
+   "key": "sword_sura_70",
+   "sourceKey": "sword_sura_70",
+   "category": "weapon",
+   "file": "weapon/sword_sura_70.png",
+   "resource": "Icons/weapon/sword_sura_70"
+  },
+  {
+   "key": "sword_sura_75",
+   "sourceKey": "sword_sura_75",
+   "category": "weapon",
+   "file": "weapon/sword_sura_75.png",
+   "resource": "Icons/weapon/sword_sura_75"
+  },
+  {
+   "key": "sword_sura_80",
+   "sourceKey": "sword_sura_80",
+   "category": "weapon",
+   "file": "weapon/sword_sura_80.png",
+   "resource": "Icons/weapon/sword_sura_80"
+  },
+  {
+   "key": "sword_sura_80b",
+   "sourceKey": "sword_sura_80b",
+   "category": "weapon",
+   "file": "weapon/sword_sura_80b.png",
+   "resource": "Icons/weapon/sword_sura_80b"
+  },
+  {
+   "key": "twohand_1",
+   "sourceKey": "twohand_1",
+   "category": "weapon",
+   "file": "weapon/twohand_1.png",
+   "resource": "Icons/weapon/twohand_1"
+  },
+  {
+   "key": "twohand_15",
+   "sourceKey": "twohand_15",
+   "category": "weapon",
+   "file": "weapon/twohand_15.png",
+   "resource": "Icons/weapon/twohand_15"
+  },
+  {
+   "key": "twohand_20",
+   "sourceKey": "twohand_20",
+   "category": "weapon",
+   "file": "weapon/twohand_20.png",
+   "resource": "Icons/weapon/twohand_20"
+  },
+  {
+   "key": "twohand_25",
+   "sourceKey": "twohand_25",
+   "category": "weapon",
+   "file": "weapon/twohand_25.png",
+   "resource": "Icons/weapon/twohand_25"
+  },
+  {
+   "key": "twohand_30",
+   "sourceKey": "twohand_30",
+   "category": "weapon",
+   "file": "weapon/twohand_30.png",
+   "resource": "Icons/weapon/twohand_30"
+  },
+  {
+   "key": "twohand_32",
+   "sourceKey": "twohand_32",
+   "category": "weapon",
+   "file": "weapon/twohand_32.png",
+   "resource": "Icons/weapon/twohand_32"
+  },
+  {
+   "key": "twohand_36",
+   "sourceKey": "twohand_36",
+   "category": "weapon",
+   "file": "weapon/twohand_36.png",
+   "resource": "Icons/weapon/twohand_36"
+  },
+  {
+   "key": "twohand_40",
+   "sourceKey": "twohand_40",
+   "category": "weapon",
+   "file": "weapon/twohand_40.png",
+   "resource": "Icons/weapon/twohand_40"
+  },
+  {
+   "key": "twohand_45",
+   "sourceKey": "twohand_45",
+   "category": "weapon",
+   "file": "weapon/twohand_45.png",
+   "resource": "Icons/weapon/twohand_45"
+  },
+  {
+   "key": "twohand_5",
+   "sourceKey": "twohand_5",
+   "category": "weapon",
+   "file": "weapon/twohand_5.png",
+   "resource": "Icons/weapon/twohand_5"
+  },
+  {
+   "key": "twohand_50",
+   "sourceKey": "twohand_50",
+   "category": "weapon",
+   "file": "weapon/twohand_50.png",
+   "resource": "Icons/weapon/twohand_50"
+  },
+  {
+   "key": "twohand_55",
+   "sourceKey": "twohand_55",
+   "category": "weapon",
+   "file": "weapon/twohand_55.png",
+   "resource": "Icons/weapon/twohand_55"
+  },
+  {
+   "key": "twohand_60",
+   "sourceKey": "twohand_60",
+   "category": "weapon",
+   "file": "weapon/twohand_60.png",
+   "resource": "Icons/weapon/twohand_60"
+  },
+  {
+   "key": "twohand_65",
+   "sourceKey": "twohand_65",
+   "category": "weapon",
+   "file": "weapon/twohand_65.png",
+   "resource": "Icons/weapon/twohand_65"
+  },
+  {
+   "key": "twohand_65b",
+   "sourceKey": "twohand_65b",
+   "category": "weapon",
+   "file": "weapon/twohand_65b.png",
+   "resource": "Icons/weapon/twohand_65b"
+  },
+  {
+   "key": "twohand_70",
+   "sourceKey": "twohand_70",
+   "category": "weapon",
+   "file": "weapon/twohand_70.png",
+   "resource": "Icons/weapon/twohand_70"
+  },
+  {
+   "key": "twohand_75",
+   "sourceKey": "twohand_75",
+   "category": "weapon",
+   "file": "weapon/twohand_75.png",
+   "resource": "Icons/weapon/twohand_75"
+  }
+ ]
+}

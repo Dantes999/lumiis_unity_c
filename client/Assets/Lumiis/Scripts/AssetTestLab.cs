@@ -22,6 +22,7 @@ namespace Lumiis.Client
         private ISpriteProvider _sprites;
         private LookCatalogClient _lookCatalog;
         private ItemCatalogClient _itemCatalog;
+        private ItemIconCatalog _iconCatalog;
 
         private UIDocument _uiDocument;
         private PanelSettings _panelSettings;
@@ -39,6 +40,14 @@ namespace Lumiis.Client
         private Label _hairLabel;
         private Label _hairColorLabel;
         private Label _motionLabel;
+        private VisualElement _iconGrid;
+        private Label _iconCategoryLabel;
+        private Label _iconPageLabel;
+        private readonly List<string> _iconCategories = new List<string>();
+        private readonly List<IconEntryJson> _iconFiltered = new List<IconEntryJson>();
+        private int _iconCategoryIndex;
+        private int _iconPage;
+        private const int IconPageSize = 64;
 
         private readonly List<ItemEntryJson> _weapons = new List<ItemEntryJson>();
         private readonly List<int> _armorIds = new List<int>();
@@ -61,6 +70,9 @@ namespace Lumiis.Client
         private GameObject _labRoot;
         private CharacterView _previewView;
         private CharacterAnimator _previewAnimator;
+        private CharacterSheetGallery _characterGallery;
+        private GameObject _characterGalleryRoot;
+        private bool _galleryVisible;
         private Vector3 _previewPosition;
 
         private Sprite _dummyPostSprite;
@@ -70,12 +82,13 @@ namespace Lumiis.Client
 
         public bool IsOpen => _isOpen;
 
-        public void Initialize(GameClient gameClient, ISpriteProvider sprites, LookCatalogClient lookCatalog, ItemCatalogClient itemCatalog)
+        public void Initialize(GameClient gameClient, ISpriteProvider sprites, LookCatalogClient lookCatalog, ItemCatalogClient itemCatalog, ItemIconCatalog iconCatalog)
         {
             _gameClient = gameClient;
             _sprites = sprites;
             _lookCatalog = lookCatalog;
             _itemCatalog = itemCatalog;
+            _iconCatalog = iconCatalog;
 
             BuildLists();
             ResetAppearance();
@@ -98,6 +111,17 @@ namespace Lumiis.Client
             FillLookList("Helmet", _helmetIds);
             FillLookList("Shield", _shieldIds);
             FillLookList("Hair", _hairIds);
+
+            _iconCategories.Clear();
+            _iconCategories.Add("Alle");
+            if (_iconCatalog != null)
+            {
+                foreach (string category in _iconCatalog.Categories())
+                {
+                    if (!string.IsNullOrEmpty(category))
+                        _iconCategories.Add(category);
+                }
+            }
         }
 
         private void FillLookList(string slot, List<int> target)
@@ -185,6 +209,9 @@ namespace Lumiis.Client
             _hairLabel = _root.Q<Label>("asset-lab-hair-label");
             _hairColorLabel = _root.Q<Label>("asset-lab-haircolor-label");
             _motionLabel = _root.Q<Label>("asset-lab-motion-label");
+            _iconGrid = _root.Q<VisualElement>("asset-lab-icon-grid");
+            _iconCategoryLabel = _root.Q<Label>("asset-lab-icon-category-label");
+            _iconPageLabel = _root.Q<Label>("asset-lab-icon-page-label");
 
             WireCycle("weapon", ChangeWeapon);
             WireCycle("upgrade", ChangeUpgrade);
@@ -203,11 +230,17 @@ namespace Lumiis.Client
             _root.Q<Button>("asset-lab-anim-attack").clicked += PlayAttack;
             _root.Q<Button>("asset-lab-dummy-reset").clicked += RebuildDummies;
             _root.Q<Button>("asset-lab-reset").clicked += ResetLab;
+            _root.Q<Button>("asset-lab-gallery").clicked += ToggleCharacterGallery;
             _root.Q<Button>("asset-lab-screenshot").clicked += () => _gameClient.CaptureScreenshot();
+            _root.Q<Button>("asset-lab-icon-category-prev").clicked += () => ChangeIconCategory(-1);
+            _root.Q<Button>("asset-lab-icon-category-next").clicked += () => ChangeIconCategory(1);
+            _root.Q<Button>("asset-lab-icon-page-prev").clicked += () => ChangeIconPage(-1);
+            _root.Q<Button>("asset-lab-icon-page-next").clicked += () => ChangeIconPage(1);
             _root.Q<Button>("asset-lab-close").clicked += Close;
 
             _uiReady = true;
             RefreshLabels();
+            RefreshIconGallery();
 
             if (_pendingOpen)
             {
@@ -250,6 +283,9 @@ namespace Lumiis.Client
 
             _previewPosition = _gameClient.LocalPlayerWorldPosition;
             _labRoot = new GameObject("AssetLabScene");
+            _galleryVisible = false;
+            _characterGalleryRoot = null;
+            _characterGallery = null;
             CreatePreview();
             CreateDummies();
             RefreshLabels();
@@ -265,6 +301,9 @@ namespace Lumiis.Client
             _labRoot = null;
             _previewView = null;
             _previewAnimator = null;
+            _characterGallery = null;
+            _characterGalleryRoot = null;
+            _galleryVisible = false;
 
             if (_root != null)
                 _root.style.display = DisplayStyle.None;
@@ -484,6 +523,73 @@ namespace Lumiis.Client
             if (_hairColorLabel != null) _hairColorLabel.text = HairColorName(_appearance.HairColorId);
         }
 
+        private void ChangeIconCategory(int direction)
+        {
+            if (_iconCategories.Count == 0) return;
+            _iconCategoryIndex = (_iconCategoryIndex + direction + _iconCategories.Count) % _iconCategories.Count;
+            _iconPage = 0;
+            RefreshIconGallery();
+        }
+
+        private void ChangeIconPage(int direction)
+        {
+            int pageCount = PageCount();
+            if (pageCount <= 1) return;
+            _iconPage = (_iconPage + direction + pageCount) % pageCount;
+            RefreshIconGallery();
+        }
+
+        private int PageCount()
+        {
+            FilterIcons();
+            return Mathf.Max(1, (_iconFiltered.Count + IconPageSize - 1) / IconPageSize);
+        }
+
+        private void FilterIcons()
+        {
+            _iconFiltered.Clear();
+            if (_iconCatalog == null) return;
+
+            string category = _iconCategories.Count > 0 ? _iconCategories[_iconCategoryIndex] : "Alle";
+            foreach (IconEntryJson entry in _iconCatalog.All)
+            {
+                if (category == "Alle" || string.Equals(entry.category, category, System.StringComparison.OrdinalIgnoreCase))
+                    _iconFiltered.Add(entry);
+            }
+        }
+
+        private void RefreshIconGallery()
+        {
+            if (_iconGrid == null) return;
+
+            FilterIcons();
+            int pageCount = Mathf.Max(1, (_iconFiltered.Count + IconPageSize - 1) / IconPageSize);
+            _iconPage = Mathf.Clamp(_iconPage, 0, pageCount - 1);
+
+            _iconGrid.Clear();
+            int start = _iconPage * IconPageSize;
+            int end = Mathf.Min(start + IconPageSize, _iconFiltered.Count);
+            for (int i = start; i < end; i++)
+            {
+                IconEntryJson entry = _iconFiltered[i];
+                var cell = new VisualElement();
+                cell.AddToClassList("asset-lab-icon-cell");
+                cell.tooltip = entry.key + " (" + entry.category + ")";
+                var image = new Image
+                {
+                    image = _iconCatalog.GetTexture(entry.key),
+                    scaleMode = ScaleMode.ScaleToFit
+                };
+                cell.Add(image);
+                _iconGrid.Add(cell);
+            }
+
+            if (_iconCategoryLabel != null)
+                _iconCategoryLabel.text = _iconCategories.Count > 0 ? _iconCategories[_iconCategoryIndex] : "Alle";
+            if (_iconPageLabel != null)
+                _iconPageLabel.text = (_iconPage + 1) + "/" + pageCount + " (" + _iconFiltered.Count + ")";
+        }
+
         private string LookName(string slot, int id)
         {
             if (id <= 0) return "Keine";
@@ -507,6 +613,80 @@ namespace Lumiis.Client
                     Destroy(child.gameObject);
             }
             CreateDummies();
+        }
+
+        private void ToggleCharacterGallery()
+        {
+            if (_galleryVisible) HideCharacterGallery();
+            else ShowCharacterGallery();
+        }
+
+        private void ShowCharacterGallery()
+        {
+            if (_galleryVisible || _labRoot == null) return;
+            _galleryVisible = true;
+
+            if (_previewView != null) _previewView.gameObject.SetActive(false);
+            foreach (Transform child in _labRoot.transform)
+            {
+                if (child.name.StartsWith("Trainingspuppe"))
+                    child.gameObject.SetActive(false);
+            }
+
+            _characterGalleryRoot = new GameObject("CharacterSheetGallery");
+            _characterGalleryRoot.transform.SetParent(_labRoot.transform, false);
+            _characterGallery = _characterGalleryRoot.AddComponent<CharacterSheetGallery>();
+            _characterGallery.Build(_previewPosition);
+
+            Button button = _root != null ? _root.Q<Button>("asset-lab-gallery") : null;
+            if (button != null) button.text = "Charakter-Galerie ausblenden";
+        }
+
+        private void HideCharacterGallery()
+        {
+            if (!_galleryVisible) return;
+            _galleryVisible = false;
+
+            if (_characterGalleryRoot != null)
+                Destroy(_characterGalleryRoot);
+            _characterGalleryRoot = null;
+            _characterGallery = null;
+
+            if (_previewView != null) _previewView.gameObject.SetActive(true);
+            if (_labRoot != null)
+            {
+                foreach (Transform child in _labRoot.transform)
+                {
+                    if (child.name.StartsWith("Trainingspuppe"))
+                        child.gameObject.SetActive(true);
+                }
+            }
+
+            Button button = _root != null ? _root.Q<Button>("asset-lab-gallery") : null;
+            if (button != null) button.text = "Charakter-Galerie zeigen";
+        }
+
+        public void DebugShowCharacterGallery()
+        {
+            ShowCharacterGallery();
+        }
+
+        public void DebugSetUiVisible(bool visible)
+        {
+            if (_root != null)
+                _root.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
+        public void DebugShowIconGallery(string category, int page = 0)
+        {
+            if (_iconCategories.Count == 0) return;
+            int index = _iconCategories.FindIndex(c => string.Equals(c, category, System.StringComparison.OrdinalIgnoreCase));
+            _iconCategoryIndex = index >= 0 ? index : 0;
+            _iconPage = Mathf.Max(0, page);
+            RefreshIconGallery();
+
+            ScrollView scroll = _root != null ? _root.Q<ScrollView>() : null;
+            if (scroll != null) scroll.scrollOffset = new Vector2(0f, 500f);
         }
 
         private void CreateDummies()

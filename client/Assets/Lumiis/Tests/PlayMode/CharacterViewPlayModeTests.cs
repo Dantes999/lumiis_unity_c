@@ -98,6 +98,18 @@ namespace Lumiis.Client.Tests.PlayMode
         }
 
         [Test]
+        public void LumiisArchive_IconManifestAndCharacterSheets_AreAvailable()
+        {
+            ItemIconCatalog icons = ItemIconCatalog.LoadFromResources();
+            Assert.Greater(icons.All.Count, 500, "Icon-Manifest wurde nicht oder unvollständig importiert.");
+            Assert.IsNotNull(icons.GetTexture("sword_30"), "sword_30-Icon fehlt.");
+            Assert.IsNotNull(icons.GetTexture("red_s"), "red_s-Trank-Icon fehlt.");
+
+            Assert.IsNotNull(Resources.Load<Texture2D>("Characters/body/warrior_m"), "Krieger-Body-Sheet fehlt.");
+            Assert.IsNotNull(Resources.Load<Texture2D>("Characters/weapon/schwert_02"), "Schwert-Sheet fehlt.");
+        }
+
+        [Test]
         public void SetWeapon_TogglesPlus7AndPlus9GlowByUpgradeLevel()
         {
             _view.SetWeapon(null, Vector2.zero, 6);

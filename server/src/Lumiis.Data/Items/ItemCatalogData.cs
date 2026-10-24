@@ -32,6 +32,9 @@ internal sealed class ItemEntryDto
     /// <summary>Client-Rendering: Standard-Aufwertungsstufe der Item-Vorlage (0-9). Die tatsächliche
     /// Instanzstufe kommt später aus dem Inventar; der Wert dient dem Testboard und als Fallback.</summary>
     public int UpgradeLevel { get; set; }
+
+    /// <summary>Client-Rendering: Icon-Schlüssel aus dem Lumiis-Asset-Archiv (optional).</summary>
+    public string IconKey { get; set; } = "";
 }
 
 internal sealed class PivotOffsetDto

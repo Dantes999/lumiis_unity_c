@@ -628,6 +628,17 @@ Für die Asset-Prüfung ohne Server-/Monster-Gewimmel gibt es eine eigene UI-Too
   `tools/request-screenshot.sh /tmp/mein-bild.png` (schreibt eine Request-Datei, `ScreenshotRequestWatcher`
   nimmt sie beim nächsten Frame auf). Nur der komplett kalte Lauf
   `tools/capture-client-screenshots.sh` startet Unity einmalig im GUI-Modus und beendet es danach.
+- Lumiis-Referenz-Assets: `tools/import-lumiis-assets.py` importiert 533 Gegenstands-Icons aus
+  `~/Desktop/lumiis-assets-archiv/assets/icons` nach `Resources/Icons` (34 Kategorien, Manifest
+  `icon-manifest.json`, Windows-taugliche Dateinamen) und 53 Charakter-Sheets aus
+  `~/Desktop/lumiis/packages/client/public/assets` nach `Resources/Characters`. `ItemIconCatalog`
+  zeigt Icons in Inventar/Ausrüstung/Shop; die Labor-UI hat eine paginierte Icon-Galerie (64/Seite).
+- "Charakter-Galerie" im Labor zeigt acht echte Lumiis-Figuren (Krieger/Ninja/Sura/Schamane, m/w)
+  aus den Sheets (48×48-Zellen, 9 Spalten, 3 Ansichten, Fußpunkt 24/44). Der Screenshot-Lauf legt
+  zusätzlich `/tmp/lumiis-asset-lab-characters.png` ab.
+- Feature-Gap und Kartenplanung: `docs/feature-gap-lumiis.md` (priorisierte Lücken gegenüber
+  `lumiis`/`lumiis-2d`), `docs/icon-integration-plan.md`, `docs/map-import-plan.md`. Mehrkarten/
+  Portale bleiben ein eigener Server-Umbau; der Plan beschreibt Konvertierung und MapCatalog.
 
 ## Escape-Menü
 Seit der Aufgabe `escape-menu.md` gibt es ein kleines Escape-Menü mit drei Aktionen - rein clientseitig,
@@ -975,9 +986,19 @@ Status). M6c Upgrade/M6d Lumiis-Steine bleiben weiterhin zurückgestellt.
   (4) `PlaceholderSpriteProvider.DrawWeapon` zeichnet jetzt Griff/Parierstange/Klinge statt eines
   dünnen Rechtecks, falls ein PNG fehlt. (5) Schnelle Screenshot-Verifikation ohne Unity-Neustart:
   F12/Button im Labor, `ScreenshotRequestWatcher` + `tools/request-screenshot.sh` für laufende
-  Play-Modi sowie `tools/capture-client-screenshots.sh` als einmaliger GUI-Lauf. 11/11 PlayMode-Tests
-  grün; die automatisch erzeugten Bilder (`/tmp/lumiis-asset-lab-plus0.png`, `-plus9.png`, `-attack.png`)
-  zeigen Labor-UI, Vorschaufigur, Trainingspuppen, Waffe, +9-Glitzern und Trail.
+  Play-Modi sowie `tools/capture-client-screenshots.sh` als einmaliger GUI-Lauf. 12/12 PlayMode-Tests
+  grün; die automatisch erzeugten Bilder (`/tmp/lumiis-asset-lab-plus0.png`, `-plus9.png`, `-attack.png`,
+  `-icons.png`, `-characters.png`) zeigen Labor-UI, Vorschaufigur, Trainingspuppen, Waffe, +9-Glitzern, Trail und die
+  acht echten Lumiis-Charaktere.
+- Lumiis-Referenz-Assets: (1) `tools/import-lumiis-assets.py` importiert 533 Icons (34 Kategorien)
+  aus dem Asset-Archiv nach `Resources/Icons`, inkl. Windows-sauberer Dateinamen, Manifest,
+  deterministischer `.meta`-Dateien und Provenance-Einträgen. (2) `ItemIconCatalog` + `iconKey`
+  zeigen Icons in Inventar/Ausrüstung/Shop; die Labor-UI hat eine paginierte Icon-Galerie
+  (64 Icons/Seite, Kategorie-Filter). (3) 53 echte Charakter-Sheets aus dem Lumiis-Referenzprojekt
+  unter `Resources/Characters`; `CharacterSheetGallery` zeigt Krieger/Ninja/Sura/Schamane (m/w) im
+  Labor und der Screenshot-Lauf legt `/tmp/lumiis-asset-lab-characters.png` ab. (4) Feature-Gap-,
+  Icon- und Kartenplanung als `docs/feature-gap-lumiis.md`, `docs/icon-integration-plan.md`,
+  `docs/map-import-plan.md`. 555 Server-/Unit-Tests und 12 PlayMode-Tests grün.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client
 War kein Codefehler. User hat den Test mit fokussiertem Unity-Fenster wiederholt (Server, Unity Play, dann Bots
 gestartet, ins Unity-Fenster geklickt): alle Spawns kamen an, auch mit 99 Bots. Wahrscheinliche Ursache war die
@@ -1061,4 +1082,8 @@ Voraussetzung: laufender Server, Charakter ausgewählt; Editor-Play oder Develop
   sind Server-Figuren/Monster wieder normal sichtbar.
 - **F12** oder "Screenshot aufnehmen" im Labor erzeugt sofort ein PNG unter `/tmp`; alternativ
   `tools/request-screenshot.sh` aus einer Shell, während Unity im Play-Modus läuft (kein Neustart).
+- Icon-Galerie: Kategorie/Seite durchklicken; es werden 64 Icons je Seite aus dem importierten
+  Lumiis-Archiv angezeigt (533 Icons, 34 Kategorien).
+- "Charakter-Galerie zeigen": acht echte Lumiis-Figuren (Krieger/Ninja/Sura/Schamane, m/w) mit
+  Waffe/Rüstung; der automatische Screenshot-Lauf legt `/tmp/lumiis-asset-lab-characters.png` ab.
 - F1 zeigt außerhalb des Labors wieder das gewohnte Debug-Overlay und -Panel.
