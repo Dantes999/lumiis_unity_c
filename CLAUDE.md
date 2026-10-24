@@ -669,6 +669,9 @@ eine Gruppen-MVP (Protocol.Version 14):
   voller Resync (LeaderEntityId + Name/Level/HP der Mitglieder). Das HUD zeigt ein Party-Panel mit
   Leader-Markierung, HP und Verlassen-Knopf; HP wird bei Treffern/Heilung/Respawn aktualisiert.
   Kein DB-Save, keine Rollen, keine EXP-Teilung in diesem MVP.
+- Audio (P1-Platzhalter): `AudioService` erzeugt Schwung-, Treffer-, Kill-, Schaden-, Loot-, Level-Up-
+  und Klick-Clips prozedural (keine Audiodateien) und spielt sie bei Angriff/Skill, EntityDamaged,
+  EntityDied, Inventar-Zuwachs und Levelaufstieg. Kein Musiksystem, noch kein Mute-UI.
 
 ## Escape-Menü
 Seit der Aufgabe `escape-menu.md` gibt es ein kleines Escape-Menü mit drei Aktionen - rein clientseitig,

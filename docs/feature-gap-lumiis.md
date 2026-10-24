@@ -37,7 +37,7 @@ Gruppe, keine Quests, keine Lumiis-Steine, keine Bosse, kein Audio, keine echten
 |---|---|---|---|
 | Lumiis-Steine + ein Boss (Wellen 75/50/25 %, Loot, Respawn, Client-View) | explizit Alpha-Umfang; fehlt | `lumiis-2d/shared/metins.js`, `server/metin.js`, `server/stages/` | L |
 | Aufwertung +0…+9 (DB-Stufen, Material/Schutzrolle, Pakete, UI) | Design liegt fertig vor; günstiger Alpha-Gewinn | `docs/tasks/M6c-upgrade.md` | M |
-| Audio + konsistente Kampf-/Loot-VFX | kein Audio-Code; VFX nur Ringe/Linien/Trail | `lumiis/packages/client/src/audio.ts`, `scene/skill-effects.ts`, `swing-trail.ts` | M |
+| Audio + konsistente Kampf-/Loot-VFX | **Audio-Platzhalter umgesetzt** (`AudioService`, prozedurale Clips); VFX weiterhin nur Ringe/Linien/Trail | `lumiis/packages/client/src/audio.ts` | –/M |
 | Item-Icons/Tooltips + kleines Content-Paket | Icons sind jetzt importiert; Item-Katalog noch 8 Einträge | `Resources/Icons`, `ItemIconCatalog`, `data/items.json` | S–M |
 | Lesbare Kartenoptik / Feldkarte | Boden ist Platzhalter-Checker; Alpha nennt Startdorf + Feld | `PlaceholderSprites.cs`, `data/maps/village/collision-source.png` | M–L |
 | Rate-Limits (Verbindung/Chat), Auth-Brute-Force-Schutz, Backups | M8 Alpha-Betrieb | `ServerConfig`, `AuthEndpoints`; Referenz `lumiis/packages/server/src/net/gateway.ts`, `lumiis-2d/docs/SECURITY.md` | S–M |

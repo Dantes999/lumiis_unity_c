@@ -45,6 +45,7 @@ namespace Lumiis.Client
         private SkillCatalogClient _skillCatalog;
         private ClassCatalogClient _classCatalog;
         private CachingSpriteProvider _spriteProvider;
+        private AudioService _audio;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private CharacterTestboard _testboard;
         private CharacterTestboard _sortingTestboard;
@@ -192,6 +193,8 @@ namespace Lumiis.Client
                 throw;
             }
             _spriteProvider = new CachingSpriteProvider(new PlaceholderSpriteProvider(_lookCatalog.CanvasPx, _lookCatalog.Ppu));
+            _audio = gameObject.AddComponent<AudioService>();
+            _audio.Initialize();
 
             try
             {
@@ -357,6 +360,7 @@ namespace Lumiis.Client
             int targetEntityId = requiresTarget && _targetEntityId >= 0 ? _targetEntityId : 0;
             _netClient.SendUseSkill(skillId, targetEntityId);
             PlayAttackAnimation(_world.LocalEntityId);
+            _audio?.PlaySwing();
 
             // Optimistische lokale Cooldown-Anzeige (siehe SkillCooldownReadyAtTime-Kommentar) - nur wenn der
             // Skill laut letztem CharacterStatsPacket tatsächlich gelernt ist, sonst gäbe es einen falschen
@@ -1057,6 +1061,7 @@ namespace Lumiis.Client
                 _targetEntityId = kvp.Key;
                 _netClient.SendAttack(kvp.Key);
                 PlayAttackAnimation(_world.LocalEntityId);
+                _audio?.PlaySwing();
                 // Kampf-Visualisierung Abschnitt 5: sofort lokal zum Ziel drehen, bevor die Serverantwort da
                 // ist - kein dauerhafter Override, der naechste HandleEntityMove ueberschreibt das wieder.
                 if (_world.LocalEntityId >= 0 && _world.Entities.TryGetValue(kvp.Key, out ClientEntity attackTarget))
@@ -1168,6 +1173,8 @@ namespace Lumiis.Client
                 _world.HandleEntityDamaged(damaged.TargetEntityId, damaged.TargetHpAfter, damaged.TargetMaxHp);
                 SpawnHitLine(damaged.AttackerEntityId, damaged.TargetEntityId, hit: true);
                 PlayAttackAnimation(damaged.AttackerEntityId);
+                if (damaged.TargetEntityId == _world.LocalEntityId) _audio?.PlayHurt();
+                else _audio?.PlayHit();
                 return;
             }
 
@@ -1183,6 +1190,7 @@ namespace Lumiis.Client
             {
                 _world.HandleEntityDied(died.EntityId);
                 if (died.EntityId == _world.LocalEntityId) _isDead = true;
+                _audio?.PlayKill();
                 return;
             }
 
@@ -1203,12 +1211,14 @@ namespace Lumiis.Client
             InventorySyncPacket inventorySync = packet as InventorySyncPacket;
             if (inventorySync != null)
             {
+                int previousInventoryCount = _inventorySlots.Count;
                 _inventorySlots.Clear();
                 _inventorySlots.AddRange(inventorySync.Slots);
                 _equippedArmorItemId = inventorySync.EquippedArmorItemId;
                 _equippedHelmetItemId = inventorySync.EquippedHelmetItemId;
                 _equippedWeaponItemId = inventorySync.EquippedWeaponItemId;
                 _equippedShieldItemId = inventorySync.EquippedShieldItemId;
+                if (_inventorySlots.Count > previousInventoryCount) _audio?.PlayLoot();
                 ApplyLocalWeaponVisual();
                 return;
             }
@@ -1257,7 +1267,10 @@ namespace Lumiis.Client
                 int previousLevel = _world.CharacterStats.Level;
                 _world.ApplyCharacterStats(characterStats);
                 if (previousLevel > 0 && characterStats.Level > previousLevel)
+                {
                     _lastLevelUpMessage = "Level Up! Level " + characterStats.Level;
+                    _audio?.PlayLevelUp();
+                }
                 return;
             }
 
