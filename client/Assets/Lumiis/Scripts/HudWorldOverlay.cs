@@ -123,7 +123,7 @@ namespace Lumiis.Client
                     _nameplates.Add(id, label);
                 }
 
-                string text = entity.Name;
+                string text = entity.Level > 0 && entity.Kind != EntityKind.Npc && id != world.LocalEntityId ? "Lv " + entity.Level + " " + entity.Name : entity.Name;
                 if (label.text != text) label.text = text;
                 bool dead = entity.CurrentHp == 0;
                 label.EnableInClassList("hud-nameplate-target", id == _gameClient.TargetEntityId);
