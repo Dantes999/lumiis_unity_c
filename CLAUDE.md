@@ -668,7 +668,7 @@ eine Gruppen-MVP (Protocol.Version 14):
   (`PartyState`, `EntityId -> Party`), Leiterwechsel beim Verlassen; `PartyChangedPacket` (1021) ist ein
   voller Resync (LeaderEntityId + Name/Level/HP der Mitglieder). Das HUD zeigt ein Party-Panel mit
   Leader-Markierung, HP und Verlassen-Knopf; HP wird bei Treffern/Heilung/Respawn aktualisiert.
-  Kein DB-Save, keine Rollen, keine EXP-Teilung in diesem MVP.
+  Kein DB-Save, keine Rollen. EXP-Teilen: andere Gruppenmitglieder erhalten die Hälfte des Kill-XP (mind. 1) und ein CharacterStatsPacket; bei Levelaufstieg sofortiger Save.
 - Audio (P1-Platzhalter): `AudioService` erzeugt Schwung-, Treffer-, Kill-, Schaden-, Loot-, Level-Up-
   und Klick-Clips prozedural (keine Audiodateien) und spielt sie bei Angriff/Skill, EntityDamaged,
   EntityDied, Inventar-Zuwachs und Levelaufstieg. Kein Musiksystem, noch kein Mute-UI.
@@ -1032,7 +1032,7 @@ Status). M6c Upgrade/M6d Lumiis-Steine bleiben weiterhin zurückgestellt.
   unter `Resources/Characters`; `CharacterSheetGallery` zeigt Krieger/Ninja/Sura/Schamane (m/w) im
   Labor und der Screenshot-Lauf legt `/tmp/lumiis-asset-lab-characters.png` ab. (4) Feature-Gap-,
   Icon- und Kartenplanung als `docs/feature-gap-lumiis.md`, `docs/icon-integration-plan.md`,
-  `docs/map-import-plan.md`. 560 Server-/Unit-Tests und 13 PlayMode-Tests grün.
+  `docs/map-import-plan.md`. 561 Server-/Unit-Tests und 13 PlayMode-Tests grün.
 - M7-HUD + Chat-MVP: (1) `Hud.uxml`/`HudController` zeigen Name/Level, HP/SP/EXP/Yang, Ziel + HP,
   Meldungen, vier Skill-Slots mit Cooldowns, aktive Buffs und einen Chat mit Karte/Global/Flüstern.
   Das alte IMGUI-Overlay bleibt F1-Debug. (2) Chat-Protokoll: `ChatRequestPacket` (16),

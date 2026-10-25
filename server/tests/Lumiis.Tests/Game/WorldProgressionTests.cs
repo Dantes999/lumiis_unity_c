@@ -197,6 +197,20 @@ namespace Lumiis.Tests.Game
             Assert.False(leveledUp);
         }
 
+        [Fact]
+        public void GrantXp_PartyShare_AppliesAmountAndLevelUps()
+        {
+            World world = NewWorld(xpPerLevel: 100);
+            Entity player = JoinWithClass(world, 1, KriegerClassDef(), level: 1);
+
+            (long xpGained, bool leveledUp) = world.GrantXp(player, 250);
+
+            Assert.Equal(250, xpGained);
+            Assert.True(leveledUp);
+            Assert.Equal(3, player.Level);
+            Assert.Equal(50, player.Xp);
+        }
+
         // ---- Punkteverteilung ----
 
         [Fact]

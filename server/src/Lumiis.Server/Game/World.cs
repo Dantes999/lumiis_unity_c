@@ -531,14 +531,28 @@ public sealed class World
         if (percent <= 0) return (0, false);
 
         long xpGained = Math.Max(1, monsterBaseXp * (long)percent / 100);
+        return ApplyXp(player, xpGained);
+    }
+
+    /// <summary>M7-Party: verteilt eine bereits berechnete XP-Menge (z. B. die Hälfte des Kill-XP an
+    /// Gruppenmitglieder). Dieselbe Levelaufstiegs-/Heil-Logik wie AwardXp, nur ohne Monsterformel.</summary>
+    internal (long XpGained, bool LeveledUp) GrantXp(Entity player, long amount)
+    {
+        if (amount <= 0 || _progressionCatalog == null || player.ClassDef == null) return (0, false);
+        if (player.Level >= _progressionCatalog.MaxLevel) return (0, false);
+        return ApplyXp(player, amount);
+    }
+
+    private (long XpGained, bool LeveledUp) ApplyXp(Entity player, long xpGained)
+    {
         player.Xp += xpGained;
 
         bool leveledUp = false;
-        while (player.Level < _progressionCatalog.MaxLevel && player.Xp >= _progressionCatalog.XpToNextLevel(player.Level))
+        while (player.Level < _progressionCatalog!.MaxLevel && player.Xp >= _progressionCatalog.XpToNextLevel(player.Level))
         {
             player.Xp -= _progressionCatalog.XpToNextLevel(player.Level);
             player.Level++;
-            player.UnspentStatPoints += player.ClassDef.StatPointsPerLevel;
+            player.UnspentStatPoints += player.ClassDef!.StatPointsPerLevel;
             player.UnspentSkillPoints += player.ClassDef.SkillPointsPerLevel;
             RecomputeDerivedStats(player);
             player.CurrentHp = player.MaxHp;

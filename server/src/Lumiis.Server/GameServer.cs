@@ -1247,6 +1247,7 @@ public sealed class GameServer : INetEventListener
             conn.Peer.SendPacket(BuildCharacterStatsPacket(xpEntity!));
             if (result.LeveledUp && xpEntity!.CharacterId is int levelCharacterId)
                 _characterSaveChannel.Writer.TryWrite(BuildCharacterSaveRequest(xpEntity));
+            SharePartyXp(attackerId, result.XpAwarded);
         }
 
         // M5a: Drops (siehe World.TryAttack) - bei Erfolg InventorySyncPacket an den Angreifer selbst (das
@@ -1631,6 +1632,28 @@ public sealed class GameServer : INetEventListener
     {
         if (_partyByEntityId.TryGetValue(entityId, out PartyState? party))
             SendPartyChanged(party);
+    }
+
+    /// <summary>M7-Party: andere Gruppenmitglieder erhalten die Hälfte des Kill-XP (mind. 1) und ein
+    /// CharacterStatsPacket; bei Levelaufstieg wird sofort gespeichert. Kein Distanz-Check (eine Karte).</summary>
+    private void SharePartyXp(int attackerId, long xpAwarded)
+    {
+        if (xpAwarded <= 0 || !_partyByEntityId.TryGetValue(attackerId, out PartyState? party)) return;
+        long share = Math.Max(1, xpAwarded / 2);
+
+        foreach (int memberId in party.Members)
+        {
+            if (memberId == attackerId) continue;
+            if (!_world.TryGet(memberId, out Entity? member) || member == null) continue;
+
+            (long gained, bool leveledUp) = _world.GrantXp(member, share);
+            if (gained <= 0) continue;
+
+            ConnectionState? memberConn = FindConnectionByEntityId(memberId);
+            memberConn?.Peer.SendPacket(BuildCharacterStatsPacket(member));
+            if (leveledUp && member.CharacterId is int characterId)
+                _characterSaveChannel.Writer.TryWrite(BuildCharacterSaveRequest(member));
+        }
     }
 
     /// <summary>Baut ein volles InventorySyncPacket aus dem aktuellen Entity-Zustand (M5a) - Resync, kein
