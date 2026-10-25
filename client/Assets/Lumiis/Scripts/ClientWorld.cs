@@ -1,3 +1,5 @@
+// Unity kompiliert ohne Nullable-Kontext; diese Datei wird zusätzlich in Lumiis.Tests (Nullable an) eingebunden.
+#nullable disable
 using System;
 using System.Collections.Generic;
 using Lumiis.Shared;
@@ -174,7 +176,7 @@ namespace Lumiis.Client
         /// Zielposition neu an. Fremde Entities der neuen Karte kommen danach über EntitySpawn (AOI-Diff).</summary>
         public void HandleMapChanged(int entityId, int x, int y, string mapId, string mapName, int mapWidth, int mapHeight)
         {
-            ClientEntity? local = LocalEntityId >= 0 && _entities.TryGetValue(LocalEntityId, out ClientEntity? existing)
+            ClientEntity local = LocalEntityId >= 0 && _entities.TryGetValue(LocalEntityId, out ClientEntity existing)
                 ? existing : null;
             string name = local?.Name ?? "";
             Appearance appearance = local?.Appearance ?? default;

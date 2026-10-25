@@ -234,8 +234,8 @@ namespace Lumiis.Tests.Integration
             Assert.True(map1Monsters.Count > 400);
             Assert.Equal(6, greenfieldMonsters.Count);
             Assert.Empty(map1Monsters.Select(m => m.Id).Intersect(greenfieldMonsters.Select(m => m.Id)));
-            Assert.NotEmpty(fixture.Server.WorldForMap("map1").Entities.Where(e => e.Kind == EntityKind.Npc));
-            Assert.Empty(fixture.Server.WorldForMap("greenfield").Entities.Where(e => e.Kind == EntityKind.Npc));
+            Assert.Contains(fixture.Server.WorldForMap("map1").Entities, e => e.Kind == EntityKind.Npc);
+            Assert.DoesNotContain(fixture.Server.WorldForMap("greenfield").Entities, e => e.Kind == EntityKind.Npc);
         }
 
         [Fact]
@@ -2282,7 +2282,7 @@ namespace Lumiis.Tests.Integration
                     client.Send(new BuyItemRequestPacket { NpcEntityId = npcEntityId, ItemId = 1 });
                     Assert.True(Pump(() => client.Received.OfType<InventorySyncPacket>().Any(s => s.Slots.Any(slot => slot.ItemId == 1)), server, client));
 
-                    client.Peer.Disconnect();
+                    client.Peer!.Disconnect();
                     Assert.True(Pump(() => client.Disconnected, server, client));
                 }
 

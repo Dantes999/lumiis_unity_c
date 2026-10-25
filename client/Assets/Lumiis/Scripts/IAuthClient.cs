@@ -1,3 +1,5 @@
+// Unity kompiliert ohne Nullable-Kontext; diese Datei wird zusätzlich in Lumiis.Tests (Nullable an) eingebunden.
+#nullable disable
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Lumiis.Shared.Net;
