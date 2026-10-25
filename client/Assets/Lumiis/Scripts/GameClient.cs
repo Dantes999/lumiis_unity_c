@@ -1202,7 +1202,9 @@ namespace Lumiis.Client
             direction.Normalize();
 
             Vector3 position = LocalPlayerWorldPosition;
-            Vector3 target = position + new Vector3(direction.x, direction.y, 0f) * 2.5f;
+            // Etwas weiter voraus als ein Server-Tick, damit ein einzelnes verzögertes MoveTo nicht sofort
+            // zum Stehen kommt; der Server klemmt/kollidiert weiterhin autoritativ.
+            Vector3 target = position + new Vector3(direction.x, direction.y, 0f) * 4f;
             int wireX = Mathf.RoundToInt(target.x * 100f);
             int wireY = Mathf.RoundToInt(target.y * 100f);
             _netClient.SendMoveTo(wireX, wireY);
