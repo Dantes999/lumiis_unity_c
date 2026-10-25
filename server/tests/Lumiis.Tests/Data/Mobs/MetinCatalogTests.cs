@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using Lumiis.Data.Mobs;
 using Xunit;
 
@@ -43,6 +45,43 @@ namespace Lumiis.Tests.Data.Mobs
                 { ""hpPercent"": 100, ""mobId"": 1, ""count"": 1 } ] } ] }";
 
             Assert.Throws<MetinCatalogException>(() => MetinCatalog.LoadFromJson(json));
+        }
+
+        [Fact]
+        public void ValidateAgainst_MissingWaveMob_Throws()
+        {
+            MetinCatalog catalog = MetinCatalog.LoadFromJson(ValidJson);
+            MobCatalog mobs = MobCatalog.LoadFromJson(@"{
+  ""mobs"": [
+    { ""id"": 3, ""name"": ""Stein"", ""speedWire"": 1, ""wanderRadiusWire"": 1, ""wanderIntervalMinMs"": 1000, ""wanderIntervalMaxMs"": 2000, ""maxHp"": 100, ""attack"": 1, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 1, ""meleeRangeWire"": 100, ""attackCooldownMs"": 500, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 100, ""level"": 1, ""baseXp"": 1 }
+  ]
+}");
+
+            Assert.Throws<MetinCatalogException>(() => catalog.ValidateAgainst(mobs));
+        }
+
+        [Fact]
+        public void LoadFromFile_RealData_ValidatesAgainstMobs()
+        {
+            string root = ResolveRepoRoot();
+            string data = Path.Combine(root, "data");
+            MetinCatalog metins = MetinCatalog.LoadFromFile(Path.Combine(data, "metins.json"));
+            MobCatalog mobs = MobCatalog.LoadFromFile(Path.Combine(data, "mobs.json"));
+
+            metins.ValidateAgainst(mobs);
+            Assert.True(metins.TryGet(3, out MetinDefinition stone));
+            Assert.Equal(3, stone.Waves.Count);
+        }
+
+        private static string ResolveRepoRoot()
+        {
+            DirectoryInfo? dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while (dir != null)
+            {
+                if (File.Exists(Path.Combine(dir.FullName, "data", "metins.json"))) return dir.FullName;
+                dir = dir.Parent;
+            }
+            throw new FileNotFoundException("Repo-Root mit data/metins.json nicht gefunden.");
         }
 
         [Fact]

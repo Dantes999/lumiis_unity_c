@@ -121,6 +121,24 @@ public sealed class MetinCatalog
     }
 
     public IReadOnlyCollection<MetinDefinition> All => _byMobId.Values;
+
+    /// <summary>Validiert alle Stein- und Wellen-MobIds gegen den geladenen MobCatalog. Wird beim
+    /// Serverstart aufgerufen (siehe Program.cs), damit ein Tippfehler in metins.json fail-fast auffaellt.</summary>
+    public void ValidateAgainst(MobCatalog mobCatalog)
+    {
+        foreach (MetinDefinition metin in _byMobId.Values)
+        {
+            if (!mobCatalog.TryGet(metin.MobId, out MobDefinition stone))
+                throw new MetinCatalogException($"metins.json: Stein-MobId {metin.MobId} existiert nicht in mobs.json.");
+
+            foreach (MetinWave wave in metin.Waves)
+            {
+                if (!mobCatalog.TryGet(wave.MobId, out _))
+                    throw new MetinCatalogException(
+                        $"metins.json: Mob {metin.MobId} ({stone.Name}) verweist in einer Welle auf unbekannte MobId {wave.MobId}.");
+            }
+        }
+    }
 }
 
 public sealed class MetinCatalogException : Exception
