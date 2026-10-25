@@ -1548,12 +1548,10 @@ public sealed class GameServer : INetEventListener
         {
             SendToVisible(targetEntityId, new EntityDiedPacket { EntityId = targetEntityId });
 
+            // Kein EntityStop für tote Spieler: die Clients frieren die Figur bei EntityDied selbst ein
+            // (ClientWorld.HandleEntityDied). Ein Stop hier hob beim Toten die Eingabesperre sofort wieder auf.
             if (result.TargetKind == EntityKind.Monster)
                 BroadcastDespawn(targetEntityId);
-            else if (TryGetEntity(targetEntityId, out Entity? deadPlayer) && deadPlayer != null)
-                // World.ApplyDamage hat die Bewegung schon gestoppt - ohne dieses Stop liefe die Figur bei
-                // allen Beobachtern bis zum alten Ziel weiter.
-                SendToVisible(targetEntityId, new EntityStopPacket { EntityId = targetEntityId, X = deadPlayer.IntX, Y = deadPlayer.IntY });
         }
     }
 

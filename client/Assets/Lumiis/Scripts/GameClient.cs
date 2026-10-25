@@ -1363,7 +1363,9 @@ namespace Lumiis.Client
             if (_world.LocalEntityId < 0 || !_world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity local))
                 return -1;
 
-            float maxDistance = _classCatalog != null ? _classCatalog.MeleeRangeWire / 100f + 0.7f : 2.2f;
+            // Exakt die Server-Reichweite (ohne Zuschlag), gemessen an den Server-Pfadpositionen statt der
+            // geglätteten Anzeige - sonst wählte der Client Ziele, die der Server als "außer Reichweite" ablehnt.
+            float maxDistance = _classCatalog != null ? _classCatalog.MeleeRangeWire / 100f : 1.5f;
 
             if (_targetEntityId >= 0
                 && _world.Entities.TryGetValue(_targetEntityId, out ClientEntity selected)
@@ -1409,8 +1411,8 @@ namespace Lumiis.Client
 
         private static float Distance(ClientEntity a, ClientEntity b)
         {
-            float dx = (float)((a.X - b.X) / 100.0);
-            float dy = (float)((a.Y - b.Y) / 100.0);
+            float dx = (float)((a.PathX - b.PathX) / 100.0);
+            float dy = (float)((a.PathY - b.PathY) / 100.0);
             return Mathf.Sqrt(dx * dx + dy * dy);
         }
 
@@ -1653,10 +1655,6 @@ namespace Lumiis.Client
             if (stop != null)
             {
                 _world.HandleEntityStop(stop.EntityId, stop.X, stop.Y);
-                // Eine dead player kann sich nicht bewegen - jeder Stop nach dem eigenen Tod ist also der
-                // Respawn (Kartenmitte, siehe World.Tick/GameServer). Kein eigenes "Respawned"-Paket nötig,
-                // siehe CLAUDE.md Abschnitt "Kampf".
-                if (_isDead && stop.EntityId == _world.LocalEntityId) _isDead = false;
                 return;
             }
 
@@ -1676,6 +1674,10 @@ namespace Lumiis.Client
             if (hpChanged != null)
             {
                 _world.HandleEntityHpChanged(hpChanged.EntityId, hpChanged.CurrentHp, hpChanged.MaxHp);
+                // Respawn erkennt der Client an wieder positiven HP der eigenen Figur (der Server schickt
+                // beim Respawn EntityHpChanged). Früher war es "jedes EntityStop nach dem Tod" - das kam aber
+                // auch sofort nach dem Tod und hob die Eingabesperre auf.
+                if (_isDead && hpChanged.EntityId == _world.LocalEntityId && hpChanged.CurrentHp > 0) _isDead = false;
                 return;
             }
 

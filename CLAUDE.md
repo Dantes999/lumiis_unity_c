@@ -1335,6 +1335,13 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   `MobDefinition.FightsBack`/`Entity.FightsBack`) - bei false erfasst der Mob auch nach einem Treffer kein Ziel.
   `EntitySpawnPacket.Level` (Protocol 21): Level von Monster/Spieler beim Erscheinen, `ClientEntity.Level` -
   für Namensschild/Zielanzeige (Spieler-Levelaufstiege danach aktualisieren es bisher nicht).
+- Bugfix Tod/Reichweite (2026-10-25): Nach dem Tod konnte man weiter schlagen/Skills auslösen, weil der Server
+  direkt nach EntityDied ein EntityStop schickte und der Client jedes Stop nach dem Tod als Respawn wertete.
+  Jetzt kein Stop mehr beim Tod (Clients frieren die Figur in `ClientWorld.HandleEntityDied` ein), Respawn
+  erkennt der Client an `EntityHpChanged` mit HP > 0. Auto-Target wählte Ziele bis 0,7 Einheiten über der
+  Server-Reichweite ("Treffer" sichtbar, Server: außer Reichweite) - jetzt exakte `MeleeRangeWire` an den
+  Server-Pfadpositionen, dazu serverseitig `GameConstants.PlayerMeleeRangeToleranceWire` (50) als
+  Latenz-Spanne nur für Spieler-Angriffe/-Skills. 697 Tests grün.
 - Offen: Monster-Sheets für die Jayang-Mobs, weitere Zonen/Dungeons, Reittiere; siehe
   `docs/feature-gap-lumiis.md`.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client

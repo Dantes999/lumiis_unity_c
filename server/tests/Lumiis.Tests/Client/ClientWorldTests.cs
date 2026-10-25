@@ -45,6 +45,25 @@ namespace Lumiis.Tests.Client
         }
 
         [Fact]
+        public void HandleEntityDied_StopsMovementAtCurrentPosition()
+        {
+            var world = new ClientWorld();
+            world.HandleJoinAccepted(entityId: 1, x: 50000, y: 50000, localName: "Me", appearance: SomeAppearance);
+            world.HandleEntitySpawn(entityId: 2, name: "Bot", kind: EntityKind.Player, typeId: 0, x: 40000, y: 40000, appearance: SomeAppearance);
+            world.HandleEntityMove(entityId: 2, startX: 40000, startY: 40000, targetX: 41000, targetY: 40000, speed: 500, receivedAtTime: 1.0);
+            world.Tick(currentTime: 1.5);
+
+            world.HandleEntityDied(2);
+            double xAtDeath = world.Entities[2].X;
+            world.Tick(currentTime: 3.0);
+
+            Assert.False(world.Entities[2].IsMoving);
+            Assert.Equal(0, world.Entities[2].CurrentHp);
+            Assert.InRange(world.Entities[2].X, xAtDeath - 1, xAtDeath + 1);
+            Assert.True(world.Entities[2].X < 41000);
+        }
+
+        [Fact]
         public void EntitySpawn_MultipleLaterJoiners_AllCreated()
         {
             var world = new ClientWorld();

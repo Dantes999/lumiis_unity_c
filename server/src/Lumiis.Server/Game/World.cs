@@ -522,8 +522,8 @@ public sealed class World
 
         long dx = attacker.IntX - target.IntX;
         long dy = attacker.IntY - target.IntY;
-        long rangeSq = (long)attacker.MeleeRangeWire * attacker.MeleeRangeWire;
-        if (dx * dx + dy * dy > rangeSq)
+        long range = EffectiveMeleeRangeWire(attacker);
+        if (dx * dx + dy * dy > range * range)
             return AttackResult.Fail(AttackFailedReason.OutOfRange);
 
         attacker.AttackReadyAtMs = nowMs + EffectiveAttackCooldownMs(attacker);
@@ -534,6 +534,11 @@ public sealed class World
     /// <summary>Nur Spieler und Monster nehmen am Kampf teil - NPCs und Boden-Drops (GroundItem) sind nie
     /// angreifbar, weder per normalem Angriff noch per Wuchtschlag/Kreisschlag.</summary>
     private static bool IsCombatKind(EntityKind kind) => kind == EntityKind.Player || kind == EntityKind.Monster;
+
+    /// <summary>Nahkampf-Reichweite für die Treffer-Prüfung: Spieler bekommen
+    /// GameConstants.PlayerMeleeRangeToleranceWire als Latenz-Spanne dazu, Monster nicht.</summary>
+    private static long EffectiveMeleeRangeWire(Entity attacker) =>
+        attacker.MeleeRangeWire + (attacker.Kind == EntityKind.Player ? GameConstants.PlayerMeleeRangeToleranceWire : 0);
 
     /// <summary>M6b: normaler Angriffs-Cooldown, ggf. durch einen aktiven Hast-Buff verkürzt (siehe
     /// docs/tasks/M6b-skills.md Abschnitt 0d) - effektiver Cooldown = Basis * (100 - CooldownReductionPercent)
@@ -943,8 +948,8 @@ public sealed class World
 
         long dx = user.IntX - target.IntX;
         long dy = user.IntY - target.IntY;
-        long rangeSq = (long)user.MeleeRangeWire * user.MeleeRangeWire;
-        if (dx * dx + dy * dy > rangeSq)
+        long range = EffectiveMeleeRangeWire(user);
+        if (dx * dx + dy * dy > range * range)
             return SkillUseResult.Fail(UseSkillFailedReason.OutOfRange);
 
         ConsumeSkillUse(user, skillDef.Id, levelData, nowMs);

@@ -353,6 +353,11 @@ namespace Lumiis.Client
         {
             if (!_entities.TryGetValue(entityId, out ClientEntity entity)) return;
             entity.CurrentHp = 0;
+            // Tote laufen nicht weiter: Pfad an der aktuellen Server-Position anhalten (der Server stoppt die
+            // Bewegung in World.ApplyDamage, schickt dafür aber bewusst kein EntityStop).
+            entity.IsMoving = false;
+            entity.StartX = entity.TargetX = (int)Math.Round(entity.PathX);
+            entity.StartY = entity.TargetY = (int)Math.Round(entity.PathY);
         }
 
         /// <summary>Aktualisiert die interpolierte Position aller bewegten Entities für den gegebenen Zeitpunkt (Sekunden, Client-Uhr).</summary>

@@ -1,4 +1,5 @@
 using Lumiis.Server.Game;
+using Lumiis.Shared;
 using Lumiis.Shared.Net;
 using Xunit;
 
@@ -73,6 +74,31 @@ namespace Lumiis.Tests.Game
 
             Assert.True(result.Success);
             Assert.Null(dummy.TargetEntityId);
+        }
+
+        [Fact]
+        public void TryAttack_PlayerSlightlyBeyondRange_HitsWithinLatencyTolerance()
+        {
+            var world = new World(maxPlayers: 10);
+            Entity player = JoinPlayer(world);
+            Entity monster = SpawnMonster(world);
+            monster.Teleport(50000 + 150 + GameConstants.PlayerMeleeRangeToleranceWire, 50000);
+
+            Assert.True(world.TryAttack(player.Id, monster.Id, nowMs: 0).Success);
+        }
+
+        [Fact]
+        public void TryAttack_PlayerBeyondTolerance_FailsOutOfRange()
+        {
+            var world = new World(maxPlayers: 10);
+            Entity player = JoinPlayer(world);
+            Entity monster = SpawnMonster(world);
+            monster.Teleport(50000 + 150 + GameConstants.PlayerMeleeRangeToleranceWire + 1, 50000);
+
+            AttackResult result = world.TryAttack(player.Id, monster.Id, nowMs: 0);
+
+            Assert.False(result.Success);
+            Assert.Equal(AttackFailedReason.OutOfRange, result.Reason);
         }
     }
 }

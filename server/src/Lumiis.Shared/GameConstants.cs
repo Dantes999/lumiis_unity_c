@@ -40,5 +40,11 @@ namespace Lumiis.Shared
 
         /// <summary>Reichweite (1/100 Welteinheiten), in der ein Spieler einen Boden-Drop aufheben kann.</summary>
         public const int PickupRangeWire = 300;
+
+        /// <summary>Spielbarkeit: Toleranz auf die Nahkampf-Reichweite, wenn ein SPIELER angreift (Wire). Der
+        /// Client sieht laufende Monster mit Netzwerkverzögerung, ohne Spanne meldete der Server bei sichtbar
+        /// angrenzenden Zielen "außer Reichweite". Der Client wählt Ziele weiterhin nur innerhalb der exakten
+        /// MeleeRangeWire aus, die Toleranz fängt nur den Versatz ab.</summary>
+        public const int PlayerMeleeRangeToleranceWire = 50;
     }
 }
