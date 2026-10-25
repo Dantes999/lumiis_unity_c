@@ -156,6 +156,20 @@ def main():
     assert len(crop["tiles"]) == w * h
 
     tiles = crop["tiles"]
+    # Startbereich als offene Wiese: Steine/Bäume/Mauern im Bereich um den Spawn entfernen, Wege und
+    # Blumen aber stehen lassen. So kann man direkt loslaufen, ohne nach zwei Schritten an einem Felsen
+    # oder Haus zu hängen; der Dorfplatz bleibt südlich erhalten.
+    for y in range(5, 54):
+        for x in range(13, 62):
+            if tiles[y * w + x] in (TREE, ROCK, WALL, CACTUS, GATE):
+                tiles[y * w + x] = GRASS
+
+    # Keine Häuser/Laternen in der offenen Startwiese zeichnen (sonst stünde dort ein Geisterhaus).
+    crop["props"] = [
+        p for p in crop["props"]
+        if not (p["tx"] < 62 and p["tx"] + p["w"] > 13 and p["ty"] < 54 and p["ty"] + p["h"] > 5)
+    ]
+
     # A closed tree border keeps the player inside the imported field crop.
     for x in range(w):
         for y in (0, 1, h - 2, h - 1):

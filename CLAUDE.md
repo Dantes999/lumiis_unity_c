@@ -176,8 +176,11 @@ Seit 2026-10-25 gibt es echte, begehbare Karten statt einer einzigen Welt. Detai
   Lumiis-Referenzprojekt importiert; `MonsterView` animiert Laufrichtung und zeigt bei Schaden einen
   kleinen HP-Balken. Hungrige Wildhunde nutzen dasselbe Wolf-Sheet mit rötlicher Tönung.
 - HUD: Minimap mit Kartenbild und Spielerpunkt, zentrale Skillleiste mit Buch-Icons und Tasten 1–4,
-  Chat unten links, Party panel nur bei Gruppe. `F1` bleibt das optionale Debug-Overlay; der
-  Reichweitenring im regulären Spiel wurde entfernt.
+  Party-Panel nur bei Gruppe. Der Chat ist für diesen Spielblock bewusst deaktiviert (Widgets bleiben im
+  UXML, aber `Focusable=false`/ausgeblendet, damit WASD nicht in ein Textfeld tippt). `F1` bleibt das
+  optionale Debug-Overlay; der Reichweitenring im regulären Spiel wurde entfernt. Leertaste schwingt
+  auch ohne Monster (lokale Animation/Sound/Kombo), der Server bekommt nur bei einem echten Ziel ein
+  `AttackRequest`.
 
 ## Sichtbarkeitsbereich (AOI)
 Seit M3b bekommt eine Verbindung nur noch Spawns, Bewegungen und Despawns von Entities innerhalb von

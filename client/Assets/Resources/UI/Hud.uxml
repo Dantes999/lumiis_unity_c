@@ -76,7 +76,7 @@
             <ui:Label name="hud-buffs" text="" class="hud-buffs" />
         </ui:VisualElement>
 
-        <ui:VisualElement class="hud-chat">
+        <ui:VisualElement name="hud-chat" class="hud-chat">
             <ui:ScrollView name="hud-chat-log" class="hud-chat-log" />
             <ui:VisualElement class="hud-chat-input-row">
                 <ui:TextField name="hud-chat-target" label="An" class="hud-chat-target" />

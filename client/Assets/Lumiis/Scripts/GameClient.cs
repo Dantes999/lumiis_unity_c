@@ -603,7 +603,7 @@ namespace Lumiis.Client
                 break;
             }
 
-            _world.HandleJoinAccepted(9000, 47600, 47800, "Abenteurer",
+            _world.HandleJoinAccepted(9000, 43700, 49800, "Abenteurer",
                 new Appearance { BodyId = bodyId, HairStyleId = 1, HairColorId = 1, ArmorId = 1, WeaponId = 2 },
                 mapId: "map1", mapName: "Yongan");
             _world.ApplyCharacterStats(new CharacterStatsPacket
@@ -1233,7 +1233,9 @@ namespace Lumiis.Client
             int targetId = FindAutoAttackTarget();
             if (targetId <= 0)
             {
-                _lastAttackFailedMessage = "Kein Monster in Reichweite.";
+                // Auch ohne Ziel immer schlagen: Animation, Sound und Kombo laufen lokal weiter. Ein
+                // AttackRequest an den Server wäre ohne Ziel nur ein garantiertes AttackFailed.
+                PerformSwingOnly();
                 return;
             }
             _lastAttackFailedMessage = "";
@@ -1275,6 +1277,13 @@ namespace Lumiis.Client
             float dx = (float)((a.X - b.X) / 100.0);
             float dy = (float)((a.Y - b.Y) / 100.0);
             return Mathf.Sqrt(dx * dx + dy * dy);
+        }
+
+        private void PerformSwingOnly()
+        {
+            PlayAttackAnimation(_world.LocalEntityId, _comboIndex);
+            _audio?.PlaySwing();
+            _comboIndex = (_comboIndex + 1) % 3;
         }
 
         private void PerformAttack(int targetId)

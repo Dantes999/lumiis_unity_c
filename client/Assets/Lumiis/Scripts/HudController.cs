@@ -150,11 +150,20 @@ namespace Lumiis.Client
             _minimapDot = _root.Q<VisualElement>("hud-minimap-dot");
             _minimapTitle = _root.Q<Label>("hud-minimap-title");
 
+            // Chat ist im aktuellen Spielblock bewusst deaktiviert: kein Fokusklau durch WASD, keine
+            // versehentlichen Chat-Eingaben. Die Widgets bleiben im UXML, damit die Chat-Logik später ohne
+            // Umbau wieder eingeschaltet werden kann.
+            VisualElement chatRoot = _root.Q<VisualElement>("hud-chat");
+            if (chatRoot != null) chatRoot.style.display = DisplayStyle.None;
+
             _chatLog = _root.Q<ScrollView>("hud-chat-log");
             _chatInput = _root.Q<TextField>("hud-chat-input");
             _chatTarget = _root.Q<TextField>("hud-chat-target");
             _chatChannelLabel = _root.Q<Label>("hud-chat-channel-label");
             _chatTarget.style.display = DisplayStyle.None;
+            _chatInput.focusable = false;
+            _chatTarget.focusable = false;
+            _gameClient.SetChatInputFocused(false);
 
             _chatInput.RegisterCallback<KeyDownEvent>(OnChatKeyDown);
             _chatInput.RegisterCallback<FocusInEvent>(_ =>
@@ -186,12 +195,6 @@ namespace Lumiis.Client
                 if (_chatInput != null && _chatFocused) _chatInput.Blur();
                 if (_partyRoot != null) _partyRoot.style.display = DisplayStyle.None;
                 return;
-            }
-
-            if (Keyboard.current != null && Keyboard.current.enterKey.wasPressedThisFrame
-                && !_chatFocused)
-            {
-                _chatInput.Focus();
             }
 
             RefreshPlayer();
