@@ -196,20 +196,65 @@ Seit 2026-10-25 gibt es echte, begehbare Karten statt einer einzigen Welt. Detai
   Body/Head/Hair/Armor (neue `CharacterSlot.Head`-Ebene); Lauf-/Angriffs frames werden über
   `CharacterView.SetAnimationFrame` angesteuert. Helm/Schild fallen bis zum Import eigener Sheets auf
   den Platzhalter zurück.
-- Login: `Login.uxml`/`CharacterSelect.uxml` wurden als Release-Karten mit Map1-Hintergrund, Branding,
-  klaren Primär-/Sekundäraktionen und Verbindungs-Foldout neu aufgebaut.
+- Login: siehe Abschnitt "Spiel-UI (klassischer MMO-Stil)".
 - Monster: `alpha_wolf`/`boar`/`dummy` sind als 40×32-Sheets (5 Frames, unten/links/rechts/oben) aus dem
   Lumiis-Referenzprojekt importiert; `MonsterView` animiert Laufrichtung und zeigt bei Schaden einen
   kleinen HP-Balken. Hungrige Wildhunde nutzen dasselbe Wolf-Sheet mit rötlicher Tönung.
 - Gruppen-Technik: zusätzlich zu den Chat-Befehlen gibt es `PartyInviteRequest` (21), `PartyRespondRequest`
   (22), `PartyLeaveRequest` (23) und `PartySnapshotRequest` (24); der Server schickt
   `PartyInviteReceived` (1025) an den Eingeladenen. Die UI kann damit ohne Chat arbeiten.
-- HUD: Minimap mit Kartenbild und Spielerpunkt, zentrale Skillleiste mit Buch-Icons und Tasten 1–4,
-  Party-Panel nur bei Gruppe. Der Chat ist für diesen Spielblock bewusst deaktiviert (Widgets bleiben im
-  UXML, aber `Focusable=false`/ausgeblendet, damit WASD nicht in ein Textfeld tippt). `F1` bleibt das
-  optionale Debug-Overlay; der Reichweitenring im regulären Spiel wurde entfernt. Leertaste schwingt
-  auch ohne Monster (lokale Animation/Sound/Kombo), der Server bekommt nur bei einem echten Ziel ein
-  `AttackRequest`.
+- HUD: siehe Abschnitt "Spiel-UI (klassischer MMO-Stil)". `F1` bleibt das optionale Debug-Overlay; der
+  Reichweitenring im regulären Spiel wurde entfernt. Leertaste schwingt auch ohne Monster (lokale
+  Animation/Sound/Kombo), der Server bekommt nur bei einem echten Ziel ein `AttackRequest`.
+
+## Spiel-UI (klassischer MMO-Stil)
+Seit 2026-10-25 sind Login, Charakterauswahl, Systemmenü und HUD im Stil klassischer MMO-Oberflächen um
+2010 neu gebaut (rein clientseitig, keine Protokolländerung):
+- Skin: Pixelart-Rahmen/Knöpfe/Slots/Kugeln/Minimap-Ring unter `Resources/UI/Skin/`, reproduzierbar mit
+  `python3 tools/generate-ui-skin.py` (deterministisch, eigene Formen, .meta mit Point-Filter). Alle
+  Stile in `Resources/UI/lumiis.uss` (Bausteine `.m2-window`, `.m2-titlebar`, `.m2-button`, `.m2-input`,
+  `.m2-inset`); Buttons werden global über `.unity-button` gestaltet.
+- Skalierung: `UiSkin.CreatePanelSettings` - alle UIDocuments (Login sortingOrder 100, HUD 0) nutzen
+  "Scale With Screen Size" mit Referenz 1280x720. `UiSkin.StretchToFill` spannt jeden `CloneTree()`-
+  Container auf die volle Fläche - ohne das war der TemplateContainer 0 px hoch (alle Kinder absolut
+  positioniert) und der Login-Bildschirm rutschte halb aus dem Bild (Ursache des "verschobenen" Logins).
+- Login: Logo, zentriertes Anmeldefenster (Kennung/Passwort, Enter meldet an), Verbindungs-Foldout,
+  "Beenden" unten rechts. Charakterauswahl: Auswahlkarten (Klick wählt, Doppelklick oder "Spiel
+  starten" verbindet), Pixelart-Vorschau aus den Charakter-Sheets (`UiSkin.BuildCharacterPortrait`).
+- HUD (`Hud.uxml`/`HudController`): Taskleiste unten mit HP-/SP-Kugeln, Schnellleiste (1-4 Skills, 5 =
+  erster Heiltrank im Inventar), vier EXP-Kugeln und Menüknöpfen (Charakter/Inventar/System); runde
+  Minimap (Ausschnitt um die Figur, Koordinaten) oben rechts, Ziel oben mittig, Chat unten links.
+- Fenster (ziehbar an der Titelleiste, Escape schließt das oberste vor dem Systemmenü): Inventar (I,
+  Ausrüstung um eine Silhouette, 20 Plätze, Tooltips, Rechtsklick legt ab; Schleifstein anklicken und dann
+  ein Ausrüstungsteil = Aufwerten, optional mit Bewahrungsrolle), Charakter (C, Werte, Status- und
+  Fertigkeitspunkte verteilen), Shop (öffnet sich per Rechtsklick auf einen Händler; Klick kauft,
+  Rechtsklick im Inventar verkauft). Damit sind Inventar/Shop/Punkteverteilung auch in Release-Builds
+  bedienbar, nicht mehr nur im Debug-Panel.
+- Chat wieder aktiv: Enter öffnet die Eingabezeile, Enter sendet und schließt, Escape schließt. Das Feld
+  ist nur während der Eingabe fokussierbar, WASD/Leertaste landen also nie versehentlich darin; beim
+  Öffnen wird eine laufende Tastaturbewegung gestoppt.
+- Lesbarkeit: kleinste Schrift 11 px, Schatten statt 1-px-Kontur. `UiSkin.ComputeScale` + `UiScaler`
+  (an jedem UIDocument): Faktor wie "Scale With Screen Size" zu 1280x720, aber nie unter 1 - kleine Fenster
+  schrumpfen die Schrift nicht; nur unter 1000x600 wird bis zur Passform verkleinert.
+- Schmied (`NpcService.Blacksmith`, Rechtsklick): eigenes Fenster statt Shop - Ausrüstungsteil wählen,
+  Stufe/Bonus/Erfolgschance (`UpgradeCatalogClient`, `upgrade.json` wird dafür nach StreamingAssets
+  kopiert, nur Anzeige), Materialzähler, Bewahrungsrolle, Warnung bei Zerstörungsrisiko, Ergebniszeile,
+  darunter das Sortiment. `NoBlacksmith` hat einen deutschen Text.
+- Gruppe ohne Chat: Rechtsklick auf einen Spieler öffnet ein Kontextmenü (In Gruppe einladen/Flüstern,
+  `GameClient.PlayerContextRequested`), `PartyInviteReceived` zeigt ein Annehmen/Ablehnen-Popup, das
+  Gruppenpanel zeigt HP-Balken je Mitglied, "Verlassen" nutzt `PartyLeave`, beim Betreten des Spiels
+  `RequestPartySnapshot`.
+- Gruppe (Protocol 20): Offline-Mitglieder ausgegraut "(offline)", Rollenname je Zeile; der Leiter öffnet
+  per Rechtsklick auf eine Zeile Entfernen/Zum Leiter machen/Rolle (PartyKick/-Promote/-SetRoleRequest).
+- Charakterauswahl-Vorschau aus dem echten `CharacterInfo.Appearance` (`UiSkin.BuildCharacterPortrait`, Sheets
+  über `LumiisSpriteProvider.SheetResourceFor`); beim Erstellen Frisur/Haarfarbe (Körper nur bei >1 Eintrag)
+  wählbar, geht als `CharacterLookChoice` an POST /characters.
+- Boden-Items: Namensschild mit "+N" und Farbe je Stufe (blau ab +1, gold ab +7, orange +9), Hervorhebung
+  unter dem Mauszeiger, Linksklick hebt auf.
+- Screenshot-Hilfen: `GameClient.DebugShowSmithPreview()` / `DebugShowPartyInvite(name)`.
+- Klick-Abschirmung: Elemente mit Klasse `ui-block` fangen Mausklicks ab
+  (`HudController.IsPointerOverUi` -> `GameClient.UiPointerHitTest`), ein Klick auf HUD/Fenster bewegt
+  oder greift also nicht an.
 
 ## Sichtbarkeitsbereich (AOI)
 Seit M3b bekommt eine Verbindung nur noch Spawns, Bewegungen und Despawns von Entities innerhalb von
@@ -1369,3 +1414,20 @@ Voraussetzung: laufender Server, Charakter ausgewählt; Editor-Play oder Develop
   Lauf legt `/tmp/lumiis-asset-lab-map.png` ab. Das ist nur eine Vorschau, noch keine spielbare
   zweite Karte (Server-Multi-Map siehe `docs/map-import-plan.md`).
 - F1 zeigt außerhalb des Labors wieder das gewohnte Debug-Overlay und -Panel.
+
+### Noch zu prüfen (Spiel-UI im klassischen MMO-Stil, vom User)
+Hinweis: in der Cloud-Session ohne Unity entstanden - Batchmode-Compile-Check und
+`tools/test-client-playmode.sh` stehen noch aus.
+- Login: Logo und Anmeldefenster stehen mittig, auch nach Ändern der Fenstergröße; Enter im Passwortfeld
+  meldet an; "Beenden" unten rechts.
+- Charakterauswahl: Karten anklicken wählt aus (goldener Rahmen, Name unter der Vorschau), Doppelklick oder
+  "Spiel starten" verbindet, "Zurück" meldet ab.
+- HUD: HP-/SP-Kugeln füllen sich passend, EXP-Kugeln + Prozent, Schnellleiste 1-5 (Klick und Taste),
+  Minimap rund mit Kartenausschnitt und Koordinaten, Ziel oben mittig.
+- Klick auf Taskleiste/Fenster/Minimap bewegt die Figur nicht.
+- I/C öffnen Inventar/Charakter, Fenster lassen sich an der Titelleiste ziehen, Escape schließt erst das
+  oberste Fenster, danach öffnet es das Systemmenü (auch über "System" in der Taskleiste).
+- Inventar: Tooltips, Klick legt an/benutzt, Rechtsklick auf Ausrüstung legt ab, Schleifstein -> Ausrüstung
+  wertet auf (mit Haken "Bewahrungsrolle"). Rechtsklick auf Händler öffnet Shop + Inventar, Klick kauft,
+  Rechtsklick im Inventar verkauft.
+- Chat: Enter öffnet, Enter sendet, Escape schließt; WASD während des Tippens bewegt nicht.

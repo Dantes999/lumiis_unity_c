@@ -1,16 +1,15 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements">
     <Style src="lumiis.uss" />
-    <ui:VisualElement name="escape-menu-root" class="screen">
-        <ui:VisualElement class="panel">
-            <ui:Label text="Menü" class="title" />
-            <ui:VisualElement class="button-row">
-                <ui:Button text="Charakter wechseln" name="escape-switch-character-button" />
+    <ui:VisualElement name="escape-menu-root" class="screen escape-screen">
+        <ui:VisualElement class="m2-window escape-window">
+            <ui:VisualElement class="m2-titlebar">
+                <ui:Label text="Systemmenü" class="m2-title" />
             </ui:VisualElement>
-            <ui:VisualElement class="button-row">
-                <ui:Button text="Ausloggen" name="escape-logout-button" />
-            </ui:VisualElement>
-            <ui:VisualElement class="button-row">
-                <ui:Button text="Beenden" name="escape-quit-button" />
+            <ui:VisualElement class="m2-window-body escape-body">
+                <ui:Button text="Zurück zum Spiel" name="escape-resume-button" class="m2-button escape-button" />
+                <ui:Button text="Charakter wechseln" name="escape-switch-character-button" class="m2-button escape-button" />
+                <ui:Button text="Ausloggen" name="escape-logout-button" class="m2-button escape-button" />
+                <ui:Button text="Spiel beenden" name="escape-quit-button" class="m2-button escape-button" />
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>

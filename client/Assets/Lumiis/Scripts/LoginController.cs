@@ -43,6 +43,20 @@ namespace Lumiis.Client
         private Button _logoutButton;
         private Label _characterSelectStatusLabel;
         private Label _characterSelectErrorLabel;
+        private Button _startGameButton;
+        private VisualElement _previewFigure;
+        private Label _selectedNameLabel;
+        private CharacterInfo? _selectedCharacter;
+        private Label _selectedInfoLabel;
+        private LookCatalogClient _lookCatalog;
+        private Label _lookBodyValue;
+        private Label _lookHairValue;
+        private VisualElement _lookColorSwatch;
+        private int _lookBodyIndex;
+        private int _lookHairIndex;
+        private int _lookColorIndex; // 0-basiert in hairColors, auf der Leitung +1
+        private bool _previewingNewLook;
+        private HudController _hud;
 
         // ---- escape-menu (siehe docs/tasks/escape-menu.md) - eigene, dritte UI-Wurzel im selben UIDocument
         // wie Login/CharacterSelect (siehe BuildUi). Bewusst NICHT über LoginFlowState gesteuert (das Menü
@@ -54,10 +68,12 @@ namespace Lumiis.Client
         /// <summary>authClient optional für PlayMode-Tests (siehe client/Assets/Lumiis/Tests/PlayMode) - im
         /// normalen Spielbetrieb (Bootstrap.cs) bleibt der Parameter weg, dann kommt die echte
         /// UnityWebRequestAuthClient gegen Lumiis.Auth zum Einsatz.</summary>
-        public void Initialize(NetClient netClient, GameClient gameClient, IAuthClient authClient = null)
+        public void Initialize(NetClient netClient, GameClient gameClient, IAuthClient authClient = null, HudController hud = null)
         {
             _netClient = netClient;
             _gameClient = gameClient;
+            _hud = hud;
+            if (_hud != null) _hud.SystemMenuRequested += OnSystemMenuRequested;
             _loginFlow = new LoginFlow(authClient ?? new UnityWebRequestAuthClient());
 
             _netClient.PacketReceived += OnPacketReceived;
@@ -89,9 +105,9 @@ namespace Lumiis.Client
             go.SetActive(false); // Erst konfigurieren, dann aktivieren - UIDocument.OnEnable soll nicht mit leeren Panel-Settings laufen.
 
             _uiDocument = go.AddComponent<UIDocument>();
-            var panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
-            panelSettings.themeStyleSheet = Resources.Load<ThemeStyleSheet>("UI/DefaultRuntimeTheme");
-            _uiDocument.panelSettings = panelSettings;
+            // Eigene Skalierung (Referenz 1280x720, Mindestfaktor 1, siehe UiSkin.ComputeScale) und Sortierung über dem HUD - Escape-Menü liegt vorn.
+            _uiDocument.panelSettings = UiSkin.CreatePanelSettings(100f);
+            go.AddComponent<UiScaler>().Initialize(_uiDocument.panelSettings);
 
             // Erst jetzt aktivieren: UIDocument.OnEnable() erzeugt rootVisualElement aus den PanelSettings,
             // das braucht ein aktives GameObject. Vorher zugewiesene PanelSettings sorgen dafür, dass
@@ -104,6 +120,12 @@ namespace Lumiis.Client
             _loginRoot = loginAsset.CloneTree();
             _characterSelectRoot = characterSelectAsset.CloneTree();
             _escapeMenuRoot = escapeMenuAsset.CloneTree();
+            // Ohne das wären die geklonten TemplateContainer 0 px hoch (alle Kinder absolut positioniert) -
+            // genau das hat den Login-Bildschirm halb aus dem Bild geschoben, siehe UiSkin.StretchToFill.
+            UiSkin.StretchToFill(_loginRoot);
+            UiSkin.StretchToFill(_characterSelectRoot);
+            UiSkin.StretchToFill(_escapeMenuRoot);
+            _uiDocument.rootVisualElement.pickingMode = PickingMode.Ignore;
             _uiDocument.rootVisualElement.Add(_loginRoot);
             _uiDocument.rootVisualElement.Add(_characterSelectRoot);
             ApplyBackdrop(_loginRoot, "login-backdrop");
@@ -134,6 +156,12 @@ namespace Lumiis.Client
             _logoutButton = _characterSelectRoot.Q<Button>("logout-button");
             _characterSelectStatusLabel = _characterSelectRoot.Q<Label>("character-select-status");
             _characterSelectErrorLabel = _characterSelectRoot.Q<Label>("character-select-error");
+            _startGameButton = _characterSelectRoot.Q<Button>("start-game-button");
+            _previewFigure = _characterSelectRoot.Q<VisualElement>("charselect-preview-figure");
+            _selectedNameLabel = _characterSelectRoot.Q<Label>("charselect-selected-name");
+            _selectedInfoLabel = _characterSelectRoot.Q<Label>("charselect-selected-info");
+            BindLookChoice();
+            UiSkin.BuildCharacterPortrait(_previewFigure, 144f);
 
             _usernameField.value = PlayerPrefs.GetString(UsernamePrefsKey, "");
 
@@ -141,7 +169,21 @@ namespace Lumiis.Client
             _registerButton.clicked += OnRegisterButtonClicked;
             _createCharacterButton.clicked += OnCreateCharacterButtonClicked;
             _logoutButton.clicked += OnLogoutButtonClicked;
+            _startGameButton.clicked += OnStartGameButtonClicked;
+            _loginRoot.Q<Button>("login-quit-button").clicked += QuitGame;
 
+            // Enter im Passwortfeld meldet an, Enter im Namensfeld springt ins Passwortfeld.
+            _usernameField.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.KeypadEnter) _passwordField.Focus();
+            }, TrickleDown.TrickleDown);
+            _passwordField.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if ((evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.KeypadEnter) && _loginButton.enabledSelf)
+                    OnLoginButtonClicked();
+            }, TrickleDown.TrickleDown);
+
+            _escapeMenuRoot.Q<Button>("escape-resume-button").clicked += CloseEscapeMenu;
             _escapeMenuRoot.Q<Button>("escape-switch-character-button").clicked += SwitchCharacter;
             _escapeMenuRoot.Q<Button>("escape-logout-button").clicked += Logout;
             _escapeMenuRoot.Q<Button>("escape-quit-button").clicked += QuitGame;
@@ -164,8 +206,19 @@ namespace Lumiis.Client
             // Nur während eines laufenden Spiels erreichbar - Login/Charakterauswahl haben kein Escape-Menü.
             if (_loginFlow.State != LoginFlowState.InGame) return;
             if (Keyboard.current == null) return;
-            if (_gameClient != null && _gameClient.IsChatInputFocused) return;
-            if (Keyboard.current.escapeKey.wasPressedThisFrame) ToggleEscapeMenu();
+            if (_gameClient != null && (_gameClient.IsChatInputFocused || _gameClient.ChatClosedRecently)) return;
+            if (!Keyboard.current.escapeKey.wasPressedThisFrame) return;
+
+            // Escape schließt zuerst ein offenes Spielfenster (Inventar, Charakter, Shop), erst danach
+            // öffnet es das Systemmenü.
+            if (!_escapeMenuOpen && _hud != null && _hud.CloseTopWindow()) return;
+            ToggleEscapeMenu();
+        }
+
+        private void OnSystemMenuRequested()
+        {
+            if (_loginFlow.State != LoginFlowState.InGame) return;
+            ToggleEscapeMenu();
         }
 
         private void ToggleEscapeMenu()
@@ -284,20 +337,191 @@ namespace Lumiis.Client
 
         // ---- Charakterauswahl ----
 
+        /// <summary>Charaktere als Auswahlkarten: Klick wählt aus (Vorschau links), Doppelklick oder
+        /// "Spiel starten" verbindet. Der erste Charakter ist vorausgewählt.</summary>
         private void PopulateCharacterList()
         {
             _characterListView.Clear();
+            CharacterInfo? previous = _selectedCharacter;
+            _selectedCharacter = null;
             foreach (CharacterInfo character in _loginFlow.Characters)
             {
                 CharacterInfo captured = character; // Schleifenvariable für den Closure einfangen.
-                var button = new Button(() => OnCharacterSelected(captured)) { text = captured.Name };
-                button.AddToClassList("character-button");
+                var button = new Button(() => SelectCharacterCard(captured)) { text = captured.Name };
+                button.AddToClassList("charslot");
+                button.userData = captured;
+                button.RegisterCallback<ClickEvent>(evt =>
+                {
+                    if (evt.clickCount >= 2) StartWithCharacter(captured);
+                });
                 _characterListView.Add(button);
+                if (previous.HasValue && previous.Value.Id == captured.Id) _selectedCharacter = captured;
             }
+
+            if (_selectedCharacter == null && _loginFlow.Characters.Count > 0)
+                _selectedCharacter = _loginFlow.Characters[0];
+            RefreshCharacterSelection();
         }
 
-        private void OnCharacterSelected(CharacterInfo character)
+        private void SelectCharacterCard(CharacterInfo character)
         {
+            _selectedCharacter = character;
+            _previewingNewLook = false;
+            RefreshCharacterSelection();
+        }
+
+        // ---- Aussehen bei der Erstellung ----
+
+        private void BindLookChoice()
+        {
+            try
+            {
+                _lookCatalog = LookCatalogClient.LoadFromStreamingAssets();
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning("LoginController: looks.json nicht geladen, Aussehenswahl aus: " + ex.Message);
+            }
+
+            _lookBodyValue = _characterSelectRoot.Q<Label>("look-body-value");
+            _lookHairValue = _characterSelectRoot.Q<Label>("look-hair-value");
+            _lookColorSwatch = _characterSelectRoot.Q<VisualElement>("look-color-swatch");
+            _characterSelectRoot.Q<Button>("look-body-prev").clicked += () => StepLook(ref _lookBodyIndex, LookIds("Body").Count, -1);
+            _characterSelectRoot.Q<Button>("look-body-next").clicked += () => StepLook(ref _lookBodyIndex, LookIds("Body").Count, 1);
+            _characterSelectRoot.Q<Button>("look-hair-prev").clicked += () => StepLook(ref _lookHairIndex, LookIds("Hair").Count, -1);
+            _characterSelectRoot.Q<Button>("look-hair-next").clicked += () => StepLook(ref _lookHairIndex, LookIds("Hair").Count, 1);
+            _characterSelectRoot.Q<Button>("look-color-prev").clicked += () => StepLook(ref _lookColorIndex, HairColorCount(), -1);
+            _characterSelectRoot.Q<Button>("look-color-next").clicked += () => StepLook(ref _lookColorIndex, HairColorCount(), 1);
+            // Nur ein Körper im Katalog: Zeile ausblenden statt eines toten Cyclers.
+            _characterSelectRoot.Q<VisualElement>("look-body-row").style.display =
+                LookIds("Body").Count > 1 ? DisplayStyle.Flex : DisplayStyle.None;
+            _newCharacterNameField.RegisterCallback<FocusInEvent>(_ => ShowNewLookPreview());
+            _newCharacterNameField.RegisterValueChangedCallback(evt =>
+            {
+                if (!_previewingNewLook) return;
+                string typed = evt.newValue != null ? evt.newValue.Trim() : "";
+                _selectedNameLabel.text = typed.Length > 0 ? typed : "Neuer Charakter";
+            });
+            RefreshLookLabels();
+        }
+
+        private System.Collections.Generic.IReadOnlyList<int> LookIds(string slot)
+        {
+            return _lookCatalog != null ? _lookCatalog.GetIdsForSlot(slot) : System.Array.Empty<int>();
+        }
+
+        private int HairColorCount() => _lookCatalog != null ? _lookCatalog.HairColors.Count : 0;
+
+        private void StepLook(ref int index, int count, int delta)
+        {
+            if (count <= 0) return;
+            index = ((index + delta) % count + count) % count;
+            RefreshLookLabels();
+            ShowNewLookPreview();
+        }
+
+        private void RefreshLookLabels()
+        {
+            _lookBodyValue.text = LookName("Body", _lookBodyIndex);
+            _lookHairValue.text = LookName("Hair", _lookHairIndex);
+            _lookColorSwatch.style.backgroundColor = HairColor(_lookColorIndex + 1);
+        }
+
+        private string LookName(string slot, int index)
+        {
+            System.Collections.Generic.IReadOnlyList<int> ids = LookIds(slot);
+            if (index < 0 || index >= ids.Count) return "-";
+            return _lookCatalog.TryGetEntry(slot, ids[index], out LookEntryJson entry) && entry.name.Length > 0
+                ? entry.name
+                : "#" + ids[index];
+        }
+
+        private Color HairColor(int hairColorId)
+        {
+            int index = hairColorId - 1; // 1-basiert wie Appearance.HairColorId
+            if (_lookCatalog == null || index < 0 || index >= _lookCatalog.HairColors.Count) return Color.white;
+            return ColorUtility.TryParseHtmlString(_lookCatalog.HairColors[index], out Color color) ? color : Color.white;
+        }
+
+        /// <summary>Gewähltes Aussehen für POST /characters; ohne Katalog bleibt es leer (Server-Default).</summary>
+        private CharacterLookChoice CurrentLookChoice()
+        {
+            if (_lookCatalog == null) return default;
+            System.Collections.Generic.IReadOnlyList<int> bodies = LookIds("Body");
+            System.Collections.Generic.IReadOnlyList<int> hairs = LookIds("Hair");
+            int? body = _lookBodyIndex < bodies.Count ? bodies[_lookBodyIndex] : (int?)null;
+            int? hair = _lookHairIndex < hairs.Count ? hairs[_lookHairIndex] : (int?)null;
+            int? color = _lookColorIndex < HairColorCount() ? _lookColorIndex + 1 : (int?)null;
+            return new CharacterLookChoice(body, hair, color);
+        }
+
+        private void ShowNewLookPreview()
+        {
+            _previewingNewLook = true;
+            RefreshCharacterSelection();
+        }
+
+        private void RefreshPreviewFigure()
+        {
+            Appearance appearance;
+            if (_previewingNewLook)
+            {
+                CharacterLookChoice look = CurrentLookChoice();
+                // Neue Charaktere bekommen serverseitig nur die Startwaffe (siehe Lumiis.Auth), keine Rüstung.
+                appearance = new Appearance
+                {
+                    BodyId = look.BodyId ?? 1,
+                    HairStyleId = look.HairStyleId ?? 1,
+                    HairColorId = look.HairColorId ?? 0,
+                    WeaponId = 1
+                };
+            }
+            else if (_selectedCharacter.HasValue)
+            {
+                appearance = _selectedCharacter.Value.Appearance;
+                if (appearance.BodyId <= 0) appearance.BodyId = 1; // alter Auth-Dienst ohne Aussehen in der Liste
+            }
+            else
+            {
+                return;
+            }
+            UiSkin.BuildCharacterPortrait(_previewFigure, 144f, appearance, HairColor(appearance.HairColorId));
+        }
+
+        private void RefreshCharacterSelection()
+        {
+            foreach (VisualElement card in _characterListView.Children())
+            {
+                bool selected = card.userData is CharacterInfo info && _selectedCharacter.HasValue && info.Id == _selectedCharacter.Value.Id;
+                card.EnableInClassList("charslot-selected", selected);
+            }
+
+            bool hasSelection = _selectedCharacter.HasValue;
+            if (_previewingNewLook)
+            {
+                string typed = _newCharacterNameField.value != null ? _newCharacterNameField.value.Trim() : "";
+                _selectedNameLabel.text = typed.Length > 0 ? typed : "Neuer Charakter";
+                _selectedInfoLabel.text = "Krieger · Stufe 1";
+            }
+            else
+            {
+                _selectedNameLabel.text = hasSelection ? _selectedCharacter.Value.Name : "Kein Charakter";
+                _selectedInfoLabel.text = hasSelection ? "Krieger · Stufe " + Mathf.Max(1, _selectedCharacter.Value.Level) : "";
+            }
+            _previewFigure.style.visibility = hasSelection || _previewingNewLook ? Visibility.Visible : Visibility.Hidden;
+            RefreshPreviewFigure();
+            _startGameButton.SetEnabled(hasSelection && _characterListView.enabledSelf);
+        }
+
+        private void OnStartGameButtonClicked()
+        {
+            if (_selectedCharacter.HasValue) StartWithCharacter(_selectedCharacter.Value);
+        }
+
+        private void StartWithCharacter(CharacterInfo character)
+        {
+            if (_loginFlow.State != LoginFlowState.CharacterSelect) return;
+            _selectedCharacter = character;
             _loginFlow.SelectCharacter(character);
             ApplyLoginFlowState();
         }
@@ -307,7 +531,8 @@ namespace Lumiis.Client
             SetCharacterSelectInteractable(false);
             SetCharacterSelectError("");
             _characterSelectStatusLabel.text = "Erstelle Charakter ...";
-            await _loginFlow.CreateCharacterAsync(NormalizedAuthUrl(), _newCharacterNameField.value);
+            await _loginFlow.CreateCharacterAsync(NormalizedAuthUrl(), _newCharacterNameField.value, CurrentLookChoice());
+            _previewingNewLook = false;
             if (_loginFlow.State == LoginFlowState.Connecting) _newCharacterNameField.value = "";
             ApplyLoginFlowState();
         }
@@ -392,6 +617,11 @@ namespace Lumiis.Client
             }
         }
 
+        private void OnDestroy()
+        {
+            if (_hud != null) _hud.SystemMenuRequested -= OnSystemMenuRequested;
+        }
+
         private void OnNetDisconnected(string reason)
         {
             _loginFlow.OnDisconnected(reason);
@@ -424,6 +654,7 @@ namespace Lumiis.Client
             _newCharacterNameField.SetEnabled(interactable);
             _createCharacterButton.SetEnabled(interactable);
             _logoutButton.SetEnabled(interactable);
+            if (_startGameButton != null) _startGameButton.SetEnabled(interactable && _selectedCharacter.HasValue);
         }
 
         private string NormalizedAuthUrl()

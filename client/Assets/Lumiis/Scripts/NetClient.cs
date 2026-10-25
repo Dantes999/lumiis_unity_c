@@ -85,6 +85,25 @@ namespace Lumiis.Client
             Send(new PartyLeaveRequestPacket());
         }
 
+        /// <summary>Protocol 20: nur der Gruppenleiter darf das, der Server prüft und antwortet sonst per Systemchat.</summary>
+        public void SendPartyKick(string targetName)
+        {
+            if (_peer == null || !IsConnected) return;
+            Send(new PartyKickRequestPacket { TargetName = targetName ?? "" });
+        }
+
+        public void SendPartyPromote(string targetName)
+        {
+            if (_peer == null || !IsConnected) return;
+            Send(new PartyPromoteRequestPacket { TargetName = targetName ?? "" });
+        }
+
+        public void SendPartySetRole(string targetName, PartyRole role)
+        {
+            if (_peer == null || !IsConnected) return;
+            Send(new PartySetRoleRequestPacket { TargetName = targetName ?? "", Role = role });
+        }
+
         public void RequestPartySnapshot()
         {
             if (_peer == null || !IsConnected) return;

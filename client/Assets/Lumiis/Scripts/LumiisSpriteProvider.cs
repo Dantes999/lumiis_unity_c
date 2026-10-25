@@ -47,6 +47,10 @@ namespace Lumiis.Client
             return null; // statische Item-Waffen laufen über CachingSpriteProvider/Resources/Sprites/Items.
         }
 
+        /// <summary>Resources-Pfad des Sheets für eine Ebene (null = kein echtes Sheet) - auch für die
+        /// UI-Vorschau in der Charakterauswahl (UiSkin.BuildCharacterPortrait).</summary>
+        public static string SheetResourceFor(CharacterSlot slot, int lookId) => ResourceFor(slot, lookId);
+
         private static string ResourceFor(CharacterSlot slot, int lookId)
         {
             switch (slot)

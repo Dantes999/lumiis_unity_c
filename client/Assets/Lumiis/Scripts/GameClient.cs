@@ -27,7 +27,12 @@ namespace Lumiis.Client
 
         /// <summary>M7-Party: voller Gruppenstand (Resync) für das HUD.</summary>
         public event System.Action<PartyChangedPacket> PartyChangedReceived;
+        /// <summary>Gruppen-UI ohne Chat: Name des Einladenden (PartyInviteReceivedPacket).</summary>
         public event System.Action<string> PartyInviteReceived;
+
+        /// <summary>Rechtsklick auf einen anderen Spieler: (EntityId, Name) für ein Kontextmenü im HUD
+        /// (z. B. "In Gruppe einladen"). Reine UI-Anfrage, keine Spielaktion.</summary>
+        public event System.Action<int, string> PlayerContextRequested;
         private Sprite _squareSprite;
         private Sprite _localMarkerSprite;
         private Sprite _monsterCircleSprite;
@@ -47,6 +52,7 @@ namespace Lumiis.Client
         private SkillCatalogClient _skillCatalog;
         private ClassCatalogClient _classCatalog;
         private MapCatalogClient _mapCatalogClient;
+        private UpgradeCatalogClient _upgradeCatalog;
         private GameObject _mapRoot;
         private CachingSpriteProvider _spriteProvider;
         private AudioService _audio;
@@ -91,6 +97,7 @@ namespace Lumiis.Client
         /// <summary>M7-Chat: UI-Textfeld hat den Fokus - dann dürfen Tasten 1-4 keine Skills auslösen und
         /// Mausklicks nicht durch das Chat-Panel in die Welt gehen.</summary>
         private bool _chatInputFocused;
+        private int _chatClosedAtFrame = -10;
 
         // Asset-Testlabor (nur Editor/Development): blendet Server-Figuren/Monster aus, sperrt Gameplay-Eingaben
         // und lässt GameClient.OnGUI das Debug-Overlay weglassen. Die UI selbst ist eine separate UI-Toolkit-
@@ -137,6 +144,7 @@ namespace Lumiis.Client
         // kein Delta - dieselbe Philosophie wie InventorySyncPacket).
         private int _shopOpenNpcEntityId = -1;
         private readonly List<(int ItemId, long BuyPrice)> _shopItems = new List<(int, long)>();
+        private bool _debugSmithPreview;
         private string _lastShopActionFailedMessage = "";
 
         // ---- Fortschritt (M6a, Debug-Panel-Stil - siehe DrawCharacterPanel) ----
@@ -292,6 +300,17 @@ namespace Lumiis.Client
                 throw;
             }
 
+            // Schmied-Fenster: Erfolgschancen nur für die Anzeige - fehlt die Kopie (alter Build), zeigt das
+            // Fenster einfach keine Prozentwerte.
+            try
+            {
+                _upgradeCatalog = UpgradeCatalogClient.LoadFromStreamingAssets();
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning("upgrade.json nicht gefunden, Schmied zeigt keine Erfolgschancen: " + ex.Message);
+            }
+
             // Multi-Map: Kartenname/Portale nur für die Anzeige - fehlt die Kopie (z. B. alter Build), läuft
             // der Client ohne Portalmarkierungen weiter statt am fehlenden Anzeige-Katalog zu scheitern.
             try
@@ -369,6 +388,7 @@ namespace Lumiis.Client
                 HandleKeyboardMovement();
                 HandleKeyboardCombat();
                 HandleClickInput();
+                UpdateGroundItemHover();
                 HandleSkillHotkeys();
             }
             HandleZoomInput();
@@ -386,7 +406,7 @@ namespace Lumiis.Client
         /// erneut (siehe World.CheckShopAccess) - das hier verhindert nur ein sichtbar totes Panel.</summary>
         private void UpdateShopAutoClose()
         {
-            if (_shopOpenNpcEntityId < 0) return;
+            if (_shopOpenNpcEntityId < 0 || _debugSmithPreview) return;
 
             if (_world.LocalEntityId < 0
                 || !_world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity local)
@@ -672,6 +692,28 @@ namespace Lumiis.Client
             _assetTestLab?.DebugShowMapPreview();
         }
 
+        /// <summary>Screenshot-/Testhilfe: zeigt das Einladungs-Popup, als hätte der Server eine Einladung
+        /// geschickt. Antworten gehen trotzdem normal an den Server (der sie ohne offene Einladung ignoriert).</summary>
+        public void DebugShowPartyInvite(string inviterName)
+        {
+            PartyInviteReceived?.Invoke(inviterName);
+        }
+
+        /// <summary>Screenshot-/Testhilfe: öffnet das Schmied-Fenster ohne echten Schmied in der Nähe
+        /// (Sortiment aus items.json: Schleifstein + Bewahrungsrolle). Aufwerten schickt trotzdem eine echte
+        /// Anfrage, die der Server ohne Schmied mit NoBlacksmith ablehnt.</summary>
+        public void DebugShowSmithPreview()
+        {
+            _debugSmithPreview = true;
+            _shopOpenNpcEntityId = int.MaxValue - 1;
+            _shopItems.Clear();
+            if (_itemCatalog != null && _upgradeCatalog != null)
+            {
+                foreach (int itemId in new[] { _upgradeCatalog.WhetstoneItemId, _upgradeCatalog.ProtectionScrollItemId })
+                    if (_itemCatalog.TryGet(itemId, out ItemEntryJson item)) _shopItems.Add((itemId, item.buyPrice));
+            }
+        }
+
         public void DebugShowPartyPreview()
         {
             if (_world.LocalEntityId < 0 || !_world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity local))
@@ -679,7 +721,11 @@ namespace Lumiis.Client
 
             var packet = new PartyChangedPacket { LeaderEntityId = local.Id };
             packet.Members.Add((local.Id, local.Name, _world.CharacterStats.Level, Mathf.Max(0, local.CurrentHp), Mathf.Max(0, local.MaxHp)));
+            packet.MemberStatus.Add((true, PartyRole.Attacker));
             packet.Members.Add((local.Id + 1, "Bob", 12, 200, 240));
+            packet.MemberStatus.Add((true, PartyRole.Defender));
+            packet.Members.Add((0, "Clara", 9, 90, 180)); // offline: EntityId 0, letzter bekannter Stand
+            packet.MemberStatus.Add((false, PartyRole.None));
             PartyChangedReceived?.Invoke(packet);
         }
 
@@ -1378,10 +1424,27 @@ namespace Lumiis.Client
             _comboIndex = (_comboIndex + 1) % 3;
         }
 
+        /// <summary>Hebt das Boden-Item unter dem Mauszeiger hervor (nur Optik, Aufheben bleibt Linksklick).</summary>
+        private void UpdateGroundItemHover()
+        {
+            if (Mouse.current == null || _groundItemViews.Count == 0) return;
+            bool overUi = UiPointerHitTest != null && UiPointerHitTest(Mouse.current.position.ReadValue());
+            Vector3 worldPos = ScreenToWorldPoint(Mouse.current.position.ReadValue());
+            bool found = false;
+            foreach (GroundItemView view in _groundItemViews.Values)
+            {
+                if (view == null) continue;
+                bool hover = !overUi && !found && view.ContainsWorldPoint(worldPos);
+                if (hover) found = true;
+                view.SetHighlighted(hover);
+            }
+        }
+
         private void HandleClickInput()
         {
             if (Mouse.current == null) return;
             if (IsPointerOverDebugPanel()) return; // Klick auf einen Debug-Panel-Button soll die Figur nicht bewegen/angreifen lassen.
+            if (UiPointerHitTest != null && UiPointerHitTest(Mouse.current.position.ReadValue())) return; // Klick auf HUD/Fenster.
 
             if (Mouse.current.leftButton.wasPressedThisFrame)
             {
@@ -1438,7 +1501,13 @@ namespace Lumiis.Client
             foreach (KeyValuePair<int, CharacterView> kvp in _views)
             {
                 if (kvp.Value == null || !kvp.Value.ContainsWorldPoint(worldPos)) continue;
-                if (!_world.Entities.TryGetValue(kvp.Key, out ClientEntity entity) || entity.Kind != EntityKind.Npc) continue;
+                if (!_world.Entities.TryGetValue(kvp.Key, out ClientEntity entity)) continue;
+                if (entity.Kind == EntityKind.Player)
+                {
+                    if (kvp.Key != _world.LocalEntityId) PlayerContextRequested?.Invoke(kvp.Key, entity.Name);
+                    return;
+                }
+                if (entity.Kind != EntityKind.Npc) continue;
 
                 _shopOpenNpcEntityId = kvp.Key;
                 _shopItems.Clear();
@@ -1722,6 +1791,13 @@ namespace Lumiis.Client
                 return;
             }
 
+            PartyInviteReceivedPacket partyInvite = packet as PartyInviteReceivedPacket;
+            if (partyInvite != null)
+            {
+                PartyInviteReceived?.Invoke(partyInvite.InviterName);
+                return;
+            }
+
             PartyChangedPacket party = packet as PartyChangedPacket;
             if (party != null)
             {
@@ -1833,6 +1909,9 @@ namespace Lumiis.Client
                 case InventoryActionFailedReason.NotConsumable: return "Dieser Gegenstand kann nicht benutzt werden.";
                 case InventoryActionFailedReason.InventoryFull: return "Inventar ist voll.";
                 case InventoryActionFailedReason.TargetAtFullHp: return "Leben bereits voll.";
+                case InventoryActionFailedReason.GroundItemNotFound: return "Der Gegenstand liegt nicht mehr da.";
+                case InventoryActionFailedReason.PickupOutOfRange: return "Zu weit entfernt zum Aufheben.";
+                case InventoryActionFailedReason.PickupNotOwner: return "Dieser Gegenstand gehört noch einem anderen Spieler.";
                 default: return "Aktion fehlgeschlagen.";
             }
         }
@@ -1845,6 +1924,7 @@ namespace Lumiis.Client
                 case UpgradeActionFailedReason.AlreadyMaxLevel: return "Maximale Aufwertungsstufe (+9) erreicht.";
                 case UpgradeActionFailedReason.NoMaterial: return "Kein Schleifstein im Inventar.";
                 case UpgradeActionFailedReason.NoProtectionScroll: return "Keine Bewahrungsrolle im Inventar.";
+                case UpgradeActionFailedReason.NoBlacksmith: return "Aufwerten geht nur beim Schmied.";
                 default: return "Aufwertung nicht möglich.";
             }
         }
@@ -1920,7 +2000,10 @@ namespace Lumiis.Client
                 Sprite iconSprite = icon != null
                     ? Sprite.Create(icon, new Rect(0, 0, icon.width, icon.height), new Vector2(0.5f, 0.5f), 32f)
                     : _squareSprite;
-                groundView.Initialize(iconSprite, entity.Name);
+                string groundName = _itemCatalog != null && _itemCatalog.TryGet(entity.TypeId, out ItemEntryJson groundItem)
+                    ? groundItem.name
+                    : entity.Name;
+                groundView.Initialize(iconSprite, groundName, entity.ItemUpgradeLevel);
                 groundView.SetWorldPosition(entity.X / 100.0, entity.Y / 100.0);
                 _groundItemViews[entity.Id] = groundView;
                 if (_assetLabActive) HideForAssetLab(groundGo);
@@ -2049,10 +2132,166 @@ namespace Lumiis.Client
 
         public void SetChatInputFocused(bool focused)
         {
+            if (_chatInputFocused && !focused) _chatClosedAtFrame = Time.frameCount;
             _chatInputFocused = focused;
+            if (focused && _keyboardMoveSent)
+            {
+                _netClient?.SendStopMove();
+                _keyboardMoveSent = false;
+            }
         }
 
         public bool IsChatInputFocused => _chatInputFocused;
+
+        // ---- Spiel-UI (Inventar-/Charakter-/Shop-Fenster, Schnellleiste): lesende Sicht auf den lokalen
+        // Cache plus dünne Absichts-Methoden. Der Server bleibt für jede Aktion die einzige Autorität. ----
+
+        /// <summary>Vom HUD gesetzt: true, wenn die Bildschirmposition (Input-System-Koordinaten, Ursprung
+        /// unten links) über einem klickbaren UI-Element liegt - dann bewegt/greift ein Klick nicht.</summary>
+        public System.Func<Vector2, bool> UiPointerHitTest { get; set; }
+
+        /// <summary>Wahr im Frame, in dem das Chatfeld geschlossen wurde (und im Folgeframe) - verhindert,
+        /// dass dieselbe Escape-/Enter-Taste danach noch das Systemmenü bzw. erneut den Chat öffnet.</summary>
+        public bool ChatClosedRecently => Time.frameCount - _chatClosedAtFrame <= 1;
+
+        public IReadOnlyList<(int SlotIndex, int ItemId, int UpgradeLevel)> InventorySlots => _inventorySlots;
+        public ItemCatalogClient ItemCatalog => _itemCatalog;
+
+        public int EquippedItemId(EquipmentSlot slot)
+        {
+            switch (slot)
+            {
+                case EquipmentSlot.Armor: return _equippedArmorItemId;
+                case EquipmentSlot.Helmet: return _equippedHelmetItemId;
+                case EquipmentSlot.Weapon: return _equippedWeaponItemId;
+                case EquipmentSlot.Shield: return _equippedShieldItemId;
+                default: return 0;
+            }
+        }
+
+        public int EquippedUpgradeLevel(EquipmentSlot slot)
+        {
+            switch (slot)
+            {
+                case EquipmentSlot.Armor: return _equippedArmorUpgradeLevel;
+                case EquipmentSlot.Helmet: return _equippedHelmetUpgradeLevel;
+                case EquipmentSlot.Weapon: return _equippedWeaponUpgradeLevel;
+                case EquipmentSlot.Shield: return _equippedShieldUpgradeLevel;
+                default: return 0;
+            }
+        }
+
+        public Texture2D GetItemIcon(int itemId)
+        {
+            if (itemId == 0 || _iconCatalog == null || _itemCatalog == null) return null;
+            return _iconCatalog.GetTextureForItem(itemId, _itemCatalog);
+        }
+
+        public bool HasProtectionScroll => _itemCatalog != null && HasProtectionScrollInInventory();
+
+        /// <summary>Kontextaktion eines Inventarplatzes (benutzen/anlegen) - dieselbe Logik wie im Debug-Panel.</summary>
+        public void UseInventorySlot(int slotIndex)
+        {
+            if (_itemCatalog == null) return;
+            HandleInventorySlotClick(slotIndex, FindItemInSlot(slotIndex));
+        }
+
+        public void UnequipItem(EquipmentSlot slot)
+        {
+            if (EquippedItemId(slot) == 0) return;
+            _netClient?.SendUnequipItem(slot);
+        }
+
+        public void UpgradeEquippedItem(EquipmentSlot slot, bool useProtectionScroll)
+        {
+            int itemId = EquippedItemId(slot);
+            if (itemId == 0) return;
+            _lastUpgradeItemName = _itemCatalog != null ? _itemCatalog.DisplayName(itemId) : "Ausrüstung";
+            _netClient?.SendUpgradeItem(slot, useProtectionScroll);
+        }
+
+        /// <summary>Benutzt den ersten Verbrauchsgegenstand (Heiltrank) im Inventar - Schnellleisten-Taste 5.</summary>
+        public void UseFirstConsumable()
+        {
+            int slotIndex = FindFirstConsumableSlot(out _);
+            if (slotIndex >= 0) _netClient?.SendUseConsumable(slotIndex);
+        }
+
+        /// <summary>Erster Inventarplatz mit einem Consumable (-1 = keiner) plus Gesamtanzahl solcher Plätze.</summary>
+        public int FindFirstConsumableSlot(out int count)
+        {
+            count = 0;
+            int first = -1;
+            if (_itemCatalog == null) return -1;
+            foreach ((int SlotIndex, int ItemId, int UpgradeLevel) entry in _inventorySlots)
+            {
+                if (!_itemCatalog.TryGet(entry.ItemId, out ItemEntryJson item) || item.itemType != "Consumable") continue;
+                count++;
+                if (first < 0 || entry.SlotIndex < first) first = entry.SlotIndex;
+            }
+            return first;
+        }
+
+        public int ShopNpcEntityId => _shopOpenNpcEntityId;
+        public IReadOnlyList<(int ItemId, long BuyPrice)> ShopItems => _shopItems;
+
+        /// <summary>Dienst des NPCs, dessen Shop gerade offen ist (Händler/Schmied), None ohne offenen Shop.</summary>
+        public NpcService ShopNpcService =>
+            _debugSmithPreview && _shopOpenNpcEntityId >= 0 ? NpcService.Blacksmith
+            : _shopOpenNpcEntityId >= 0 && _world.Entities.TryGetValue(_shopOpenNpcEntityId, out ClientEntity npc)
+                ? npc.NpcService
+                : NpcService.None;
+
+        public UpgradeCatalogClient UpgradeCatalog => _upgradeCatalog;
+
+        /// <summary>Letzte Aufwertungsmeldung (Erfolg/Fehlschlag/Ablehnungsgrund) fürs Schmied-Fenster.</summary>
+        public string LastUpgradeMessage => _lastUpgradeMessage;
+
+        public string ShopNpcName
+        {
+            get
+            {
+                return _shopOpenNpcEntityId >= 0 && _world.Entities.TryGetValue(_shopOpenNpcEntityId, out ClientEntity npc)
+                    ? npc.Name
+                    : ShopNpcService == NpcService.Blacksmith ? "Schmied" : "Händler";
+            }
+        }
+
+        public void BuyShopItem(int itemId)
+        {
+            if (_shopOpenNpcEntityId < 0) return;
+            _netClient?.SendBuyItem(_shopOpenNpcEntityId, itemId);
+        }
+
+        public void SellInventorySlot(int slotIndex)
+        {
+            if (_shopOpenNpcEntityId < 0 || FindItemInSlot(slotIndex) == 0) return;
+            _netClient?.SendSellItem(_shopOpenNpcEntityId, slotIndex);
+        }
+
+        public void CloseShop()
+        {
+            _shopOpenNpcEntityId = -1;
+            _debugSmithPreview = false;
+        }
+
+        public void AllocateStatPoint(StatKind stat)
+        {
+            _netClient?.SendAllocateStatPoint(stat);
+        }
+
+        public void AllocateSkillPoint(int skillId)
+        {
+            _netClient?.SendAllocateSkillPoint(skillId);
+        }
+
+        /// <summary>Klick auf einen Skill der Schnellleiste - wie Taste 1-4.</summary>
+        public void UseSkillSlot(int hotkeyIndex)
+        {
+            if (!_inGame || _gameplayInputLocked || _world.LocalEntityId < 0) return;
+            if (hotkeyIndex < 0 || hotkeyIndex >= SkillHotkeys.Length) return;
+            UseSkillHotkey(hotkeyIndex);
+        }
 
         public void SendChat(ChatChannel channel, string targetName, string text)
         {
@@ -2063,6 +2302,9 @@ namespace Lumiis.Client
         public void PartyInvite(string targetName) => _netClient?.SendPartyInvite(targetName);
         public void PartyRespond(bool accept) => _netClient?.SendPartyRespond(accept);
         public void PartyLeave() => _netClient?.SendPartyLeave();
+        public void PartyKick(string targetName) => _netClient?.SendPartyKick(targetName);
+        public void PartyPromote(string targetName) => _netClient?.SendPartyPromote(targetName);
+        public void PartySetRole(string targetName, PartyRole role) => _netClient?.SendPartySetRole(targetName, role);
         public void RequestPartySnapshot() => _netClient?.RequestPartySnapshot();
 
         public Vector3 LocalPlayerWorldPosition
