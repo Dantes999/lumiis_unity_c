@@ -226,6 +226,20 @@ Seit 2026-10-25 sind Login, Charakterauswahl, Systemmenü und HUD im Stil klassi
 - Chat wieder aktiv: Enter öffnet die Eingabezeile, Enter sendet und schließt, Escape schließt. Das Feld
   ist nur während der Eingabe fokussierbar, WASD/Leertaste landen also nie versehentlich darin; beim
   Öffnen wird eine laufende Tastaturbewegung gestoppt.
+- Lesbarkeit: kleinste Schrift 11 px, Schatten statt 1-px-Kontur. `UiSkin.ComputeScale` + `UiScaler`
+  (an jedem UIDocument): Faktor wie "Scale With Screen Size" zu 1280x720, aber nie unter 1 - kleine Fenster
+  schrumpfen die Schrift nicht; nur unter 1000x600 wird bis zur Passform verkleinert.
+- Schmied (`NpcService.Blacksmith`, Rechtsklick): eigenes Fenster statt Shop - Ausrüstungsteil wählen,
+  Stufe/Bonus/Erfolgschance (`UpgradeCatalogClient`, `upgrade.json` wird dafür nach StreamingAssets
+  kopiert, nur Anzeige), Materialzähler, Bewahrungsrolle, Warnung bei Zerstörungsrisiko, Ergebniszeile,
+  darunter das Sortiment. `NoBlacksmith` hat einen deutschen Text.
+- Gruppe ohne Chat: Rechtsklick auf einen Spieler öffnet ein Kontextmenü (In Gruppe einladen/Flüstern,
+  `GameClient.PlayerContextRequested`), `PartyInviteReceived` zeigt ein Annehmen/Ablehnen-Popup, das
+  Gruppenpanel zeigt HP-Balken je Mitglied, "Verlassen" nutzt `PartyLeave`, beim Betreten des Spiels
+  `RequestPartySnapshot`.
+- Boden-Items: Namensschild mit "+N" und Farbe je Stufe (blau ab +1, gold ab +7, orange +9), Hervorhebung
+  unter dem Mauszeiger, Linksklick hebt auf.
+- Screenshot-Hilfen: `GameClient.DebugShowSmithPreview()` / `DebugShowPartyInvite(name)`.
 - Klick-Abschirmung: Elemente mit Klasse `ui-block` fangen Mausklicks ab
   (`HudController.IsPointerOverUi` -> `GameClient.UiPointerHitTest`), ein Klick auf HUD/Fenster bewegt
   oder greift also nicht an.

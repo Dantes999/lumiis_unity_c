@@ -1186,6 +1186,151 @@
     font-size: 13px;
 }
 
+/* ---- Schmied ---- */
+
+.hud-smith-window {
+    left: 280px;
+    top: 90px;
+    width: 260px;
+}
+
+.hud-smith-slots {
+    flex-direction: row;
+    justify-content: center;
+    margin-bottom: 6px;
+}
+
+.hud-smith-slot {
+    margin: 0 4px;
+}
+
+.hud-smith-details {
+    padding: 6px 8px;
+    min-height: 120px;
+}
+
+.hud-smith-item {
+    color: rgb(255, 232, 150);
+    font-size: 15px;
+    -unity-font-style: bold;
+    white-space: normal;
+}
+
+.hud-smith-step,
+.hud-smith-line {
+    color: rgb(236, 226, 204);
+    font-size: 13px;
+    white-space: normal;
+}
+
+.hud-smith-chance {
+    color: rgb(150, 230, 140);
+    font-size: 14px;
+    -unity-font-style: bold;
+}
+
+.hud-smith-chance-low {
+    color: rgb(255, 150, 110);
+}
+
+.hud-smith-warning {
+    color: rgb(255, 140, 110);
+    font-size: 13px;
+    white-space: normal;
+}
+
+.hud-smith-upgrade {
+    margin-top: 6px;
+    min-height: 30px;
+    font-size: 15px;
+    -unity-font-style: bold;
+}
+
+.hud-smith-result {
+    color: rgb(255, 222, 130);
+    font-size: 13px;
+    white-space: normal;
+    -unity-text-align: middle-center;
+    min-height: 18px;
+    margin: 4px 0;
+}
+
+/* ---- Gruppeneinladung / Kontextmenü ---- */
+
+.hud-party-invite {
+    position: absolute;
+    display: none;
+    left: 50%;
+    top: 34%;
+    width: 300px;
+    margin-left: -150px;
+}
+
+.hud-dialog-text {
+    color: rgb(246, 236, 214);
+    font-size: 15px;
+    white-space: normal;
+    -unity-text-align: middle-center;
+    margin: 6px 0 10px 0;
+}
+
+.hud-dialog-buttons {
+    flex-direction: row;
+    justify-content: center;
+}
+
+.hud-dialog-buttons > .unity-button {
+    min-width: 110px;
+    margin: 0 6px;
+}
+
+.hud-context-menu {
+    position: absolute;
+    display: none;
+    width: 170px;
+    padding: 6px;
+}
+
+.hud-context-title {
+    color: rgb(255, 232, 150);
+    font-size: 14px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    margin-bottom: 4px;
+}
+
+.hud-context-button {
+    margin: 2px 0;
+}
+
+/* ---- Gruppe: Mitgliederzeilen ---- */
+
+.hud-party-row {
+    margin: 2px 0 4px 0;
+}
+
+.hud-party-name {
+    color: rgb(240, 232, 214);
+    font-size: 13px;
+}
+
+.hud-party-name-leader {
+    color: rgb(255, 222, 110);
+    -unity-font-style: bold;
+}
+
+.hud-party-hp {
+    height: 8px;
+    background-color: rgb(40, 14, 12);
+    border-width: 1px;
+    border-color: rgb(10, 6, 4);
+}
+
+.hud-party-hp-fill {
+    height: 100%;
+    background-color: rgb(196, 40, 32);
+}
+
 /* ---- Tooltip ---- */
 
 .hud-tooltip {

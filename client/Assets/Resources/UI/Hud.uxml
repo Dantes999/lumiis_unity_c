@@ -182,6 +182,53 @@
             </ui:VisualElement>
         </ui:VisualElement>
 
+        <!-- Schmied (NpcService.Blacksmith): angelegte Ausrüstung aufwerten, darunter das Sortiment
+             (Schleifstein/Bewahrungsrolle). Ob die Aufwertung gelingt, entscheidet der Server. -->
+        <ui:VisualElement name="hud-smith-window" class="m2-window hud-window hud-smith-window ui-block">
+            <ui:VisualElement name="hud-smith-titlebar" class="m2-titlebar">
+                <ui:Label name="hud-smith-title" text="Schmied" class="m2-title" />
+                <ui:Button name="hud-smith-close" text="" class="m2-close" />
+            </ui:VisualElement>
+            <ui:VisualElement class="m2-window-body">
+                <ui:Label text="Ausrüstung wählen" class="m2-section" />
+                <ui:VisualElement name="hud-smith-slots" class="hud-smith-slots" />
+                <ui:VisualElement class="m2-inset hud-smith-details">
+                    <ui:Label name="hud-smith-item" text="" class="hud-smith-item" />
+                    <ui:Label name="hud-smith-step" text="" class="hud-smith-step" />
+                    <ui:Label name="hud-smith-chance" text="" class="hud-smith-chance" />
+                    <ui:Label name="hud-smith-material" text="" class="hud-smith-line" />
+                    <ui:Toggle name="hud-smith-protect" text="Bewahrungsrolle nutzen" class="m2-toggle" />
+                    <ui:Label name="hud-smith-warning" text="" class="hud-smith-warning" />
+                </ui:VisualElement>
+                <ui:Button name="hud-smith-upgrade" text="Aufwerten" class="m2-button hud-smith-upgrade" />
+                <ui:Label name="hud-smith-result" text="" class="hud-smith-result" />
+                <ui:Label text="Sortiment" class="m2-section" />
+                <ui:VisualElement name="hud-smith-shop" class="hud-item-grid" />
+                <ui:Label text="Linksklick: kaufen" class="hud-window-hint" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Gruppeneinladung ohne Chat (PartyInviteReceivedPacket). -->
+        <ui:VisualElement name="hud-party-invite" class="m2-window hud-party-invite ui-block">
+            <ui:VisualElement class="m2-titlebar">
+                <ui:Label text="Gruppeneinladung" class="m2-title" />
+            </ui:VisualElement>
+            <ui:VisualElement class="m2-window-body">
+                <ui:Label name="hud-party-invite-text" text="" class="hud-dialog-text" />
+                <ui:VisualElement class="hud-dialog-buttons">
+                    <ui:Button name="hud-party-invite-accept" text="Annehmen" class="m2-button" />
+                    <ui:Button name="hud-party-invite-decline" text="Ablehnen" class="m2-button" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Kontextmenü bei Rechtsklick auf einen anderen Spieler. -->
+        <ui:VisualElement name="hud-context-menu" class="m2-panel hud-context-menu ui-block">
+            <ui:Label name="hud-context-title" text="" class="hud-context-title" />
+            <ui:Button name="hud-context-invite" text="In Gruppe einladen" class="m2-button hud-context-button" />
+            <ui:Button name="hud-context-whisper" text="Flüstern" class="m2-button hud-context-button" />
+        </ui:VisualElement>
+
         <ui:VisualElement name="hud-tooltip" class="hud-tooltip" picking-mode="Ignore">
             <ui:Label name="hud-tooltip-title" text="" class="hud-tooltip-title" picking-mode="Ignore" />
             <ui:Label name="hud-tooltip-body" text="" class="hud-tooltip-body" picking-mode="Ignore" />

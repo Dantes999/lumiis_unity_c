@@ -69,6 +69,13 @@ namespace Lumiis.Client
         // ---- Gruppe ----
         private VisualElement _partyRoot;
         private VisualElement _partyMembers;
+        private VisualElement _partyInvite;
+        private Label _partyInviteText;
+        private VisualElement _contextMenu;
+        private Label _contextTitle;
+        private string _contextPlayerName = "";
+        private int _contextOpenedAtFrame = -10;
+        private bool _wasInGame;
 
         // ---- Chat ----
         private VisualElement _chatInputRow;
@@ -85,6 +92,7 @@ namespace Lumiis.Client
         private VisualElement _inventoryWindow;
         private VisualElement _characterWindow;
         private VisualElement _shopWindow;
+        private VisualElement _smithWindow;
         private readonly List<VisualElement> _openWindows = new List<VisualElement>();
 
         private sealed class ItemSlotView
@@ -105,6 +113,22 @@ namespace Lumiis.Client
         private VisualElement _shopGrid;
         private Label _shopTitle;
         private string _shopSignature = "";
+
+        // ---- Schmied ----
+        private static readonly EquipmentSlot[] SmithSlotOrder = { EquipmentSlot.Weapon, EquipmentSlot.Armor, EquipmentSlot.Helmet, EquipmentSlot.Shield };
+        private readonly Dictionary<EquipmentSlot, ItemSlotView> _smithSlots = new Dictionary<EquipmentSlot, ItemSlotView>();
+        private EquipmentSlot _smithSelected = EquipmentSlot.Weapon;
+        private VisualElement _smithShopGrid;
+        private Label _smithTitle;
+        private Label _smithItem;
+        private Label _smithStep;
+        private Label _smithChance;
+        private Label _smithMaterial;
+        private Label _smithWarning;
+        private Label _smithResult;
+        private Toggle _smithProtect;
+        private Button _smithUpgrade;
+        private string _smithResultAtOpen = "";
         private int _lastShopNpcEntityId = -1;
 
         private Label _charLevel;
@@ -136,6 +160,8 @@ namespace Lumiis.Client
             _gameClient = gameClient;
             _gameClient.ChatMessageReceived += OnChatMessage;
             _gameClient.PartyChangedReceived += OnPartyChanged;
+            _gameClient.PartyInviteReceived += OnPartyInvite;
+            _gameClient.PlayerContextRequested += OnPlayerContext;
             _gameClient.UiPointerHitTest = IsPointerOverUi;
             StartCoroutine(BuildUiNextFrame());
         }
@@ -146,6 +172,11 @@ namespace Lumiis.Client
             if (_chatOpen)
             {
                 CloseChat();
+                return true;
+            }
+            if (_contextMenu != null && _contextMenu.resolvedStyle.display != DisplayStyle.None)
+            {
+                HideContextMenu();
                 return true;
             }
             if (_openWindows.Count == 0) return false;
@@ -276,7 +307,86 @@ namespace Lumiis.Client
             _partyRoot = _root.Q<VisualElement>("hud-party");
             _partyMembers = _root.Q<VisualElement>("hud-party-members");
             _partyRoot.style.display = DisplayStyle.None;
-            _root.Q<Button>("hud-party-leave").clicked += () => _gameClient.SendChat(ChatChannel.Map, "", "/leave");
+            _root.Q<Button>("hud-party-leave").clicked += () => _gameClient.PartyLeave();
+
+            _partyInvite = _root.Q<VisualElement>("hud-party-invite");
+            _partyInviteText = _root.Q<Label>("hud-party-invite-text");
+            _partyInvite.style.display = DisplayStyle.None;
+            _root.Q<Button>("hud-party-invite-accept").clicked += () => AnswerPartyInvite(true);
+            _root.Q<Button>("hud-party-invite-decline").clicked += () => AnswerPartyInvite(false);
+
+            _contextMenu = _root.Q<VisualElement>("hud-context-menu");
+            _contextTitle = _root.Q<Label>("hud-context-title");
+            _contextMenu.style.display = DisplayStyle.None;
+            _root.Q<Button>("hud-context-invite").clicked += () =>
+            {
+                if (_contextPlayerName.Length > 0)
+                {
+                    _gameClient.PartyInvite(_contextPlayerName);
+                    AddChatLine("System", "Einladung an " + _contextPlayerName + " gesendet.", ChatChannel.System);
+                }
+                HideContextMenu();
+            };
+            _root.Q<Button>("hud-context-whisper").clicked += () =>
+            {
+                string name = _contextPlayerName;
+                HideContextMenu();
+                if (name.Length == 0) return;
+                _channel = ChatChannel.Whisper;
+                UpdateChannelUi();
+                _chatTarget.value = name;
+                OpenChat();
+            };
+        }
+
+        private void AnswerPartyInvite(bool accept)
+        {
+            _gameClient.PartyRespond(accept);
+            _partyInvite.style.display = DisplayStyle.None;
+        }
+
+        private void OnPartyInvite(string inviterName)
+        {
+            if (_partyInvite == null) return;
+            _partyInviteText.text = inviterName + " lädt dich in eine Gruppe ein.";
+            _partyInvite.style.display = DisplayStyle.Flex;
+            _partyInvite.BringToFront();
+            AddChatLine("System", inviterName + " hat dich in eine Gruppe eingeladen.", ChatChannel.System);
+        }
+
+        private void OnPlayerContext(int entityId, string playerName)
+        {
+            if (_contextMenu == null || Mouse.current == null) return;
+            _contextPlayerName = playerName ?? "";
+            _contextTitle.text = _contextPlayerName;
+
+            Vector2 screen = Mouse.current.position.ReadValue();
+            Vector2 panelPos = RuntimePanelUtils.ScreenToPanel(_root.panel, new Vector2(screen.x, Screen.height - screen.y));
+            Vector2 local = _root.WorldToLocal(panelPos);
+            float maxX = Mathf.Max(0f, _root.layout.width - 180f);
+            float maxY = Mathf.Max(0f, _root.layout.height - 120f);
+            _contextMenu.style.left = Mathf.Clamp(local.x + 4f, 0f, maxX);
+            _contextMenu.style.top = Mathf.Clamp(local.y + 4f, 0f, maxY);
+            _contextMenu.style.display = DisplayStyle.Flex;
+            _contextMenu.BringToFront();
+            _contextOpenedAtFrame = Time.frameCount;
+        }
+
+        private void HideContextMenu()
+        {
+            if (_contextMenu != null) _contextMenu.style.display = DisplayStyle.None;
+            _contextPlayerName = "";
+        }
+
+        /// <summary>Kontextmenü schließt bei jedem Klick außerhalb (außer im Öffnungs-Frame).</summary>
+        private void UpdateContextMenu()
+        {
+            if (_contextMenu == null || _contextMenu.resolvedStyle.display == DisplayStyle.None) return;
+            if (Mouse.current == null || Time.frameCount - _contextOpenedAtFrame <= 1) return;
+            if (!Mouse.current.leftButton.wasPressedThisFrame && !Mouse.current.rightButton.wasPressedThisFrame) return;
+            Vector2 screen = Mouse.current.position.ReadValue();
+            Vector2 panelPos = RuntimePanelUtils.ScreenToPanel(_root.panel, new Vector2(screen.x, Screen.height - screen.y));
+            if (!_contextMenu.worldBound.Contains(panelPos)) HideContextMenu();
         }
 
         private void BindChat()
@@ -314,6 +424,9 @@ namespace Lumiis.Client
             SetupWindow(_inventoryWindow, "hud-inventory-titlebar", "hud-inventory-close", null);
             SetupWindow(_characterWindow, "hud-character-titlebar", "hud-character-close", null);
             SetupWindow(_shopWindow, "hud-shop-titlebar", "hud-shop-close", () => _gameClient.CloseShop());
+            _smithWindow = _root.Q<VisualElement>("hud-smith-window");
+            SetupWindow(_smithWindow, "hud-smith-titlebar", "hud-smith-close", () => _gameClient.CloseShop());
+            BuildSmithWindow();
 
             BuildInventoryWindow();
             BuildCharacterWindow();
@@ -389,7 +502,7 @@ namespace Lumiis.Client
             if (window == null) return;
             bool open = window.resolvedStyle.display != DisplayStyle.None && _openWindows.Contains(window);
             SetWindowOpen(window, !open);
-            if (open && window == _shopWindow) _gameClient.CloseShop();
+            if (open && (window == _shopWindow || window == _smithWindow)) _gameClient.CloseShop();
         }
 
         private void SetWindowOpen(VisualElement window, bool open)
@@ -404,7 +517,7 @@ namespace Lumiis.Client
             }
             else
             {
-                if (window == _shopWindow) _gameClient.CloseShop();
+                if (window == _shopWindow || window == _smithWindow) _gameClient.CloseShop();
                 if (window == _inventoryWindow) CancelUpgradeMode();
                 HideTooltip();
             }
@@ -561,7 +674,7 @@ namespace Lumiis.Client
             {
                 _inventoryHint.text = _gameClient.ShopNpcEntityId >= 0
                     ? "Rechtsklick auf einen Gegenstand: verkaufen."
-                    : "Klick: benutzen/anlegen · Rechtsklick auf Ausrüstung: ablegen · Schleifstein anklicken: aufwerten";
+                    : "Klick: benutzen/anlegen · Rechtsklick auf Ausrüstung: ablegen · Aufwerten beim Schmied";
                 _inventoryHint.RemoveFromClassList("hud-window-hint-active");
             }
 
@@ -734,35 +847,55 @@ namespace Lumiis.Client
         {
             int npcId = _gameClient.ShopNpcEntityId;
             bool shopOpen = npcId >= 0;
-            bool windowOpen = _openWindows.Contains(_shopWindow);
+            bool smith = shopOpen && _gameClient.ShopNpcService == NpcService.Blacksmith;
+            VisualElement window = smith ? _smithWindow : _shopWindow;
+            VisualElement other = smith ? _shopWindow : _smithWindow;
+            VisualElement grid = smith ? _smithShopGrid : _shopGrid;
 
             if (shopOpen && npcId != _lastShopNpcEntityId)
             {
-                // Neuer Shop (Rechtsklick auf einen Händler): Shop- und Inventarfenster öffnen.
-                SetWindowOpen(_shopWindow, true);
+                // Neuer NPC (Rechtsklick auf Händler/Schmied): passendes Fenster plus Inventar öffnen.
+                if (_openWindows.Contains(other))
+                {
+                    other.style.display = DisplayStyle.None;
+                    _openWindows.Remove(other);
+                }
+                SetWindowOpen(window, true);
                 if (!_openWindows.Contains(_inventoryWindow)) SetWindowOpen(_inventoryWindow, true);
-                windowOpen = true;
+                _shopSignature = "";
+                _smithResultAtOpen = _gameClient.LastUpgradeMessage ?? "";
             }
-            else if (!shopOpen && windowOpen)
+            else if (!shopOpen)
             {
-                _shopWindow.style.display = DisplayStyle.None;
-                _openWindows.Remove(_shopWindow);
-                windowOpen = false;
+                foreach (VisualElement w in new[] { _shopWindow, _smithWindow })
+                {
+                    if (!_openWindows.Contains(w)) continue;
+                    w.style.display = DisplayStyle.None;
+                    _openWindows.Remove(w);
+                }
             }
             _lastShopNpcEntityId = npcId;
-            if (!windowOpen) return;
+            if (!shopOpen || !_openWindows.Contains(window)) return;
 
-            _shopTitle.text = _gameClient.ShopNpcName;
+            if (smith)
+            {
+                _smithTitle.text = _gameClient.ShopNpcName;
+                RefreshSmithDetails();
+            }
+            else
+            {
+                _shopTitle.text = _gameClient.ShopNpcName;
+            }
 
-            string signature = "";
+            string signature = smith ? "S" : "M";
             foreach ((int ItemId, long BuyPrice) entry in _gameClient.ShopItems)
                 signature += entry.ItemId + ":" + entry.BuyPrice + ";";
             if (signature == _shopSignature) return;
             _shopSignature = signature;
 
-            _shopGrid.Clear();
-            _shopGrid.style.width = InventoryColumns * 40f;
-            _shopGrid.style.alignSelf = Align.Center;
+            grid.Clear();
+            grid.style.width = InventoryColumns * 40f;
+            grid.style.alignSelf = Align.Center;
             foreach ((int ItemId, long BuyPrice) entry in _gameClient.ShopItems)
             {
                 int itemId = entry.ItemId;
@@ -774,8 +907,133 @@ namespace Lumiis.Client
                     if (evt.button == 0) _gameClient.BuyShopItem(itemId);
                 });
                 RegisterTooltip(view.Root, () => (ItemName(itemId), ItemDescription(itemId, 0) + "\nPreis: " + FormatYang(price) + "\nKlick: kaufen"));
-                _shopGrid.Add(view.Root);
+                grid.Add(view.Root);
             }
+        }
+
+        // ================= Schmied =================
+
+        private void BuildSmithWindow()
+        {
+            _smithTitle = _root.Q<Label>("hud-smith-title");
+            _smithShopGrid = _root.Q<VisualElement>("hud-smith-shop");
+            _smithItem = _root.Q<Label>("hud-smith-item");
+            _smithStep = _root.Q<Label>("hud-smith-step");
+            _smithChance = _root.Q<Label>("hud-smith-chance");
+            _smithMaterial = _root.Q<Label>("hud-smith-material");
+            _smithWarning = _root.Q<Label>("hud-smith-warning");
+            _smithResult = _root.Q<Label>("hud-smith-result");
+            _smithProtect = _root.Q<Toggle>("hud-smith-protect");
+            _smithUpgrade = _root.Q<Button>("hud-smith-upgrade");
+
+            VisualElement slots = _root.Q<VisualElement>("hud-smith-slots");
+            foreach (EquipmentSlot slot in SmithSlotOrder)
+            {
+                EquipmentSlot captured = slot;
+                ItemSlotView view = CreateItemSlot();
+                view.Root.AddToClassList("hud-smith-slot");
+                slots.Add(view.Root);
+                _smithSlots[slot] = view;
+                view.Root.RegisterCallback<PointerDownEvent>(evt =>
+                {
+                    if (evt.button == 0) _smithSelected = captured;
+                });
+                RegisterTooltip(view.Root, () => EquipTooltip(captured));
+            }
+
+            _smithUpgrade.clicked += () =>
+            {
+                bool protect = _smithProtect.value && CountItem(ProtectionScrollItemId()) > 0;
+                _smithResultAtOpen = "";
+                _gameClient.UpgradeEquippedItem(_smithSelected, protect);
+            };
+        }
+
+        private int WhetstoneItemId() => _gameClient.UpgradeCatalog != null ? _gameClient.UpgradeCatalog.WhetstoneItemId : FindItemIdOfType("UpgradeMaterial");
+        private int ProtectionScrollItemId() => _gameClient.UpgradeCatalog != null ? _gameClient.UpgradeCatalog.ProtectionScrollItemId : FindItemIdOfType("ProtectionScroll");
+
+        private int FindItemIdOfType(string itemType)
+        {
+            foreach ((int SlotIndex, int ItemId, int UpgradeLevel) entry in _gameClient.InventorySlots)
+            {
+                if (_gameClient.ItemCatalog != null && _gameClient.ItemCatalog.TryGet(entry.ItemId, out ItemEntryJson item) && item.itemType == itemType)
+                    return entry.ItemId;
+            }
+            return -1;
+        }
+
+        private int CountItem(int itemId)
+        {
+            if (itemId <= 0) return 0;
+            int count = 0;
+            foreach ((int SlotIndex, int ItemId, int UpgradeLevel) entry in _gameClient.InventorySlots)
+                if (entry.ItemId == itemId) count++;
+            return count;
+        }
+
+        private void RefreshSmithDetails()
+        {
+            foreach (KeyValuePair<EquipmentSlot, ItemSlotView> kvp in _smithSlots)
+            {
+                ApplySlot(kvp.Value, _gameClient.EquippedItemId(kvp.Key), _gameClient.EquippedUpgradeLevel(kvp.Key));
+                kvp.Value.Root.EnableInClassList("hud-item-slot-selected", kvp.Key == _smithSelected);
+            }
+
+            int itemId = _gameClient.EquippedItemId(_smithSelected);
+            int level = _gameClient.EquippedUpgradeLevel(_smithSelected);
+            int maxLevel = _gameClient.UpgradeCatalog != null ? _gameClient.UpgradeCatalog.MaxUpgradeLevel : ItemEntryJson.MaxUpgradeLevel;
+            int whetstones = CountItem(WhetstoneItemId());
+            int scrolls = CountItem(ProtectionScrollItemId());
+
+            _smithProtect.SetEnabled(scrolls > 0);
+            if (scrolls == 0) _smithProtect.value = false;
+
+            string warning = "";
+            bool canUpgrade = true;
+            if (itemId == 0)
+            {
+                _smithItem.text = SlotName(_smithSelected) + ": leer";
+                _smithStep.text = "Lege zuerst ein Ausrüstungsteil an.";
+                _smithChance.text = "";
+                canUpgrade = false;
+            }
+            else
+            {
+                _smithItem.text = ItemName(itemId) + (level > 0 ? " +" + level : "");
+                if (level >= maxLevel)
+                {
+                    _smithStep.text = "Höchste Stufe erreicht (+" + maxLevel + ").";
+                    _smithChance.text = "";
+                    canUpgrade = false;
+                }
+                else
+                {
+                    int bonus = 0;
+                    if (_gameClient.ItemCatalog != null && _gameClient.ItemCatalog.TryGet(itemId, out ItemEntryJson item))
+                        bonus = item.upgradeBonusPerLevel;
+                    string stat = _smithSelected == EquipmentSlot.Weapon ? "Angriff" : "Verteidigung";
+                    _smithStep.text = "+" + level + " → +" + (level + 1) + (bonus > 0 ? "   (" + stat + " +" + bonus + ")" : "");
+                    int chance = _gameClient.UpgradeCatalog != null ? _gameClient.UpgradeCatalog.SuccessChancePercent(level) : -1;
+                    _smithChance.text = chance >= 0 ? "Erfolgschance: " + chance + " %" : "";
+                    _smithChance.EnableInClassList("hud-smith-chance-low", chance >= 0 && chance < 50);
+                }
+            }
+
+            _smithMaterial.text = "Schleifstein: " + whetstones + "   ·   Bewahrungsrolle: " + scrolls;
+            if (canUpgrade && whetstones == 0)
+            {
+                warning = "Kein Schleifstein im Inventar - unten im Sortiment kaufen.";
+                canUpgrade = false;
+            }
+            else if (canUpgrade && !_smithProtect.value)
+            {
+                warning = "Ohne Bewahrungsrolle wird das Teil bei einem Fehlschlag zerstört!";
+            }
+            _smithWarning.text = warning;
+            _smithUpgrade.SetEnabled(canUpgrade);
+
+            string result = _gameClient.LastUpgradeMessage ?? "";
+            _smithResult.text = result == _smithResultAtOpen ? "" : result;
         }
 
         // ================= Tooltip =================
@@ -835,7 +1093,7 @@ namespace Lumiis.Client
                 if (_gameClient.ShopNpcEntityId >= 0)
                     body += item.sellPrice > 0 ? "\nRechtsklick: verkaufen für " + FormatYang(item.sellPrice) : "\nNicht verkäuflich";
                 else if (item.itemType == "UpgradeMaterial")
-                    body += "\nKlick: Aufwerten starten";
+                    body += "\nZum Aufwerten beim Schmied";
                 else if (item.itemType == "Consumable")
                     body += "\nKlick: benutzen";
                 else if (item.itemType != "ProtectionScroll")
@@ -850,7 +1108,8 @@ namespace Lumiis.Client
             if (itemId == 0) return (SlotName(slot), "leer");
             int upgrade = _gameClient.EquippedUpgradeLevel(slot);
             string body = ItemDescription(itemId, upgrade) + "\nRechtsklick: ablegen";
-            if (upgrade < ItemEntryJson.MaxUpgradeLevel) body += "\nAufwerten: Schleifstein anklicken, dann hier klicken";
+            body += "\nStufe +" + upgrade + " / +" + ItemEntryJson.MaxUpgradeLevel;
+            if (upgrade < ItemEntryJson.MaxUpgradeLevel) body += "\nAufwerten: beim Schmied (Rechtsklick auf den Schmied)";
             return (ItemName(itemId) + (upgrade > 0 ? " +" + upgrade : ""), body);
         }
 
@@ -917,7 +1176,16 @@ namespace Lumiis.Client
         {
             if (_root == null) return;
 
-            bool visible = _gameClient != null && _gameClient.IsInGame && !_gameClient.IsAssetLabActive;
+            bool inGame = _gameClient != null && _gameClient.IsInGame;
+            if (inGame && !_wasInGame) _gameClient.RequestPartySnapshot();
+            if (!inGame && _wasInGame)
+            {
+                if (_partyInvite != null) _partyInvite.style.display = DisplayStyle.None;
+                HideContextMenu();
+            }
+            _wasInGame = inGame;
+
+            bool visible = inGame && !_gameClient.IsAssetLabActive;
             _root.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
             if (!visible)
             {
@@ -928,6 +1196,7 @@ namespace Lumiis.Client
             }
 
             HandleHotkeys();
+            UpdateContextMenu();
             RefreshPlayer();
             RefreshTarget();
             RefreshQuickslots();
@@ -1195,13 +1464,25 @@ namespace Lumiis.Client
             if (_partyRoot == null) return;
             _partyMembers.Clear();
             _partyRoot.style.display = packet.Members.Count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+            if (packet.Members.Count > 0 && _partyInvite != null) _partyInvite.style.display = DisplayStyle.None;
 
             foreach ((int entityId, string name, int level, int hp, int maxHp) in packet.Members)
             {
-                string prefix = entityId == packet.LeaderEntityId ? "★ " : "· ";
-                var label = new Label(prefix + name + "  Lv " + level + "  HP " + hp + "/" + maxHp);
-                label.AddToClassList("hud-party-member");
-                _partyMembers.Add(label);
+                bool leader = entityId == packet.LeaderEntityId;
+                var row = new VisualElement();
+                row.AddToClassList("hud-party-row");
+                var label = new Label((leader ? "★ " : "") + name + "   Lv " + level);
+                label.AddToClassList("hud-party-name");
+                label.EnableInClassList("hud-party-name-leader", leader);
+                var bar = new VisualElement();
+                bar.AddToClassList("hud-party-hp");
+                var fill = new VisualElement();
+                fill.AddToClassList("hud-party-hp-fill");
+                fill.style.width = Length.Percent(maxHp > 0 ? Mathf.Clamp01(hp / (float)maxHp) * 100f : 0f);
+                bar.Add(fill);
+                row.Add(label);
+                row.Add(bar);
+                _partyMembers.Add(row);
             }
         }
 
@@ -1265,6 +1546,8 @@ namespace Lumiis.Client
             {
                 _gameClient.ChatMessageReceived -= OnChatMessage;
                 _gameClient.PartyChangedReceived -= OnPartyChanged;
+                _gameClient.PartyInviteReceived -= OnPartyInvite;
+                _gameClient.PlayerContextRequested -= OnPlayerContext;
                 _gameClient.UiPointerHitTest = null;
             }
             if (_panelSettings != null)

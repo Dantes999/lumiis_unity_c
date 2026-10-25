@@ -27,7 +27,12 @@ namespace Lumiis.Client
 
         /// <summary>M7-Party: voller Gruppenstand (Resync) für das HUD.</summary>
         public event System.Action<PartyChangedPacket> PartyChangedReceived;
+        /// <summary>Gruppen-UI ohne Chat: Name des Einladenden (PartyInviteReceivedPacket).</summary>
         public event System.Action<string> PartyInviteReceived;
+
+        /// <summary>Rechtsklick auf einen anderen Spieler: (EntityId, Name) für ein Kontextmenü im HUD
+        /// (z. B. "In Gruppe einladen"). Reine UI-Anfrage, keine Spielaktion.</summary>
+        public event System.Action<int, string> PlayerContextRequested;
         private Sprite _squareSprite;
         private Sprite _localMarkerSprite;
         private Sprite _monsterCircleSprite;
@@ -47,6 +52,7 @@ namespace Lumiis.Client
         private SkillCatalogClient _skillCatalog;
         private ClassCatalogClient _classCatalog;
         private MapCatalogClient _mapCatalogClient;
+        private UpgradeCatalogClient _upgradeCatalog;
         private GameObject _mapRoot;
         private CachingSpriteProvider _spriteProvider;
         private AudioService _audio;
@@ -138,6 +144,7 @@ namespace Lumiis.Client
         // kein Delta - dieselbe Philosophie wie InventorySyncPacket).
         private int _shopOpenNpcEntityId = -1;
         private readonly List<(int ItemId, long BuyPrice)> _shopItems = new List<(int, long)>();
+        private bool _debugSmithPreview;
         private string _lastShopActionFailedMessage = "";
 
         // ---- Fortschritt (M6a, Debug-Panel-Stil - siehe DrawCharacterPanel) ----
@@ -293,6 +300,17 @@ namespace Lumiis.Client
                 throw;
             }
 
+            // Schmied-Fenster: Erfolgschancen nur für die Anzeige - fehlt die Kopie (alter Build), zeigt das
+            // Fenster einfach keine Prozentwerte.
+            try
+            {
+                _upgradeCatalog = UpgradeCatalogClient.LoadFromStreamingAssets();
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning("upgrade.json nicht gefunden, Schmied zeigt keine Erfolgschancen: " + ex.Message);
+            }
+
             // Multi-Map: Kartenname/Portale nur für die Anzeige - fehlt die Kopie (z. B. alter Build), läuft
             // der Client ohne Portalmarkierungen weiter statt am fehlenden Anzeige-Katalog zu scheitern.
             try
@@ -370,6 +388,7 @@ namespace Lumiis.Client
                 HandleKeyboardMovement();
                 HandleKeyboardCombat();
                 HandleClickInput();
+                UpdateGroundItemHover();
                 HandleSkillHotkeys();
             }
             HandleZoomInput();
@@ -387,7 +406,7 @@ namespace Lumiis.Client
         /// erneut (siehe World.CheckShopAccess) - das hier verhindert nur ein sichtbar totes Panel.</summary>
         private void UpdateShopAutoClose()
         {
-            if (_shopOpenNpcEntityId < 0) return;
+            if (_shopOpenNpcEntityId < 0 || _debugSmithPreview) return;
 
             if (_world.LocalEntityId < 0
                 || !_world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity local)
@@ -671,6 +690,28 @@ namespace Lumiis.Client
         public void DebugShowAssetLabMapPreview()
         {
             _assetTestLab?.DebugShowMapPreview();
+        }
+
+        /// <summary>Screenshot-/Testhilfe: zeigt das Einladungs-Popup, als hätte der Server eine Einladung
+        /// geschickt. Antworten gehen trotzdem normal an den Server (der sie ohne offene Einladung ignoriert).</summary>
+        public void DebugShowPartyInvite(string inviterName)
+        {
+            PartyInviteReceived?.Invoke(inviterName);
+        }
+
+        /// <summary>Screenshot-/Testhilfe: öffnet das Schmied-Fenster ohne echten Schmied in der Nähe
+        /// (Sortiment aus items.json: Schleifstein + Bewahrungsrolle). Aufwerten schickt trotzdem eine echte
+        /// Anfrage, die der Server ohne Schmied mit NoBlacksmith ablehnt.</summary>
+        public void DebugShowSmithPreview()
+        {
+            _debugSmithPreview = true;
+            _shopOpenNpcEntityId = int.MaxValue - 1;
+            _shopItems.Clear();
+            if (_itemCatalog != null && _upgradeCatalog != null)
+            {
+                foreach (int itemId in new[] { _upgradeCatalog.WhetstoneItemId, _upgradeCatalog.ProtectionScrollItemId })
+                    if (_itemCatalog.TryGet(itemId, out ItemEntryJson item)) _shopItems.Add((itemId, item.buyPrice));
+            }
         }
 
         public void DebugShowPartyPreview()
@@ -1379,6 +1420,22 @@ namespace Lumiis.Client
             _comboIndex = (_comboIndex + 1) % 3;
         }
 
+        /// <summary>Hebt das Boden-Item unter dem Mauszeiger hervor (nur Optik, Aufheben bleibt Linksklick).</summary>
+        private void UpdateGroundItemHover()
+        {
+            if (Mouse.current == null || _groundItemViews.Count == 0) return;
+            bool overUi = UiPointerHitTest != null && UiPointerHitTest(Mouse.current.position.ReadValue());
+            Vector3 worldPos = ScreenToWorldPoint(Mouse.current.position.ReadValue());
+            bool found = false;
+            foreach (GroundItemView view in _groundItemViews.Values)
+            {
+                if (view == null) continue;
+                bool hover = !overUi && !found && view.ContainsWorldPoint(worldPos);
+                if (hover) found = true;
+                view.SetHighlighted(hover);
+            }
+        }
+
         private void HandleClickInput()
         {
             if (Mouse.current == null) return;
@@ -1440,7 +1497,13 @@ namespace Lumiis.Client
             foreach (KeyValuePair<int, CharacterView> kvp in _views)
             {
                 if (kvp.Value == null || !kvp.Value.ContainsWorldPoint(worldPos)) continue;
-                if (!_world.Entities.TryGetValue(kvp.Key, out ClientEntity entity) || entity.Kind != EntityKind.Npc) continue;
+                if (!_world.Entities.TryGetValue(kvp.Key, out ClientEntity entity)) continue;
+                if (entity.Kind == EntityKind.Player)
+                {
+                    if (kvp.Key != _world.LocalEntityId) PlayerContextRequested?.Invoke(kvp.Key, entity.Name);
+                    return;
+                }
+                if (entity.Kind != EntityKind.Npc) continue;
 
                 _shopOpenNpcEntityId = kvp.Key;
                 _shopItems.Clear();
@@ -1724,6 +1787,13 @@ namespace Lumiis.Client
                 return;
             }
 
+            PartyInviteReceivedPacket partyInvite = packet as PartyInviteReceivedPacket;
+            if (partyInvite != null)
+            {
+                PartyInviteReceived?.Invoke(partyInvite.InviterName);
+                return;
+            }
+
             PartyChangedPacket party = packet as PartyChangedPacket;
             if (party != null)
             {
@@ -1847,6 +1917,7 @@ namespace Lumiis.Client
                 case UpgradeActionFailedReason.AlreadyMaxLevel: return "Maximale Aufwertungsstufe (+9) erreicht.";
                 case UpgradeActionFailedReason.NoMaterial: return "Kein Schleifstein im Inventar.";
                 case UpgradeActionFailedReason.NoProtectionScroll: return "Keine Bewahrungsrolle im Inventar.";
+                case UpgradeActionFailedReason.NoBlacksmith: return "Aufwerten geht nur beim Schmied.";
                 default: return "Aufwertung nicht möglich.";
             }
         }
@@ -1922,7 +1993,10 @@ namespace Lumiis.Client
                 Sprite iconSprite = icon != null
                     ? Sprite.Create(icon, new Rect(0, 0, icon.width, icon.height), new Vector2(0.5f, 0.5f), 32f)
                     : _squareSprite;
-                groundView.Initialize(iconSprite, entity.Name);
+                string groundName = _itemCatalog != null && _itemCatalog.TryGet(entity.TypeId, out ItemEntryJson groundItem)
+                    ? groundItem.name
+                    : entity.Name;
+                groundView.Initialize(iconSprite, groundName, entity.ItemUpgradeLevel);
                 groundView.SetWorldPosition(entity.X / 100.0, entity.Y / 100.0);
                 _groundItemViews[entity.Id] = groundView;
                 if (_assetLabActive) HideForAssetLab(groundGo);
@@ -2154,6 +2228,18 @@ namespace Lumiis.Client
         public int ShopNpcEntityId => _shopOpenNpcEntityId;
         public IReadOnlyList<(int ItemId, long BuyPrice)> ShopItems => _shopItems;
 
+        /// <summary>Dienst des NPCs, dessen Shop gerade offen ist (Händler/Schmied), None ohne offenen Shop.</summary>
+        public NpcService ShopNpcService =>
+            _debugSmithPreview && _shopOpenNpcEntityId >= 0 ? NpcService.Blacksmith
+            : _shopOpenNpcEntityId >= 0 && _world.Entities.TryGetValue(_shopOpenNpcEntityId, out ClientEntity npc)
+                ? npc.NpcService
+                : NpcService.None;
+
+        public UpgradeCatalogClient UpgradeCatalog => _upgradeCatalog;
+
+        /// <summary>Letzte Aufwertungsmeldung (Erfolg/Fehlschlag/Ablehnungsgrund) fürs Schmied-Fenster.</summary>
+        public string LastUpgradeMessage => _lastUpgradeMessage;
+
         public string ShopNpcName
         {
             get
@@ -2179,6 +2265,7 @@ namespace Lumiis.Client
         public void CloseShop()
         {
             _shopOpenNpcEntityId = -1;
+            _debugSmithPreview = false;
         }
 
         public void AllocateStatPoint(StatKind stat)

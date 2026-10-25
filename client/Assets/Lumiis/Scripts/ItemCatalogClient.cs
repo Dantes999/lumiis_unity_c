@@ -36,6 +36,10 @@ namespace Lumiis.Client
         /// hier bewusst NICHT geladen - die kommt beim Kaufen ohnehin autoritativ vom Server.</summary>
         public long sellPrice;
 
+        /// <summary>Kaufpreis laut items.json - nur für die Debug-Vorschau des Schmied-Fensters; im echten
+        /// Spiel kommt der Preis autoritativ per ShopContentPacket.</summary>
+        public long buyPrice;
+
         /// <summary>Paper-Doll-Rendering: Dateiname (ohne Endung) des statischen Waffen-PNGs unter
         /// Resources/Sprites/Items/. Leer = CharacterView nutzt den generierten Platzhalter.</summary>
         public string spriteKey = "";
