@@ -721,7 +721,11 @@ namespace Lumiis.Client
 
             var packet = new PartyChangedPacket { LeaderEntityId = local.Id };
             packet.Members.Add((local.Id, local.Name, _world.CharacterStats.Level, Mathf.Max(0, local.CurrentHp), Mathf.Max(0, local.MaxHp)));
+            packet.MemberStatus.Add((true, PartyRole.Attacker));
             packet.Members.Add((local.Id + 1, "Bob", 12, 200, 240));
+            packet.MemberStatus.Add((true, PartyRole.Defender));
+            packet.Members.Add((0, "Clara", 9, 90, 180)); // offline: EntityId 0, letzter bekannter Stand
+            packet.MemberStatus.Add((false, PartyRole.None));
             PartyChangedReceived?.Invoke(packet);
         }
 
@@ -1905,6 +1909,9 @@ namespace Lumiis.Client
                 case InventoryActionFailedReason.NotConsumable: return "Dieser Gegenstand kann nicht benutzt werden.";
                 case InventoryActionFailedReason.InventoryFull: return "Inventar ist voll.";
                 case InventoryActionFailedReason.TargetAtFullHp: return "Leben bereits voll.";
+                case InventoryActionFailedReason.GroundItemNotFound: return "Der Gegenstand liegt nicht mehr da.";
+                case InventoryActionFailedReason.PickupOutOfRange: return "Zu weit entfernt zum Aufheben.";
+                case InventoryActionFailedReason.PickupNotOwner: return "Dieser Gegenstand gehört noch einem anderen Spieler.";
                 default: return "Aktion fehlgeschlagen.";
             }
         }
@@ -2295,6 +2302,9 @@ namespace Lumiis.Client
         public void PartyInvite(string targetName) => _netClient?.SendPartyInvite(targetName);
         public void PartyRespond(bool accept) => _netClient?.SendPartyRespond(accept);
         public void PartyLeave() => _netClient?.SendPartyLeave();
+        public void PartyKick(string targetName) => _netClient?.SendPartyKick(targetName);
+        public void PartyPromote(string targetName) => _netClient?.SendPartyPromote(targetName);
+        public void PartySetRole(string targetName, PartyRole role) => _netClient?.SendPartySetRole(targetName, role);
         public void RequestPartySnapshot() => _netClient?.RequestPartySnapshot();
 
         public Vector3 LocalPlayerWorldPosition

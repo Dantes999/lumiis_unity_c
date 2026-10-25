@@ -227,6 +227,11 @@
             <ui:Label name="hud-context-title" text="" class="hud-context-title" />
             <ui:Button name="hud-context-invite" text="In Gruppe einladen" class="m2-button hud-context-button" />
             <ui:Button name="hud-context-whisper" text="Flüstern" class="m2-button hud-context-button" />
+            <ui:Button name="hud-context-promote" text="Zum Leiter machen" class="m2-button hud-context-button" />
+            <ui:Button name="hud-context-role-attacker" text="Rolle: Angreifer" class="m2-button hud-context-button" />
+            <ui:Button name="hud-context-role-defender" text="Rolle: Verteidiger" class="m2-button hud-context-button" />
+            <ui:Button name="hud-context-role-none" text="Rolle entfernen" class="m2-button hud-context-button" />
+            <ui:Button name="hud-context-kick" text="Aus Gruppe entfernen" class="m2-button hud-context-button hud-context-danger" />
         </ui:VisualElement>
 
         <ui:VisualElement name="hud-tooltip" class="hud-tooltip" picking-mode="Ignore">

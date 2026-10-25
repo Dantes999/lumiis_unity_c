@@ -1317,6 +1317,35 @@
     margin: 2px 0 4px 0;
 }
 
+.hud-party-row-offline {
+    opacity: 0.5;
+}
+
+.hud-party-header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.hud-party-role {
+    font-size: 11px;
+    color: rgb(214, 196, 160);
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
+    -unity-text-outline-width: 0;
+}
+
+.hud-party-role-attacker {
+    color: rgb(255, 150, 110);
+}
+
+.hud-party-role-defender {
+    color: rgb(140, 190, 255);
+}
+
+.hud-context-danger {
+    color: rgb(255, 150, 130);
+}
+
 .hud-party-name {
     color: rgb(240, 232, 214);
     font-size: 13px;

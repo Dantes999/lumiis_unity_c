@@ -77,6 +77,13 @@ namespace Lumiis.Client
         private VisualElement _contextMenu;
         private Label _contextTitle;
         private string _contextPlayerName = "";
+        private Button _contextInvite;
+        private Button _contextWhisper;
+        private Button _contextKick;
+        private Button _contextPromote;
+        private Button _contextRoleAttacker;
+        private Button _contextRoleDefender;
+        private Button _contextRoleNone;
         private int _contextOpenedAtFrame = -10;
         private bool _wasInGame;
 
@@ -322,7 +329,19 @@ namespace Lumiis.Client
             _contextMenu = _root.Q<VisualElement>("hud-context-menu");
             _contextTitle = _root.Q<Label>("hud-context-title");
             _contextMenu.style.display = DisplayStyle.None;
-            _root.Q<Button>("hud-context-invite").clicked += () =>
+            _contextInvite = _root.Q<Button>("hud-context-invite");
+            _contextWhisper = _root.Q<Button>("hud-context-whisper");
+            _contextKick = _root.Q<Button>("hud-context-kick");
+            _contextPromote = _root.Q<Button>("hud-context-promote");
+            _contextRoleAttacker = _root.Q<Button>("hud-context-role-attacker");
+            _contextRoleDefender = _root.Q<Button>("hud-context-role-defender");
+            _contextRoleNone = _root.Q<Button>("hud-context-role-none");
+            _contextKick.clicked += () => RunContextAction(name => _gameClient.PartyKick(name));
+            _contextPromote.clicked += () => RunContextAction(name => _gameClient.PartyPromote(name));
+            _contextRoleAttacker.clicked += () => RunContextAction(name => _gameClient.PartySetRole(name, PartyRole.Attacker));
+            _contextRoleDefender.clicked += () => RunContextAction(name => _gameClient.PartySetRole(name, PartyRole.Defender));
+            _contextRoleNone.clicked += () => RunContextAction(name => _gameClient.PartySetRole(name, PartyRole.None));
+            _contextInvite.clicked += () =>
             {
                 if (_contextPlayerName.Length > 0)
                 {
@@ -358,9 +377,48 @@ namespace Lumiis.Client
             AddChatLine("System", inviterName + " hat dich in eine Gruppe eingeladen.", ChatChannel.System);
         }
 
+        private void RunContextAction(System.Action<string> action)
+        {
+            string name = _contextPlayerName;
+            HideContextMenu();
+            if (name.Length > 0) action(name);
+        }
+
+        private static void ShowButton(Button button, bool visible)
+        {
+            if (button != null) button.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
         private void OnPlayerContext(int entityId, string playerName)
         {
-            if (_contextMenu == null || Mouse.current == null) return;
+            if (_contextMenu == null) return;
+            ShowButton(_contextInvite, true);
+            ShowButton(_contextWhisper, true);
+            ShowButton(_contextKick, false);
+            ShowButton(_contextPromote, false);
+            ShowButton(_contextRoleAttacker, false);
+            ShowButton(_contextRoleDefender, false);
+            ShowButton(_contextRoleNone, false);
+            OpenContextMenu(playerName);
+        }
+
+        /// <summary>Rechtsklick auf eine Zeile im Gruppenpanel - nur der Leiter bekommt die Verwaltungsaktionen.</summary>
+        private void OnPartyMemberContext(string memberName, bool online, bool isSelf, PartyRole role)
+        {
+            if (_contextMenu == null) return;
+            ShowButton(_contextInvite, false);
+            ShowButton(_contextWhisper, online && !isSelf);
+            ShowButton(_contextKick, !isSelf);
+            ShowButton(_contextPromote, online && !isSelf);
+            ShowButton(_contextRoleAttacker, role != PartyRole.Attacker);
+            ShowButton(_contextRoleDefender, role != PartyRole.Defender);
+            ShowButton(_contextRoleNone, role != PartyRole.None);
+            OpenContextMenu(memberName);
+        }
+
+        private void OpenContextMenu(string playerName)
+        {
+            if (Mouse.current == null) return;
             _contextPlayerName = playerName ?? "";
             _contextTitle.text = _contextPlayerName;
 
@@ -368,7 +426,7 @@ namespace Lumiis.Client
             Vector2 panelPos = RuntimePanelUtils.ScreenToPanel(_root.panel, new Vector2(screen.x, Screen.height - screen.y));
             Vector2 local = _root.WorldToLocal(panelPos);
             float maxX = Mathf.Max(0f, _root.layout.width - 180f);
-            float maxY = Mathf.Max(0f, _root.layout.height - 120f);
+            float maxY = Mathf.Max(0f, _root.layout.height - TaskbarHeight - 230f);
             _contextMenu.style.left = Mathf.Clamp(local.x + 4f, 0f, maxX);
             _contextMenu.style.top = Mathf.Clamp(local.y + 4f, 0f, maxY);
             _contextMenu.style.display = DisplayStyle.Flex;
@@ -1511,22 +1569,53 @@ namespace Lumiis.Client
             _partyRoot.style.display = packet.Members.Count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
             if (packet.Members.Count > 0 && _partyInvite != null) _partyInvite.style.display = DisplayStyle.None;
 
-            foreach ((int entityId, string name, int level, int hp, int maxHp) in packet.Members)
+            ClientEntity local = LocalEntity();
+            int localId = local != null ? local.Id : -1;
+            bool localIsLeader = localId >= 0 && packet.LeaderEntityId == localId;
+            for (int i = 0; i < packet.Members.Count; i++)
             {
-                bool leader = entityId == packet.LeaderEntityId;
+                (int entityId, string name, int level, int hp, int maxHp) = packet.Members[i];
+                bool online = i < packet.MemberStatus.Count ? packet.MemberStatus[i].Online : true;
+                PartyRole role = i < packet.MemberStatus.Count ? packet.MemberStatus[i].Role : PartyRole.None;
+                bool leader = online && entityId == packet.LeaderEntityId;
+                bool isSelf = online && entityId == localId;
                 var row = new VisualElement();
                 row.AddToClassList("hud-party-row");
-                var label = new Label((leader ? "★ " : "") + name + "   Lv " + level);
+                row.EnableInClassList("hud-party-row-offline", !online);
+                var header = new VisualElement();
+                header.AddToClassList("hud-party-header");
+                var label = new Label((leader ? "★ " : "") + name + "   Lv " + level + (online ? "" : "  (offline)"));
                 label.AddToClassList("hud-party-name");
                 label.EnableInClassList("hud-party-name-leader", leader);
+                header.Add(label);
+                string roleName = PartyRoleName(role);
+                if (roleName.Length > 0)
+                {
+                    var roleLabel = new Label(roleName);
+                    roleLabel.AddToClassList("hud-party-role");
+                    roleLabel.EnableInClassList("hud-party-role-attacker", role == PartyRole.Attacker);
+                    roleLabel.EnableInClassList("hud-party-role-defender", role == PartyRole.Defender);
+                    header.Add(roleLabel);
+                }
                 var bar = new VisualElement();
                 bar.AddToClassList("hud-party-hp");
                 var fill = new VisualElement();
                 fill.AddToClassList("hud-party-hp-fill");
                 fill.style.width = Length.Percent(maxHp > 0 ? Mathf.Clamp01(hp / (float)maxHp) * 100f : 0f);
                 bar.Add(fill);
-                row.Add(label);
+                row.Add(header);
                 row.Add(bar);
+                if (localIsLeader)
+                {
+                    string memberName = name;
+                    row.RegisterCallback<PointerDownEvent>(evt =>
+                    {
+                        if (evt.button != 1) return;
+                        OnPartyMemberContext(memberName, online, isSelf, role);
+                        evt.StopPropagation();
+                    });
+                    RegisterTooltip(row, () => (memberName, "Rechtsklick: Mitglied verwalten"));
+                }
                 _partyMembers.Add(row);
             }
         }
@@ -1552,6 +1641,16 @@ namespace Lumiis.Client
         }
 
         // ================= Texte =================
+
+        private static string PartyRoleName(PartyRole role)
+        {
+            switch (role)
+            {
+                case PartyRole.Attacker: return "Angreifer";
+                case PartyRole.Defender: return "Verteidiger";
+                default: return "";
+            }
+        }
 
         private static string ChannelPrefix(ChatChannel channel)
         {
