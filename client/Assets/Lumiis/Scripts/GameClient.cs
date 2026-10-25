@@ -113,6 +113,8 @@ namespace Lumiis.Client
         private int _targetEntityId = -1;
         private string _lastAttackFailedMessage = "";
         private bool _attackHeld;
+        private Vector2 _lastKeyboardDirection;
+        private float _combatFacingUntil = float.NegativeInfinity;
         private float _nextAutoAttackAt;
         private int _comboIndex;
         private float _nextMoveSendAt;
@@ -404,7 +406,7 @@ namespace Lumiis.Client
                     kvp.Value.SetWorldPosition(entity.X / 100.0, entity.Y / 100.0);
                     kvp.Value.SetFacing(entity.Facing);
                     if (_animators.TryGetValue(kvp.Key, out CharacterAnimator animator))
-                        animator.Animate(entity.IsMoving);
+                        animator.Animate(entity.IsMoving, entity.Speed);
                 }
             }
 
@@ -1318,9 +1320,47 @@ namespace Lumiis.Client
             if (direction.sqrMagnitude < 0.0001f) return;
 
             _aimDirection = direction.normalized;
+
+            // Beim Laufen ohne Kampf schaut die Figur in Laufrichtung: sonst lief sie seitlich/rückwärts, und
+            // schon kleine Mausbewegungen nahe der Figur ließen die Blickrichtung mitten im Schritt umspringen.
+            if (TryGetLocalWalkDirection(out Vector2 walkDirection) && !IsLocalCombatFacingActive())
+            {
+                _world.SetFacingOverride(_world.LocalEntityId,
+                    Mathf.RoundToInt(localWorld.x * 100f + walkDirection.x * 100f),
+                    Mathf.RoundToInt(localWorld.y * 100f + walkDirection.y * 100f));
+                return;
+            }
+
             _world.SetFacingOverride(_world.LocalEntityId,
                 Mathf.RoundToInt(mouseWorld.x * 100f),
                 Mathf.RoundToInt(mouseWorld.y * 100f));
+        }
+
+        /// <summary>Laufrichtung der eigenen Figur: WASD-Eingabe, sonst der aktuelle Server-Pfad (Klick-Laufen).</summary>
+        private bool TryGetLocalWalkDirection(out Vector2 walkDirection)
+        {
+            walkDirection = Vector2.zero;
+            if (_keyboardMoveSent && _lastKeyboardDirection.sqrMagnitude > 0f)
+            {
+                walkDirection = _lastKeyboardDirection;
+                return true;
+            }
+            if (!_world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity local) || !local.IsMoving)
+                return false;
+            walkDirection = new Vector2(local.TargetX - local.StartX, local.TargetY - local.StartY);
+            if (walkDirection.sqrMagnitude < 1f) return false;
+            walkDirection.Normalize();
+            return true;
+        }
+
+        /// <summary>Solange geschlagen wird (Leertaste gehalten, Hieb läuft oder kurz danach), zeigt die Figur
+        /// zur Maus - so bleibt "weglaufen und nach hinten schlagen" möglich.</summary>
+        private bool IsLocalCombatFacingActive()
+        {
+            if (_attackHeld || _pendingAttackTargetId > 0) return true;
+            if (Time.time < _combatFacingUntil) return true;
+            return _animators.TryGetValue(_world.LocalEntityId, out CharacterAnimator animator)
+                && animator != null && animator.IsAttackPlaying;
         }
 
         /// <summary>WASD/Pfeiltasten: hält die Figur in die gewünschte Richtung. Der Client sendet in
@@ -1355,9 +1395,10 @@ namespace Lumiis.Client
             }
 
             _keyboardMoveSent = true;
+            direction.Normalize();
+            _lastKeyboardDirection = direction;
             if (Time.time < _nextMoveSendAt) return;
             _nextMoveSendAt = Time.time + 0.10f;
-            direction.Normalize();
 
             Vector3 position = LocalPlayerWorldPosition;
             // Etwas weiter voraus als ein Server-Tick, damit ein einzelnes verzögertes MoveTo nicht sofort
@@ -2266,6 +2307,7 @@ namespace Lumiis.Client
         private void PlayAttackAnimation(int entityId, int comboIndex = 0, float aimDegrees = float.NaN)
         {
             if (entityId <= 0) return;
+            if (entityId == _world.LocalEntityId) _combatFacingUntil = Time.time + 0.45f;
             if (_animators.TryGetValue(entityId, out CharacterAnimator animator) && animator != null)
                 animator.PlayAttack(comboIndex, aimDegrees);
         }

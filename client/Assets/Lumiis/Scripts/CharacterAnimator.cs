@@ -12,7 +12,6 @@ namespace Lumiis.Client
         private const float IdleBreatheScale = 0.01f;
         private const float IdleBreatheSpeed = 1.5f;
         private const float WalkBobUnits = 0.05f;
-        private const float WalkBobSpeed = 9f;
         private const float AttackDurationSeconds = SwingMath.TotalSeconds;
         private const float AfterimageIntervalSeconds = 0.028f;
         private const float LungeUnits = 0.07f;
@@ -30,6 +29,9 @@ namespace Lumiis.Client
         private float _pauseUntil = float.NegativeInfinity;
         private float _pausedElapsed;
         private float _nextAfterimageAt;
+        private float _walkPhase;
+        private bool _walking;
+        private float _lastMovingAt = float.NegativeInfinity;
 
         public WeaponSocketFrameConfig FrameConfig => _frameConfig;
 
@@ -85,11 +87,19 @@ namespace Lumiis.Client
                 Destroy(_frameConfig);
         }
 
-        public void Animate(bool isMoving)
+        public void Animate(bool isMoving, int speedWire = 0)
         {
             if (_view == null || _view.VisualRoot == null) return;
 
             float t = Time.time;
+            if (isMoving) _lastMovingAt = t;
+            bool walking = isMoving || t - _lastMovingAt < WalkCycle.StopGraceSeconds;
+            if (walking)
+            {
+                // Losgehen beginnt immer mit einem Schritt, nicht an einer zufälligen Stelle des Zyklus.
+                _walkPhase = _walking ? WalkCycle.Advance(_walkPhase, Time.deltaTime, speedWire) : 0f;
+            }
+            _walking = walking;
             float attackElapsed = t - _attackStartTime;
             bool attacking = t < _pauseUntil || (attackElapsed >= 0f && attackElapsed < AttackDurationSeconds);
 
@@ -125,12 +135,12 @@ namespace Lumiis.Client
                 }
                 _view.SetAttackTrailActive(striking);
             }
-            else if (isMoving)
+            else if (walking)
             {
                 state = "walk";
-                frame = Mathf.FloorToInt(Mathf.Abs(Mathf.Sin(t * WalkBobSpeed)) * 4f) % 4;
+                frame = WalkCycle.Frame(_walkPhase);
 
-                float bob = Mathf.Abs(Mathf.Sin(t * WalkBobSpeed)) * WalkBobUnits;
+                float bob = WalkCycle.Bob(_walkPhase) * WalkBobUnits;
                 _view.VisualRoot.localPosition = new Vector3(0f, bob, 0f);
                 _view.VisualRoot.localScale = Vector3.one;
                 _view.VisualRoot.localRotation = Quaternion.identity;

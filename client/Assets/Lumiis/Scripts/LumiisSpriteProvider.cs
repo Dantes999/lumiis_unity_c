@@ -119,7 +119,7 @@ namespace Lumiis.Client
         {
             switch (state)
             {
-                case "walk": return 1 + Mathf.Abs(frame) % 2;
+                case "walk": return WalkCycle.SheetColumn(frame);
                 case "attack": return 4 + Mathf.Clamp(frame, 0, 2);
                 case "dead": return 8;
                 default: return 0;
