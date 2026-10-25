@@ -23,7 +23,7 @@ generierte Testkarte. Die frühere reine Bildvorschau im Asset-Testlabor bleibt 
   doppelte Karten-/Portal-Ids, fehlende Kollision, blockierte Startposition, unbekanntes
   Portalziel, blockierte Ankunft, Ankunft in einem Portal der Zielkarte (Endlosschleife),
   ungültige Rechtecke.
-- `data/maps/index.json` listet `village` (Default) und `greenfield`; `startMapId` ist `village`.
+- `data/maps/index.json` listet `map1` (Default), `village` (Legacy/Test) und `greenfield`; `startMapId` ist `map1`.
 - `data/maps/village/map.json` (Name „Dorf“, Start 50000/50000) und `portals.json`
   (Portal 1: Rechteck 52000..52800 / 49500..50500 → `greenfield` 50000/65000).
 - `data/maps/greenfield/`: eigene Kollision (`collision-source.png` + `collision.bin`, Generator
