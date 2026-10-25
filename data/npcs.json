@@ -43,6 +43,25 @@
         49,
         50,
         51
+      ],
+      "service": "Merchant"
+    },
+    {
+      "id": 2,
+      "name": "Schmied",
+      "service": "Blacksmith",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 1,
+        "hairColorId": 1,
+        "armorId": 3,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": [
+        9,
+        10
       ]
     }
   ]

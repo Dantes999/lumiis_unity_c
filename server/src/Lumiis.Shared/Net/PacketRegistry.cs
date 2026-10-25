@@ -42,7 +42,7 @@ namespace Lumiis.Shared.Net
         /// <summary>M7-Chat: Chat-Nachricht senden (Karte/Global/Flüstern).</summary>
         ChatRequest = 16,
 
-        /// <summary>Multi-Map (Protocol.Version 17): nur wirksam mit --allow-debug-commands, sonst still
+        /// <summary>Multi-Map (Protocol.Version 18): nur wirksam mit --allow-debug-commands, sonst still
         /// verworfen (siehe DebugSpawnMonsterRequest-Kommentar). Versetzt den eigenen Charakter auf die
         /// Startposition der angegebenen Karte - Debug-API zum Testen des Kartenwechsels ohne Portal.</summary>
         DebugChangeMapRequest = 17,
@@ -50,8 +50,11 @@ namespace Lumiis.Shared.Net
         /// <summary>M6c: angelegte Ausrüstung aufwerten (Schleifstein, optional Bewahrungsrolle).</summary>
         UpgradeItemRequest = 18,
 
-        /// <summary>Taste losgelassen: laufende Bewegung sofort beenden (Protocol.Version 17).</summary>
+        /// <summary>Taste losgelassen: laufende Bewegung sofort beenden (Protocol.Version 18).</summary>
         StopMove = 19,
+
+        /// <summary>Boden-Drop aufheben (Protocol.Version 18).</summary>
+        PickupItemRequest = 20,
 
         // Server -> Client: ab 1000
         JoinAccepted = 1000,
@@ -106,7 +109,7 @@ namespace Lumiis.Shared.Net
         /// <summary>M7-Party: voller Gruppenstand (Resync).</summary>
         PartyChanged = 1021,
 
-        /// <summary>Multi-Map (Protocol.Version 17): der eigene Charakter hat die Karte gewechselt (Portal
+        /// <summary>Multi-Map (Protocol.Version 18): der eigene Charakter hat die Karte gewechselt (Portal
         /// oder Dev-Tool). Der Client leert seine Entities/Umgebung und baut Boden/Portale der neuen Karte
         /// neu auf; die Zielposition ist bereits enthalten (kein separates EntityStop nötig).</summary>
         MapChanged = 1022,
@@ -130,6 +133,7 @@ namespace Lumiis.Shared.Net
                 case PacketId.JoinRequest: return new JoinRequestPacket();
                 case PacketId.MoveTo: return new MoveToPacket();
                 case PacketId.StopMove: return new StopMovePacket();
+                case PacketId.PickupItemRequest: return new PickupItemRequestPacket();
                 case PacketId.JoinAccepted: return new JoinAcceptedPacket();
                 case PacketId.JoinRejected: return new JoinRejectedPacket();
                 case PacketId.EntitySpawn: return new EntitySpawnPacket();

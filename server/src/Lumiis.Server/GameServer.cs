@@ -215,7 +215,8 @@ public sealed class GameServer : INetEventListener
         Func<long>? nowMs = null, CollisionMap? collisionMap = null, MobCatalog? mobCatalog = null, SpawnCatalog? spawnCatalog = null,
         ClassCatalog? classCatalog = null, ItemCatalog? itemCatalog = null, NpcCatalog? npcCatalog = null, NpcSpawnCatalog? npcSpawnCatalog = null,
         ProgressionCatalog? progressionCatalog = null, SkillCatalog? skillCatalog = null, MapCatalog? mapCatalog = null,
-        UpgradeCatalog? upgradeCatalog = null, Random? random = null, MetinCatalog? metinCatalog = null)
+        UpgradeCatalog? upgradeCatalog = null, Random? random = null, MetinCatalog? metinCatalog = null,
+        bool useGroundDrops = false, bool requireBlacksmithForUpgrade = false)
     {
         _config = config;
         _logger = logger;
@@ -247,7 +248,8 @@ public sealed class GameServer : INetEventListener
                 var world = new World(config.MaxPlayers, collisionMap: null, random: random, itemCatalog: itemCatalog,
                     progressionCatalog: progressionCatalog, skillCatalog: skillCatalog,
                     mapDefinition: map, entityIdGenerator: allocateEntityId, upgradeCatalog: upgradeCatalog,
-                    mobCatalog: mobCatalog, metinCatalog: metinCatalog);
+                    mobCatalog: mobCatalog, metinCatalog: metinCatalog, useGroundDrops: useGroundDrops,
+                    requireBlacksmithForUpgrade: requireBlacksmithForUpgrade);
                 _worlds[map.Id] = world;
                 SpawnMapContent(world, map.Spawns, map.NpcPlacements);
             }
@@ -260,7 +262,8 @@ public sealed class GameServer : INetEventListener
             _world = new World(config.MaxPlayers, collisionMap, random: random, itemCatalog: itemCatalog,
                 progressionCatalog: progressionCatalog, skillCatalog: skillCatalog,
                 entityIdGenerator: allocateEntityId, upgradeCatalog: upgradeCatalog,
-                mobCatalog: mobCatalog, metinCatalog: metinCatalog);
+                mobCatalog: mobCatalog, metinCatalog: metinCatalog, useGroundDrops: useGroundDrops,
+                requireBlacksmithForUpgrade: requireBlacksmithForUpgrade);
             _worlds = new Dictionary<string, World>(StringComparer.Ordinal) { { _world.MapId, _world } };
             if (spawnCatalog != null && mobCatalog != null)
                 SpawnMapContent(_world, spawnCatalog.Spawns, Array.Empty<NpcPlacement>());
@@ -339,7 +342,8 @@ public sealed class GameServer : INetEventListener
             foreach (NpcPlacement placement in npcPlacements)
             {
                 _npcCatalog.TryGet(placement.NpcId, out NpcDefinition npcDef);
-                world.SpawnNpc(placement.NpcId, npcDef.Name, placement.PositionX, placement.PositionY, npcDef.Appearance, npcDef.ShopItemIds);
+                world.SpawnNpc(placement.NpcId, npcDef.Name, placement.PositionX, placement.PositionY, npcDef.Appearance,
+                    npcDef.ShopItemIds, npcDef.Service);
             }
         }
     }
@@ -647,7 +651,18 @@ public sealed class GameServer : INetEventListener
                     if (conn.VisibleEntityIds.Contains(otherId)) continue;
                     if (!world.TryGet(otherId, out Entity? other)) continue; // sollte nicht vorkommen (Entity gerade erst in ComputeVisibility gesehen)
 
-                    conn.Peer.SendPacket(new EntitySpawnPacket { EntityId = other!.Id, Name = other.Name, X = other.IntX, Y = other.IntY, Appearance = other.Appearance, Kind = other.Kind, TypeId = other.TypeId });
+                    conn.Peer.SendPacket(new EntitySpawnPacket
+                    {
+                        EntityId = other!.Id,
+                        Name = other.Name,
+                        X = other.IntX,
+                        Y = other.IntY,
+                        Appearance = other.Appearance,
+                        Kind = other.Kind,
+                        TypeId = other.TypeId,
+                        ItemUpgradeLevel = (byte)Math.Clamp(other.ItemUpgradeLevel, 0, 9),
+                        NpcService = other.Service
+                    });
                     SendHpIfDamaged(conn.Peer, other);
                     if (other.IsMoving)
                     {
@@ -1013,6 +1028,9 @@ public sealed class GameServer : INetEventListener
             case StopMovePacket:
                 HandleStopMove(conn);
                 break;
+            case PickupItemRequestPacket pickup:
+                HandlePickupItemRequest(conn, pickup);
+                break;
             case AttackRequestPacket attack:
                 HandleAttackRequest(conn, attack);
                 break;
@@ -1290,7 +1308,18 @@ public sealed class GameServer : INetEventListener
         {
             if (!world.TryGet(otherId, out Entity? other)) continue; // sollte nicht vorkommen
 
-            conn.Peer.SendPacket(new EntitySpawnPacket { EntityId = other!.Id, Name = other.Name, X = other.IntX, Y = other.IntY, Appearance = other.Appearance, Kind = other.Kind, TypeId = other.TypeId });
+            conn.Peer.SendPacket(new EntitySpawnPacket
+            {
+                EntityId = other!.Id,
+                Name = other.Name,
+                X = other.IntX,
+                Y = other.IntY,
+                Appearance = other.Appearance,
+                Kind = other.Kind,
+                TypeId = other.TypeId,
+                ItemUpgradeLevel = (byte)Math.Clamp(other.ItemUpgradeLevel, 0, 9),
+                NpcService = other.Service
+            });
             SendHpIfDamaged(conn.Peer, other);
             if (other.IsMoving)
             {
@@ -1415,6 +1444,26 @@ public sealed class GameServer : INetEventListener
 
         entity.StopMoving();
         SendToVisible(entityId, new EntityStopPacket { EntityId = entityId, X = entity.IntX, Y = entity.IntY });
+    }
+
+    /// <summary>Hebt einen Boden-Drop auf; bei Erfolg Inventar-Sync und Despawn für alle Beobachter.</summary>
+    private void HandlePickupItemRequest(ConnectionState conn, PickupItemRequestPacket request)
+    {
+        if (conn.EntityId is not int entityId) return;
+        World world = conn.World ?? _world;
+        (bool success, InventoryActionFailedReason reason) = world.TryPickupItem(entityId, request.GroundItemEntityId);
+        if (!success)
+        {
+            conn.Peer.SendPacket(new InventoryActionFailedPacket { Reason = reason });
+            return;
+        }
+
+        if (TryGetEntity(entityId, out Entity? player) && player != null)
+        {
+            conn.Peer.SendPacket(BuildInventorySyncPacket(player));
+            _inventorySaveChannel.Writer.TryWrite(BuildInventorySaveRequest(player));
+        }
+        BroadcastDespawn(request.GroundItemEntityId);
     }
 
     /// <summary>Netzwerk-Seite eines erfolgreichen Angriffs (M4a Spieler->Monster, seit M4c auch
@@ -2391,7 +2440,7 @@ public sealed class GameServer : INetEventListener
         _logger.Info($"Dev-Tools: Entity {entityId} auf Level {request.Level} gesetzt");
     }
 
-    /// <summary>Dev-Tool (Multi-Map, Protocol.Version 17): versetzt den eigenen Charakter auf die Startposition
+    /// <summary>Dev-Tool (Multi-Map, Protocol.Version 18): versetzt den eigenen Charakter auf die Startposition
     /// der angegebenen Karte - nur mit --allow-debug-commands, sonst still verworfen (wie die anderen
     /// Debug-Befehle, siehe HandleDebugSpawnMonster-Kommentar). Debug-API zum Testen des Kartenwechsels ohne
     /// Portal (der Client nutzt sie aus dem Debug-Panel).</summary>

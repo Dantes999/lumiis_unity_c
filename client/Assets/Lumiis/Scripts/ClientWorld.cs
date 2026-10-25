@@ -12,6 +12,10 @@ namespace Lumiis.Client
         public string Name;
         public EntityKind Kind;
         public int TypeId;
+        /// <summary>Nur Kind=GroundItem: Aufwertungsstufe der Boden-Instanz.</summary>
+        public int ItemUpgradeLevel;
+        /// <summary>Nur Kind=Npc: Dienst (Shop/Schmied), für die UI.</summary>
+        public NpcService NpcService;
         public double X;
         public double Y;
         public Appearance Appearance;
@@ -85,7 +89,7 @@ namespace Lumiis.Client
         /// (kein Neuanlegen), damit gehaltene Referenzen (z. B. im Debug-Panel) gültig bleiben.</summary>
         public CharacterState CharacterStats { get; } = new CharacterState();
 
-        /// <summary>Multi-Map (Protocol.Version 17): aktuelle Karte aus JoinAccepted/MapChanged. Maße kommen
+        /// <summary>Multi-Map (Protocol.Version 18): aktuelle Karte aus JoinAccepted/MapChanged. Maße kommen
         /// vom Server (heute immer GameConstants, später ggf. kleinere Karten); der Client skaliert Boden und
         /// Portale danach.</summary>
         public string MapId { get; private set; } = "village";
@@ -165,16 +169,22 @@ namespace Lumiis.Client
             ApplyAppearance(entityId, name, EntityKind.Player, typeId: 0, x, y, appearance);
         }
 
-        public void HandleEntitySpawn(int entityId, string name, EntityKind kind, int typeId, int x, int y, Appearance appearance)
+        public void HandleEntitySpawn(int entityId, string name, EntityKind kind, int typeId, int x, int y, Appearance appearance,
+            int itemUpgradeLevel = 0, NpcService npcService = NpcService.None)
         {
-            ApplyAppearance(entityId, name, kind, typeId, x, y, appearance);
+            ApplyAppearance(entityId, name, kind, typeId, x, y, appearance, itemUpgradeLevel, npcService);
         }
 
         /// <summary>Gemeinsamer Erzeugungs-/Aktualisierungspfad für die eigene Figur (aus JoinAccepted, immer
         /// Kind=Player) und andere Figuren/Monster (aus EntitySpawn) - kein zweiter Codepfad.</summary>
-        private void ApplyAppearance(int entityId, string name, EntityKind kind, int typeId, int x, int y, Appearance appearance)
+        private void ApplyAppearance(int entityId, string name, EntityKind kind, int typeId, int x, int y, Appearance appearance,
+            int itemUpgradeLevel = 0, NpcService npcService = NpcService.None)
         {
-            var entity = new ClientEntity { Id = entityId, Name = name, Kind = kind, TypeId = typeId, X = x, Y = y, Appearance = appearance };
+            var entity = new ClientEntity
+            {
+                Id = entityId, Name = name, Kind = kind, TypeId = typeId, X = x, Y = y, Appearance = appearance,
+                ItemUpgradeLevel = itemUpgradeLevel, NpcService = npcService
+            };
             _entities[entityId] = entity;
             EntitySpawned?.Invoke(entity);
         }

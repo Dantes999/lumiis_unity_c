@@ -71,6 +71,27 @@ namespace Lumiis.Shared.Net
         }
     }
 
+    /// <summary>Der Client hebt einen Boden-Drop auf. Der Server prüft Existenz, Reichweite und Inventarplatz.</summary>
+    public sealed class PickupItemRequestPacket : IPacket
+    {
+        public int GroundItemEntityId;
+
+        public PacketId Id
+        {
+            get { return PacketId.PickupItemRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteInt32(GroundItemEntityId);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            GroundItemEntityId = reader.ReadInt32();
+        }
+    }
+
     /// <summary>Der Client greift eine sichtbare Entity an (M4a). Der Server prüft alles serverautoritativ
     /// erneut (Existenz, Leben, PvP, Cooldown, Reichweite) - siehe World.TryAttack.</summary>
     public sealed class AttackRequestPacket : IPacket
@@ -465,7 +486,7 @@ namespace Lumiis.Shared.Net
         }
     }
 
-    /// <summary>Multi-Map (Protocol.Version 17): nur wirksam mit --allow-debug-commands (sonst still
+    /// <summary>Multi-Map (Protocol.Version 18): nur wirksam mit --allow-debug-commands (sonst still
     /// verworfen, siehe DebugSpawnMonsterRequestPacket). Versetzt den eigenen Charakter auf die
     /// Startposition der Zielkarte - Debug-API zum Testen des Kartenwechsels ohne Portal.</summary>
     public sealed class DebugChangeMapRequestPacket : IPacket

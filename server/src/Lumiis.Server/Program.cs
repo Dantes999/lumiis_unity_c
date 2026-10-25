@@ -194,7 +194,7 @@ Console.CancelKeyPress += (_, eventArgs) =>
     cts.Cancel();
 };
 
-GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, mobCatalog: mobCatalog, classCatalog: classCatalog, itemCatalog: itemCatalog, npcCatalog: npcCatalog, progressionCatalog: progressionCatalog, skillCatalog: skillCatalog, mapCatalog: mapCatalog, upgradeCatalog: upgradeCatalog, metinCatalog: metinCatalog);
+GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, mobCatalog: mobCatalog, classCatalog: classCatalog, itemCatalog: itemCatalog, npcCatalog: npcCatalog, progressionCatalog: progressionCatalog, skillCatalog: skillCatalog, mapCatalog: mapCatalog, upgradeCatalog: upgradeCatalog, metinCatalog: metinCatalog, useGroundDrops: true, requireBlacksmithForUpgrade: true);
 
 try
 {
