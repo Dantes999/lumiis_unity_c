@@ -1,5 +1,6 @@
 using Lumiis.Auth;
 using Lumiis.Data;
+using Lumiis.Data.Items;
 using Lumiis.Data.Looks;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,6 +20,13 @@ builder.Services.AddSingleton(_ =>
 {
     string dataDir = builder.Configuration["data-dir"] ?? ResolveDefaultDataDir();
     return LookCatalog.LoadFromFile(Path.Combine(dataDir, "looks.json"));
+});
+
+// Nur für die Charakterliste: ausgerüstete Item-IDs -> LookIds (siehe CharacterAppearance).
+builder.Services.AddSingleton(sp =>
+{
+    string dataDir = builder.Configuration["data-dir"] ?? ResolveDefaultDataDir();
+    return ItemCatalog.LoadFromFile(Path.Combine(dataDir, "items.json"), sp.GetRequiredService<LookCatalog>());
 });
 
 // `dotnet run --project server/src/Lumiis.Auth` (siehe CLAUDE.md) setzt bei Web-SDK-Projekten

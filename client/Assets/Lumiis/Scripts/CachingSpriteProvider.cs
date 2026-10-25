@@ -27,6 +27,13 @@ namespace Lumiis.Client
             _inner = inner;
         }
 
+        /// <summary>Liefert den innersten Provider (für Checks auf den konkreten Sprite-Typ).</summary>
+        public static ISpriteProvider Unwrap(ISpriteProvider provider)
+        {
+            while (provider is CachingSpriteProvider caching) provider = caching._inner;
+            return provider;
+        }
+
         public int Count => _cache.Count + _weaponCache.Count;
 
         public Sprite GetSprite(CharacterSlot slot, int lookId, FacingDirection direction, string state, int frame, Vector2 pivotNormalized)

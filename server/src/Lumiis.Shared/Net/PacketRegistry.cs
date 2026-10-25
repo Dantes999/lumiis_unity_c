@@ -61,6 +61,11 @@ namespace Lumiis.Shared.Net
         PartyLeaveRequest = 23,
         PartySnapshotRequest = 24,
 
+        /// <summary>Gruppen-Rollen/-Verwaltung (Protocol.Version 20): nur der Leiter.</summary>
+        PartyKickRequest = 25,
+        PartyPromoteRequest = 26,
+        PartySetRoleRequest = 27,
+
         // Server -> Client: ab 1000
         JoinAccepted = 1000,
         JoinRejected = 1001,
@@ -146,6 +151,9 @@ namespace Lumiis.Shared.Net
                 case PacketId.PartyRespondRequest: return new PartyRespondRequestPacket();
                 case PacketId.PartyLeaveRequest: return new PartyLeaveRequestPacket();
                 case PacketId.PartySnapshotRequest: return new PartySnapshotRequestPacket();
+                case PacketId.PartyKickRequest: return new PartyKickRequestPacket();
+                case PacketId.PartyPromoteRequest: return new PartyPromoteRequestPacket();
+                case PacketId.PartySetRoleRequest: return new PartySetRoleRequestPacket();
                 case PacketId.JoinAccepted: return new JoinAcceptedPacket();
                 case PacketId.JoinRejected: return new JoinRejectedPacket();
                 case PacketId.EntitySpawn: return new EntitySpawnPacket();

@@ -11,6 +11,7 @@ public sealed class LookCatalog
 {
     public const string BodySlot = "Body";
     public const string HelmetSlot = "Helmet";
+    public const string HairSlot = "Hair";
 
     private readonly LookCatalogDto _data;
     private readonly Dictionary<string, List<int>> _idsBySlot;

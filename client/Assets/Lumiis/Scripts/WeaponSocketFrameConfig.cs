@@ -81,12 +81,15 @@ namespace Lumiis.Client
             {
                 int sorting = SortingOffsetFor(facing);
 
-                Add(frames, "idle", 0, facing, Vector2.zero, 0f, sorting);
+                // Ruhehaltung: die Klinge zeigt nie senkrecht nach oben (sah aus wie ein Schwert über dem Kopf),
+                // sondern schräg nach vorn bzw. gesenkt. Lauf-Frames pendeln um diese Ruhehaltung.
+                float rest = RestRotationFor(facing);
+                Add(frames, "idle", 0, facing, Vector2.zero, rest, sorting);
 
-                Add(frames, "walk", 0, facing, new Vector2(0f, 0f), 0f, sorting);
-                Add(frames, "walk", 1, facing, new Vector2(0.02f, 0.04f), -18f, sorting);
-                Add(frames, "walk", 2, facing, new Vector2(0f, 0.06f), 0f, sorting);
-                Add(frames, "walk", 3, facing, new Vector2(-0.01f, 0.03f), 16f, sorting);
+                Add(frames, "walk", 0, facing, new Vector2(0f, 0f), rest, sorting);
+                Add(frames, "walk", 1, facing, new Vector2(0.02f, 0.04f), rest - 12f, sorting);
+                Add(frames, "walk", 2, facing, new Vector2(0f, 0.06f), rest, sorting);
+                Add(frames, "walk", 3, facing, new Vector2(-0.01f, 0.03f), rest + 10f, sorting);
 
                 Add(frames, "attack", 0, facing, new Vector2(0f, 0.02f), 10f, sorting);
                 Add(frames, "attack", 1, facing, new Vector2(0.02f, 0.06f), -35f, sorting);
@@ -96,6 +99,19 @@ namespace Lumiis.Client
 
             config.frames = frames.ToArray();
             return config;
+        }
+
+        /// <summary>Ruhewinkel der Waffe (Grad, gegen den Uhrzeigersinn, 0 = Klinge nach oben). Seite: schräg
+        /// nach vorn (bei Left spiegelt CharacterView das Vorzeichen), Unten: gesenkt nach außen vor dem Körper,
+        /// Oben: über die Schulter hinter dem Körper.</summary>
+        public static float RestRotationFor(WeaponFacing facing)
+        {
+            switch (facing)
+            {
+                case WeaponFacing.Down: return -145f;
+                case WeaponFacing.Up: return -30f;
+                default: return -60f;
+            }
         }
 
         public static int SortingOffsetFor(WeaponFacing facing)

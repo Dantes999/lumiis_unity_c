@@ -53,6 +53,21 @@ public sealed class Entity
     /// <summary>Nur Kind=GroundItem: ItemId (TypeId) und Aufwertungsstufe dieser Boden-Instanz.</summary>
     public int ItemUpgradeLevel { get; set; }
 
+    /// <summary>Nur Kind=GroundItem: EntityId des Spielers, dem der Drop bis LootOwnershipEndsAtMs gehört
+    /// (Killer; seine Gruppe darf ebenfalls aufheben, siehe World.TryPickupItem). null = frei für alle.</summary>
+    public int? LootOwnerEntityId { get; set; }
+
+    /// <summary>Nur Kind=GroundItem: bis zu diesem Zeitpunkt (monotone Serverzeit, ms) gilt LootOwnerEntityId.</summary>
+    public long LootOwnershipEndsAtMs { get; set; }
+
+    /// <summary>Nur Kind=GroundItem: ab diesem Zeitpunkt wird der Drop entfernt (0 = nie, z. B. in Tests).</summary>
+    public long DespawnAtMs { get; set; }
+
+    /// <summary>Gruppenrollen-Bonus in Prozent (data/party.json, gesetzt von GameServer), angewendet in
+    /// World.RecomputeDerivedStats nach Ausrüstung und Kampfrausch. 0 = kein Bonus.</summary>
+    public int PartyAttackBonusPercent { get; set; }
+    public int PartyDefenseBonusPercent { get; set; }
+
     /// <summary>Nur Kind=Npc: technischer Dienst (Shop/Schmied), aus data/npcs.json.</summary>
     public NpcService Service { get; set; }
 
