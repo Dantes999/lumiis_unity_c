@@ -136,8 +136,9 @@ namespace Lumiis.Tests
         [Fact]
         public void EntitySpawn_RoundTrip_Monster()
         {
-            var original = new EntitySpawnPacket { EntityId = 12, Name = "Wildhund", X = 30000, Y = 30000, Appearance = default, Kind = EntityKind.Monster, TypeId = 1 };
+            var original = new EntitySpawnPacket { EntityId = 12, Name = "Wildhund", X = 30000, Y = 30000, Appearance = default, Kind = EntityKind.Monster, TypeId = 1, Level = 23 };
             var decoded = Assert.IsType<EntitySpawnPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(23, decoded.Level);
             Assert.Equal(original.EntityId, decoded.EntityId);
             Assert.Equal(original.Name, decoded.Name);
             Assert.Equal(original.X, decoded.X);

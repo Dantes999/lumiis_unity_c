@@ -119,6 +119,10 @@ namespace Lumiis.Shared.Net
         /// <summary>Nur Kind=Npc: Dienst des NPCs (Shop/Schmied).</summary>
         public NpcService NpcService;
 
+        /// <summary>Protocol 21: Level beim Erscheinen (Monster aus mobs.json, Spieler ihr aktuelles Level;
+        /// 0 bei NPC/Boden-Item) - nur für Namensschild/Zielanzeige.</summary>
+        public int Level;
+
         public PacketId Id
         {
             get { return PacketId.EntitySpawn; }
@@ -135,6 +139,7 @@ namespace Lumiis.Shared.Net
             writer.WriteInt32(TypeId);
             writer.WriteByte(ItemUpgradeLevel);
             writer.WriteByte((byte)NpcService);
+            writer.WriteInt32(Level);
         }
 
         public void Read(PacketReader reader)
@@ -148,6 +153,7 @@ namespace Lumiis.Shared.Net
             TypeId = reader.ReadInt32();
             ItemUpgradeLevel = reader.ReadByte();
             NpcService = (NpcService)reader.ReadByte();
+            Level = reader.ReadInt32();
         }
     }
 
@@ -249,7 +255,10 @@ namespace Lumiis.Shared.Net
 
         /// <summary>M5b: Ziel ist ein NPC (Kind=Npc) - NPCs sind unangreifbar/statisch, siehe CLAUDE.md
         /// "Shop und NPCs".</summary>
-        TargetNotAttackable = 6
+        TargetNotAttackable = 6,
+
+        /// <summary>Der Angreifer selbst ist tot (bis zum Respawn keine Kampfaktionen).</summary>
+        AttackerDead = 7
     }
 
     /// <summary>Eine Entity wurde getroffen (M4a) - an alle AOI-Beobachter des Ziels (inklusive Angreifer,
@@ -780,7 +789,10 @@ namespace Lumiis.Shared.Net
         TargetAlreadyDead = 6,
         OutOfRange = 7,
         TargetIsPlayer = 8,
-        TargetNotAttackable = 9
+        TargetNotAttackable = 9,
+
+        /// <summary>Der Nutzer ist tot (bis zum Respawn keine Skills).</summary>
+        UserDead = 10
     }
 
     /// <summary>Ein UseSkillRequestPacket wurde abgelehnt - nur an den Anfragenden, Verbindung bleibt

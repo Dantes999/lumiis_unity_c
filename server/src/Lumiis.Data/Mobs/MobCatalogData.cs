@@ -22,6 +22,8 @@ internal sealed class MobEntryDto
     public bool Aggressive { get; set; }
     public int AggroRangeWire { get; set; }
     public int LeashRangeWire { get; set; }
+    /// <summary>Trainingspuppen: false = wehrt sich nie (auch nicht reaktiv nach einem Treffer). Fehlt das Feld, true.</summary>
+    public bool FightsBack { get; set; } = true;
 
     /// <summary>M5a: Drops bei Monstertod, siehe MobDrop.</summary>
     public List<MobDropDto> Drops { get; set; } = new();

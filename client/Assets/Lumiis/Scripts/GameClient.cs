@@ -243,6 +243,7 @@ namespace Lumiis.Client
         {
             _netClient = netClient;
             _camera = camera;
+            _world.LocalFacingFollowsAim = true; // eigene Figur schaut zur Maus, siehe UpdateMouseFacing
             _squareSprite = PlaceholderSprites.CreateSquare();
             _localMarkerSprite = PlaceholderSprites.CreateRing();
             _monsterCircleSprite = PlaceholderSprites.CreateCircle();
@@ -1592,7 +1593,7 @@ namespace Lumiis.Client
             {
                 Debug.Log("EntitySpawn: Id=" + spawn.EntityId + " Kind=" + spawn.Kind + " Name=" + spawn.Name + " Pos=(" + (spawn.X / 100.0) + "," + (spawn.Y / 100.0) + ")");
                 _world.HandleEntitySpawn(spawn.EntityId, spawn.Name, spawn.Kind, spawn.TypeId, spawn.X, spawn.Y, spawn.Appearance,
-                    spawn.ItemUpgradeLevel, spawn.NpcService);
+                    spawn.ItemUpgradeLevel, spawn.NpcService, spawn.Level);
                 return;
             }
 
@@ -1896,7 +1897,8 @@ namespace Lumiis.Client
             // (Monster gegen Spieler, anderer Spieler gegen Monster) reaktiv zum Ziel drehen - beide
             // Positionen sind hier ohnehin schon bekannt. Fuer den lokalen Spieler redundant zur
             // optimistischen Drehung beim Senden (HandleRightClickAttack/UseSkillHotkey), aber harmlos.
-            _world.SetFacingOverride(attackerEntityId, target.IntX, target.IntY);
+            if (!(_world.LocalFacingFollowsAim && attackerEntityId == _world.LocalEntityId))
+                _world.SetFacingOverride(attackerEntityId, target.IntX, target.IntY);
         }
 
         private static string InventoryActionFailedReasonText(InventoryActionFailedReason reason)
@@ -1939,6 +1941,7 @@ namespace Lumiis.Client
                 case AttackFailedReason.OnCooldown: return "Angriff noch im Abklingen.";
                 case AttackFailedReason.TargetIsPlayer: return "Spieler können nicht angegriffen werden.";
                 case AttackFailedReason.TargetNotAttackable: return "Dieses Ziel kann nicht angegriffen werden.";
+                case AttackFailedReason.AttackerDead: return "Du bist tot.";
                 default: return "Angriff fehlgeschlagen.";
             }
         }
@@ -1956,6 +1959,7 @@ namespace Lumiis.Client
                 case UseSkillFailedReason.OutOfRange: return "Ziel außer Reichweite.";
                 case UseSkillFailedReason.TargetIsPlayer: return "Spieler können nicht angegriffen werden.";
                 case UseSkillFailedReason.TargetNotAttackable: return "Dieses Ziel kann nicht angegriffen werden.";
+                case UseSkillFailedReason.UserDead: return "Du bist tot.";
                 default: return "Skill fehlgeschlagen.";
             }
         }
@@ -2016,8 +2020,11 @@ namespace Lumiis.Client
                 var monsterView = monsterGo.AddComponent<MonsterView>();
                 string artKey = MonsterArt.ResourceForMob(entity.TypeId);
                 Sprite[] frames = artKey != null ? MonsterArt.LoadFrames(artKey) : null;
+                Sprite stone = frames == null ? MonsterArt.LoadStone(MonsterArt.StoneResourceForMob(entity.TypeId)) : null;
                 if (frames != null)
                     monsterView.Initialize(frames, MonsterColorFor(entity.TypeId), MonsterScaleFor(entity.TypeId));
+                else if (stone != null)
+                    monsterView.Initialize(stone, MonsterColorFor(entity.TypeId), MonsterScaleFor(entity.TypeId));
                 else
                     monsterView.Initialize(MonsterShapeFor(entity.TypeId), MonsterColorFor(entity.TypeId), MonsterScaleFor(entity.TypeId));
                 monsterView.SetWorldPosition(entity.X / 100.0, entity.Y / 100.0);
@@ -2383,7 +2390,8 @@ namespace Lumiis.Client
             {
                 1 => Color.white,                    // Wildhund: Original-Sheet
                 2 => new Color(0.9f, 1f, 0.85f),     // Waldschrat/Boar: leicht grünlicher Stich
-                3 => new Color(0.35f, 0.45f, 0.8f), // Lumiis-Stein: blau
+                3 => Color.white,                    // Lumiis des Kummers: Original-Bild
+                18 => new Color(0.45f, 0.4f, 0.55f), // Lumiis der Schwärze: dunkel getöntes Kummer-Bild
                 4 => new Color(0.6f, 0.15f, 0.15f), // Boss: dunkelrot
                 5 => new Color(0.95f, 0.62f, 0.55f), // Hungriger Wildhund: rötlich
                 _ => Color.white
@@ -2398,6 +2406,10 @@ namespace Lumiis.Client
                 case 3: return 1.15f;
                 case 4: return 1.8f;
                 case 5: return 1.05f;
+                case 18: return 1.3f;
+                case 20: return 0.85f; // Größen aus monster.json des Lumiis-Asset-Archivs
+                case 22: return 1.15f;
+                case 24: return 1.15f;
                 default: return 1f;
             }
         }

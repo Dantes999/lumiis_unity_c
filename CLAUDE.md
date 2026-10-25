@@ -168,9 +168,14 @@ Seit 2026-10-25 gibt es echte, begehbare Karten statt einer einzigen Welt. Detai
   (`tiles.json`) werden mit `tools/import-map1.py` zu `Resources/Maps/map1.png` (4096×4096, 32 px/Tile)
   und einer 1000×1000-`collision.bin` gebacken. Dorfplatz, Häuser, Wege, Wasser und Baumrand stammen aus
   dem Referenzlayout; der Start liegt außerhalb des Dorfes auf einer offenen Wiese.
-- Spawns: drei Wildhunde (Mob 1), drei Hungrige Wildhunde (Mob 5), ein Lumiis-Stein (Mob 3) und der
-  Waldboss (Mob 4) - die normalen Mobs mindestens 20 Weltenheiten vom Start entfernt, im Startbereich
-  steht kein Monster. Dorfhändler und **Schmied** sitzen im Dorfplatz.
+- Spawns (seit 2026-10-25 Originaldaten): `tools/import-map1-spawns.py` setzt aus `tools/map1-yongan-spawns.json`
+  (lumiis-2d@4376dae, nur der Map1-Ausschnitt) alle 47 Originalgruppen außerhalb der Dorf-Sicherheitszone:
+  Wilder Hund (Mob 20, Lv 1), Wolf (21, Lv 3), Alphawolf (22, Lv 5, aggressiv), Wildschwein (23, Lv 7) und
+  5 feste Lumiis des Kummers (24, Lv 5, wehrt sich nicht, Wellen aus Wölfen/Hund wie im Original). Level/HP/
+  Angriff/Verteidigung/EXP/Angriffstempo/aggressiv 1:1 aus dem Original, Laufgeschwindigkeit (×140 Wire),
+  Reichweiten, Yang und Beute an unser System angepasst. Kein Boss (gibt es im Original auf Yongan nicht).
+  Start und Respawn liegen jetzt auf dem Dorfplatz. Dorfhändler und **Schmied** sitzen im Dorfplatz.
+  Sheets: `dog`/`wolf`/`metin_sorrow` aus dem Lumiis-Asset-Archiv (`MonsterArt`, Steine als Einzelbild).
 - Drops: Produktionsserver nutzt echte **Boden-Drops** (`EntityKind.GroundItem`): Monster lassen Items mit
   Icon/Name auf dem Boden fallen, Aufheben per Klick (`PickupItemRequestPacket` 20) prüft Distanz
   (`GameConstants.PickupRangeWire`), Besitz und Inventarplatz. Besitz: 10 s nur Killer oder dessen Gruppe
@@ -1310,6 +1315,18 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   außerhalb des Map1-Ausschnitts), Jayang führt am Osttor zurück. Nicht übernommen: Zonen 2-5 (Lv 25-45,
   über dem Alpha-Levelcap), Hasun-Dong-Portal, Lager des Alten Mannes, eigene Monstergrafik für die neuen
   Mobs (Platzhalterform). 684 Tests grün.
+- Spielbarkeit I (2026-10-25, Protocol.Version 21): Tote Spieler können bis zum Respawn nichts mehr -
+  `World.TryAttack` liefert `AttackFailedReason.AttackerDead`, `TryUseSkill` `UseSkillFailedReason.UserDead`,
+  `SetDestination` lehnt ab; `GameServer.IsDeadPlayerAction` verwirft MoveTo/StopMove/Aufheben/Inventar/
+  Shop/Aufwerten eines toten Spielers still, und beim Spielertod geht sofort ein `EntityStop` an die
+  Beobachter. Ruckeln beim Laufen behoben: `ClientWorld` setzte bei jedem EntityMove die Anzeige hart auf
+  die Server-Startposition zurück (WASD schickt alle 100 ms ein neues Ziel); jetzt wird die Abweichung als
+  Offset mit 0,1 s Zeitkonstante ausgeblendet, ab 300 Wire (Teleport/Respawn) hart gesetzt.
+  Trainingspuppen: Mob 6 "Trainingspuppe" (`dummy`-Sheet, 2000 HP, steht still, 5 s Respawn, keine
+  Beute) dreimal am Westrand des Map1-Dorfplatzes; neues optionales Mob-Feld `fightsBack` (Default true,
+  `MobDefinition.FightsBack`/`Entity.FightsBack`) - bei false erfasst der Mob auch nach einem Treffer kein Ziel.
+  `EntitySpawnPacket.Level` (Protocol 21): Level von Monster/Spieler beim Erscheinen, `ClientEntity.Level` -
+  für Namensschild/Zielanzeige (Spieler-Levelaufstiege danach aktualisieren es bisher nicht).
 - Offen: Monster-Sheets für die Jayang-Mobs, weitere Zonen/Dungeons, Reittiere; siehe
   `docs/feature-gap-lumiis.md`.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client

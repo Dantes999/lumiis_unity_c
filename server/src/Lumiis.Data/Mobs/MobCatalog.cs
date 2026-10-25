@@ -47,6 +47,9 @@ public sealed class MobDefinition
     public bool Aggressive { get; }
     public int AggroRangeWire { get; }
 
+    /// <summary>false = Trainingspuppe: erfasst nie ein Ziel, auch nicht reaktiv nach einem Treffer.</summary>
+    public bool FightsBack { get; init; } = true;
+
     /// <summary>M4c: Distanz vom Wander-Anker, ab der ein verfolgtes Ziel aufgegeben wird (siehe
     /// World-Tick-Monster-KI).</summary>
     public int LeashRangeWire { get; }
@@ -202,7 +205,8 @@ public sealed class MobCatalog
             byId[entry.Id] = new MobDefinition(entry.Id, entry.Name, entry.SpeedWire, entry.WanderRadiusWire, entry.WanderIntervalMinMs, entry.WanderIntervalMaxMs,
                 entry.MaxHp, entry.Attack, entry.Defense, entry.YangMin, entry.YangMax,
                 entry.MeleeRangeWire, entry.AttackCooldownMs, entry.Aggressive, entry.AggroRangeWire, entry.LeashRangeWire, drops,
-                entry.Level, entry.BaseXp);
+                entry.Level, entry.BaseXp)
+            { FightsBack = entry.FightsBack };
         }
 
         if (byId.Count == 0)

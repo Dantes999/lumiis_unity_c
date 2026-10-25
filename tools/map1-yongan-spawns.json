@@ -1,0 +1,643 @@
+{
+ "source": "lumiis-2d@4376dae shared/maps.js buildMap(\"yongan\") + shared/spawns.js buildSpawns/buildMetinPoints, nur der Map1-Ausschnitt (tools/map1-yongan-crop.json: x 250-377, y 210-337); Werte aus shared/mobs.js/metins.js",
+ "village": {
+  "cx": 320,
+  "cy": 292,
+  "r": 36
+ },
+ "safe": [
+  {
+   "x0": 284,
+   "y0": 256,
+   "x1": 356,
+   "y1": 328
+  }
+ ],
+ "groups": [
+  {
+   "tx": 313,
+   "ty": 217,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wild_dog",
+    "wild_dog",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 282,
+   "ty": 249,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "alpha_wolf",
+    "wolf",
+    "wolf"
+   ]
+  },
+  {
+   "tx": 334,
+   "ty": 216,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "alpha_wolf",
+    "wolf",
+    "wolf"
+   ]
+  },
+  {
+   "tx": 251,
+   "ty": 285,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wild_dog",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 275,
+   "ty": 317,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wolf",
+    "wolf",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 328,
+   "ty": 224,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wild_dog",
+    "wild_dog",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 255,
+   "ty": 276,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "alpha_wolf",
+    "wolf",
+    "wolf"
+   ]
+  },
+  {
+   "tx": 275,
+   "ty": 332,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wild_dog",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 266,
+   "ty": 299,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wolf",
+    "wolf",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 264,
+   "ty": 226,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wolf",
+    "wolf",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 278,
+   "ty": 240,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wild_dog",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 294,
+   "ty": 237,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wild_dog",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 274,
+   "ty": 220,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wolf",
+    "wolf",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 250,
+   "ty": 295,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wild_dog",
+    "wild_dog",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 336,
+   "ty": 228,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wild_dog",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 376,
+   "ty": 291,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wolf",
+    "wolf",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 347,
+   "ty": 210,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wolf",
+    "wolf",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 341,
+   "ty": 215,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wild_dog",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 286,
+   "ty": 224,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wild_dog",
+    "wild_dog",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 301,
+   "ty": 222,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wild_dog",
+    "wild_dog",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 363,
+   "ty": 269,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wild_dog",
+    "wild_dog",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 345,
+   "ty": 240,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "alpha_wolf",
+    "wolf",
+    "wolf"
+   ]
+  },
+  {
+   "tx": 254,
+   "ty": 326,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "alpha_wolf",
+    "wolf",
+    "wolf"
+   ]
+  },
+  {
+   "tx": 348,
+   "ty": 228,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wild_dog",
+    "wild_dog",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 273,
+   "ty": 258,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wolf",
+    "wolf",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 255,
+   "ty": 334,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wolf",
+    "wolf",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 271,
+   "ty": 278,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wolf",
+    "wolf",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 321,
+   "ty": 237,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wild_dog",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 322,
+   "ty": 230,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wild_dog",
+    "wild_dog",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 270,
+   "ty": 232,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wolf",
+    "wolf",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 279,
+   "ty": 214,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wolf",
+    "wolf",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 352,
+   "ty": 248,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wild_dog",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 261,
+   "ty": 294,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "alpha_wolf",
+    "wolf",
+    "wolf"
+   ]
+  },
+  {
+   "tx": 364,
+   "ty": 244,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wolf",
+    "wolf",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 292,
+   "ty": 248,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wild_dog",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 301,
+   "ty": 233,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wolf",
+    "wolf",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 310,
+   "ty": 225,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wolf",
+    "wolf",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 361,
+   "ty": 326,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wolf",
+    "wolf",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 343,
+   "ty": 248,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "alpha_wolf",
+    "wolf",
+    "wolf"
+   ]
+  },
+  {
+   "tx": 255,
+   "ty": 308,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wolf",
+    "wolf",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 286,
+   "ty": 243,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wild_dog",
+    "wild_dog",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 354,
+   "ty": 333,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "alpha_wolf",
+    "wolf",
+    "wolf"
+   ]
+  },
+  {
+   "tx": 301,
+   "ty": 215,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wild_dog",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 273,
+   "ty": 251,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "alpha_wolf",
+    "wolf",
+    "wolf"
+   ]
+  },
+  {
+   "tx": 267,
+   "ty": 285,
+   "zone": 1,
+   "respawnMs": 15000,
+   "members": [
+    "wild_dog",
+    "wild_dog",
+    "wild_dog"
+   ]
+  },
+  {
+   "tx": 270,
+   "ty": 210,
+   "zone": 2,
+   "respawnMs": 20000,
+   "members": [
+    "wild_boar",
+    "wild_boar",
+    "wild_boar"
+   ]
+  },
+  {
+   "tx": 265,
+   "ty": 216,
+   "zone": 2,
+   "respawnMs": 20000,
+   "members": [
+    "wild_boar",
+    "wild_boar"
+   ]
+  }
+ ],
+ "metins": [
+  {
+   "key": "metin_sorrow",
+   "count": 5,
+   "respawnMs": [
+    120000,
+    240000
+   ],
+   "pointsInCrop": [
+    [
+     278,
+     337
+    ],
+    [
+     340,
+     242
+    ],
+    [
+     272,
+     266
+    ],
+    [
+     280,
+     234
+    ],
+    [
+     329,
+     216
+    ],
+    [
+     318,
+     222
+    ],
+    [
+     362,
+     336
+    ],
+    [
+     309,
+     234
+    ]
+   ],
+   "waves": [
+    [
+     "wolf",
+     "wolf",
+     "wild_dog"
+    ],
+    [
+     "alpha_wolf",
+     "wolf",
+     "wolf"
+    ],
+    [
+     "alpha_wolf",
+     "alpha_wolf",
+     "wolf",
+     "wolf"
+    ]
+   ]
+  }
+ ],
+ "mobs": {
+  "wild_dog": {
+   "name": "Wilder Hund",
+   "level": 1,
+   "hp": 94,
+   "atk": 11,
+   "def": 1,
+   "speed": 3,
+   "cooldown": 1500,
+   "aggressive": false,
+   "exp": 12
+  },
+  "wolf": {
+   "name": "Wolf",
+   "level": 3,
+   "hp": 187,
+   "atk": 18,
+   "def": 4,
+   "speed": 3.2,
+   "cooldown": 1500,
+   "aggressive": false,
+   "exp": 32
+  },
+  "alpha_wolf": {
+   "name": "Alphawolf",
+   "level": 5,
+   "hp": 323,
+   "atk": 25,
+   "def": 7,
+   "speed": 3.2,
+   "cooldown": 1500,
+   "aggressive": true,
+   "exp": 64
+  },
+  "wild_boar": {
+   "name": "Wildschwein",
+   "level": 7,
+   "hp": 459,
+   "atk": 30,
+   "def": 11,
+   "speed": 3,
+   "cooldown": 1700,
+   "aggressive": false,
+   "exp": 105
+  },
+  "metin_sorrow": {
+   "name": "Lumiis des Kummers",
+   "level": 5,
+   "hp": 3825,
+   "atk": 0,
+   "def": 6,
+   "speed": 0,
+   "cooldown": 1000000000,
+   "aggressive": false,
+   "exp": 900
+  }
+ }
+}
