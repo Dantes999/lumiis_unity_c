@@ -7,6 +7,7 @@
 // Usage (Node 20+, no dependencies):
 //   node tools/export-lumiis-map.mjs map  <mapId> > tools/map2-jayang-source.json
 //   node tools/export-lumiis-map.mjs mobs <mapId> > tools/map2-jayang-mobs.json
+//   node tools/export-lumiis-map.mjs spawns <mapId> > tools/lumiis2d-<mapId>-spawns.json   (wie map, ohne Kacheln)
 // LUMIIS_2D=/path/to/lumiis-2d overrides the source folder.
 
 import os from 'node:os';
@@ -17,8 +18,8 @@ const ROOT = process.env.LUMIIS_2D || path.join(os.homedir(), 'Desktop', 'lumiis
 const load = (rel) => import(pathToFileURL(path.join(ROOT, rel)).href);
 
 const [mode, id] = process.argv.slice(2);
-if (!['map', 'mobs'].includes(mode) || !id) {
-  console.error('usage: node tools/export-lumiis-map.mjs map|mobs <mapId>');
+if (!['map', 'mobs', 'spawns'].includes(mode) || !id) {
+  console.error('usage: node tools/export-lumiis-map.mjs map|mobs|spawns <mapId>');
   process.exit(1);
 }
 
@@ -42,7 +43,7 @@ for (const pts of metinPoints.values()) for (const p of pts) avoid.push(p);
 Object.defineProperty(avoid, 'gone', { value: metinPoints.gone || [] });
 const specialPoints = buildSpecialPoints(map, mobMap, specialDefs, groups, avoid);
 
-if (mode === 'map') {
+if (mode === 'map' || mode === 'spawns') {
   const out = {
     id: MAPS[id].tier === 2 ? 'map2' : id,
     sourceMapId: id,
@@ -67,7 +68,7 @@ if (mode === 'map') {
         points: (specialPoints.get(d.key) || []).map((p) => [p.tx, p.ty]),
       })),
     },
-    tiles: Array.from(map.tiles),
+    tiles: mode === 'map' ? Array.from(map.tiles) : undefined,
   };
   process.stdout.write(JSON.stringify(out));
 } else {
