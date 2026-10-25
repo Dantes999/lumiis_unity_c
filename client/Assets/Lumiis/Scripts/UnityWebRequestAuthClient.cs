@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
+using Lumiis.Shared.Net;
 
 namespace Lumiis.Client
 {
@@ -42,7 +43,7 @@ namespace Lumiis.Client
             CharacterListResponseDto listResponse = JsonUtility.FromJson<CharacterListResponseDto>(body);
             var characters = new List<CharacterInfo>();
             foreach (CharacterDto dto in listResponse.characters ?? Array.Empty<CharacterDto>())
-                characters.Add(new CharacterInfo(dto.id, dto.name));
+                characters.Add(ToInfo(dto));
             return AuthResult<IReadOnlyList<CharacterInfo>>.Success(characters);
         }
 
@@ -54,7 +55,25 @@ namespace Lumiis.Client
             if (status != 201) return AuthResult<CharacterInfo>.Http(status, TryGetServerMessage(body));
 
             CharacterDto dto = JsonUtility.FromJson<CharacterDto>(body);
-            return AuthResult<CharacterInfo>.Success(new CharacterInfo(dto.id, dto.name));
+            return AuthResult<CharacterInfo>.Success(ToInfo(dto));
+        }
+
+        private static CharacterInfo ToInfo(CharacterDto dto)
+        {
+            AppearanceDto a = dto.appearance;
+            Appearance appearance = a == null ? default : new Appearance
+            {
+                BodyId = a.bodyId,
+                HairStyleId = a.hairStyleId,
+                HairColorId = a.hairColorId,
+                ArmorId = a.armorId,
+                HelmetId = a.helmetId,
+                WeaponId = a.weaponId,
+                ShieldId = a.shieldId
+            };
+            EquipmentDto e = dto.equipment;
+            return new CharacterInfo(dto.id, dto.name, dto.level <= 0 ? 1 : dto.level, dto.mapId, appearance,
+                e?.weaponItemId ?? 0, e?.weaponUpgradeLevel ?? 0);
         }
 
         // ---- HTTP (UnityWebRequest + TaskCompletionSource statt UnityEngine.Awaitable: SendWebRequest()
@@ -135,6 +154,35 @@ namespace Lumiis.Client
         {
             public int id;
             public string name;
+            public int level;
+            public string mapId;
+            public AppearanceDto appearance;
+            public EquipmentDto equipment;
+        }
+
+        [Serializable]
+        private sealed class AppearanceDto
+        {
+            public int bodyId;
+            public int hairStyleId;
+            public int hairColorId;
+            public int armorId;
+            public int helmetId;
+            public int weaponId;
+            public int shieldId;
+        }
+
+        [Serializable]
+        private sealed class EquipmentDto
+        {
+            public int armorItemId;
+            public int helmetItemId;
+            public int weaponItemId;
+            public int shieldItemId;
+            public int armorUpgradeLevel;
+            public int helmetUpgradeLevel;
+            public int weaponUpgradeLevel;
+            public int shieldUpgradeLevel;
         }
 
         [Serializable]

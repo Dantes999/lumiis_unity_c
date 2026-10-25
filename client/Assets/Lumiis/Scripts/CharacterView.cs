@@ -199,9 +199,8 @@ namespace Lumiis.Client
             {
                 _weaponRenderer.enabled = true;
                 _weaponRenderer.sprite = weaponSprite;
-                _weaponRenderer.transform.localScale = _spriteProvider is LumiisSpriteProvider
-                    ? new Vector3(0.85f, 0.85f, 1f)
-                    : Vector3.one;
+                float weaponScale = WeaponScaleFor(weaponSprite);
+                _weaponRenderer.transform.localScale = new Vector3(weaponScale, weaponScale, 1f);
                 SetWeaponPixelOffset();
                 UpdateTrailAnchor();
             }
@@ -214,6 +213,18 @@ namespace Lumiis.Client
 
             UpdateUpgradeEffects();
             RefreshWeaponSocketPose();
+        }
+
+        /// <summary>Die Item-PNGs sind für den 128-px-Platzhalter-Körper gezeichnet (Klinge ~1,9 Welteinheiten).
+        /// Die echten Lumiis-Sheets sind nur 48 px bei 32 PPU (~1,5 Einheiten hoch) - mit fester Skalierung ragte
+        /// das Holzschwert deshalb weit über den Kopf. Hier wird die sichtbare Waffenlänge auf einen Anteil der
+        /// Figurenhöhe begrenzt.</summary>
+        private float WeaponScaleFor(Sprite weaponSprite)
+        {
+            if (!(_spriteProvider is LumiisSpriteProvider) || weaponSprite == null) return 1f;
+            const float targetLengthWorld = 0.8f;
+            float length = weaponSprite.bounds.size.y;
+            return length > 0.01f ? Mathf.Min(1f, targetLengthWorld / length) : 1f;
         }
 
         /// <summary>Zurück auf die Appearance-Waffe (Platzhalter) - z. B. beim lokalen F7-Look-Cycler.</summary>

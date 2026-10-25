@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Lumiis.Shared.Net;
 
 namespace Lumiis.Client
 {
@@ -54,15 +55,33 @@ namespace Lumiis.Client
         public static AuthResult<T> Network() => new AuthResult<T>(AuthOutcome.NetworkFailure, 0, null, default);
     }
 
+    /// <summary>Eintrag der Charakterliste. Appearance enthält LookIds (wie EntitySpawn/JoinAccepted) für die
+    /// Vorschau in der Charakterauswahl; WeaponItemId/WeaponUpgradeLevel erlauben dieselbe Item-Waffe
+    /// (spriteKey aus items.json, +7/+9-Glanz) wie im Spiel. Alle Werte kommen vom Auth-Dienst.</summary>
     public readonly struct CharacterInfo
     {
         public int Id { get; }
         public string Name { get; }
+        public int Level { get; }
+        public string MapId { get; }
+        public Appearance Appearance { get; }
+        public int WeaponItemId { get; }
+        public int WeaponUpgradeLevel { get; }
 
         public CharacterInfo(int id, string name)
+            : this(id, name, 1, null, default, 0, 0)
+        {
+        }
+
+        public CharacterInfo(int id, string name, int level, string mapId, Appearance appearance, int weaponItemId, int weaponUpgradeLevel)
         {
             Id = id;
             Name = name;
+            Level = level;
+            MapId = mapId;
+            Appearance = appearance;
+            WeaponItemId = weaponItemId;
+            WeaponUpgradeLevel = weaponUpgradeLevel;
         }
     }
 
