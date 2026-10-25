@@ -26,6 +26,7 @@ namespace Lumiis.Client
         private int _lastFrame = -1;
         private WeaponFacing _lastFacing = (WeaponFacing)(-1);
         private float _attackStartTime = float.NegativeInfinity;
+        private int _comboIndex;
 
         public WeaponSocketFrameConfig FrameConfig => _frameConfig;
 
@@ -42,9 +43,10 @@ namespace Lumiis.Client
 
         /// <summary>Startet einen Schlagimpuls (lokaler Angriff oder eingehendes EntityDamaged/EntityDodged
         /// für diese Entity). Der Trail wird nur während der aktiven Schlagframes emittiert.</summary>
-        public void PlayAttack()
+        public void PlayAttack(int comboIndex = 0)
         {
             _attackStartTime = Time.time;
+            _comboIndex = Mathf.Abs(comboIndex) % 3;
             _lastState = null; // nächster Animate-Aufruf wendet sofort den Attack-Frame an
         }
 
@@ -72,6 +74,9 @@ namespace Lumiis.Client
                 frame = Mathf.Clamp(Mathf.FloorToInt(attackElapsed / AttackDurationSeconds * 4f), 0, 3);
                 _view.VisualRoot.localPosition = Vector3.zero;
                 _view.VisualRoot.localScale = Vector3.one;
+                // Kleine links/rechts/links-Neigung als sichtbarer Schlag-Kombo.
+                float lean = _comboIndex == 1 ? 7f : _comboIndex == 2 ? -4f : -7f;
+                _view.VisualRoot.localRotation = Quaternion.Euler(0f, 0f, lean);
             }
             else if (isMoving)
             {
@@ -81,6 +86,7 @@ namespace Lumiis.Client
                 float bob = Mathf.Abs(Mathf.Sin(t * WalkBobSpeed)) * WalkBobUnits;
                 _view.VisualRoot.localPosition = new Vector3(0f, bob, 0f);
                 _view.VisualRoot.localScale = Vector3.one;
+                _view.VisualRoot.localRotation = Quaternion.identity;
             }
             else
             {
@@ -90,6 +96,7 @@ namespace Lumiis.Client
                 float breathe = 1f + Mathf.Sin(t * IdleBreatheSpeed) * IdleBreatheScale;
                 _view.VisualRoot.localPosition = Vector3.zero;
                 _view.VisualRoot.localScale = new Vector3(breathe, breathe, 1f);
+                _view.VisualRoot.localRotation = Quaternion.identity;
             }
 
             ApplyFrame(state, frame);

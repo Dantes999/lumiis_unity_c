@@ -14,9 +14,9 @@ Aufwand: S = wenige Tage, M = 1–2 Wochen, L = mehrere Wochen (inkl. Tests/Doku
 Der Serverkern ist solide: autoritativer 25-Hz-Loop, LiteNetLib, PostgreSQL/EF Core, Token-Auth,
 AOI, Kollision, Monster-KI, Kampf, Items/Inventar/Shop, Level/XP/Stats, vier Skills, Paper-Doll
 und breite Tests. HUD, Chat, Gruppe inkl. EXP-Teilen, Audio-Platzhalter, 546 Item-Icons,
-32 Items, Multi-Map mit zwei Karten/Portalen, Aufwertung +0…+9 sowie ein Lumiis-Stein/Boss-MVP
-sind umgesetzt. Offen sind vor allem echte Stein-Wellen, Quests/Trade, echter Kartenimport und
-mehr Content.
+32 Items, Map1 (Yongan-Crop) mit Dorf/Feld/Portalen, WASD-/Leertasten-Steuerung, Minimap und
+Release-HUD, Aufwertung +0…+9 sowie ein Lumiis-Stein/Boss-MVP sind umgesetzt. Offen sind vor allem
+Quests/Trade, echte Vollkarten und mehr Content.
 
 ## P0 – spielbarer Alpha-Test / M7
 
@@ -40,7 +40,7 @@ soziale Integrationstests. YangChanged beim Join ist bereits im Code.
 | Aufwertung +0…+9 (DB-Stufen, Material/Schutzrolle, Pakete, UI) | **umgesetzt** (M6c: `data/upgrade.json`, `UpgradeCatalog`, Migration `AddUpgradeLevels`, `UpgradeItem*`-Pakete, Debug-Panel-UI; Zerstoerung ohne Bewahrungsrolle) | `docs/tasks/M6c-upgrade.md` | – |
 | Audio + konsistente Kampf-/Loot-VFX | **Audio-Platzhalter umgesetzt** (`AudioService`, prozedurale Clips); VFX weiterhin nur Ringe/Linien/Trail | `lumiis/packages/client/src/audio.ts` | –/M |
 | Item-Icons/Tooltips + kleines Content-Paket | **Icons + Content-Paket umgesetzt**: 546 Icons, 32 Items mit iconKey, 13 fehlende Archivdateien nachgeladen; Tooltips weiterhin knapp | `Resources/Icons`, `ItemIconCatalog`, `data/items.json` | –/S |
-| Lesbare Kartenoptik / Feldkarte | **Multi-Map umgesetzt** (Dorf + generiertes Grünes Feld, Portale, HUD-Kartenname); Boden weiterhin Platzhalter-Checker, kein echtes Terrain | `docs/map-import-plan.md`, `data/maps/`, `MapCatalog.cs`, `GameClient.RebuildMapVisuals` | M–L |
+| Lesbare Kartenoptik / Feldkarte | **Map1 umgesetzt**: Yongan-Crop mit Dorf, Wegen, Wasser und Baumrand als 32-px-Tilemap; Minimap + Release-HUD; `greenfield` bleibt Platzhalter-Testkarte | `docs/map-import-plan.md`, `data/maps/map1`, `GameClient.RebuildMapVisuals` | –/M |
 | Rate-Limits (Verbindung/Chat), Auth-Brute-Force-Schutz, Backups | M8 Alpha-Betrieb | `ServerConfig`, `AuthEndpoints`; Referenz `lumiis/packages/server/src/net/gateway.ts`, `lumiis-2d/docs/SECURITY.md` | S–M |
 | Last-/Flow-Tests mit Bots | Bot kann nur bewegen | `lumiis-2d/tests/perf.test.js`, `lumiis-2d/tools/flow/` | M |
 

@@ -214,17 +214,17 @@ namespace Lumiis.Tests.Integration
         public void MultiMap_MonstersAndNpcs_AreSeparatedPerMap()
         {
             (ServerFixture fixture, MapCatalog catalog) = CreateMultiMapFixture();
-            Assert.Equal("village", catalog.StartMapId);
+            Assert.Equal("map1", catalog.StartMapId);
 
-            List<Entity> villageMonsters = fixture.Server.WorldForMap("village").Entities
+            List<Entity> map1Monsters = fixture.Server.WorldForMap("map1").Entities
                 .Where(e => e.Kind == EntityKind.Monster).ToList();
             List<Entity> greenfieldMonsters = fixture.Server.WorldForMap("greenfield").Entities
                 .Where(e => e.Kind == EntityKind.Monster).ToList();
 
-            Assert.Equal(17, villageMonsters.Count);
+            Assert.Equal(6, map1Monsters.Count);
             Assert.Equal(6, greenfieldMonsters.Count);
-            Assert.Empty(villageMonsters.Select(m => m.Id).Intersect(greenfieldMonsters.Select(m => m.Id)));
-            Assert.NotEmpty(fixture.Server.WorldForMap("village").Entities.Where(e => e.Kind == EntityKind.Npc));
+            Assert.Empty(map1Monsters.Select(m => m.Id).Intersect(greenfieldMonsters.Select(m => m.Id)));
+            Assert.NotEmpty(fixture.Server.WorldForMap("map1").Entities.Where(e => e.Kind == EntityKind.Npc));
             Assert.Empty(fixture.Server.WorldForMap("greenfield").Entities.Where(e => e.Kind == EntityKind.Npc));
         }
 
@@ -365,7 +365,7 @@ namespace Lumiis.Tests.Integration
                 Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
 
                 JoinAcceptedPacket accepted = client.Received.OfType<JoinAcceptedPacket>().First();
-                Assert.Equal("village", accepted.MapId);
+                Assert.Equal("map1", accepted.MapId);
             }
             finally
             {

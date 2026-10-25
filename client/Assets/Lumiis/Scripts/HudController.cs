@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using Lumiis.Shared.Net;
@@ -39,6 +40,13 @@ namespace Lumiis.Client
         private VisualElement _partyMembers;
         private readonly Label[] _skillNames = new Label[4];
         private readonly Label[] _skillCooldowns = new Label[4];
+        private readonly VisualElement[] _skillIcons = new VisualElement[4];
+        private static readonly string[] SkillIconKeys = { "book_bash", "book_sword_spin", "book_berserk", "book_fast_attack" };
+
+        private VisualElement _minimapFrame;
+        private VisualElement _minimapDot;
+        private Label _minimapTitle;
+        private string _minimapMapId = "";
 
         private ScrollView _chatLog;
         private TextField _chatInput;
@@ -115,6 +123,32 @@ namespace Lumiis.Client
             _skillCooldowns[1] = _root.Q<Label>("hud-skill-2-cd");
             _skillCooldowns[2] = _root.Q<Label>("hud-skill-3-cd");
             _skillCooldowns[3] = _root.Q<Label>("hud-skill-4-cd");
+            _skillIcons[0] = _root.Q<VisualElement>("hud-skill-1-icon");
+            _skillIcons[1] = _root.Q<VisualElement>("hud-skill-2-icon");
+            _skillIcons[2] = _root.Q<VisualElement>("hud-skill-3-icon");
+            _skillIcons[3] = _root.Q<VisualElement>("hud-skill-4-icon");
+            for (int i = 0; i < _skillIcons.Length; i++)
+            {
+                Texture2D texture = _gameClient.GetIconTexture(SkillIconKeys[i]);
+                if (texture == null || _skillIcons[i] == null) continue;
+                var icon = new Image
+                {
+                    image = texture,
+                    scaleMode = ScaleMode.ScaleToFit,
+                    pickingMode = PickingMode.Ignore
+                };
+                icon.AddToClassList("hud-skill-icon-image");
+                icon.style.width = 32;
+                icon.style.height = 32;
+                _skillIcons[i].style.width = 34;
+                _skillIcons[i].style.height = 34;
+                _skillIcons[i].style.flexShrink = 0;
+                _skillIcons[i].Add(icon);
+            }
+
+            _minimapFrame = _root.Q<VisualElement>("hud-minimap-frame");
+            _minimapDot = _root.Q<VisualElement>("hud-minimap-dot");
+            _minimapTitle = _root.Q<Label>("hud-minimap-title");
 
             _chatLog = _root.Q<ScrollView>("hud-chat-log");
             _chatInput = _root.Q<TextField>("hud-chat-input");
@@ -163,6 +197,7 @@ namespace Lumiis.Client
             RefreshPlayer();
             RefreshTarget();
             RefreshSkills();
+            RefreshMinimap();
             RefreshMessage();
         }
 
@@ -231,6 +266,31 @@ namespace Lumiis.Client
                 buffText += BuffName(kvp.Key) + " " + kvp.Value.ToString("0.0") + "s";
             }
             _buffs.text = buffText;
+        }
+
+        private void RefreshMinimap()
+        {
+            if (_minimapFrame == null || _minimapDot == null) return;
+
+            if (!string.Equals(_minimapMapId, _gameClient.CurrentMapId, StringComparison.Ordinal))
+            {
+                _minimapMapId = _gameClient.CurrentMapId;
+                Sprite mapSprite = Resources.Load<Sprite>("Maps/" + _minimapMapId);
+                Texture2D mapTexture = mapSprite != null ? mapSprite.texture : Resources.Load<Texture2D>("Maps/" + _minimapMapId);
+                if (mapTexture != null)
+                    _minimapFrame.style.backgroundImage = new StyleBackground(mapTexture);
+                if (_minimapTitle != null)
+                    _minimapTitle.text = _gameClient.CurrentMapName;
+            }
+
+            if (!_gameClient.TryGetCurrentMapVisual(out MapVisual visual) || visual.Width <= 0 || visual.Height <= 0)
+                return;
+
+            Vector3 position = _gameClient.LocalPlayerWorldPosition;
+            float x = Mathf.Clamp01((position.x - visual.OriginX) / visual.Width);
+            float y = Mathf.Clamp01(1f - (position.y - visual.OriginY) / visual.Height);
+            _minimapDot.style.left = Length.Percent(x * 100f);
+            _minimapDot.style.top = Length.Percent(y * 100f);
         }
 
         private void RefreshMessage()

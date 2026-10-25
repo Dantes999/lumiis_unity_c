@@ -41,9 +41,9 @@ public sealed class LumiisDbContext : DbContext
             // auf 0 setzen, ein ungültiges Level (siehe ProgressionCatalog.MaxLevel-Bereich 1..25).
             entity.Property(c => c.Level).HasDefaultValue(1);
 
-            // Multi-Map: DB-Default "village" - bestehende Zeilen (und von Auth ohne MapId eingefügte)
-            // landen damit automatisch auf der Default-Karte, ohne dass die Migration Daten raten muss.
-            entity.Property(c => c.MapId).HasMaxLength(64).HasDefaultValue("village");
+            // Multi-Map: DB-Default "map1" - neue Zeilen (und von Auth ohne MapId eingefügte) landen damit
+            // automatisch auf Map1; die Map1Default-Migration hebt bestehende village-Zeilen ebenfalls dorthin.
+            entity.Property(c => c.MapId).HasMaxLength(64).HasDefaultValue("map1");
 
             // M6c: Aufwertungsstufen der Ausrüstung - DB-Default 0, bestehende Zeilen bleiben +0.
             entity.Property(c => c.EquippedArmorUpgradeLevel).HasDefaultValue(0);

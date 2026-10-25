@@ -703,20 +703,20 @@ namespace Lumiis.Client
                     child.gameObject.SetActive(false);
             }
 
-            Texture2D texture = Resources.Load<Texture2D>("Maps/greenfield");
-            if (texture == null)
+            Sprite mapSprite = Resources.Load<Sprite>("Maps/map1");
+            if (mapSprite == null)
             {
-                Debug.LogWarning("Karten-Vorschau fehlt: Resources/Maps/greenfield.png");
+                Debug.LogWarning("Karten-Vorschau fehlt: Resources/Maps/map1.png");
                 _mapPreviewVisible = false;
                 if (_previewView != null) _previewView.gameObject.SetActive(true);
                 return;
             }
 
-            _mapPreviewSprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height),
-                new Vector2(0.5f, 0.5f), 4f, 0, SpriteMeshType.FullRect);
-            _mapPreviewRoot = new GameObject("GreenfieldMapPreview");
+            _mapPreviewSprite = mapSprite;
+            _mapPreviewRoot = new GameObject("Map1Preview");
             _mapPreviewRoot.transform.SetParent(_labRoot.transform, false);
             _mapPreviewRoot.transform.position = _previewPosition;
+            _mapPreviewRoot.transform.localScale = Vector3.one * 0.16f;
             var renderer = _mapPreviewRoot.AddComponent<SpriteRenderer>();
             renderer.sprite = _mapPreviewSprite;
             renderer.sortingOrder = -60;
@@ -732,8 +732,7 @@ namespace Lumiis.Client
 
             if (_mapPreviewRoot != null) Destroy(_mapPreviewRoot);
             _mapPreviewRoot = null;
-            if (_mapPreviewSprite != null) Destroy(_mapPreviewSprite);
-            _mapPreviewSprite = null;
+            _mapPreviewSprite = null; // aus Resources geladen - kein Destroy auf einem Asset.
 
             if (_previewView != null) _previewView.gameObject.SetActive(true);
             if (_labRoot != null)

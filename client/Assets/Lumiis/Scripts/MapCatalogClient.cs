@@ -25,6 +25,22 @@ namespace Lumiis.Client
         public string name = "";
         public int startX;
         public int startY;
+        public int visualOriginX;
+        public int visualOriginY;
+        public int visualWidth;
+        public int visualHeight;
+        public int visualPixelsPerUnit;
+    }
+
+    /// <summary>Optionales Kartenbild (Resources/Maps/&lt;mapId&gt;). Herkunft/Breite/Höhe stehen in map.json;
+    /// fehlt das Bild, fällt der Client auf den alten Platzhalterboden zurück.</summary>
+    public sealed class MapVisual
+    {
+        public int OriginX;
+        public int OriginY;
+        public int Width;
+        public int Height;
+        public int PixelsPerUnit;
     }
 
     [Serializable]
@@ -52,6 +68,7 @@ namespace Lumiis.Client
     {
         private readonly Dictionary<string, string> _names = new Dictionary<string, string>();
         private readonly Dictionary<string, List<PortalJson>> _portals = new Dictionary<string, List<PortalJson>>();
+        private readonly Dictionary<string, MapVisual> _visuals = new Dictionary<string, MapVisual>();
         private readonly List<string> _mapIds = new List<string>();
 
         public string StartMapId { get; private set; } = "village";
@@ -78,7 +95,21 @@ namespace Lumiis.Client
                 if (File.Exists(mapJsonPath))
                 {
                     MapFileJson mapFile = JsonUtility.FromJson<MapFileJson>(File.ReadAllText(mapJsonPath));
-                    if (mapFile != null && !string.IsNullOrEmpty(mapFile.name)) _names[entry.id] = mapFile.name;
+                    if (mapFile != null)
+                    {
+                        if (!string.IsNullOrEmpty(mapFile.name)) _names[entry.id] = mapFile.name;
+                        if (mapFile.visualWidth > 0 && mapFile.visualHeight > 0)
+                        {
+                            _visuals[entry.id] = new MapVisual
+                            {
+                                OriginX = mapFile.visualOriginX,
+                                OriginY = mapFile.visualOriginY,
+                                Width = mapFile.visualWidth,
+                                Height = mapFile.visualHeight,
+                                PixelsPerUnit = mapFile.visualPixelsPerUnit > 0 ? mapFile.visualPixelsPerUnit : 32
+                            };
+                        }
+                    }
                 }
 
                 string portalsPath = Path.Combine(mapsDirectory, entry.id, "portals.json");
@@ -102,6 +133,11 @@ namespace Lumiis.Client
             return _portals.TryGetValue(mapId, out List<PortalJson>? portals)
                 ? portals
                 : (IReadOnlyList<PortalJson>)Array.Empty<PortalJson>();
+        }
+
+        public bool TryGetVisual(string mapId, out MapVisual visual)
+        {
+            return _visuals.TryGetValue(mapId, out visual);
         }
     }
 }

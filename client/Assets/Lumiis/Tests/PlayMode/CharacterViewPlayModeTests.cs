@@ -110,6 +110,22 @@ namespace Lumiis.Client.Tests.PlayMode
         }
 
         [Test]
+        public void Map1AndMonsterArt_AreImported()
+        {
+            Sprite map = Resources.Load<Sprite>("Maps/map1");
+            Assert.IsNotNull(map, "map1.png fehlt unter Resources/Maps/ oder wurde nicht als Sprite importiert.");
+            Assert.AreEqual(128f, map.rect.width / map.pixelsPerUnit, 0.01f);
+            Assert.AreEqual(128f, map.rect.height / map.pixelsPerUnit, 0.01f);
+
+            Sprite[] wolf = MonsterArt.LoadFrames("alpha_wolf");
+            Assert.IsNotNull(wolf, "alpha_wolf.png fehlt unter Resources/Sprites/Monsters/.");
+            Assert.AreEqual(20, wolf.Length);
+            Assert.AreEqual(1.25f, wolf[0].rect.width / wolf[0].pixelsPerUnit, 0.01f);
+            Assert.IsNotNull(MonsterArt.LoadFrames("boar"));
+            Assert.IsNotNull(ItemIconCatalog.LoadFromResources().GetTexture("book_bash"), "book_bash-Icon fehlt.");
+        }
+
+        [Test]
         public void SetWeapon_TogglesPlus7AndPlus9GlowByUpgradeLevel()
         {
             _view.SetWeapon(null, Vector2.zero, 6);

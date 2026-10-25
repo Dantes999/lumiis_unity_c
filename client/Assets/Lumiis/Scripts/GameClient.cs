@@ -69,7 +69,7 @@ namespace Lumiis.Client
         // geladenen Katalogs - der Client kennt mobs.json bewusst nicht (siehe CLAUDE.md Abschnitt "Monster"),
         // dieselbe kleine, feste MobId-Zuordnung wie MonsterShapeFor/MonsterColorFor, nur um einen Anzeigenamen
         // ergänzt. Reine Dev-Bequemlichkeit, kein neuer Lade-Mechanismus für ein Dev-Only-Feature.
-        private static readonly (int MobId, string Name)[] DebugMobTypes = { (1, "Wildhund"), (2, "Waldschrat"), (3, "Lumiis-Stein"), (4, "Waldboss") };
+        private static readonly (int MobId, string Name)[] DebugMobTypes = { (1, "Wildhund"), (2, "Waldschrat"), (3, "Lumiis-Stein"), (4, "Waldboss"), (5, "Hungriger Wildhund") };
         private int _debugSpawnMobIndex;
         private int _debugMapIndex;
 #endif
@@ -99,6 +99,10 @@ namespace Lumiis.Client
         // ---- Kampf (M4a, Debug-Overlay-Text - siehe DrawStatusLine/DrawTargetLine) ----
         private int _targetEntityId = -1;
         private string _lastAttackFailedMessage = "";
+        private bool _attackHeld;
+        private float _nextAutoAttackAt;
+        private int _comboIndex;
+        private float _nextMoveSendAt;
         private long _yangTotal;
         private bool _isDead;
 
@@ -195,6 +199,19 @@ namespace Lumiis.Client
         public string CurrentMapId
         {
             get { return _world.MapId; }
+        }
+
+        /// <summary>Kartenbild-Metadaten (Ursprung/Größe) für HUD-Minimap und Bodenanzeige.</summary>
+        public bool TryGetCurrentMapVisual(out MapVisual visual)
+        {
+            visual = null;
+            return _mapCatalogClient != null && _mapCatalogClient.TryGetVisual(_world.MapId, out visual);
+        }
+
+        /// <summary>Icon-Textur für HUD-Elemente (z. B. Skill-Symbole aus dem Lumiis-Icon-Manifest).</summary>
+        public Texture2D GetIconTexture(string key)
+        {
+            return _iconCatalog != null ? _iconCatalog.GetTexture(key) : null;
         }
 
         /// <summary>Multi-Map-Debug-API (nur sinnvoll mit --allow-debug-commands): bittet den Server, den
@@ -322,7 +339,11 @@ namespace Lumiis.Client
             {
                 ClientEntity entity;
                 if (_world.Entities.TryGetValue(kvp.Key, out entity))
+                {
                     kvp.Value.SetWorldPosition(entity.X / 100.0, entity.Y / 100.0);
+                    kvp.Value.SetPose(entity.Facing, entity.IsMoving, Time.time);
+                    kvp.Value.SetHealth(entity.CurrentHp, entity.MaxHp);
+                }
             }
 
             if (_world.LocalEntityId >= 0 && _world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity localForRing))
@@ -335,6 +356,8 @@ namespace Lumiis.Client
 
             if (_inGame && !_gameplayInputLocked && !_assetLabActive && !_chatInputFocused)
             {
+                HandleKeyboardMovement();
+                HandleKeyboardCombat();
                 HandleClickInput();
                 HandleSkillHotkeys();
             }
@@ -580,9 +603,24 @@ namespace Lumiis.Client
                 break;
             }
 
-            _world.HandleJoinAccepted(9000, 50000, 50000, "AssetLab",
-                new Appearance { BodyId = bodyId, HairStyleId = 1, HairColorId = 1, ArmorId = 1, WeaponId = 2 });
+            _world.HandleJoinAccepted(9000, 47600, 47800, "Abenteurer",
+                new Appearance { BodyId = bodyId, HairStyleId = 1, HairColorId = 1, ArmorId = 1, WeaponId = 2 },
+                mapId: "map1", mapName: "Yongan");
+            _world.ApplyCharacterStats(new CharacterStatsPacket
+            {
+                Level = 5,
+                Xp = 140,
+                XpToNext = 560,
+                MaxHp = 220,
+                CurrentHp = 184,
+                MaxSp = 60,
+                CurrentSp = 44,
+                Attack = 22,
+                Defense = 9,
+                UnspentStatPoints = 3
+            });
             _inGame = true;
+            RebuildMapVisuals();
         }
 
         public void DebugOpenAssetLab()
@@ -1145,6 +1183,112 @@ namespace Lumiis.Client
             }
         }
 
+        /// <summary>WASD/Pfeiltasten: hält die Figur in die gewünschte Richtung. Der Client sendet in
+        /// kurzen Abständen ein neues MoveTo-Ziel; die eigentliche Bewegung/Kollision bleibt serverautoritativ
+        /// (ClientWorld interpoliert die eingehenden EntityMove-Pakete).</summary>
+        private void HandleKeyboardMovement()
+        {
+            if (Keyboard.current == null || _world.LocalEntityId < 0) return;
+
+            Vector2 direction = Vector2.zero;
+            if (Keyboard.current.wKey.isPressed || Keyboard.current.upArrowKey.isPressed) direction.y += 1f;
+            if (Keyboard.current.sKey.isPressed || Keyboard.current.downArrowKey.isPressed) direction.y -= 1f;
+            if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed) direction.x -= 1f;
+            if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed) direction.x += 1f;
+
+            if (direction.sqrMagnitude <= 0f) return;
+            if (Time.time < _nextMoveSendAt) return;
+            _nextMoveSendAt = Time.time + 0.10f;
+            direction.Normalize();
+
+            Vector3 position = LocalPlayerWorldPosition;
+            Vector3 target = position + new Vector3(direction.x, direction.y, 0f) * 2.5f;
+            int wireX = Mathf.RoundToInt(target.x * 100f);
+            int wireY = Mathf.RoundToInt(target.y * 100f);
+            _netClient.SendMoveTo(wireX, wireY);
+            _world.SetFacingOverride(_world.LocalEntityId, wireX, wireY);
+        }
+
+        /// <summary>Leertaste: ein Schlag; gedrückt halten schlägt automatisch im Takt weiter. Der lokale
+        /// Kombo-Zähler (links/rechts/links) ist rein kosmetisch, der Server prüft jeden Treffer selbst.</summary>
+        private void HandleKeyboardCombat()
+        {
+            if (Keyboard.current == null || _world.LocalEntityId < 0) return;
+
+            bool space = Keyboard.current.spaceKey.isPressed;
+            if (Keyboard.current.spaceKey.wasPressedThisFrame && !_attackHeld)
+            {
+                _attackHeld = true;
+                _nextAutoAttackAt = Time.time;
+            }
+            if (!space)
+            {
+                _attackHeld = false;
+                return;
+            }
+
+            if (!_attackHeld || Time.time < _nextAutoAttackAt) return;
+            _nextAutoAttackAt = Time.time + 0.82f;
+
+            int targetId = FindAutoAttackTarget();
+            if (targetId <= 0)
+            {
+                _lastAttackFailedMessage = "Kein Monster in Reichweite.";
+                return;
+            }
+            _lastAttackFailedMessage = "";
+            PerformAttack(targetId);
+        }
+
+        private int FindAutoAttackTarget()
+        {
+            if (_world.LocalEntityId < 0 || !_world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity local))
+                return -1;
+
+            float maxDistance = _classCatalog != null ? _classCatalog.MeleeRangeWire / 100f + 0.7f : 2.2f;
+
+            if (_targetEntityId >= 0
+                && _world.Entities.TryGetValue(_targetEntityId, out ClientEntity selected)
+                && selected.Kind == EntityKind.Monster
+                && selected.CurrentHp != 0
+                && Distance(local, selected) <= maxDistance)
+            {
+                return _targetEntityId;
+            }
+
+            int bestId = -1;
+            float bestDistance = maxDistance;
+            foreach (KeyValuePair<int, ClientEntity> kvp in _world.Entities)
+            {
+                ClientEntity entity = kvp.Value;
+                if (entity.Kind != EntityKind.Monster || entity.CurrentHp == 0) continue;
+                float distance = Distance(local, entity);
+                if (distance > bestDistance) continue;
+                bestDistance = distance;
+                bestId = kvp.Key;
+            }
+            return bestId;
+        }
+
+        private static float Distance(ClientEntity a, ClientEntity b)
+        {
+            float dx = (float)((a.X - b.X) / 100.0);
+            float dy = (float)((a.Y - b.Y) / 100.0);
+            return Mathf.Sqrt(dx * dx + dy * dy);
+        }
+
+        private void PerformAttack(int targetId)
+        {
+            if (targetId <= 0) return;
+            _targetEntityId = targetId;
+            _netClient.SendAttack(targetId);
+            PlayAttackAnimation(_world.LocalEntityId, _comboIndex);
+            _audio?.PlaySwing();
+            _comboIndex = (_comboIndex + 1) % 3;
+            if (_world.LocalEntityId >= 0 && _world.Entities.TryGetValue(targetId, out ClientEntity target))
+                _world.SetFacingOverride(_world.LocalEntityId, target.IntX, target.IntY);
+        }
+
         private void HandleClickInput()
         {
             if (Mouse.current == null) return;
@@ -1189,14 +1333,7 @@ namespace Lumiis.Client
             foreach (KeyValuePair<int, MonsterView> kvp in _monsterViews)
             {
                 if (kvp.Value == null || !kvp.Value.ContainsWorldPoint(worldPos)) continue;
-                _targetEntityId = kvp.Key;
-                _netClient.SendAttack(kvp.Key);
-                PlayAttackAnimation(_world.LocalEntityId);
-                _audio?.PlaySwing();
-                // Kampf-Visualisierung Abschnitt 5: sofort lokal zum Ziel drehen, bevor die Serverantwort da
-                // ist - kein dauerhafter Override, der naechste HandleEntityMove ueberschreibt das wieder.
-                if (_world.LocalEntityId >= 0 && _world.Entities.TryGetValue(kvp.Key, out ClientEntity attackTarget))
-                    _world.SetFacingOverride(_world.LocalEntityId, attackTarget.IntX, attackTarget.IntY);
+                PerformAttack(kvp.Key);
                 return;
             }
 
@@ -1680,7 +1817,12 @@ namespace Lumiis.Client
             {
                 var monsterGo = new GameObject("Monster_" + entity.Id + "_" + entity.Name);
                 var monsterView = monsterGo.AddComponent<MonsterView>();
-                monsterView.Initialize(MonsterShapeFor(entity.TypeId), MonsterColorFor(entity.TypeId), MonsterScaleFor(entity.TypeId));
+                string artKey = MonsterArt.ResourceForMob(entity.TypeId);
+                Sprite[] frames = artKey != null ? MonsterArt.LoadFrames(artKey) : null;
+                if (frames != null)
+                    monsterView.Initialize(frames, MonsterColorFor(entity.TypeId), MonsterScaleFor(entity.TypeId));
+                else
+                    monsterView.Initialize(MonsterShapeFor(entity.TypeId), MonsterColorFor(entity.TypeId), MonsterScaleFor(entity.TypeId));
                 monsterView.SetWorldPosition(entity.X / 100.0, entity.Y / 100.0);
                 _monsterViews[entity.Id] = monsterView;
                 if (_assetLabActive) HideForAssetLab(monsterGo);
@@ -1706,14 +1848,8 @@ namespace Lumiis.Client
                 LocalPlayerMarker marker = markerGo.AddComponent<LocalPlayerMarker>();
                 marker.Initialize(_localMarkerSprite);
 
-                // Kampf-Visualisierung Abschnitt 2: Reichweitenring, unparented (siehe RangeRingView-
-                // Klassenkommentar) - Durchmesser = 2 * MeleeRangeWire (Radius), Wire -> Weltenheit /100.
-                var rangeRingGo = new GameObject("RangeRing");
-                _rangeRingView = rangeRingGo.AddComponent<RangeRingView>();
-                float rangeDiameter = 2f * _classCatalog.MeleeRangeWire / 100f;
-                _rangeRingView.Initialize(_unitRingSprite, rangeDiameter, RangeRingColor, RangeRingSortingOrder);
-                _rangeRingView.SetWorldPosition(entity.X / 100.0, entity.Y / 100.0);
-
+                // Kein Reichweitenring mehr im regulären Spiel - der wirkte wie ein Debug-Overlay. Der
+                // Ring bleibt nur als internes Kampf-Visual (RadiusFlash/Buff-Ringe) verfügbar.
                 ApplyLocalWeaponVisual();
             }
 
@@ -1751,11 +1887,11 @@ namespace Lumiis.Client
             view.SetWeapon(weaponSprite, pivotOffset, upgradeLevel);
         }
 
-        private void PlayAttackAnimation(int entityId)
+        private void PlayAttackAnimation(int entityId, int comboIndex = 0)
         {
             if (entityId <= 0) return;
             if (_animators.TryGetValue(entityId, out CharacterAnimator animator) && animator != null)
-                animator.PlayAttack();
+                animator.PlayAttack(comboIndex);
         }
 
         public bool HasLocalPlayer => _world.LocalEntityId >= 0 && _world.Entities.ContainsKey(_world.LocalEntityId);
@@ -1881,11 +2017,12 @@ namespace Lumiis.Client
         {
             return mobId switch
             {
-                1 => new Color(0.55f, 0.35f, 0.2f), // Wildhund: braun
-                2 => new Color(0.3f, 0.5f, 0.25f),  // Waldschrat: grün
+                1 => Color.white,                    // Wildhund: Original-Sheet
+                2 => new Color(0.9f, 1f, 0.85f),     // Waldschrat/Boar: leicht grünlicher Stich
                 3 => new Color(0.35f, 0.45f, 0.8f), // Lumiis-Stein: blau
                 4 => new Color(0.6f, 0.15f, 0.15f), // Boss: dunkelrot
-                _ => Color.gray
+                5 => new Color(0.95f, 0.62f, 0.55f), // Hungriger Wildhund: rötlich
+                _ => Color.white
             };
         }
 
@@ -1893,8 +2030,10 @@ namespace Lumiis.Client
         {
             switch (mobId)
             {
+                case 2: return 1.1f;
                 case 3: return 1.15f;
                 case 4: return 1.8f;
+                case 5: return 1.05f;
                 default: return 1f;
             }
         }
@@ -1979,21 +2118,38 @@ namespace Lumiis.Client
             float mapUnitsX = _world.MapWidth / 100f;
             float mapUnitsY = _world.MapHeight / 100f;
 
-            var floorGo = new GameObject("Floor");
-            floorGo.transform.SetParent(_mapRoot.transform, false);
-            var floorRenderer = floorGo.AddComponent<SpriteRenderer>();
-            floorRenderer.sprite = PlaceholderSprites.CreateCheckerTile();
-            floorRenderer.drawMode = SpriteDrawMode.Tiled;
-            floorRenderer.size = new Vector2(mapUnitsX, mapUnitsY);
-            floorRenderer.sortingOrder = -100;
-            floorGo.transform.position = new Vector3(mapUnitsX / 2f, mapUnitsY / 2f, 0f);
+            // Echte, aus den Referenz-Tiles gebackene Karte (Resources/Maps/<mapId>). Die Metadaten
+            // (Ursprung/Größe/PixelsPerUnit) stehen in data/maps/<mapId>/map.json. Fehlt das Bild, bleibt ein
+            // ruhiger Grasboden statt des alten Debug-Schachbretts.
+            MapVisual visual = null;
+            bool hasVisual = _mapCatalogClient != null
+                && _mapCatalogClient.TryGetVisual(_world.MapId, out visual);
+            if (hasVisual)
+            {
+                Sprite mapSprite = Resources.Load<Sprite>("Maps/" + _world.MapId);
+                if (mapSprite != null)
+                {
+                    var floorGo = new GameObject("Floor_" + _world.MapId);
+                    floorGo.transform.SetParent(_mapRoot.transform, false);
+                    var floorRenderer = floorGo.AddComponent<SpriteRenderer>();
+                    floorRenderer.sprite = mapSprite;
+                    floorRenderer.sortingOrder = -100;
+                    floorGo.transform.position = new Vector3(
+                        visual.OriginX + visual.Width / 2f,
+                        visual.OriginY + visual.Height / 2f,
+                        0f);
+                    return;
+                }
+            }
 
-            Color borderColor = new Color(1f, 0.3f, 0.3f, 1f);
-            float thickness = 0.3f;
-            CreateBorderBar(borderColor, new Vector3(mapUnitsX / 2f, -thickness / 2f, 0f), new Vector3(mapUnitsX + thickness, thickness, 1f));
-            CreateBorderBar(borderColor, new Vector3(mapUnitsX / 2f, mapUnitsY + thickness / 2f, 0f), new Vector3(mapUnitsX + thickness, thickness, 1f));
-            CreateBorderBar(borderColor, new Vector3(-thickness / 2f, mapUnitsY / 2f, 0f), new Vector3(thickness, mapUnitsY + thickness, 1f));
-            CreateBorderBar(borderColor, new Vector3(mapUnitsX + thickness / 2f, mapUnitsY / 2f, 0f), new Vector3(thickness, mapUnitsY + thickness, 1f));
+            var fallback = new GameObject("FloorFallback");
+            fallback.transform.SetParent(_mapRoot.transform, false);
+            var fallbackRenderer = fallback.AddComponent<SpriteRenderer>();
+            fallbackRenderer.sprite = PlaceholderSprites.CreateSquare();
+            fallbackRenderer.color = new Color(0.16f, 0.24f, 0.15f, 1f);
+            fallbackRenderer.sortingOrder = -100;
+            fallback.transform.localScale = new Vector3(mapUnitsX, mapUnitsY, 1f);
+            fallback.transform.position = new Vector3(mapUnitsX / 2f, mapUnitsY / 2f, 0f);
         }
 
         /// <summary>Zeichnet die Portale der aktuellen Karte als halbtransparente Rechtecke (rein optisch,
@@ -2016,18 +2172,6 @@ namespace Lumiis.Client
                 go.transform.localScale = new Vector3(width, height, 1f);
                 go.transform.position = new Vector3((portal.x1 + portal.x2) / 200f, (portal.y1 + portal.y2) / 200f, 0f);
             }
-        }
-
-        private void CreateBorderBar(Color color, Vector3 position, Vector3 scale)
-        {
-            var go = new GameObject("MapBoundaryBar");
-            if (_mapRoot != null) go.transform.SetParent(_mapRoot.transform, false);
-            var renderer = go.AddComponent<SpriteRenderer>();
-            renderer.sprite = _squareSprite;
-            renderer.color = color;
-            renderer.sortingOrder = -50;
-            go.transform.position = position;
-            go.transform.localScale = scale;
         }
 
         // ---- Debug-UI (IMGUI) - Login/Charakterauswahl übernimmt LoginController (UI Toolkit, siehe dort). ----

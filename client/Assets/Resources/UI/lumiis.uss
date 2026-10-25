@@ -513,3 +513,154 @@ Button:disabled {
     font-size: 10px;
     background-color: rgb(95, 55, 55);
 }
+
+/* ---- Release-Optik: Minimap, zentrale Skillleiste, dezenter Chat ---- */
+
+.hud-minimap {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    width: 170px;
+    padding: 5px;
+    background-color: rgba(12, 15, 18, 0.82);
+    border-width: 1px;
+    border-color: rgba(160, 135, 80, 0.65);
+    border-radius: 4px;
+    align-items: center;
+}
+
+.hud-minimap-title {
+    color: rgb(230, 215, 170);
+    font-size: 11px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    margin-bottom: 3px;
+}
+
+.hud-minimap-frame {
+    width: 158px;
+    height: 158px;
+    background-color: rgb(30, 44, 28);
+    border-width: 1px;
+    border-color: rgb(35, 42, 30);
+    -unity-background-scale-mode: scale-to-fit;
+    overflow: hidden;
+}
+
+.hud-minimap-dot {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background-color: rgb(255, 224, 80);
+    border-radius: 3px;
+    border-width: 1px;
+    border-color: rgb(80, 55, 10);
+}
+
+.hud-party {
+    top: 190px;
+}
+
+.hud-skills {
+    left: 50%;
+    right: auto;
+    margin-left: -230px;
+    bottom: 10px;
+    width: 460px;
+}
+
+.hud-hint {
+    color: rgba(235, 230, 210, 0.72);
+    font-size: 10px;
+    -unity-text-align: middle-center;
+    margin-bottom: 3px;
+}
+
+.hud-skill-slots {
+    flex-direction: row;
+    justify-content: center;
+}
+
+.hud-skill-slot {
+    width: 76px;
+    height: 84px;
+    margin: 0 3px;
+    padding: 4px;
+    background-color: rgba(12, 15, 18, 0.88);
+    border-width: 1px;
+    border-color: rgba(160, 135, 80, 0.65);
+    border-radius: 4px;
+    align-items: center;
+}
+
+.hud-skill-icon {
+    width: 34px;
+    height: 34px;
+    margin: 1px;
+}
+
+.hud-skill-key {
+    color: rgb(245, 220, 140);
+    font-size: 10px;
+    -unity-font-style: bold;
+}
+
+.hud-skill-name {
+    color: rgb(235, 235, 225);
+    font-size: 9px;
+    -unity-text-align: middle-center;
+    white-space: normal;
+}
+
+.hud-skill-cd {
+    color: rgb(255, 190, 100);
+    font-size: 10px;
+    min-height: 11px;
+    -unity-text-align: middle-center;
+}
+
+.hud-chat {
+    width: 330px;
+    height: 188px;
+    background-color: rgba(10, 12, 15, 0.72);
+    border-color: rgba(120, 110, 80, 0.45);
+}
+
+.hud-chat-log {
+    height: 112px;
+}
+
+.hud-chat-line {
+    font-size: 10px;
+}
+
+.hud-player {
+    width: 258px;
+    background-color: rgba(10, 12, 15, 0.78);
+    border-color: rgba(120, 110, 80, 0.55);
+}
+
+.hud-target {
+    background-color: rgba(10, 12, 15, 0.82);
+    border-color: rgba(150, 90, 80, 0.7);
+}
+
+.hud-skill-icon {
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.hud-skills {
+    left: auto;
+    right: 10px;
+    margin-left: 0;
+    width: 460px;
+}
+
+.hud-skill-icon-image {
+    width: 34px;
+    height: 34px;
+}
+
+.hud-skill-slot {
+    height: 96px;
+}

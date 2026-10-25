@@ -48,9 +48,9 @@ namespace Lumiis.Client
             }
 
             camera.orthographic = true;
-            camera.orthographicSize = 8f;
+            camera.orthographicSize = 7.5f;
             camera.clearFlags = CameraClearFlags.SolidColor;
-            camera.backgroundColor = new Color(0.08f, 0.08f, 0.1f);
+            camera.backgroundColor = new Color(0.055f, 0.09f, 0.06f);
 
             Vector3 position = camera.transform.position;
             camera.transform.position = new Vector3(position.x, position.y, -10f);

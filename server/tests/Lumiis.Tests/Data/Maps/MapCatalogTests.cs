@@ -176,8 +176,21 @@ namespace Lumiis.Tests.Data.Maps
 
             MapCatalog catalog = MapCatalog.LoadFromDirectory(Path.Combine(dataDir, "maps"), mobCatalog, npcCatalog);
 
-            Assert.Equal("village", catalog.StartMapId);
-            Assert.Equal(2, catalog.Maps.Count);
+            Assert.Equal("map1", catalog.StartMapId);
+            Assert.Equal(3, catalog.Maps.Count);
+            Assert.True(catalog.TryGet("map1", out MapDefinition? map1));
+            Assert.Equal("Yongan", map1!.Name);
+            Assert.NotEmpty(map1.Spawns);
+            Assert.NotEmpty(map1.NpcPlacements);
+            Assert.False(map1.Collision.IsBlockedAtWire(map1.StartX, map1.StartY));
+            // Startbereich bleibt monsterfrei: kein Spawn innerhalb von 20 Weltenheiten (2000 Wire).
+            foreach (SpawnPoint spawn in map1.Spawns)
+            {
+                long dx = spawn.PositionX - map1.StartX;
+                long dy = spawn.PositionY - map1.StartY;
+                Assert.True(dx * dx + dy * dy > 2000L * 2000L);
+            }
+
             Assert.True(catalog.TryGet("greenfield", out MapDefinition? greenfield));
             Assert.Equal("Gruenes Feld", greenfield!.Name);
             Assert.True(greenfield.Collision.Width >= 1000);
@@ -187,7 +200,7 @@ namespace Lumiis.Tests.Data.Maps
             Assert.Single(greenfield.Portals);
             Assert.Equal("village", greenfield.Portals[0].TargetMapId);
 
-            MapDefinition village = catalog.StartMap;
+            MapDefinition village = catalog.Get("village");
             Assert.EndsWith("Dorf", village.Name);
             Assert.Single(village.Portals);
             Assert.False(village.Collision.IsBlockedAtWire(village.Portals[0].X1, village.Portals[0].Y1));

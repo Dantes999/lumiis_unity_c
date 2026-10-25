@@ -167,6 +167,40 @@
           "chancePercent": 25
         }
       ]
+    },
+    {
+      "id": 5,
+      "name": "Hungriger Wildhund",
+      "speedWire": 760,
+      "wanderRadiusWire": 550,
+      "wanderIntervalMinMs": 1600,
+      "wanderIntervalMaxMs": 4200,
+      "maxHp": 48,
+      "attack": 8,
+      "defense": 1,
+      "yangMin": 8,
+      "yangMax": 20,
+      "meleeRangeWire": 140,
+      "attackCooldownMs": 650,
+      "aggressive": true,
+      "aggroRangeWire": 430,
+      "leashRangeWire": 760,
+      "level": 4,
+      "baseXp": 45,
+      "drops": [
+        {
+          "itemId": 8,
+          "chancePercent": 35
+        },
+        {
+          "itemId": 40,
+          "chancePercent": 25
+        },
+        {
+          "itemId": 6,
+          "chancePercent": 8
+        }
+      ]
     }
   ]
 }

@@ -127,7 +127,7 @@ namespace Lumiis.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
-                        .HasDefaultValue("village");
+                        .HasDefaultValue("map1");
 
                     b.Property<string>("Name")
                         .IsRequired()

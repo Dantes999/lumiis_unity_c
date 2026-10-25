@@ -121,10 +121,11 @@ und beide Dateien neu committen.
 Seit 2026-10-25 gibt es echte, begehbare Karten statt einer einzigen Welt. Details/Plan:
 `docs/map-import-plan.md`.
 
-- Daten: `data/maps/index.json` (`startMapId` + Kartenliste), je Kartenordner `collision.bin`,
-  optional `spawns.json`, `npcs.json`, `portals.json`, `map.json` (Name/Startposition). `village`
-  bleibt Default und Legacy-Fallback. Zweite Karte: `greenfield` (generierte Kollision, eigene
-  Spawns/Portale, leere NPC-Liste). Geladen/validiert von `MapCatalog` (`Lumiis.Data.Maps`) fail-fast
+- Daten: `data/maps/index.json` (`startMapId=map1` + Kartenliste), je Kartenordner `collision.bin`,
+  optional `spawns.json`, `npcs.json`, `portals.json`, `map.json` (Name/Startposition/Visualdaten).
+  **Map1** ist das aus dem Lumiis-Referenzlayout `yongan` geschnittene Startareal (128×128 Tiles,
+  Dorfplatz + Feldrand, siehe unten); `village` bleibt als Legacy-/Testkarte erhalten, `greenfield`
+  ist die generierte zweite Karte. Geladen/validiert von `MapCatalog` (`Lumiis.Data.Maps`) fail-fast
   (doppelte IDs, blockierter Start, unbekanntes Portalziel, blockierte Ankunft, Ankunft im Zielportal,
   invertierte/außerhalb liegende Rechtecke). Karten haben weiterhin global
   `GameConstants.MapWidth/Height` (1000×1000 Zellen).
@@ -136,7 +137,9 @@ Seit 2026-10-25 gibt es echte, begehbare Karten statt einer einzigen Welt. Detai
   aus); `GameServer.TransitionEntityToMap` entfernt die Entity aus der alten World, schickt Despawn an
   alte Beobachter, setzt sie in die neue World, leert `VisibleEntityIds`, sendet `MapChangedPacket` und
   persistiert Position+MapId sofort. Neue Entities der Zielkarte kommen über den normalen AOI-Diff.
-- Persistenz: `Character.MapId` (DB, Default `village`, Migration `AddCharacterMapId`);
+- Persistenz: `Character.MapId` (DB, Default `map1`, Migrationen `AddCharacterMapId` + `Map1Default`);
+  bestehende `village`-Charaktere werden per Migration auf `map1` gehoben und ihre alte Dorfposition
+  zurückgesetzt;
   `PositionSaveRequest`/`CharacterSaveRequest` tragen die MapId. Unbekannte gespeicherte MapIds fallen
   beim Join auf die Startkarte zurück (Warnung, kein Join-Abbruch). Respawn/„im Tod ausgeloggt“ nutzt
   die Startposition der Karte; eine beim Join blockierte gespeicherte Position fällt auf den Kartenstart
@@ -146,13 +149,35 @@ Seit 2026-10-25 gibt es echte, begehbare Karten statt einer einzigen Welt. Detai
   `DebugChangeMapRequestPacket` (17, Client→Server, nur mit `--allow-debug-commands`).
 - Client: `ClientWorld` hält MapId/Name/Maße; `HandleMapChanged` leert alle Entities, behält
   Fortschritt/Buffs und legt die eigene Figur an der Zielposition neu an. `GameClient.RebuildMapVisuals`
-  baut Boden/Ränder/Portalrechtecke neu; Kartenname/Portale kommen aus `MapCatalogClient`
-  (StreamingAssets/`lumiis-data/maps`, vom Shared-Build mitkopiert, rein für die Anzeige). HUD zeigt den
-  Kartenamen, das Debug-Panel hat „Karte wechseln“ (Dev-Tool). Eine clientseitige Kollisionsprüfung gibt
-  es weiterhin nicht.
+  baut Boden/Portalrechtecke neu; Kartenname/Portale/Visualdaten kommen aus `MapCatalogClient`
+  (StreamingAssets/`lumiis-data/maps`, vom Shared-Build mitkopiert, rein für die Anzeige). Für `map1`
+  wird `Resources/Maps/map1.png` (Sprite, 32 px/Tile, 128×128 Weltenheiten) an `visualOriginX/Y` gesetzt;
+  ohne Kartenbild bleibt ein ruhiger Grasboden als Fallback. HUD zeigt Kartenname + Minimap, das
+  Debug-Panel hat „Karte wechseln“ (Dev-Tool). Eine clientseitige Kollisionsprüfung gibt es weiterhin
+  nicht.
 - Bewusste Limitations: keine Referenzkarten importiert (kein Terrain/`tiles.bin`), keine kleineren
   Kartenmaße pro Map, kein Client-Kollisionsrendering, Gruppe bleibt kartenübergreifend, testmap/grove/
   sohan fehlen (Portale dorthin würden den Start abbrechen).
+
+## Map1, Steuerung und Spiel-UI (Release-Optik)
+
+- `data/maps/map1/`: Startareal aus `yongan` (Lumiis-2D-Referenzkarte, Crop 128×128). Die Kacheln
+  (`tiles.json`) werden mit `tools/import-map1.py` zu `Resources/Maps/map1.png` (4096×4096, 32 px/Tile)
+  und einer 1000×1000-`collision.bin` gebacken. Dorfplatz, Häuser, Wege, Wasser und Baumrand stammen aus
+  dem Referenzlayout; der Start liegt südlich des Dorfes auf freiem Feld.
+- Spawns: drei Wildhunde (Mob 1) und drei Hungrige Wildhunde (Mob 5), alle mindestens 20 Weltenheiten
+  vom Start entfernt; im Startbereich steht kein Monster. Ein Dorfhändler sitzt im Dorfplatz.
+- Bewegung: WASD oder Pfeiltasten senden alle 100 ms ein neues MoveTo-Ziel (Server bleibt autoritativ);
+  Linksklick auf den Boden bleibt als Komfort erhalten.
+- Kampf: Leertaste schlägt, gedrückt halten wiederholt den Schlag im Server-Cooldown-Takt. Der lokale
+  Kombo-Zähler wechselt links/rechts/links und neigt die Figur sichtbar; Auto-Target wählt das nächste
+  Monster in Reichweite. Rechtsklick auf ein Monster bleibt als manueller Angriff erhalten.
+- Monster: `alpha_wolf`/`boar`/`dummy` sind als 40×32-Sheets (5 Frames, unten/links/rechts/oben) aus dem
+  Lumiis-Referenzprojekt importiert; `MonsterView` animiert Laufrichtung und zeigt bei Schaden einen
+  kleinen HP-Balken. Hungrige Wildhunde nutzen dasselbe Wolf-Sheet mit rötlicher Tönung.
+- HUD: Minimap mit Kartenbild und Spielerpunkt, zentrale Skillleiste mit Buch-Icons und Tasten 1–4,
+  Chat unten links, Party panel nur bei Gruppe. `F1` bleibt das optionale Debug-Overlay; der
+  Reichweitenring im regulären Spiel wurde entfernt.
 
 ## Sichtbarkeitsbereich (AOI)
 Seit M3b bekommt eine Verbindung nur noch Spawns, Bewegungen und Despawns von Entities innerhalb von
@@ -1144,7 +1169,7 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   unter `Resources/Characters`; `CharacterSheetGallery` zeigt Krieger/Ninja/Sura/Schamane (m/w) im
   Labor und der Screenshot-Lauf legt `/tmp/lumiis-asset-lab-characters.png` ab. (4) Feature-Gap-,
   Icon- und Kartenplanung als `docs/feature-gap-lumiis.md`, `docs/icon-integration-plan.md`,
-  `docs/map-import-plan.md`. 637 Server-/Unit-Tests und 13 PlayMode-Tests grün.
+  `docs/map-import-plan.md`. 637 Server-/Unit-Tests und 14 PlayMode-Tests grün.
 - M7-HUD + Chat-MVP: (1) `Hud.uxml`/`HudController` zeigen Name/Level, HP/SP/EXP/Yang, Ziel + HP,
   Meldungen, vier Skill-Slots mit Cooldowns, aktive Buffs und einen Chat mit Karte/Global/Flüstern.
   Das alte IMGUI-Overlay bleibt F1-Debug. (2) Chat-Protokoll: `ChatRequestPacket` (16),

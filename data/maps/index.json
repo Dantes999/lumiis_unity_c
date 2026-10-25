@@ -1,7 +1,14 @@
 {
-  "startMapId": "village",
+  "startMapId": "map1",
   "maps": [
-    { "id": "village" },
-    { "id": "greenfield" }
+    {
+      "id": "map1"
+    },
+    {
+      "id": "village"
+    },
+    {
+      "id": "greenfield"
+    }
   ]
 }
