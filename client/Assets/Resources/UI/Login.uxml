@@ -1,37 +1,46 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements">
     <Style src="lumiis.uss" />
     <ui:VisualElement name="login-root" class="screen login-screen">
-        <ui:VisualElement name="login-backdrop" class="login-backdrop" />
-        <ui:VisualElement class="login-layout">
-            <ui:VisualElement class="login-brand">
-                <ui:Label text="LUMIIS" class="login-logo" />
-                <ui:Label text="Ein neues Kapitel beginnt." class="login-tagline" />
-                <ui:Label text="Betritt die Welt von Yongan, stelle dich den Wildhunden und sammle deine erste Ausrüstung." class="login-copy" />
-                <ui:VisualElement class="login-feature-row">
-                    <ui:Label text="◆  Freies Abenteuer" class="login-feature" />
-                    <ui:Label text="◆  Handel &amp; Gruppen" class="login-feature" />
-                    <ui:Label text="◆  Lumiis-Steine" class="login-feature" />
-                </ui:VisualElement>
+        <ui:VisualElement name="login-backdrop" class="login-backdrop" picking-mode="Ignore" />
+        <ui:VisualElement class="login-vignette" picking-mode="Ignore" />
+
+        <ui:VisualElement class="login-center" picking-mode="Ignore">
+            <ui:VisualElement class="login-header" picking-mode="Ignore">
+                <ui:Label text="LUMIIS" class="login-logo" picking-mode="Ignore" />
+                <ui:Label text="Das Reich der Steine" class="login-tagline" picking-mode="Ignore" />
             </ui:VisualElement>
 
-            <ui:VisualElement class="panel login-card">
-                <ui:Label text="Anmelden" class="login-title" />
-                <ui:Label text="Willkommen zurück, Abenteurer." class="login-subtitle" />
-                <ui:TextField label="Benutzername" name="username-field" class="login-input" />
-                <ui:TextField label="Passwort" name="password-field" class="login-input" password="true" />
-                <ui:VisualElement class="button-row login-actions">
-                    <ui:Button text="Anmelden" name="login-button" class="primary-button" />
-                    <ui:Button text="Registrieren" name="register-button" class="secondary-button" />
+            <ui:VisualElement class="m2-window login-window">
+                <ui:VisualElement class="m2-titlebar">
+                    <ui:Label text="Anmeldung" class="m2-title" />
                 </ui:VisualElement>
-                <ui:Label name="login-status" class="status-text" />
-                <ui:Label name="login-error" class="error-text" />
-                <ui:Foldout text="Verbindung" name="advanced-foldout" value="false">
-                    <ui:TextField label="Auth-URL" name="auth-url-field" value="http://127.0.0.1:5080" />
-                    <ui:TextField label="Server-Host" name="server-host-field" value="127.0.0.1" />
-                    <ui:TextField label="Server-Port" name="server-port-field" value="7777" />
-                </ui:Foldout>
-                <ui:Label text="Lumiis Alpha · Viel Spaß beim Testen" class="login-version" />
+                <ui:VisualElement class="m2-window-body">
+                    <ui:VisualElement class="login-field-row">
+                        <ui:Label text="Kennung" class="login-field-label" />
+                        <ui:TextField name="username-field" class="m2-input login-input" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="login-field-row">
+                        <ui:Label text="Passwort" class="login-field-label" />
+                        <ui:TextField name="password-field" class="m2-input login-input" password="true" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="button-row login-actions">
+                        <ui:Button text="Anmelden" name="login-button" class="m2-button primary-button" />
+                        <ui:Button text="Registrieren" name="register-button" class="m2-button" />
+                    </ui:VisualElement>
+                    <ui:Label name="login-status" class="status-text" />
+                    <ui:Label name="login-error" class="error-text" />
+                    <ui:Foldout text="Verbindung" name="advanced-foldout" value="false" class="m2-foldout">
+                        <ui:TextField label="Auth-URL" name="auth-url-field" value="http://127.0.0.1:5080" class="m2-input" />
+                        <ui:TextField label="Server-Host" name="server-host-field" value="127.0.0.1" class="m2-input" />
+                        <ui:TextField label="Server-Port" name="server-port-field" value="7777" class="m2-input" />
+                    </ui:Foldout>
+                </ui:VisualElement>
             </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement class="login-footer" picking-mode="Ignore">
+            <ui:Label text="Lumiis Alpha · Kanal 1" class="login-version" picking-mode="Ignore" />
+            <ui:Button text="Beenden" name="login-quit-button" class="m2-button" />
         </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

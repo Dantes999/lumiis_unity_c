@@ -1,94 +1,190 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements">
     <Style src="lumiis.uss" />
-    <ui:VisualElement name="hud-root" class="hud-root">
-        <ui:VisualElement class="hud-player">
-            <ui:Label name="hud-player-name" text="-" class="hud-player-name" />
-            <ui:Label name="hud-map-name" text="-" class="hud-map-name" />
-            <ui:VisualElement class="hud-bar-row">
-                <ui:Label text="HP" class="hud-bar-label" />
-                <ui:VisualElement class="hud-bar-bg"><ui:VisualElement name="hud-hp-fill" class="hud-bar-fill hud-bar-hp" /></ui:VisualElement>
-                <ui:Label name="hud-hp-text" text="-" class="hud-bar-text" />
-            </ui:VisualElement>
-            <ui:VisualElement class="hud-bar-row">
-                <ui:Label text="SP" class="hud-bar-label" />
-                <ui:VisualElement class="hud-bar-bg"><ui:VisualElement name="hud-sp-fill" class="hud-bar-fill hud-bar-sp" /></ui:VisualElement>
-                <ui:Label name="hud-sp-text" text="-" class="hud-bar-text" />
-            </ui:VisualElement>
-            <ui:VisualElement class="hud-bar-row">
-                <ui:Label text="EXP" class="hud-bar-label" />
-                <ui:VisualElement class="hud-bar-bg"><ui:VisualElement name="hud-xp-fill" class="hud-bar-fill hud-bar-xp" /></ui:VisualElement>
-                <ui:Label name="hud-xp-text" text="-" class="hud-bar-text" />
-            </ui:VisualElement>
-            <ui:Label name="hud-yang" text="Yang: 0" class="hud-yang" />
+    <!-- Spiel-HUD im klassischen MMO-Stil: Taskleiste unten (HP/SP-Kugeln, Schnellleiste, EXP-Kugeln,
+         Menüknöpfe), runde Minimap oben rechts, Ziel oben mittig, Chat unten links, Fenster (Inventar,
+         Charakter, Shop). Elemente mit der Klasse "ui-block" fangen Mausklicks ab, damit ein Klick auf die
+         Oberfläche die Figur nicht bewegt (siehe HudController.IsPointerOverUi). -->
+    <ui:VisualElement name="hud-root" class="hud-root" picking-mode="Ignore">
+
+        <ui:VisualElement name="hud-player" class="hud-player" picking-mode="Ignore">
+            <ui:Label name="hud-player-name" text="-" class="hud-player-name" picking-mode="Ignore" />
+            <ui:Label name="hud-player-level" text="" class="hud-player-level" picking-mode="Ignore" />
+            <ui:Label name="hud-buffs" text="" class="hud-buffs" picking-mode="Ignore" />
         </ui:VisualElement>
 
-        <ui:VisualElement name="hud-target" class="hud-target">
-            <ui:Label name="hud-target-name" text="" class="hud-target-name" />
-            <ui:VisualElement class="hud-bar-row">
-                <ui:VisualElement class="hud-bar-bg"><ui:VisualElement name="hud-target-hp-fill" class="hud-bar-fill hud-bar-target" /></ui:VisualElement>
-                <ui:Label name="hud-target-hp-text" text="" class="hud-bar-text" />
+        <ui:VisualElement name="hud-target" class="hud-target" picking-mode="Ignore">
+            <ui:Label name="hud-target-name" text="" class="hud-target-name" picking-mode="Ignore" />
+            <ui:VisualElement class="hud-target-bar" picking-mode="Ignore">
+                <ui:VisualElement name="hud-target-hp-fill" class="hud-target-fill" picking-mode="Ignore" />
+                <ui:Label name="hud-target-hp-text" text="" class="hud-target-text" picking-mode="Ignore" />
             </ui:VisualElement>
         </ui:VisualElement>
 
-        <ui:VisualElement name="hud-minimap" class="hud-minimap">
-            <ui:Label name="hud-minimap-title" text="Yongan" class="hud-minimap-title" />
-            <ui:VisualElement name="hud-minimap-frame" class="hud-minimap-frame">
-                <ui:VisualElement name="hud-minimap-dot" class="hud-minimap-dot" />
+        <ui:Label name="hud-message" text="" class="hud-message" picking-mode="Ignore" />
+
+        <ui:VisualElement name="hud-minimap" class="hud-minimap ui-block">
+            <ui:Label name="hud-minimap-title" text="-" class="hud-minimap-title" picking-mode="Ignore" />
+            <ui:VisualElement name="hud-minimap-frame" class="hud-minimap-frame" picking-mode="Ignore">
+                <ui:VisualElement name="hud-minimap-map" class="hud-minimap-map" picking-mode="Ignore" />
+                <ui:VisualElement name="hud-minimap-dot" class="hud-minimap-dot" picking-mode="Ignore" />
             </ui:VisualElement>
+            <ui:VisualElement class="hud-minimap-ring" picking-mode="Ignore" />
+            <ui:Label name="hud-minimap-coords" text="" class="hud-minimap-coords" picking-mode="Ignore" />
         </ui:VisualElement>
 
-        <ui:VisualElement name="hud-party" class="hud-party">
+        <ui:VisualElement name="hud-party" class="hud-party m2-panel ui-block">
             <ui:Label text="Gruppe" class="hud-party-title" />
             <ui:VisualElement name="hud-party-members" class="hud-party-members" />
-            <ui:Button name="hud-party-leave" text="Gruppe verlassen" class="hud-party-leave" />
+            <ui:Button name="hud-party-leave" text="Verlassen" class="m2-button hud-small-button" />
         </ui:VisualElement>
 
-        <ui:Label name="hud-message" text="" class="hud-message" />
-
-        <ui:VisualElement class="hud-skills">
-            <ui:Label name="hud-hint" text="WASD / Pfeile: Bewegen   ·   Leertaste: Angriff (halten = Kombo)" class="hud-hint" />
-            <ui:VisualElement class="hud-skill-slots">
-                <ui:VisualElement class="hud-skill-slot">
-                    <ui:Label text="1" class="hud-skill-key" />
-                    <ui:VisualElement name="hud-skill-1-icon" class="hud-skill-icon" />
-                    <ui:Label name="hud-skill-1" text="Wuchtschlag" class="hud-skill-name" />
-                    <ui:Label name="hud-skill-1-cd" text="" class="hud-skill-cd" />
-                </ui:VisualElement>
-                <ui:VisualElement class="hud-skill-slot">
-                    <ui:Label text="2" class="hud-skill-key" />
-                    <ui:VisualElement name="hud-skill-2-icon" class="hud-skill-icon" />
-                    <ui:Label name="hud-skill-2" text="Kreisschlag" class="hud-skill-name" />
-                    <ui:Label name="hud-skill-2-cd" text="" class="hud-skill-cd" />
-                </ui:VisualElement>
-                <ui:VisualElement class="hud-skill-slot">
-                    <ui:Label text="3" class="hud-skill-key" />
-                    <ui:VisualElement name="hud-skill-3-icon" class="hud-skill-icon" />
-                    <ui:Label name="hud-skill-3" text="Kampfrausch" class="hud-skill-name" />
-                    <ui:Label name="hud-skill-3-cd" text="" class="hud-skill-cd" />
-                </ui:VisualElement>
-                <ui:VisualElement class="hud-skill-slot">
-                    <ui:Label text="4" class="hud-skill-key" />
-                    <ui:VisualElement name="hud-skill-4-icon" class="hud-skill-icon" />
-                    <ui:Label name="hud-skill-4" text="Hast" class="hud-skill-name" />
-                    <ui:Label name="hud-skill-4-cd" text="" class="hud-skill-cd" />
-                </ui:VisualElement>
-            </ui:VisualElement>
-            <ui:Label name="hud-buffs" text="" class="hud-buffs" />
-        </ui:VisualElement>
-
-        <ui:VisualElement name="hud-chat" class="hud-chat">
+        <ui:VisualElement name="hud-chat" class="hud-chat" picking-mode="Ignore">
             <ui:ScrollView name="hud-chat-log" class="hud-chat-log" />
-            <ui:VisualElement class="hud-chat-input-row">
-                <ui:TextField name="hud-chat-target" label="An" class="hud-chat-target" />
-                <ui:TextField name="hud-chat-input" class="hud-chat-input" />
-                <ui:Button name="hud-chat-send" text="Senden" class="hud-chat-send" />
+            <ui:VisualElement name="hud-chat-input-row" class="hud-chat-input-row ui-block">
+                <ui:Button name="hud-chat-channel" text="Karte" class="m2-button hud-chat-channel-button" />
+                <ui:TextField name="hud-chat-target" class="m2-input hud-chat-target" />
+                <ui:TextField name="hud-chat-input" class="m2-input hud-chat-input" />
+                <ui:Button name="hud-chat-send" text="Senden" class="m2-button hud-chat-send" />
             </ui:VisualElement>
-            <ui:VisualElement class="hud-chat-channels">
-                <ui:Label name="hud-chat-channel-label" text="Kanal: Karte" class="hud-chat-channel-label" />
-                <ui:Button name="hud-chat-map" text="Karte" class="hud-chat-channel-button" />
-                <ui:Button name="hud-chat-global" text="Global" class="hud-chat-channel-button" />
-                <ui:Button name="hud-chat-whisper" text="Flüstern" class="hud-chat-channel-button" />
+            <ui:Label name="hud-chat-hint" text="Enter: Chat · Tab im Chat: Kanal wechseln" class="hud-chat-hint" picking-mode="Ignore" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="hud-taskbar" class="hud-taskbar ui-block">
+            <ui:VisualElement class="hud-taskbar-center" picking-mode="Ignore">
+                <ui:VisualElement class="hud-quickslots" picking-mode="Ignore">
+                    <ui:VisualElement name="hud-quickslot-1" class="hud-quickslot">
+                        <ui:VisualElement name="hud-skill-1-icon" class="hud-quickslot-icon" picking-mode="Ignore" />
+                        <ui:Label name="hud-skill-1-cd" text="" class="hud-quickslot-cd" picking-mode="Ignore" />
+                        <ui:Label name="hud-skill-1" text="Wuchtschlag" class="hud-quickslot-level" picking-mode="Ignore" />
+                        <ui:Label text="1" class="hud-quickslot-key" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="hud-quickslot-2" class="hud-quickslot">
+                        <ui:VisualElement name="hud-skill-2-icon" class="hud-quickslot-icon" picking-mode="Ignore" />
+                        <ui:Label name="hud-skill-2-cd" text="" class="hud-quickslot-cd" picking-mode="Ignore" />
+                        <ui:Label name="hud-skill-2" text="Kreisschlag" class="hud-quickslot-level" picking-mode="Ignore" />
+                        <ui:Label text="2" class="hud-quickslot-key" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="hud-quickslot-3" class="hud-quickslot">
+                        <ui:VisualElement name="hud-skill-3-icon" class="hud-quickslot-icon" picking-mode="Ignore" />
+                        <ui:Label name="hud-skill-3-cd" text="" class="hud-quickslot-cd" picking-mode="Ignore" />
+                        <ui:Label name="hud-skill-3" text="Kampfrausch" class="hud-quickslot-level" picking-mode="Ignore" />
+                        <ui:Label text="3" class="hud-quickslot-key" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="hud-quickslot-4" class="hud-quickslot">
+                        <ui:VisualElement name="hud-skill-4-icon" class="hud-quickslot-icon" picking-mode="Ignore" />
+                        <ui:Label name="hud-skill-4-cd" text="" class="hud-quickslot-cd" picking-mode="Ignore" />
+                        <ui:Label name="hud-skill-4" text="Hast" class="hud-quickslot-level" picking-mode="Ignore" />
+                        <ui:Label text="4" class="hud-quickslot-key" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="hud-quickslot-5" class="hud-quickslot">
+                        <ui:VisualElement name="hud-quickslot-5-icon" class="hud-quickslot-icon" picking-mode="Ignore" />
+                        <ui:Label name="hud-quickslot-5-count" text="" class="hud-quickslot-level" picking-mode="Ignore" />
+                        <ui:Label text="5" class="hud-quickslot-key" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="hud-quickslot-6" class="hud-quickslot">
+                        <ui:VisualElement name="hud-quickslot-6-icon" class="hud-quickslot-icon" picking-mode="Ignore" />
+                        <ui:Label name="hud-quickslot-6-count" text="" class="hud-quickslot-level" picking-mode="Ignore" />
+                        <ui:Label text="6" class="hud-quickslot-key" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="hud-quickslot-7" class="hud-quickslot">
+                        <ui:VisualElement name="hud-quickslot-7-icon" class="hud-quickslot-icon" picking-mode="Ignore" />
+                        <ui:Label name="hud-quickslot-7-count" text="" class="hud-quickslot-level" picking-mode="Ignore" />
+                        <ui:Label text="7" class="hud-quickslot-key" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="hud-quickslot-8" class="hud-quickslot">
+                        <ui:VisualElement name="hud-quickslot-8-icon" class="hud-quickslot-icon" picking-mode="Ignore" />
+                        <ui:Label name="hud-quickslot-8-count" text="" class="hud-quickslot-level" picking-mode="Ignore" />
+                        <ui:Label text="8" class="hud-quickslot-key" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement class="hud-exp" picking-mode="Ignore">
+                    <ui:Label text="EXP" class="hud-exp-label" picking-mode="Ignore" />
+                    <ui:VisualElement name="hud-exp-orb-1" class="hud-exp-orb" picking-mode="Ignore">
+                        <ui:VisualElement name="hud-exp-orb-1-fill" class="hud-exp-orb-fill" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="hud-exp-orb-2" class="hud-exp-orb" picking-mode="Ignore">
+                        <ui:VisualElement name="hud-exp-orb-2-fill" class="hud-exp-orb-fill" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="hud-exp-orb-3" class="hud-exp-orb" picking-mode="Ignore">
+                        <ui:VisualElement name="hud-exp-orb-3-fill" class="hud-exp-orb-fill" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="hud-exp-orb-4" class="hud-exp-orb" picking-mode="Ignore">
+                        <ui:VisualElement name="hud-exp-orb-4-fill" class="hud-exp-orb-fill" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                    <ui:Label name="hud-xp-text" text="" class="hud-exp-text" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <ui:VisualElement class="hud-menu-buttons">
+                    <ui:Button name="hud-btn-character" text="Charakter (C)" class="m2-button hud-menu-button" />
+                    <ui:Button name="hud-btn-inventory" text="Inventar (I)" class="m2-button hud-menu-button" />
+                    <ui:Button name="hud-btn-system" text="System (Esc)" class="m2-button hud-menu-button" />
+                </ui:VisualElement>
             </ui:VisualElement>
+            <ui:Label name="hud-yang" text="0 Yang" class="hud-taskbar-yang" picking-mode="Ignore" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="hud-hp-orb" class="hud-orb hud-orb-hp ui-block">
+            <ui:VisualElement class="hud-orb-empty" picking-mode="Ignore" />
+            <ui:VisualElement name="hud-hp-fill" class="hud-orb-fill" picking-mode="Ignore">
+                <ui:VisualElement class="hud-orb-fill-image hud-orb-fill-hp" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement class="hud-orb-glass" picking-mode="Ignore" />
+            <ui:VisualElement class="hud-orb-frame" picking-mode="Ignore" />
+            <ui:Label text="HP" class="hud-orb-caption" picking-mode="Ignore" />
+            <ui:Label name="hud-hp-text" text="-" class="hud-orb-text" picking-mode="Ignore" />
+        </ui:VisualElement>
+        <ui:VisualElement name="hud-sp-orb" class="hud-orb hud-orb-sp ui-block">
+            <ui:VisualElement class="hud-orb-empty" picking-mode="Ignore" />
+            <ui:VisualElement name="hud-sp-fill" class="hud-orb-fill" picking-mode="Ignore">
+                <ui:VisualElement class="hud-orb-fill-image hud-orb-fill-sp" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement class="hud-orb-glass" picking-mode="Ignore" />
+            <ui:VisualElement class="hud-orb-frame" picking-mode="Ignore" />
+            <ui:Label text="SP" class="hud-orb-caption" picking-mode="Ignore" />
+            <ui:Label name="hud-sp-text" text="-" class="hud-orb-text" picking-mode="Ignore" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="hud-inventory-window" class="m2-window hud-window hud-inventory-window ui-block">
+            <ui:VisualElement name="hud-inventory-titlebar" class="m2-titlebar">
+                <ui:Label text="Inventar" class="m2-title" />
+                <ui:Button name="hud-inventory-close" text="" class="m2-close" />
+            </ui:VisualElement>
+            <ui:VisualElement class="m2-window-body">
+                <ui:VisualElement name="hud-equip-area" class="m2-inset hud-equip-area">
+                    <ui:VisualElement class="hud-equip-silhouette" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <ui:VisualElement class="hud-upgrade-row">
+                    <ui:Toggle name="hud-protect-toggle" text="Bewahrungsrolle nutzen" class="m2-toggle" />
+                </ui:VisualElement>
+                <ui:Label name="hud-inventory-hint" text="" class="hud-window-hint" />
+                <ui:VisualElement name="hud-inventory-grid" class="hud-item-grid" />
+                <ui:VisualElement class="hud-yang-row">
+                    <ui:Label name="hud-inventory-yang" text="0 Yang" class="hud-yang-value" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="hud-character-window" class="m2-window hud-window hud-character-window ui-block">
+            <ui:VisualElement name="hud-character-titlebar" class="m2-titlebar">
+                <ui:Label text="Charakter" class="m2-title" />
+                <ui:Button name="hud-character-close" text="" class="m2-close" />
+            </ui:VisualElement>
+            <ui:VisualElement name="hud-character-body" class="m2-window-body" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="hud-shop-window" class="m2-window hud-window hud-shop-window ui-block">
+            <ui:VisualElement name="hud-shop-titlebar" class="m2-titlebar">
+                <ui:Label name="hud-shop-title" text="Händler" class="m2-title" />
+                <ui:Button name="hud-shop-close" text="" class="m2-close" />
+            </ui:VisualElement>
+            <ui:VisualElement class="m2-window-body">
+                <ui:VisualElement name="hud-shop-grid" class="hud-item-grid" />
+                <ui:Label text="Linksklick: kaufen · Rechtsklick im Inventar: verkaufen" class="hud-window-hint" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="hud-tooltip" class="hud-tooltip" picking-mode="Ignore">
+            <ui:Label name="hud-tooltip-title" text="" class="hud-tooltip-title" picking-mode="Ignore" />
+            <ui:Label name="hud-tooltip-body" text="" class="hud-tooltip-body" picking-mode="Ignore" />
         </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

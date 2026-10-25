@@ -89,6 +89,7 @@ namespace Lumiis.Client
         /// <summary>M7-Chat: UI-Textfeld hat den Fokus - dann dürfen Tasten 1-4 keine Skills auslösen und
         /// Mausklicks nicht durch das Chat-Panel in die Welt gehen.</summary>
         private bool _chatInputFocused;
+        private int _chatClosedAtFrame = -10;
 
         // Asset-Testlabor (nur Editor/Development): blendet Server-Figuren/Monster aus, sperrt Gameplay-Eingaben
         // und lässt GameClient.OnGUI das Debug-Overlay weglassen. Die UI selbst ist eine separate UI-Toolkit-
@@ -1380,6 +1381,7 @@ namespace Lumiis.Client
         {
             if (Mouse.current == null) return;
             if (IsPointerOverDebugPanel()) return; // Klick auf einen Debug-Panel-Button soll die Figur nicht bewegen/angreifen lassen.
+            if (UiPointerHitTest != null && UiPointerHitTest(Mouse.current.position.ReadValue())) return; // Klick auf HUD/Fenster.
 
             if (Mouse.current.leftButton.wasPressedThisFrame)
             {
@@ -2022,10 +2024,153 @@ namespace Lumiis.Client
 
         public void SetChatInputFocused(bool focused)
         {
+            if (_chatInputFocused && !focused) _chatClosedAtFrame = Time.frameCount;
             _chatInputFocused = focused;
+            if (focused && _keyboardMoveSent)
+            {
+                _netClient?.SendStopMove();
+                _keyboardMoveSent = false;
+            }
         }
 
         public bool IsChatInputFocused => _chatInputFocused;
+
+        // ---- Spiel-UI (Inventar-/Charakter-/Shop-Fenster, Schnellleiste): lesende Sicht auf den lokalen
+        // Cache plus dünne Absichts-Methoden. Der Server bleibt für jede Aktion die einzige Autorität. ----
+
+        /// <summary>Vom HUD gesetzt: true, wenn die Bildschirmposition (Input-System-Koordinaten, Ursprung
+        /// unten links) über einem klickbaren UI-Element liegt - dann bewegt/greift ein Klick nicht.</summary>
+        public System.Func<Vector2, bool> UiPointerHitTest { get; set; }
+
+        /// <summary>Wahr im Frame, in dem das Chatfeld geschlossen wurde (und im Folgeframe) - verhindert,
+        /// dass dieselbe Escape-/Enter-Taste danach noch das Systemmenü bzw. erneut den Chat öffnet.</summary>
+        public bool ChatClosedRecently => Time.frameCount - _chatClosedAtFrame <= 1;
+
+        public IReadOnlyList<(int SlotIndex, int ItemId, int UpgradeLevel)> InventorySlots => _inventorySlots;
+        public ItemCatalogClient ItemCatalog => _itemCatalog;
+
+        public int EquippedItemId(EquipmentSlot slot)
+        {
+            switch (slot)
+            {
+                case EquipmentSlot.Armor: return _equippedArmorItemId;
+                case EquipmentSlot.Helmet: return _equippedHelmetItemId;
+                case EquipmentSlot.Weapon: return _equippedWeaponItemId;
+                case EquipmentSlot.Shield: return _equippedShieldItemId;
+                default: return 0;
+            }
+        }
+
+        public int EquippedUpgradeLevel(EquipmentSlot slot)
+        {
+            switch (slot)
+            {
+                case EquipmentSlot.Armor: return _equippedArmorUpgradeLevel;
+                case EquipmentSlot.Helmet: return _equippedHelmetUpgradeLevel;
+                case EquipmentSlot.Weapon: return _equippedWeaponUpgradeLevel;
+                case EquipmentSlot.Shield: return _equippedShieldUpgradeLevel;
+                default: return 0;
+            }
+        }
+
+        public Texture2D GetItemIcon(int itemId)
+        {
+            if (itemId == 0 || _iconCatalog == null || _itemCatalog == null) return null;
+            return _iconCatalog.GetTextureForItem(itemId, _itemCatalog);
+        }
+
+        public bool HasProtectionScroll => _itemCatalog != null && HasProtectionScrollInInventory();
+
+        /// <summary>Kontextaktion eines Inventarplatzes (benutzen/anlegen) - dieselbe Logik wie im Debug-Panel.</summary>
+        public void UseInventorySlot(int slotIndex)
+        {
+            if (_itemCatalog == null) return;
+            HandleInventorySlotClick(slotIndex, FindItemInSlot(slotIndex));
+        }
+
+        public void UnequipItem(EquipmentSlot slot)
+        {
+            if (EquippedItemId(slot) == 0) return;
+            _netClient?.SendUnequipItem(slot);
+        }
+
+        public void UpgradeEquippedItem(EquipmentSlot slot, bool useProtectionScroll)
+        {
+            int itemId = EquippedItemId(slot);
+            if (itemId == 0) return;
+            _lastUpgradeItemName = _itemCatalog != null ? _itemCatalog.DisplayName(itemId) : "Ausrüstung";
+            _netClient?.SendUpgradeItem(slot, useProtectionScroll);
+        }
+
+        /// <summary>Benutzt den ersten Verbrauchsgegenstand (Heiltrank) im Inventar - Schnellleisten-Taste 5.</summary>
+        public void UseFirstConsumable()
+        {
+            int slotIndex = FindFirstConsumableSlot(out _);
+            if (slotIndex >= 0) _netClient?.SendUseConsumable(slotIndex);
+        }
+
+        /// <summary>Erster Inventarplatz mit einem Consumable (-1 = keiner) plus Gesamtanzahl solcher Plätze.</summary>
+        public int FindFirstConsumableSlot(out int count)
+        {
+            count = 0;
+            int first = -1;
+            if (_itemCatalog == null) return -1;
+            foreach ((int SlotIndex, int ItemId, int UpgradeLevel) entry in _inventorySlots)
+            {
+                if (!_itemCatalog.TryGet(entry.ItemId, out ItemEntryJson item) || item.itemType != "Consumable") continue;
+                count++;
+                if (first < 0 || entry.SlotIndex < first) first = entry.SlotIndex;
+            }
+            return first;
+        }
+
+        public int ShopNpcEntityId => _shopOpenNpcEntityId;
+        public IReadOnlyList<(int ItemId, long BuyPrice)> ShopItems => _shopItems;
+
+        public string ShopNpcName
+        {
+            get
+            {
+                return _shopOpenNpcEntityId >= 0 && _world.Entities.TryGetValue(_shopOpenNpcEntityId, out ClientEntity npc)
+                    ? npc.Name
+                    : "Händler";
+            }
+        }
+
+        public void BuyShopItem(int itemId)
+        {
+            if (_shopOpenNpcEntityId < 0) return;
+            _netClient?.SendBuyItem(_shopOpenNpcEntityId, itemId);
+        }
+
+        public void SellInventorySlot(int slotIndex)
+        {
+            if (_shopOpenNpcEntityId < 0 || FindItemInSlot(slotIndex) == 0) return;
+            _netClient?.SendSellItem(_shopOpenNpcEntityId, slotIndex);
+        }
+
+        public void CloseShop()
+        {
+            _shopOpenNpcEntityId = -1;
+        }
+
+        public void AllocateStatPoint(StatKind stat)
+        {
+            _netClient?.SendAllocateStatPoint(stat);
+        }
+
+        public void AllocateSkillPoint(int skillId)
+        {
+            _netClient?.SendAllocateSkillPoint(skillId);
+        }
+
+        /// <summary>Klick auf einen Skill der Schnellleiste - wie Taste 1-4.</summary>
+        public void UseSkillSlot(int hotkeyIndex)
+        {
+            if (!_inGame || _gameplayInputLocked || _world.LocalEntityId < 0) return;
+            if (hotkeyIndex < 0 || hotkeyIndex >= SkillHotkeys.Length) return;
+            UseSkillHotkey(hotkeyIndex);
+        }
 
         public void SendChat(ChatChannel channel, string targetName, string text)
         {

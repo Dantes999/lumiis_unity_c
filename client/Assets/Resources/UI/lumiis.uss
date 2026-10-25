@@ -1,4 +1,8 @@
-/* Minimale, funktionale Gestaltung (lesbar, keine Design-Arbeit - das kommt später mit dem Art-Stil). */
+/* Lumiis-UI im klassischen MMO-Stil (dunkler Stein, Bronze-/Goldkanten, Pixelart-Rahmen).
+   Alle Maße beziehen sich auf die Referenzauflösung 1280x720 (UiSkin.CreatePanelSettings skaliert mit).
+   Skin-Texturen: Resources/UI/Skin, erzeugt von tools/generate-ui-skin.py. */
+
+/* ================= Grundbausteine ================= */
 
 .screen {
     position: absolute;
@@ -8,57 +12,192 @@
     bottom: 0;
     align-items: center;
     justify-content: center;
-    background-color: rgba(8, 8, 12, 0.85);
+    background-color: rgba(4, 3, 2, 0.7);
 }
 
-.panel {
-    width: 420px;
-    padding: 20px;
-    background-color: rgb(30, 30, 36);
-    border-width: 1px;
-    border-color: rgb(60, 60, 70);
+.m2-window {
+    background-image: resource("UI/Skin/panel");
+    -unity-slice-left: 12;
+    -unity-slice-right: 12;
+    -unity-slice-top: 12;
+    -unity-slice-bottom: 12;
+    padding: 6px 6px 10px 6px;
 }
 
-.title {
-    font-size: 22px;
-    color: rgb(235, 235, 240);
-    -unity-text-align: middle-center;
+.m2-panel {
+    background-image: resource("UI/Skin/panel");
+    -unity-slice-left: 12;
+    -unity-slice-right: 12;
+    -unity-slice-top: 12;
+    -unity-slice-bottom: 12;
+    padding: 9px;
+}
+
+.m2-titlebar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    height: 22px;
+    margin-bottom: 4px;
+    background-image: resource("UI/Skin/titlebar");
+    -unity-slice-left: 6;
+    -unity-slice-right: 6;
+    -unity-slice-top: 6;
+    -unity-slice-bottom: 6;
+}
+
+.m2-title {
+    flex-grow: 1;
+    color: rgb(246, 222, 160);
+    font-size: 13px;
     -unity-font-style: bold;
-    margin-bottom: 16px;
+    -unity-text-align: middle-center;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgb(30, 8, 4);
+    padding: 0;
+    margin: 0;
 }
 
-/* Eingabefelder explizit groß/klar dimensioniert statt sich allein auf das Default-Theme zu verlassen -
-   dessen Basiswerte machten die Felder kaum sichtbar/klickbar. */
-.unity-text-field {
-    min-height: 34px;
-    margin-bottom: 10px;
+.m2-window-body {
+    padding: 6px 8px 2px 8px;
 }
 
-.unity-text-field__label {
-    color: rgb(210, 210, 215);
-    min-width: 120px;
-    font-size: 14px;
-    -unity-text-align: middle-left;
+.m2-inset {
+    background-image: resource("UI/Skin/panel_inset");
+    -unity-slice-left: 6;
+    -unity-slice-right: 6;
+    -unity-slice-top: 6;
+    -unity-slice-bottom: 6;
+    padding: 4px;
 }
 
-.unity-text-field__input {
-    background-color: rgb(18, 18, 22);
-    color: rgb(235, 235, 240);
-    border-width: 1px;
-    border-color: rgb(90, 90, 105);
-    border-radius: 3px;
-    min-height: 30px;
-    padding: 4px 8px;
-    font-size: 14px;
+.m2-section {
+    color: rgb(226, 190, 112);
+    font-size: 12px;
+    -unity-font-style: bold;
+    margin: 6px 0 3px 0;
+}
+
+/* ---- Knöpfe (gilt für alle Buttons, auch Asset-Testlabor) ---- */
+
+.unity-button {
+    background-image: resource("UI/Skin/button");
+    -unity-slice-left: 6;
+    -unity-slice-right: 6;
+    -unity-slice-top: 6;
+    -unity-slice-bottom: 6;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    border-radius: 0;
+    color: rgb(250, 232, 190);
+    font-size: 12px;
+    -unity-font-style: bold;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgb(24, 12, 4);
+    margin: 3px;
+    padding: 4px 12px;
+    min-height: 26px;
+}
+
+.unity-button:hover {
+    background-image: resource("UI/Skin/button_hover");
+    background-color: rgba(0, 0, 0, 0);
+    color: rgb(255, 246, 214);
+}
+
+.unity-button:active {
+    background-image: resource("UI/Skin/button_pressed");
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.unity-button:disabled {
+    background-image: resource("UI/Skin/button_disabled");
+    color: rgb(150, 140, 128);
+}
+
+.m2-button {
+    min-width: 96px;
+}
+
+.primary-button {
+    color: rgb(255, 236, 160);
+}
+
+.m2-close {
+    position: absolute;
+    right: 4px;
+    top: 3px;
+    width: 16px;
+    height: 16px;
+    min-width: 16px;
+    min-height: 16px;
+    margin: 0;
+    padding: 0;
+    background-image: resource("UI/Skin/close");
+    -unity-slice-left: 0;
+    -unity-slice-right: 0;
+    -unity-slice-top: 0;
+    -unity-slice-bottom: 0;
+}
+
+.m2-close:hover,
+.m2-close:active {
+    background-image: resource("UI/Skin/close_hover");
+}
+
+/* ---- Eingabefelder ---- */
+
+.m2-input {
+    margin: 2px 0;
+    min-height: 24px;
+}
+
+.m2-input .unity-base-text-field__input,
+.m2-input .unity-text-field__input {
+    background-image: resource("UI/Skin/input");
+    -unity-slice-left: 4;
+    -unity-slice-right: 4;
+    -unity-slice-top: 4;
+    -unity-slice-bottom: 4;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    border-radius: 0;
+    color: rgb(240, 228, 200);
+    font-size: 13px;
+    min-height: 24px;
+    padding: 3px 8px;
     flex-grow: 1;
 }
 
-.unity-foldout {
-    margin-top: 8px;
+.m2-input:focus .unity-base-text-field__input,
+.m2-input .unity-base-text-field__input:focus {
+    background-image: resource("UI/Skin/input_focus");
 }
 
-.unity-foldout__text {
-    color: rgb(190, 190, 200);
+.m2-input > .unity-label {
+    color: rgb(214, 196, 160);
+    font-size: 12px;
+    min-width: 90px;
+    -unity-text-align: middle-left;
+}
+
+.m2-foldout {
+    margin-top: 6px;
+}
+
+.m2-foldout .unity-foldout__text {
+    color: rgb(190, 170, 130);
+    font-size: 11px;
+}
+
+.m2-toggle {
+    margin: 2px 0;
+}
+
+.m2-toggle .unity-toggle__text,
+.m2-toggle > .unity-label {
+    color: rgb(214, 196, 160);
+    font-size: 11px;
 }
 
 .button-row {
@@ -67,68 +206,948 @@
     margin-top: 8px;
 }
 
-Button {
-    background-color: rgb(55, 90, 140);
-    color: rgb(240, 240, 245);
-    border-width: 0;
-    border-radius: 4px;
-    margin: 4px;
-    padding: 8px 16px;
-    min-height: 34px;
-    min-width: 120px;
-    font-size: 14px;
-}
-
-Button:hover {
-    background-color: rgb(70, 105, 160);
-}
-
-Button:disabled {
-    background-color: rgb(60, 60, 65);
-    color: rgb(150, 150, 155);
-}
-
 .error-text {
-    color: rgb(230, 100, 100);
+    color: rgb(255, 110, 90);
+    font-size: 12px;
     white-space: normal;
-    margin-top: 8px;
-    min-height: 18px;
+    -unity-text-align: middle-center;
+    margin-top: 2px;
+    min-height: 16px;
 }
 
 .status-text {
-    color: rgb(190, 190, 200);
+    color: rgb(220, 205, 170);
+    font-size: 12px;
     -unity-text-align: middle-center;
-    margin-top: 6px;
+    margin-top: 4px;
+}
+
+/* ================= Login / Charakterauswahl ================= */
+
+.login-screen,
+.character-select-screen {
+    background-color: rgb(10, 8, 6);
+}
+
+.login-backdrop {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    opacity: 0.55;
+    -unity-background-scale-mode: scale-and-crop;
+}
+
+.login-vignette {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-image: resource("UI/Skin/vignette");
+    -unity-background-scale-mode: stretch-to-fill;
+}
+
+.login-center {
+    align-items: center;
+    justify-content: center;
+}
+
+.login-header {
+    align-items: center;
+    margin-bottom: 18px;
+}
+
+.login-logo {
+    color: rgb(240, 196, 96);
+    font-size: 64px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    -unity-text-outline-width: 2px;
+    -unity-text-outline-color: rgb(52, 22, 6);
+    text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.8);
+    letter-spacing: 6px;
+}
+
+.login-logo-small {
+    font-size: 40px;
+    margin-bottom: 10px;
+}
+
+.login-tagline {
+    color: rgb(232, 214, 176);
+    font-size: 15px;
+    -unity-font-style: italic;
+    -unity-text-align: middle-center;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgb(20, 10, 4);
+}
+
+.login-window {
+    width: 330px;
+}
+
+.login-field-row {
+    flex-direction: row;
+    align-items: center;
+    margin: 3px 0;
+}
+
+.login-field-label {
+    width: 72px;
+    color: rgb(226, 204, 158);
+    font-size: 12px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-right;
+    margin-right: 8px;
+}
+
+.login-input {
+    flex-grow: 1;
+}
+
+.login-actions {
+    margin-top: 10px;
+}
+
+.login-footer {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    bottom: 12px;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.login-version {
+    color: rgba(220, 200, 160, 0.6);
+    font-size: 11px;
+}
+
+.charselect-window {
+    width: 640px;
+}
+
+.charselect-body {
+    flex-direction: row;
+}
+
+.charselect-preview {
+    width: 200px;
+    height: 250px;
+    align-items: center;
+    margin-right: 10px;
+}
+
+.charselect-preview-figure {
+    width: 144px;
+    height: 144px;
+    margin-top: 22px;
+    margin-bottom: 14px;
+}
+
+.charselect-selected-name {
+    color: rgb(250, 230, 170);
+    font-size: 16px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgb(20, 10, 4);
+}
+
+.charselect-selected-info {
+    color: rgb(200, 184, 150);
+    font-size: 12px;
+    -unity-text-align: middle-center;
+}
+
+.charselect-right {
+    flex-grow: 1;
 }
 
 .character-list {
-    height: 180px;
-    margin-bottom: 12px;
-    border-width: 1px;
-    border-color: rgb(55, 55, 62);
+    height: 132px;
     flex-grow: 0;
     flex-shrink: 0;
-    overflow: hidden;
 }
 
-.character-button {
-    -unity-text-align: middle-left;
-    background-color: rgb(40, 40, 48);
-    margin: 2px 0;
+.character-list .unity-scroll-view__content-container {
+    flex-direction: row;
+    flex-wrap: wrap;
 }
 
-.character-button:hover {
-    background-color: rgb(55, 55, 65);
+.charslot {
+    width: 92px;
+    height: 56px;
+    margin: 3px;
+    padding: 4px;
+    min-width: 0;
+    background-image: resource("UI/Skin/charslot");
+    -unity-slice-left: 10;
+    -unity-slice-right: 10;
+    -unity-slice-top: 10;
+    -unity-slice-bottom: 10;
+    color: rgb(230, 214, 180);
+    font-size: 12px;
+    white-space: normal;
+    -unity-text-align: middle-center;
+}
+
+.charslot:hover {
+    background-image: resource("UI/Skin/charslot_selected");
+}
+
+.charslot-selected {
+    background-image: resource("UI/Skin/charslot_selected");
+    color: rgb(255, 236, 160);
 }
 
 .new-character-row {
     flex-direction: row;
     align-items: center;
-    flex-shrink: 0;
 }
 
-.new-character-row .unity-text-field {
+.new-character-row .m2-input {
     flex-grow: 1;
+}
+
+.charselect-actions {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 4px 8px 0 8px;
+}
+
+.escape-screen {
+    background-color: rgba(0, 0, 0, 0.45);
+}
+
+.escape-window {
+    width: 240px;
+}
+
+.escape-body {
+    align-items: stretch;
+}
+
+.escape-button {
+    margin: 3px 4px;
+}
+
+/* ================= HUD ================= */
+
+.hud-root {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+}
+
+.hud-root Label {
+    padding: 0;
+    margin: 0;
+}
+
+/* ---- Spieler-Plakette oben links ---- */
+
+.hud-player {
+    position: absolute;
+    left: 12px;
+    top: 10px;
+}
+
+.hud-player-name {
+    color: rgb(255, 232, 150);
+    font-size: 15px;
+    -unity-font-style: bold;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgb(16, 8, 2);
+}
+
+.hud-player-level {
+    color: rgb(230, 220, 200);
+    font-size: 12px;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgb(16, 8, 2);
+}
+
+.hud-buffs {
+    color: rgb(160, 230, 160);
+    font-size: 11px;
+    margin-top: 4px;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgb(8, 16, 4);
+}
+
+/* ---- Ziel oben mittig ---- */
+
+.hud-target {
+    position: absolute;
+    left: 50%;
+    top: 10px;
+    width: 240px;
+    margin-left: -120px;
+    align-items: center;
+}
+
+.hud-target-name {
+    color: rgb(255, 214, 180);
+    font-size: 13px;
+    -unity-font-style: bold;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgb(20, 4, 2);
+    margin-bottom: 2px;
+}
+
+.hud-target-bar {
+    width: 240px;
+    height: 14px;
+    padding: 2px;
+    background-image: resource("UI/Skin/bar_frame");
+    -unity-slice-left: 3;
+    -unity-slice-right: 3;
+    -unity-slice-top: 3;
+    -unity-slice-bottom: 3;
+}
+
+.hud-target-fill {
+    height: 100%;
+    width: 100%;
+    background-color: rgb(186, 30, 22);
+    border-top-width: 1px;
+    border-top-color: rgb(240, 110, 90);
+}
+
+.hud-target-text {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -1px;
+    color: rgb(255, 240, 230);
+    font-size: 10px;
+    -unity-text-align: middle-center;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgb(0, 0, 0);
+}
+
+.hud-message {
+    position: absolute;
+    left: 50%;
+    top: 62px;
+    width: 520px;
+    margin-left: -260px;
+    color: rgb(255, 226, 140);
+    font-size: 14px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgb(20, 10, 2);
+    white-space: normal;
+}
+
+/* ---- Runde Minimap oben rechts ---- */
+
+.hud-minimap {
+    position: absolute;
+    right: 10px;
+    top: 6px;
+    width: 176px;
+    height: 200px;
+    align-items: center;
+}
+
+.hud-minimap-title {
+    color: rgb(250, 226, 160);
+    font-size: 12px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgb(16, 8, 2);
+    height: 16px;
+}
+
+.hud-minimap-frame {
+    position: absolute;
+    left: 14px;
+    top: 30px;
+    width: 148px;
+    height: 148px;
+    border-radius: 74px;
+    overflow: hidden;
+    background-color: rgb(24, 34, 20);
+}
+
+.hud-minimap-map {
+    position: absolute;
+    width: 444px;
+    height: 444px;
+    -unity-background-scale-mode: stretch-to-fill;
+}
+
+.hud-minimap-dot {
+    position: absolute;
+    left: 70px;
+    top: 70px;
+    width: 8px;
+    height: 8px;
+    border-radius: 4px;
+    background-color: rgb(255, 230, 60);
+    border-width: 1px;
+    border-color: rgb(60, 30, 0);
+}
+
+.hud-minimap-ring {
+    position: absolute;
+    left: 0;
+    top: 16px;
+    width: 176px;
+    height: 176px;
+    background-image: resource("UI/Skin/minimap_frame");
+}
+
+.hud-minimap-coords {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 186px;
+    color: rgb(220, 206, 170);
+    font-size: 10px;
+    -unity-text-align: middle-center;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgb(0, 0, 0);
+}
+
+/* ---- Gruppe ---- */
+
+.hud-party {
+    position: absolute;
+    right: 12px;
+    top: 214px;
+    width: 180px;
+}
+
+.hud-party-title {
+    color: rgb(246, 222, 160);
+    font-size: 12px;
+    -unity-font-style: bold;
+    margin-bottom: 3px;
+}
+
+.hud-party-member {
+    color: rgb(230, 220, 200);
+    font-size: 11px;
+}
+
+.hud-small-button {
+    min-width: 60px;
+    min-height: 20px;
+    font-size: 10px;
+    padding: 1px 6px;
+}
+
+/* ---- Chat unten links ---- */
+
+.hud-chat {
+    position: absolute;
+    left: 8px;
+    bottom: 70px;
+    width: 360px;
+}
+
+.hud-chat-log {
+    height: 120px;
+    background-color: rgba(0, 0, 0, 0.35);
+    padding: 3px 5px;
+}
+
+.hud-chat-line {
+    color: rgb(236, 230, 214);
+    font-size: 11px;
+    white-space: normal;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgba(0, 0, 0, 0.9);
+}
+
+.hud-chat-system { color: rgb(255, 214, 110); }
+.hud-chat-whisper { color: rgb(240, 150, 255); }
+.hud-chat-global { color: rgb(150, 230, 255); }
+
+.hud-chat-input-row {
+    flex-direction: row;
+    align-items: center;
+    margin-top: 2px;
+    background-color: rgba(0, 0, 0, 0.6);
+    padding: 2px;
+}
+
+.hud-chat-channel-button {
+    min-width: 58px;
+    min-height: 22px;
+    font-size: 10px;
+    padding: 1px 4px;
+    margin: 1px;
+}
+
+.hud-chat-target {
+    width: 80px;
+    margin-right: 2px;
+}
+
+.hud-chat-input {
+    flex-grow: 1;
+}
+
+.hud-chat-send {
+    min-width: 50px;
+    min-height: 22px;
+    font-size: 10px;
+    padding: 1px 4px;
+    margin: 1px;
+}
+
+.hud-chat-hint {
+    color: rgba(230, 220, 190, 0.55);
+    font-size: 9px;
+    margin-top: 1px;
+}
+
+/* ---- Taskleiste unten ---- */
+
+.hud-taskbar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 64px;
+    background-image: resource("UI/Skin/taskbar");
+    -unity-slice-left: 0;
+    -unity-slice-right: 0;
+    -unity-slice-top: 6;
+    -unity-slice-bottom: 0;
+    -unity-background-scale-mode: stretch-to-fill;
+    align-items: center;
+    justify-content: center;
+}
+
+.hud-taskbar-center {
+    flex-direction: row;
+    align-items: center;
+    margin-top: 4px;
+}
+
+.hud-quickslots {
+    flex-direction: row;
+    align-items: center;
+    margin-right: 12px;
+}
+
+.hud-quickslot {
+    width: 40px;
+    height: 40px;
+    margin: 0 2px;
+    background-image: resource("UI/Skin/slot");
+    -unity-slice-left: 4;
+    -unity-slice-right: 4;
+    -unity-slice-top: 4;
+    -unity-slice-bottom: 4;
+    align-items: center;
+    justify-content: center;
+}
+
+.hud-quickslot:hover {
+    background-image: resource("UI/Skin/slot_hover");
+}
+
+.hud-quickslot-icon {
+    width: 32px;
+    height: 32px;
+}
+
+.hud-quickslot-cd {
+    position: absolute;
+    left: 3px;
+    top: 3px;
+    right: 3px;
+    bottom: 3px;
+    color: rgb(255, 240, 200);
+    font-size: 12px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgb(0, 0, 0);
+}
+
+.hud-quickslot-cooling {
+    background-color: rgba(0, 0, 0, 0.6);
+}
+
+.hud-quickslot-level {
+    position: absolute;
+    right: 3px;
+    bottom: 1px;
+    color: rgb(255, 255, 255);
+    font-size: 9px;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgb(0, 0, 0);
+}
+
+.hud-quickslot-key {
+    position: absolute;
+    left: 3px;
+    top: 1px;
+    color: rgb(255, 214, 110);
+    font-size: 10px;
+    -unity-font-style: bold;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgb(0, 0, 0);
+}
+
+.hud-quickslot-locked {
+    opacity: 0.45;
+}
+
+.hud-exp {
+    flex-direction: row;
+    align-items: center;
+    margin-right: 12px;
+}
+
+.hud-exp-label {
+    color: rgb(250, 226, 140);
+    font-size: 11px;
+    -unity-font-style: bold;
+    margin-right: 4px;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgb(0, 0, 0);
+}
+
+.hud-exp-orb {
+    width: 18px;
+    height: 18px;
+    margin: 0 1px;
+    background-image: resource("UI/Skin/exp_orb_empty");
+    overflow: hidden;
+}
+
+.hud-exp-orb-fill {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 18px;
+    height: 0;
+    overflow: hidden;
+}
+
+/* Kind wird per Code eingefügt (volle Kugel, unten verankert) */
+.hud-exp-orb-fill-image {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 18px;
+    height: 18px;
+    background-image: resource("UI/Skin/exp_orb_full");
+}
+
+.hud-exp-text {
+    color: rgb(230, 220, 190);
+    font-size: 10px;
+    margin-left: 5px;
+    width: 52px;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgb(0, 0, 0);
+}
+
+.hud-menu-buttons {
+    flex-direction: row;
+}
+
+.hud-menu-button {
+    min-width: 0;
+    min-height: 24px;
+    padding: 2px 7px;
+    font-size: 10px;
+    margin: 1px;
+}
+
+.hud-taskbar-yang {
+    position: absolute;
+    right: 120px;
+    bottom: 2px;
+    color: rgb(255, 222, 110);
+    font-size: 10px;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgb(0, 0, 0);
+}
+
+/* ---- HP/SP-Kugeln ---- */
+
+.hud-orb {
+    position: absolute;
+    bottom: 4px;
+    width: 100px;
+    height: 100px;
+}
+
+.hud-orb-hp { left: 6px; }
+.hud-orb-sp { right: 6px; }
+
+.hud-orb-empty {
+    position: absolute;
+    left: 8px;
+    top: 8px;
+    width: 84px;
+    height: 84px;
+    background-image: resource("UI/Skin/orb_empty");
+}
+
+.hud-orb-fill {
+    position: absolute;
+    left: 8px;
+    bottom: 8px;
+    width: 84px;
+    height: 84px;
+    overflow: hidden;
+}
+
+.hud-orb-fill-image {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 84px;
+    height: 84px;
+}
+
+.hud-orb-fill-hp { background-image: resource("UI/Skin/orb_hp"); }
+.hud-orb-fill-sp { background-image: resource("UI/Skin/orb_sp"); }
+
+.hud-orb-glass {
+    position: absolute;
+    left: 8px;
+    top: 8px;
+    width: 84px;
+    height: 84px;
+    background-image: resource("UI/Skin/orb_glass");
+}
+
+.hud-orb-frame {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100px;
+    height: 100px;
+    background-image: resource("UI/Skin/orb_frame");
+}
+
+.hud-orb-caption {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 30px;
+    color: rgba(255, 245, 230, 0.85);
+    font-size: 11px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgb(0, 0, 0);
+}
+
+.hud-orb-text {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 46px;
+    color: rgb(255, 255, 255);
+    font-size: 11px;
+    -unity-text-align: middle-center;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgb(0, 0, 0);
+}
+
+/* ---- Fenster (Inventar/Charakter/Shop) ---- */
+
+.hud-window {
+    position: absolute;
+    display: none;
+}
+
+.hud-inventory-window {
+    right: 196px;
+    top: 90px;
+    width: 232px;
+}
+
+.hud-character-window {
+    left: 16px;
+    top: 90px;
+    width: 250px;
+}
+
+.hud-shop-window {
+    left: 280px;
+    top: 90px;
+    width: 232px;
+}
+
+.hud-equip-area {
+    height: 140px;
+    margin-bottom: 4px;
+}
+
+.hud-equip-silhouette {
+    position: absolute;
+    left: 50%;
+    top: 14px;
+    width: 64px;
+    height: 96px;
+    margin-left: -32px;
+    background-image: resource("UI/Skin/silhouette");
+}
+
+.hud-equip-slot {
+    position: absolute;
+}
+
+.hud-equip-label {
+    position: absolute;
+    color: rgb(190, 170, 130);
+    font-size: 9px;
+}
+
+.hud-item-grid {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.hud-item-slot {
+    width: 38px;
+    height: 38px;
+    margin: 1px;
+    background-image: resource("UI/Skin/slot");
+    -unity-slice-left: 4;
+    -unity-slice-right: 4;
+    -unity-slice-top: 4;
+    -unity-slice-bottom: 4;
+    align-items: center;
+    justify-content: center;
+}
+
+.hud-item-slot:hover {
+    background-image: resource("UI/Skin/slot_hover");
+}
+
+.hud-item-slot-selected {
+    background-image: resource("UI/Skin/slot_selected");
+}
+
+.hud-item-icon {
+    width: 30px;
+    height: 30px;
+}
+
+.hud-item-text {
+    color: rgb(230, 214, 180);
+    font-size: 8px;
+    white-space: normal;
+    -unity-text-align: middle-center;
+}
+
+.hud-item-badge {
+    position: absolute;
+    right: 3px;
+    bottom: 1px;
+    color: rgb(255, 230, 120);
+    font-size: 9px;
+    -unity-font-style: bold;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgb(0, 0, 0);
+}
+
+.hud-upgrade-row {
+    flex-direction: row;
+    align-items: center;
+}
+
+.hud-window-hint {
+    color: rgb(200, 184, 150);
+    font-size: 10px;
+    white-space: normal;
+    margin: 2px 0 4px 0;
+}
+
+.hud-window-hint-active {
+    color: rgb(255, 220, 120);
+}
+
+.hud-yang-row {
+    flex-direction: row;
+    justify-content: flex-end;
+    margin-top: 4px;
+}
+
+.hud-yang-value {
+    color: rgb(255, 222, 110);
+    font-size: 12px;
+    -unity-font-style: bold;
+}
+
+.hud-stat-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 20px;
+}
+
+.hud-stat-name {
+    color: rgb(214, 196, 160);
+    font-size: 11px;
+}
+
+.hud-stat-value {
+    color: rgb(255, 245, 225);
+    font-size: 11px;
+    -unity-font-style: bold;
+    flex-grow: 1;
+    -unity-text-align: middle-right;
+    margin-right: 4px;
+}
+
+.hud-plus-button {
+    min-width: 20px;
+    width: 20px;
+    min-height: 18px;
+    height: 18px;
+    padding: 0;
+    margin: 1px;
+    font-size: 11px;
+}
+
+/* ---- Tooltip ---- */
+
+.hud-tooltip {
+    position: absolute;
+    display: none;
+    max-width: 220px;
+    padding: 6px 8px;
+    background-image: resource("UI/Skin/tooltip");
+    -unity-slice-left: 3;
+    -unity-slice-right: 3;
+    -unity-slice-top: 3;
+    -unity-slice-bottom: 3;
+}
+
+.hud-tooltip-title {
+    color: rgb(255, 222, 130);
+    font-size: 12px;
+    -unity-font-style: bold;
+}
+
+.hud-tooltip-body {
+    color: rgb(230, 220, 200);
+    font-size: 11px;
+    white-space: normal;
 }
 
 /* ---- Asset-Testlabor (Editor/Development, F10) ---- */
@@ -236,580 +1255,3 @@ Button:disabled {
     height: 32px;
 }
 
-/* ---- M7-HUD: dauerhaftes Spieler-/Ziel-/Skill-/Chat-Overlay ---- */
-
-.hud-root {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 0;
-    bottom: 0;
-}
-
-.hud-player {
-    position: absolute;
-    left: 10px;
-    top: 10px;
-    width: 270px;
-    padding: 8px;
-    background-color: rgba(15, 17, 22, 0.88);
-    border-width: 1px;
-    border-color: rgb(65, 75, 92);
-    border-radius: 4px;
-}
-
-.hud-player-name {
-    color: rgb(240, 240, 245);
-    font-size: 15px;
-    -unity-font-style: bold;
-    margin-bottom: 4px;
-}
-
-.hud-map-name {
-    color: rgb(180, 205, 225);
-    font-size: 12px;
-    margin-bottom: 6px;
-}
-
-.hud-bar-row {
-    flex-direction: row;
-    align-items: center;
-    margin: 2px 0;
-}
-
-.hud-bar-label {
-    width: 34px;
-    color: rgb(180, 185, 195);
-    font-size: 10px;
-}
-
-.hud-bar-bg {
-    flex-grow: 1;
-    height: 10px;
-    background-color: rgb(30, 30, 36);
-    border-width: 1px;
-    border-color: rgb(55, 60, 70);
-    margin-right: 4px;
-}
-
-.hud-bar-fill {
-    height: 8px;
-    width: 100%;
-}
-
-.hud-bar-hp { background-color: rgb(190, 45, 45); }
-.hud-bar-sp { background-color: rgb(50, 95, 190); }
-.hud-bar-xp { background-color: rgb(180, 150, 45); }
-.hud-bar-target { background-color: rgb(210, 70, 55); }
-
-.hud-bar-text {
-    width: 76px;
-    color: rgb(205, 210, 220);
-    font-size: 10px;
-    -unity-text-align: middle-right;
-}
-
-.hud-yang {
-    color: rgb(225, 195, 95);
-    font-size: 11px;
-    margin-top: 2px;
-}
-
-.hud-target {
-    position: absolute;
-    left: 50%;
-    top: 10px;
-    margin-left: -130px;
-    width: 260px;
-    padding: 6px 8px;
-    background-color: rgba(15, 17, 22, 0.88);
-    border-width: 1px;
-    border-color: rgb(90, 62, 62);
-    border-radius: 4px;
-}
-
-.hud-target-name {
-    color: rgb(240, 220, 200);
-    font-size: 13px;
-    -unity-text-align: middle-center;
-    margin-bottom: 3px;
-}
-
-.hud-message {
-    position: absolute;
-    left: 50%;
-    top: 86px;
-    margin-left: -220px;
-    width: 440px;
-    color: rgb(240, 220, 150);
-    font-size: 12px;
-    -unity-text-align: middle-center;
-    white-space: normal;
-}
-
-.hud-skills {
-    position: absolute;
-    right: 10px;
-    bottom: 10px;
-    width: 460px;
-    align-items: center;
-}
-
-.hud-skill-slots {
-    flex-direction: row;
-    justify-content: center;
-}
-
-.hud-skill-slot {
-    width: 110px;
-    margin: 0 2px;
-    padding: 4px;
-    background-color: rgba(15, 17, 22, 0.88);
-    border-width: 1px;
-    border-color: rgb(65, 75, 92);
-    border-radius: 3px;
-    align-items: center;
-}
-
-.hud-skill-key {
-    color: rgb(235, 205, 110);
-    font-size: 11px;
-    -unity-font-style: bold;
-}
-
-.hud-skill-name {
-    color: rgb(225, 230, 240);
-    font-size: 10px;
-    -unity-text-align: middle-center;
-}
-
-.hud-skill-cd {
-    color: rgb(150, 190, 255);
-    font-size: 10px;
-    min-height: 12px;
-}
-
-.hud-buffs {
-    color: rgb(210, 210, 220);
-    font-size: 10px;
-    margin-top: 3px;
-    -unity-text-align: middle-center;
-}
-
-.hud-chat {
-    position: absolute;
-    left: 10px;
-    bottom: 10px;
-    width: 360px;
-    height: 210px;
-    padding: 6px;
-    background-color: rgba(15, 17, 22, 0.86);
-    border-width: 1px;
-    border-color: rgb(55, 65, 80);
-    border-radius: 4px;
-}
-
-.hud-chat-log {
-    height: 132px;
-    background-color: rgba(8, 9, 12, 0.55);
-    padding: 3px;
-    margin-bottom: 3px;
-}
-
-.hud-chat-input-row {
-    flex-direction: row;
-    align-items: center;
-}
-
-.hud-chat-target {
-    width: 74px;
-    margin-right: 3px;
-}
-
-.hud-chat-input {
-    flex-grow: 1;
-    margin-right: 3px;
-}
-
-.hud-chat-channel-label {
-    color: rgb(160, 170, 185);
-    font-size: 10px;
-    margin-right: 4px;
-}
-
-.hud-chat-channels {
-    flex-direction: row;
-    align-items: center;
-    margin-top: 2px;
-}
-
-.hud-chat-target, .hud-chat-input {
-    min-height: 24px;
-}
-
-.hud-chat-target .unity-text-field__input, .hud-chat-input .unity-text-field__input {
-    min-height: 22px;
-    font-size: 11px;
-}
-
-.hud-chat-target .unity-text-field__label {
-    min-width: 18px;
-    font-size: 10px;
-}
-
-.hud-chat-send, .hud-chat-channel-button {
-    min-width: 50px;
-    min-height: 24px;
-    padding: 1px 6px;
-    margin: 1px;
-    font-size: 10px;
-}
-
-.hud-chat-line {
-    color: rgb(220, 225, 235);
-    font-size: 11px;
-    white-space: normal;
-}
-
-.hud-chat-system { color: rgb(235, 205, 110); }
-.hud-chat-whisper { color: rgb(180, 210, 255); }
-.hud-chat-global { color: rgb(160, 225, 180); }
-
-.hud-party {
-    position: absolute;
-    right: 10px;
-    top: 10px;
-    width: 270px;
-    padding: 6px 8px;
-    background-color: rgba(15, 17, 22, 0.88);
-    border-width: 1px;
-    border-color: rgb(65, 75, 92);
-    border-radius: 4px;
-}
-
-.hud-party-title {
-    color: rgb(150, 190, 255);
-    font-size: 12px;
-    -unity-font-style: bold;
-    margin-bottom: 3px;
-}
-
-.hud-party-members {
-    flex-direction: column;
-}
-
-.hud-party-hint {
-    color: rgb(150, 155, 165);
-    font-size: 9px;
-    white-space: normal;
-    margin-top: 2px;
-}
-
-.hud-party-leave {
-    min-width: 80px;
-    min-height: 22px;
-    padding: 1px 6px;
-    margin: 3px 0 0 0;
-    font-size: 10px;
-    background-color: rgb(95, 55, 55);
-}
-
-/* ---- Release-Optik: Minimap, zentrale Skillleiste, dezenter Chat ---- */
-
-.hud-minimap {
-    position: absolute;
-    right: 10px;
-    top: 10px;
-    width: 170px;
-    padding: 5px;
-    background-color: rgba(12, 15, 18, 0.82);
-    border-width: 1px;
-    border-color: rgba(160, 135, 80, 0.65);
-    border-radius: 4px;
-    align-items: center;
-}
-
-.hud-minimap-title {
-    color: rgb(230, 215, 170);
-    font-size: 11px;
-    -unity-font-style: bold;
-    -unity-text-align: middle-center;
-    margin-bottom: 3px;
-}
-
-.hud-minimap-frame {
-    width: 158px;
-    height: 158px;
-    background-color: rgb(30, 44, 28);
-    border-width: 1px;
-    border-color: rgb(35, 42, 30);
-    -unity-background-scale-mode: scale-to-fit;
-    overflow: hidden;
-}
-
-.hud-minimap-dot {
-    position: absolute;
-    width: 6px;
-    height: 6px;
-    background-color: rgb(255, 224, 80);
-    border-radius: 3px;
-    border-width: 1px;
-    border-color: rgb(80, 55, 10);
-}
-
-.hud-party {
-    top: 190px;
-}
-
-.hud-skills {
-    left: 50%;
-    right: auto;
-    margin-left: -230px;
-    bottom: 10px;
-    width: 460px;
-}
-
-.hud-hint {
-    color: rgba(235, 230, 210, 0.72);
-    font-size: 10px;
-    -unity-text-align: middle-center;
-    margin-bottom: 3px;
-}
-
-.hud-skill-slots {
-    flex-direction: row;
-    justify-content: center;
-}
-
-.hud-skill-slot {
-    width: 76px;
-    height: 84px;
-    margin: 0 3px;
-    padding: 4px;
-    background-color: rgba(12, 15, 18, 0.88);
-    border-width: 1px;
-    border-color: rgba(160, 135, 80, 0.65);
-    border-radius: 4px;
-    align-items: center;
-}
-
-.hud-skill-icon {
-    width: 34px;
-    height: 34px;
-    margin: 1px;
-}
-
-.hud-skill-key {
-    color: rgb(245, 220, 140);
-    font-size: 10px;
-    -unity-font-style: bold;
-}
-
-.hud-skill-name {
-    color: rgb(235, 235, 225);
-    font-size: 9px;
-    -unity-text-align: middle-center;
-    white-space: normal;
-}
-
-.hud-skill-cd {
-    color: rgb(255, 190, 100);
-    font-size: 10px;
-    min-height: 11px;
-    -unity-text-align: middle-center;
-}
-
-.hud-chat {
-    width: 330px;
-    height: 188px;
-    background-color: rgba(10, 12, 15, 0.72);
-    border-color: rgba(120, 110, 80, 0.45);
-}
-
-.hud-chat-log {
-    height: 112px;
-}
-
-.hud-chat-line {
-    font-size: 10px;
-}
-
-.hud-player {
-    width: 258px;
-    background-color: rgba(10, 12, 15, 0.78);
-    border-color: rgba(120, 110, 80, 0.55);
-}
-
-.hud-target {
-    background-color: rgba(10, 12, 15, 0.82);
-    border-color: rgba(150, 90, 80, 0.7);
-}
-
-.hud-skill-icon {
-    -unity-background-scale-mode: scale-to-fit;
-}
-
-.hud-skills {
-    left: auto;
-    right: 10px;
-    margin-left: 0;
-    width: 460px;
-}
-
-.hud-skill-icon-image {
-    width: 34px;
-    height: 34px;
-}
-
-.hud-skill-slot {
-    height: 96px;
-}
-
-/* ---- Login / Charakterauswahl: Release-Optik ---- */
-
-.login-screen,
-.character-select-screen {
-    background-color: rgb(7, 12, 9);
-}
-
-.login-backdrop {
-    position: absolute;
-    left: 0;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    opacity: 0.32;
-    -unity-background-scale-mode: scale-and-crop;
-}
-
-.login-layout {
-    position: relative;
-    flex-direction: row;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-    padding: 24px;
-}
-
-.login-brand {
-    width: 330px;
-    margin-right: 40px;
-}
-
-.login-logo {
-    color: rgb(236, 205, 128);
-    font-size: 52px;
-    -unity-font-style: bold;
-    -unity-text-align: middle-left;
-    margin-bottom: 2px;
-}
-
-.login-tagline {
-    color: rgb(240, 240, 230);
-    font-size: 20px;
-    margin-bottom: 14px;
-}
-
-.login-copy {
-    color: rgba(225, 230, 220, 0.78);
-    font-size: 13px;
-    white-space: normal;
-}
-
-.login-feature-row {
-    margin-top: 24px;
-}
-
-.login-feature {
-    color: rgba(220, 198, 145, 0.9);
-    font-size: 12px;
-    margin: 5px 0;
-}
-
-.login-card {
-    width: 370px;
-    padding: 28px;
-    background-color: rgba(12, 17, 13, 0.94);
-    border-width: 1px;
-    border-color: rgba(166, 139, 82, 0.6);
-    border-radius: 6px;
-}
-
-.character-card {
-    width: 430px;
-}
-
-.login-title {
-    color: rgb(242, 236, 218);
-    font-size: 24px;
-    -unity-font-style: bold;
-    -unity-text-align: middle-left;
-    margin-bottom: 2px;
-}
-
-.login-subtitle {
-    color: rgba(200, 208, 196, 0.72);
-    font-size: 12px;
-    margin-bottom: 18px;
-}
-
-.login-input {
-    margin-bottom: 6px;
-}
-
-.login-actions {
-    margin-top: 18px;
-    justify-content: flex-start;
-}
-
-.primary-button {
-    background-color: rgb(150, 103, 43);
-    color: rgb(255, 244, 219);
-    min-width: 145px;
-}
-
-.primary-button:hover {
-    background-color: rgb(181, 126, 54);
-}
-
-.secondary-button {
-    background-color: rgba(48, 58, 48, 0.9);
-    color: rgb(225, 230, 220);
-    border-width: 1px;
-    border-color: rgba(126, 142, 118, 0.55);
-}
-
-.secondary-button:hover {
-    background-color: rgba(64, 78, 64, 0.95);
-}
-
-.login-version {
-    color: rgba(170, 178, 165, 0.55);
-    font-size: 10px;
-    margin-top: 14px;
-    -unity-text-align: middle-left;
-}
-
-.character-card .character-list {
-    height: 210px;
-    background-color: rgba(5, 8, 6, 0.6);
-    border-color: rgba(100, 116, 94, 0.45);
-    padding: 4px;
-}
-
-.character-card .character-button {
-    min-height: 38px;
-    margin: 3px 0;
-    background-color: rgba(32, 45, 34, 0.95);
-    color: rgb(235, 238, 228);
-    border-width: 1px;
-    border-color: rgba(100, 116, 94, 0.35);
-    -unity-text-align: middle-left;
-    padding-left: 12px;
-}
-
-.character-card .character-button:hover {
-    background-color: rgba(54, 72, 53, 0.95);
-    border-color: rgba(190, 158, 86, 0.65);
-}

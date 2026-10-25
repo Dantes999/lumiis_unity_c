@@ -43,6 +43,11 @@ namespace Lumiis.Client
         private Button _logoutButton;
         private Label _characterSelectStatusLabel;
         private Label _characterSelectErrorLabel;
+        private Button _startGameButton;
+        private VisualElement _previewFigure;
+        private Label _selectedNameLabel;
+        private CharacterInfo? _selectedCharacter;
+        private HudController _hud;
 
         // ---- escape-menu (siehe docs/tasks/escape-menu.md) - eigene, dritte UI-Wurzel im selben UIDocument
         // wie Login/CharacterSelect (siehe BuildUi). Bewusst NICHT über LoginFlowState gesteuert (das Menü
@@ -54,10 +59,12 @@ namespace Lumiis.Client
         /// <summary>authClient optional für PlayMode-Tests (siehe client/Assets/Lumiis/Tests/PlayMode) - im
         /// normalen Spielbetrieb (Bootstrap.cs) bleibt der Parameter weg, dann kommt die echte
         /// UnityWebRequestAuthClient gegen Lumiis.Auth zum Einsatz.</summary>
-        public void Initialize(NetClient netClient, GameClient gameClient, IAuthClient authClient = null)
+        public void Initialize(NetClient netClient, GameClient gameClient, IAuthClient authClient = null, HudController hud = null)
         {
             _netClient = netClient;
             _gameClient = gameClient;
+            _hud = hud;
+            if (_hud != null) _hud.SystemMenuRequested += OnSystemMenuRequested;
             _loginFlow = new LoginFlow(authClient ?? new UnityWebRequestAuthClient());
 
             _netClient.PacketReceived += OnPacketReceived;
@@ -89,9 +96,8 @@ namespace Lumiis.Client
             go.SetActive(false); // Erst konfigurieren, dann aktivieren - UIDocument.OnEnable soll nicht mit leeren Panel-Settings laufen.
 
             _uiDocument = go.AddComponent<UIDocument>();
-            var panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
-            panelSettings.themeStyleSheet = Resources.Load<ThemeStyleSheet>("UI/DefaultRuntimeTheme");
-            _uiDocument.panelSettings = panelSettings;
+            // Eigene Skalierung (Referenz 1280x720) und Sortierung über dem HUD - Escape-Menü liegt vorn.
+            _uiDocument.panelSettings = UiSkin.CreatePanelSettings(100f);
 
             // Erst jetzt aktivieren: UIDocument.OnEnable() erzeugt rootVisualElement aus den PanelSettings,
             // das braucht ein aktives GameObject. Vorher zugewiesene PanelSettings sorgen dafür, dass
@@ -104,6 +110,12 @@ namespace Lumiis.Client
             _loginRoot = loginAsset.CloneTree();
             _characterSelectRoot = characterSelectAsset.CloneTree();
             _escapeMenuRoot = escapeMenuAsset.CloneTree();
+            // Ohne das wären die geklonten TemplateContainer 0 px hoch (alle Kinder absolut positioniert) -
+            // genau das hat den Login-Bildschirm halb aus dem Bild geschoben, siehe UiSkin.StretchToFill.
+            UiSkin.StretchToFill(_loginRoot);
+            UiSkin.StretchToFill(_characterSelectRoot);
+            UiSkin.StretchToFill(_escapeMenuRoot);
+            _uiDocument.rootVisualElement.pickingMode = PickingMode.Ignore;
             _uiDocument.rootVisualElement.Add(_loginRoot);
             _uiDocument.rootVisualElement.Add(_characterSelectRoot);
             ApplyBackdrop(_loginRoot, "login-backdrop");
@@ -134,6 +146,10 @@ namespace Lumiis.Client
             _logoutButton = _characterSelectRoot.Q<Button>("logout-button");
             _characterSelectStatusLabel = _characterSelectRoot.Q<Label>("character-select-status");
             _characterSelectErrorLabel = _characterSelectRoot.Q<Label>("character-select-error");
+            _startGameButton = _characterSelectRoot.Q<Button>("start-game-button");
+            _previewFigure = _characterSelectRoot.Q<VisualElement>("charselect-preview-figure");
+            _selectedNameLabel = _characterSelectRoot.Q<Label>("charselect-selected-name");
+            UiSkin.BuildCharacterPortrait(_previewFigure, 144f);
 
             _usernameField.value = PlayerPrefs.GetString(UsernamePrefsKey, "");
 
@@ -141,7 +157,21 @@ namespace Lumiis.Client
             _registerButton.clicked += OnRegisterButtonClicked;
             _createCharacterButton.clicked += OnCreateCharacterButtonClicked;
             _logoutButton.clicked += OnLogoutButtonClicked;
+            _startGameButton.clicked += OnStartGameButtonClicked;
+            _loginRoot.Q<Button>("login-quit-button").clicked += QuitGame;
 
+            // Enter im Passwortfeld meldet an, Enter im Namensfeld springt ins Passwortfeld.
+            _usernameField.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.KeypadEnter) _passwordField.Focus();
+            }, TrickleDown.TrickleDown);
+            _passwordField.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if ((evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.KeypadEnter) && _loginButton.enabledSelf)
+                    OnLoginButtonClicked();
+            }, TrickleDown.TrickleDown);
+
+            _escapeMenuRoot.Q<Button>("escape-resume-button").clicked += CloseEscapeMenu;
             _escapeMenuRoot.Q<Button>("escape-switch-character-button").clicked += SwitchCharacter;
             _escapeMenuRoot.Q<Button>("escape-logout-button").clicked += Logout;
             _escapeMenuRoot.Q<Button>("escape-quit-button").clicked += QuitGame;
@@ -164,8 +194,19 @@ namespace Lumiis.Client
             // Nur während eines laufenden Spiels erreichbar - Login/Charakterauswahl haben kein Escape-Menü.
             if (_loginFlow.State != LoginFlowState.InGame) return;
             if (Keyboard.current == null) return;
-            if (_gameClient != null && _gameClient.IsChatInputFocused) return;
-            if (Keyboard.current.escapeKey.wasPressedThisFrame) ToggleEscapeMenu();
+            if (_gameClient != null && (_gameClient.IsChatInputFocused || _gameClient.ChatClosedRecently)) return;
+            if (!Keyboard.current.escapeKey.wasPressedThisFrame) return;
+
+            // Escape schließt zuerst ein offenes Spielfenster (Inventar, Charakter, Shop), erst danach
+            // öffnet es das Systemmenü.
+            if (!_escapeMenuOpen && _hud != null && _hud.CloseTopWindow()) return;
+            ToggleEscapeMenu();
+        }
+
+        private void OnSystemMenuRequested()
+        {
+            if (_loginFlow.State != LoginFlowState.InGame) return;
+            ToggleEscapeMenu();
         }
 
         private void ToggleEscapeMenu()
@@ -284,20 +325,61 @@ namespace Lumiis.Client
 
         // ---- Charakterauswahl ----
 
+        /// <summary>Charaktere als Auswahlkarten: Klick wählt aus (Vorschau links), Doppelklick oder
+        /// "Spiel starten" verbindet. Der erste Charakter ist vorausgewählt.</summary>
         private void PopulateCharacterList()
         {
             _characterListView.Clear();
+            CharacterInfo? previous = _selectedCharacter;
+            _selectedCharacter = null;
             foreach (CharacterInfo character in _loginFlow.Characters)
             {
                 CharacterInfo captured = character; // Schleifenvariable für den Closure einfangen.
-                var button = new Button(() => OnCharacterSelected(captured)) { text = captured.Name };
-                button.AddToClassList("character-button");
+                var button = new Button(() => SelectCharacterCard(captured)) { text = captured.Name };
+                button.AddToClassList("charslot");
+                button.userData = captured;
+                button.RegisterCallback<ClickEvent>(evt =>
+                {
+                    if (evt.clickCount >= 2) StartWithCharacter(captured);
+                });
                 _characterListView.Add(button);
+                if (previous.HasValue && previous.Value.Id == captured.Id) _selectedCharacter = captured;
             }
+
+            if (_selectedCharacter == null && _loginFlow.Characters.Count > 0)
+                _selectedCharacter = _loginFlow.Characters[0];
+            RefreshCharacterSelection();
         }
 
-        private void OnCharacterSelected(CharacterInfo character)
+        private void SelectCharacterCard(CharacterInfo character)
         {
+            _selectedCharacter = character;
+            RefreshCharacterSelection();
+        }
+
+        private void RefreshCharacterSelection()
+        {
+            foreach (VisualElement card in _characterListView.Children())
+            {
+                bool selected = card.userData is CharacterInfo info && _selectedCharacter.HasValue && info.Id == _selectedCharacter.Value.Id;
+                card.EnableInClassList("charslot-selected", selected);
+            }
+
+            bool hasSelection = _selectedCharacter.HasValue;
+            _selectedNameLabel.text = hasSelection ? _selectedCharacter.Value.Name : "Kein Charakter";
+            _previewFigure.style.visibility = hasSelection ? Visibility.Visible : Visibility.Hidden;
+            _startGameButton.SetEnabled(hasSelection && _characterListView.enabledSelf);
+        }
+
+        private void OnStartGameButtonClicked()
+        {
+            if (_selectedCharacter.HasValue) StartWithCharacter(_selectedCharacter.Value);
+        }
+
+        private void StartWithCharacter(CharacterInfo character)
+        {
+            if (_loginFlow.State != LoginFlowState.CharacterSelect) return;
+            _selectedCharacter = character;
             _loginFlow.SelectCharacter(character);
             ApplyLoginFlowState();
         }
@@ -392,6 +474,11 @@ namespace Lumiis.Client
             }
         }
 
+        private void OnDestroy()
+        {
+            if (_hud != null) _hud.SystemMenuRequested -= OnSystemMenuRequested;
+        }
+
         private void OnNetDisconnected(string reason)
         {
             _loginFlow.OnDisconnected(reason);
@@ -424,6 +511,7 @@ namespace Lumiis.Client
             _newCharacterNameField.SetEnabled(interactable);
             _createCharacterButton.SetEnabled(interactable);
             _logoutButton.SetEnabled(interactable);
+            if (_startGameButton != null) _startGameButton.SetEnabled(interactable && _selectedCharacter.HasValue);
         }
 
         private string NormalizedAuthUrl()
