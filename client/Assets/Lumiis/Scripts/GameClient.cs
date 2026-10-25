@@ -2246,7 +2246,7 @@ namespace Lumiis.Client
             {
                 return _shopOpenNpcEntityId >= 0 && _world.Entities.TryGetValue(_shopOpenNpcEntityId, out ClientEntity npc)
                     ? npc.Name
-                    : "Händler";
+                    : ShopNpcService == NpcService.Blacksmith ? "Schmied" : "Händler";
             }
         }
 

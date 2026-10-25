@@ -776,6 +776,8 @@
     -unity-background-scale-mode: stretch-to-fill;
     align-items: center;
     justify-content: center;
+    padding-left: 116px; /* Platz für die HP-Kugel, damit Slot 1 sie nie berührt */
+    padding-right: 116px;
 }
 
 .hud-taskbar-center {
@@ -793,7 +795,7 @@
 .hud-quickslot {
     width: 40px;
     height: 40px;
-    margin: 0 2px;
+    margin: 0 3px;
     background-image: resource("UI/Skin/slot");
     -unity-slice-left: 4;
     -unity-slice-right: 4;
@@ -844,10 +846,15 @@
 
 .hud-quickslot-key {
     position: absolute;
-    left: 3px;
-    top: 1px;
+    left: -3px;
+    top: -5px;
+    padding: 0 3px;
+    background-color: rgba(10, 8, 6, 0.85);
+    border-width: 1px;
+    border-color: rgb(120, 96, 58);
+    border-radius: 2px;
     color: rgb(255, 214, 110);
-    font-size: 12px;
+    font-size: 11px;
     -unity-font-style: bold;
     -unity-text-outline-width: 0;
     text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
@@ -1159,7 +1166,7 @@
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    min-height: 20px;
+    min-height: 22px;
 }
 
 .hud-stat-name {

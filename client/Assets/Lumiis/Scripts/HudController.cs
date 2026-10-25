@@ -25,6 +25,8 @@ namespace Lumiis.Client
         private const float MinimapSize = 148f;
         private const float MinimapZoom = 3f;
         private const int InventoryColumns = 5;
+        private const float TaskbarHeight = 68f;
+        private const float WindowMargin = 4f;
 
         private static readonly ChatChannel[] ChatChannelCycle = { ChatChannel.Map, ChatChannel.Global, ChatChannel.Whisper };
 
@@ -486,7 +488,7 @@ namespace Lumiis.Client
                 if (_dragWindow != window || !titlebar.HasPointerCapture(evt.pointerId)) return;
                 Vector2 delta = (Vector2)evt.position - _dragStartPointer;
                 float maxX = Mathf.Max(0f, _root.layout.width - window.layout.width);
-                float maxY = Mathf.Max(0f, _root.layout.height - 40f);
+                float maxY = Mathf.Max(0f, _root.layout.height - TaskbarHeight - window.layout.height);
                 window.style.left = Mathf.Clamp(_dragStartWindow.x + delta.x, 0f, maxX);
                 window.style.top = Mathf.Clamp(_dragStartWindow.y + delta.y, 0f, maxY);
             });
@@ -495,6 +497,31 @@ namespace Lumiis.Client
                 if (titlebar.HasPointerCapture(evt.pointerId)) titlebar.ReleasePointer(evt.pointerId);
                 _dragWindow = null;
             });
+        }
+
+        // Hält offene Fenster oberhalb der Taskleiste (wichtig bei kleinen Auflösungen wie 1024x576).
+        private void KeepWindowsInView()
+        {
+            float rootHeight = _root.layout.height;
+            float rootWidth = _root.layout.width;
+            if (float.IsNaN(rootHeight) || rootHeight <= 0f) return;
+            foreach (VisualElement window in _openWindows)
+            {
+                if (window == _dragWindow) continue;
+                Rect r = window.layout;
+                if (float.IsNaN(r.height) || r.height <= 0f) continue;
+                float maxTop = Mathf.Max(WindowMargin, rootHeight - TaskbarHeight - r.height);
+                if (r.y > maxTop + 0.5f)
+                {
+                    window.style.top = maxTop;
+                    window.style.bottom = StyleKeyword.Auto;
+                }
+                if (r.xMax > rootWidth + 0.5f)
+                {
+                    window.style.left = Mathf.Max(0f, rootWidth - r.width);
+                    window.style.right = StyleKeyword.Auto;
+                }
+            }
         }
 
         private void ToggleWindow(VisualElement window)
@@ -546,7 +573,7 @@ namespace Lumiis.Client
             _inventoryYang = _root.Q<Label>("hud-inventory-yang");
 
             VisualElement grid = _root.Q<VisualElement>("hud-inventory-grid");
-            grid.style.width = InventoryColumns * 40f;
+            grid.style.width = InventoryColumns * 40f + 4f; // Puffer gegen Rundung, sonst bricht die Zeile um.
             grid.style.alignSelf = Align.Center;
             for (int i = 0; i < _inventorySlots.Length; i++)
             {
@@ -894,7 +921,7 @@ namespace Lumiis.Client
             _shopSignature = signature;
 
             grid.Clear();
-            grid.style.width = InventoryColumns * 40f;
+            grid.style.width = InventoryColumns * 40f + 4f; // Puffer gegen Rundung, sonst bricht die Zeile um.
             grid.style.alignSelf = Align.Center;
             foreach ((int ItemId, long BuyPrice) entry in _gameClient.ShopItems)
             {
@@ -1197,6 +1224,7 @@ namespace Lumiis.Client
 
             HandleHotkeys();
             UpdateContextMenu();
+            KeepWindowsInView();
             RefreshPlayer();
             RefreshTarget();
             RefreshQuickslots();
