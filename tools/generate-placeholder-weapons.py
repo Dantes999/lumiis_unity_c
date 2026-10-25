@@ -80,6 +80,24 @@ def axe(name):
     write(image, name)
 
 
+def spear(name):
+    image = Image.new("RGBA", (SIZE, SIZE), TRANSPARENT)
+    d = ImageDraw.Draw(image)
+
+    # Langer Stiel
+    rect(d, (60, 4, 68, 124), OUTLINE)
+    rect(d, (62, 6, 66, 122), WOOD)
+    for y in range(12, 118, 8):
+        d.line([(62, y), (66, y)], fill=WOOD_DARK, width=1)
+
+    # Speerspitze
+    poly(d, [(64, 2), (80, 26), (64, 44), (48, 26)], OUTLINE)
+    poly(d, [(64, 6), (76, 26), (64, 39), (52, 26)], STEEL)
+    d.line([(64, 10), (64, 36)], fill=STEEL_LIGHT, width=2)
+
+    write(image, name)
+
+
 def write(image, name):
     OUT.mkdir(parents=True, exist_ok=True)
     png = OUT / f"{name}.png"
@@ -94,11 +112,17 @@ def meta_text(name):
         "weapon_2_wood": "c1000000000000000000000000000001",
         "weapon_2_iron": "c1000000000000000000000000000002",
         "weapon_3_axe": "c1000000000000000000000000000003",
+        "weapon_2_short": "c1000000000000000000000000000004",
+        "weapon_2_steel": "c1000000000000000000000000000005",
+        "weapon_4_spear": "c1000000000000000000000000000006",
     }[name]
     sprite_id = {
         "weapon_2_wood": "d1000000000000000000000000000001",
         "weapon_2_iron": "d1000000000000000000000000000002",
         "weapon_3_axe": "d1000000000000000000000000000003",
+        "weapon_2_short": "d1000000000000000000000000000004",
+        "weapon_2_steel": "d1000000000000000000000000000005",
+        "weapon_4_spear": "d1000000000000000000000000000006",
     }[name]
     return f"""fileFormatVersion: 2
 guid: {guid}
@@ -204,4 +228,7 @@ TextureImporter:
 if __name__ == "__main__":
     sword("weapon_2_wood", WOOD, WOOD_DARK, wood=True)
     sword("weapon_2_iron", STEEL, STEEL_DARK, wood=False)
+    sword("weapon_2_short", STEEL, STEEL_DARK, wood=False)
+    sword("weapon_2_steel", STEEL_LIGHT, STEEL_DARK, wood=False)
     axe("weapon_3_axe")
+    spear("weapon_4_spear")
