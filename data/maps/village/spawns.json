@@ -14,6 +14,8 @@
     { "id": 12, "mobId": 1, "positionX": 50000, "positionY": 50200, "respawnSeconds": 30 },
     { "id": 13, "mobId": 2, "positionX": 50000, "positionY": 49800, "respawnSeconds": 60 },
     { "id": 14, "mobId": 1, "positionX": 50280, "positionY": 49720, "respawnSeconds": 30 },
-    { "id": 15, "mobId": 2, "positionX": 49720, "positionY": 50280, "respawnSeconds": 60 }
+    { "id": 15, "mobId": 2, "positionX": 49720, "positionY": 50280, "respawnSeconds": 60 },
+    { "id": 16, "mobId": 3, "positionX": 55000, "positionY": 48000, "respawnSeconds": 120 },
+    { "id": 17, "mobId": 4, "positionX": 60000, "positionY": 50000, "respawnSeconds": 180 }
   ]
 }

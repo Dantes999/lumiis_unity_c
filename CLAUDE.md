@@ -142,8 +142,9 @@ Spieler (Feld `Kind`, siehe unten), keine Unterklasse: Bewegungslogik (`MoveTo`/
 seit M4a, automatischer Respawn an SpawnPoints seit M4b - siehe Abschnitt "Kampf".
 
 Datenformat:
-- `data/mobs.json`: Mob-Typen (Id, Name, SpeedWire, WanderRadiusWire, WanderIntervalMinMs/MaxMs). Aktuell zwei
-  Platzhalter ("Wildhund" schnell/kurzer Intervall, "Waldschrat" langsam/langer Intervall). Geladen/validiert
+- `data/mobs.json`: Mob-Typen (Id, Name, SpeedWire, WanderRadiusWire, WanderIntervalMinMs/MaxMs). Aktuell vier Typen: zwei Platzhalter ("Wildhund", "Waldschrat") sowie seit dem Lumiis-MVP
+  "Lumiis des Kummers" (quasi stationärer Stein, hohe HP/Defense, garantiert ein Material) und "Waldboss"
+  (aggressiver Boss mit 1200 HP). Echte Wellen-Phasen (75/50/25 %) fehlen noch. Geladen/validiert
   über `MobCatalog` (`Lumiis.Data.Mobs`, analog zu `LookCatalog`).
 - `data/maps/village/spawns.json`: Spawn-Punkte (Id, MobId, PositionX/Y wire, RespawnSeconds). `RespawnSeconds`
   wird seit M4b ausgewertet (siehe Abschnitt "Kampf") - stirbt das dort verankerte Monster, respawnt nach

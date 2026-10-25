@@ -35,7 +35,7 @@ Gruppe, keine Quests, keine Lumiis-Steine, keine Bosse, kein Audio, keine echten
 
 | Feature | Warum | Beleg | Aufwand |
 |---|---|---|---|
-| Lumiis-Steine + ein Boss (Wellen 75/50/25 %, Loot, Respawn, Client-View) | explizit Alpha-Umfang; fehlt | `lumiis-2d/shared/metins.js`, `server/metin.js`, `server/stages/` | L |
+| Lumiis-Steine + ein Boss (Wellen 75/50/25 %, Loot, Respawn, Client-View) | **MVP umgesetzt**: `Lumiis des Kummers` (stationär, 800 HP, garantiertes Material) und `Waldboss` (1200 HP, aggressiv) als Mobs inkl. Client-Form/Farbe/Skalierung; echte Wellen-Phasen fehlen | `lumiis-2d/shared/metins.js`, `server/metin.js`, `server/stages/` | M |
 | Aufwertung +0…+9 (DB-Stufen, Material/Schutzrolle, Pakete, UI) | Design liegt fertig vor; günstiger Alpha-Gewinn | `docs/tasks/M6c-upgrade.md` | M |
 | Audio + konsistente Kampf-/Loot-VFX | **Audio-Platzhalter umgesetzt** (`AudioService`, prozedurale Clips); VFX weiterhin nur Ringe/Linien/Trail | `lumiis/packages/client/src/audio.ts` | –/M |
 | Item-Icons/Tooltips + kleines Content-Paket | Icons sind jetzt importiert; Item-Katalog noch 8 Einträge | `Resources/Icons`, `ItemIconCatalog`, `data/items.json` | S–M |

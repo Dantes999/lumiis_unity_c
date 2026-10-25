@@ -1490,7 +1490,7 @@ namespace Lumiis.Client
             {
                 var monsterGo = new GameObject("Monster_" + entity.Id + "_" + entity.Name);
                 var monsterView = monsterGo.AddComponent<MonsterView>();
-                monsterView.Initialize(MonsterShapeFor(entity.TypeId), MonsterColorFor(entity.TypeId));
+                monsterView.Initialize(MonsterShapeFor(entity.TypeId), MonsterColorFor(entity.TypeId), MonsterScaleFor(entity.TypeId));
                 monsterView.SetWorldPosition(entity.X / 100.0, entity.Y / 100.0);
                 _monsterViews[entity.Id] = monsterView;
                 if (_assetLabActive) HideForAssetLab(monsterGo);
@@ -1675,7 +1675,16 @@ namespace Lumiis.Client
         // Client kennt mobs.json bewusst nicht (Appearance-Feld im Paket bleibt bei Monstern ohnehin ohne
         // Bedeutung, siehe EntitySpawnPacket-Kommentar), deshalb eine feste, kleine Zuordnung statt eines
         // eigenen Katalogs. Unbekannte MobIds fallen auf Kreis/Grau zurück.
-        private Sprite MonsterShapeFor(int mobId) => mobId == 2 ? _monsterTriangleSprite : _monsterCircleSprite;
+        private Sprite MonsterShapeFor(int mobId)
+        {
+            switch (mobId)
+            {
+                case 2: return _monsterTriangleSprite; // Waldschrat
+                case 3: return _squareSprite;           // Lumiis-Stein
+                case 4: return _monsterTriangleSprite;  // Boss
+                default: return _monsterCircleSprite;
+            }
+        }
 
         private static Color MonsterColorFor(int mobId)
         {
@@ -1683,8 +1692,20 @@ namespace Lumiis.Client
             {
                 1 => new Color(0.55f, 0.35f, 0.2f), // Wildhund: braun
                 2 => new Color(0.3f, 0.5f, 0.25f),  // Waldschrat: grün
+                3 => new Color(0.35f, 0.45f, 0.8f), // Lumiis-Stein: blau
+                4 => new Color(0.6f, 0.15f, 0.15f), // Boss: dunkelrot
                 _ => Color.gray
             };
+        }
+
+        private static float MonsterScaleFor(int mobId)
+        {
+            switch (mobId)
+            {
+                case 3: return 1.15f;
+                case 4: return 1.8f;
+                default: return 1f;
+            }
         }
 
         private void OnEntityDespawned(int entityId)

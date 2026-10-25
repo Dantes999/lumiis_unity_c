@@ -11,11 +11,12 @@ namespace Lumiis.Client
     {
         private SpriteRenderer _renderer;
 
-        public void Initialize(Sprite sprite, Color color)
+        public void Initialize(Sprite sprite, Color color, float uniformScale = 1f)
         {
             _renderer = gameObject.AddComponent<SpriteRenderer>();
             _renderer.sprite = sprite;
             _renderer.color = color;
+            transform.localScale = new Vector3(uniformScale, uniformScale, 1f);
         }
 
         public void SetWorldPosition(double worldX, double worldY)
