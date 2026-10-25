@@ -63,6 +63,11 @@ public sealed class Entity
     /// <summary>Nur Kind=GroundItem: ab diesem Zeitpunkt wird der Drop entfernt (0 = nie, z. B. in Tests).</summary>
     public long DespawnAtMs { get; set; }
 
+    /// <summary>Gruppenrollen-Bonus in Prozent (data/party.json, gesetzt von GameServer), angewendet in
+    /// World.RecomputeDerivedStats nach Ausrüstung und Kampfrausch. 0 = kein Bonus.</summary>
+    public int PartyAttackBonusPercent { get; set; }
+    public int PartyDefenseBonusPercent { get; set; }
+
     /// <summary>Nur Kind=Npc: technischer Dienst (Shop/Schmied), aus data/npcs.json.</summary>
     public NpcService Service { get; set; }
 

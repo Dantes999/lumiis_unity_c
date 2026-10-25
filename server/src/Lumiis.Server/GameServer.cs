@@ -15,6 +15,7 @@ using Lumiis.Data.Items;
 using Lumiis.Data.Maps;
 using Lumiis.Data.Mobs;
 using Lumiis.Data.Npcs;
+using Lumiis.Data.Parties;
 using Lumiis.Data.Progression;
 using Lumiis.Data.Skills;
 using Lumiis.Data.Upgrade;
@@ -55,14 +56,6 @@ public sealed class GameServer : INetEventListener
             Peer = peer;
             CloseAtMs = closeAtMs;
         }
-    }
-
-    /// <summary>M7-Party: Leader + Mitglieder als EntityIds; die Zuordnung EntityId -> Party liegt in
-    /// _partyByEntityId. Kein DB-Speichern (Alpha-MVP), Gruppen lösen sich beim Verlassen/Disconnect auf.</summary>
-    private sealed class PartyState
-    {
-        public int LeaderEntityId;
-        public readonly List<int> Members = new();
     }
 
     /// <summary>Ergebnis eines asynchronen Charakter-Lookups (siehe LookupCharacterForJoinAsync), auf dem
@@ -166,10 +159,9 @@ public sealed class GameServer : INetEventListener
     private readonly Func<long> _nowMs;
     private readonly Dictionary<int, ConnectionState> _connections = new();
 
-    /// <summary>M7-Party: EntityId -> Gruppe und offene Einladungen (Invitee -> Inviter). Kein DB-Save.</summary>
-    private readonly Dictionary<int, PartyState> _partyByEntityId = new();
-    private readonly Dictionary<int, int> _pendingPartyInvites = new();
-    private const int MaxPartySize = 8;
+    /// <summary>Gruppen nach CharacterId (Protocol.Version 20): Mitglieder bleiben beim Ausloggen in der
+    /// Gruppe, siehe PartyManager. Nur im Speicher, kein DB-Save.</summary>
+    private readonly PartyManager _parties;
     private readonly ConcurrentQueue<JoinLookupResult> _pendingJoinResults = new();
     private readonly Channel<PositionSaveRequest> _positionSaveChannel;
     private readonly Channel<YangSaveRequest> _yangSaveChannel;
@@ -216,8 +208,9 @@ public sealed class GameServer : INetEventListener
         ClassCatalog? classCatalog = null, ItemCatalog? itemCatalog = null, NpcCatalog? npcCatalog = null, NpcSpawnCatalog? npcSpawnCatalog = null,
         ProgressionCatalog? progressionCatalog = null, SkillCatalog? skillCatalog = null, MapCatalog? mapCatalog = null,
         UpgradeCatalog? upgradeCatalog = null, Random? random = null, MetinCatalog? metinCatalog = null,
-        bool useGroundDrops = false, bool requireBlacksmithForUpgrade = false)
+        bool useGroundDrops = false, bool requireBlacksmithForUpgrade = false, PartyCatalog? partyCatalog = null)
     {
+        _parties = new PartyManager(partyCatalog);
         _config = config;
         _logger = logger;
         _tokenService = tokenService;
@@ -452,6 +445,13 @@ public sealed class GameServer : INetEventListener
             foreach (int expiredGroundItemId in world.RemoveExpiredGroundItems(tickNowMs))
                 BroadcastDespawn(expiredGroundItemId);
         }
+
+        // Gruppe: Offline-Mitglieder nach Ablauf der Frist (data/party.json) entfernen.
+        (List<Party> expiredParties, List<PartyMember> expiredMembers) = _parties.ExpireOfflineMembers(tickNowMs);
+        foreach (PartyMember member in expiredMembers.Where(m => m.IsOnline))
+            NotifyPartyRemovals(null, new List<PartyMember> { member });
+        foreach (Party party in expiredParties)
+            SendPartyChanged(party);
 
         foreach (Entity entity in arrived)
             SendToVisible(entity.Id, new EntityStopPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY });
@@ -941,7 +941,15 @@ public sealed class GameServer : INetEventListener
                     _characterSaveChannel.Writer.TryWrite(BuildCharacterSaveRequest(entity));
                 }
 
-                RemoveFromParty(entityId, notifyRemaining: true);
+                // Gruppe: Mitglied bleibt offline in der Gruppe (PartyManager.SetOffline), Rest wird synchronisiert.
+                if (conn.World != null && conn.World.TryGet(entityId, out Entity? leaving) && leaving!.CharacterId is int leavingCharacterId)
+                {
+                    Party? remainingParty = _parties.SetOffline(leavingCharacterId, leaving.Level, leaving.CurrentHp, leaving.MaxHp, _nowMs(),
+                        out List<PartyMember> dissolved);
+                    // Die Entity ist gleich weg: keine Pakete/Boni mehr an sie selbst.
+                    dissolved.RemoveAll(m => m.CharacterId == leavingCharacterId);
+                    NotifyPartyRemovals(remainingParty, dissolved);
+                }
                 (conn.World ?? _world).Remove(entityId);
                 BroadcastDespawn(entityId);
 
@@ -1045,6 +1053,19 @@ public sealed class GameServer : INetEventListener
                 break;
             case PartySnapshotRequestPacket:
                 HandlePartySnapshotRequest(conn);
+                break;
+            case PartyKickRequestPacket partyKick:
+                if (TryGetOwnPlayer(conn, out Entity? kicker)) KickFromParty(conn, kicker!, partyKick.TargetName);
+                break;
+            case PartyPromoteRequestPacket partyPromote:
+                if (TryGetOwnPlayer(conn, out Entity? promoter)) PromotePartyMember(conn, promoter!, partyPromote.TargetName);
+                break;
+            case PartySetRoleRequestPacket partySetRole:
+                if (TryGetOwnPlayer(conn, out Entity? roleSetter))
+                {
+                    if (!Enum.IsDefined(typeof(PartyRole), partySetRole.Role)) SendSystemChat(conn, "Diese Rolle gibt es nicht.");
+                    else SetPartyRole(conn, roleSetter!, partySetRole.TargetName, partySetRole.Role);
+                }
                 break;
             case AttackRequestPacket attack:
                 HandleAttackRequest(conn, attack);
@@ -1361,6 +1382,10 @@ public sealed class GameServer : INetEventListener
         // World.TryJoin oben bereits Teil der World, der nächste UpdateVisibility-Tick erkennt sie für jede
         // Verbindung im AOI-Radius als "neu sichtbar" und verschickt EntitySpawn ganz normal über den
         // Tick-Diff (Abschnitt 3) - kein Sonderfall nötig.
+        // Gruppe: war der Charakter beim Ausloggen in einer Gruppe, ist er jetzt wieder online darin.
+        if (_parties.SetOnline(character.Id, entity.Id) is Party rejoinedParty)
+            SendPartyChanged(rejoinedParty);
+
         _logger.Info($"{entity.Name} (Entity {entity.Id}, Character {character.Id}) beigetreten (Karte {world.MapId})");
     }
 
@@ -1455,7 +1480,7 @@ public sealed class GameServer : INetEventListener
         World world = conn.World ?? _world;
         // Beute des Killers darf während der Besitzfrist auch dessen Gruppe aufheben.
         (bool success, InventoryActionFailedReason reason) = world.TryPickupItem(entityId, request.GroundItemEntityId, _nowMs(),
-            ownerEntityId => _partyByEntityId.TryGetValue(entityId, out PartyState? party) && party.Members.Contains(ownerEntityId));
+            ownerEntityId => SharesParty(entityId, ownerEntityId));
         if (!success)
         {
             conn.Peer.SendPacket(new InventoryActionFailedPacket { Reason = reason });
@@ -1767,14 +1792,20 @@ public sealed class GameServer : INetEventListener
 
     private void HandlePartyLeaveRequest(ConnectionState conn)
     {
-        if (conn.EntityId is not int entityId) return;
-        LeaveParty(conn, entityId);
+        if (TryGetOwnPlayer(conn, out Entity? sender)) LeaveParty(conn, sender!);
     }
 
     private void HandlePartySnapshotRequest(ConnectionState conn)
     {
-        if (conn.EntityId is not int entityId) return;
-        SendPartySnapshot(conn, entityId);
+        if (TryGetOwnPlayer(conn, out Entity? sender)) SendPartySnapshot(conn, sender!);
+    }
+
+    /// <summary>Für Beute-Besitz (Boden-Drops): teilen die beiden Spieler-Entities eine Gruppe?</summary>
+    private bool SharesParty(int entityIdA, int entityIdB)
+    {
+        return TryGetEntity(entityIdA, out Entity? a) && a?.CharacterId is int characterA
+            && TryGetEntity(entityIdB, out Entity? b) && b?.CharacterId is int characterB
+            && _parties.AreInSameParty(characterA, characterB);
     }
 
     private bool TryGetOwnPlayer(ConnectionState conn, out Entity? entity)
@@ -1783,9 +1814,9 @@ public sealed class GameServer : INetEventListener
         return conn.EntityId is int entityId && TryGetEntity(entityId, out entity) && entity != null && entity.Kind == EntityKind.Player;
     }
 
-    /// <summary>M7-Party-MVP über Chat-Befehle: /invite Name, /accept, /decline, /leave, /party.
-    /// Kein DB-Save, keine Rollen; max. 8 Mitglieder, Leiter ist der Einladende. Gibt true zurück, wenn der
-    /// Text ein bekannter Befehl war (dann nicht als Chat gebroadcastet wird).</summary>
+    /// <summary>Gruppen-Befehle über den Chat: /invite Name, /accept, /decline, /leave, /party, seit
+    /// Protocol.Version 20 zusätzlich /kick Name, /promote Name und /role Name angreifer|verteidiger|keine
+    /// (nur der Leiter). Gibt true zurück, wenn der Text ein Befehl war (dann nicht als Chat gebroadcastet).</summary>
     private bool HandlePartyCommand(ConnectionState conn, Entity sender, string text)
     {
         if (!text.StartsWith("/", StringComparison.Ordinal)) return false;
@@ -1798,7 +1829,7 @@ public sealed class GameServer : INetEventListener
         {
             case "/party":
             case "/gruppe":
-                SendPartySnapshot(conn, sender.Id);
+                SendPartySnapshot(conn, sender);
                 return true;
 
             case "/invite":
@@ -1818,12 +1849,57 @@ public sealed class GameServer : INetEventListener
 
             case "/leave":
             case "/verlassen":
-                LeaveParty(conn, sender.Id);
+                LeaveParty(conn, sender);
                 return true;
 
-            default:
-                SendSystemChat(conn, "Unbekannter Befehl. Verfügbar: /invite Name, /accept, /decline, /leave, /party");
+            case "/kick":
+            case "/entfernen":
+                KickFromParty(conn, sender, argument);
                 return true;
+
+            case "/promote":
+            case "/leiter":
+                PromotePartyMember(conn, sender, argument);
+                return true;
+
+            case "/role":
+            case "/rolle":
+            {
+                string[] roleParts = argument.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+                if (roleParts.Length < 2 || !TryParsePartyRole(roleParts[1], out PartyRole role))
+                {
+                    SendSystemChat(conn, "Verwendung: /role <Name> angreifer|verteidiger|keine");
+                    return true;
+                }
+                SetPartyRole(conn, sender, roleParts[0], role);
+                return true;
+            }
+
+            default:
+                SendSystemChat(conn, "Unbekannter Befehl. Verfügbar: /invite Name, /accept, /decline, /leave, /party, /kick Name, /promote Name, /role Name Rolle");
+                return true;
+        }
+    }
+
+    private static bool TryParsePartyRole(string text, out PartyRole role)
+    {
+        switch (text.Trim().ToLowerInvariant())
+        {
+            case "angreifer":
+            case "attacker":
+                role = PartyRole.Attacker;
+                return true;
+            case "verteidiger":
+            case "defender":
+                role = PartyRole.Defender;
+                return true;
+            case "keine":
+            case "none":
+                role = PartyRole.None;
+                return true;
+            default:
+                role = PartyRole.None;
+                return false;
         }
     }
 
@@ -1834,39 +1910,31 @@ public sealed class GameServer : INetEventListener
             SendSystemChat(conn, "Verwendung: /invite <Name>");
             return;
         }
+        if (sender.CharacterId is not int senderCharacterId) return;
 
         Entity? target = FindPlayerEntityByName(targetName);
-        if (target == null)
+        if (target?.CharacterId is not int targetCharacterId)
         {
             SendSystemChat(conn, "Spieler nicht gefunden: " + targetName);
             return;
         }
-        if (target.Id == sender.Id)
-        {
-            SendSystemChat(conn, "Du kannst dich nicht selbst einladen.");
-            return;
-        }
-        if (_partyByEntityId.ContainsKey(target.Id))
-        {
-            SendSystemChat(conn, target.Name + " ist bereits in einer Gruppe.");
-            return;
-        }
 
-        if (_partyByEntityId.TryGetValue(sender.Id, out PartyState? existing))
+        switch (_parties.Invite(senderCharacterId, targetCharacterId))
         {
-            if (existing.LeaderEntityId != sender.Id)
-            {
+            case PartyActionResult.TargetIsSelf:
+                SendSystemChat(conn, "Du kannst dich nicht selbst einladen.");
+                return;
+            case PartyActionResult.AlreadyInParty:
+                SendSystemChat(conn, target.Name + " ist bereits in einer Gruppe.");
+                return;
+            case PartyActionResult.NotLeader:
                 SendSystemChat(conn, "Nur der Gruppenleiter kann einladen.");
                 return;
-            }
-            if (existing.Members.Count >= MaxPartySize)
-            {
-                SendSystemChat(conn, "Die Gruppe ist voll (max. " + MaxPartySize + ").");
+            case PartyActionResult.PartyFull:
+                SendSystemChat(conn, "Die Gruppe ist voll (max. " + _parties.Catalog.MaxMembers + ").");
                 return;
-            }
         }
 
-        _pendingPartyInvites[target.Id] = sender.Id;
         SendSystemChat(conn, "Einladung an " + target.Name + " gesendet.");
         ConnectionState? targetConn = FindConnectionByEntityId(target.Id);
         if (targetConn != null)
@@ -1878,129 +1946,247 @@ public sealed class GameServer : INetEventListener
 
     private void AcceptPartyInvite(ConnectionState conn, Entity sender)
     {
-        if (_partyByEntityId.ContainsKey(sender.Id))
+        if (sender.CharacterId is not int senderCharacterId) return;
+
+        PartyActionResult result = _parties.Accept(senderCharacterId, sender.Name, sender.Id,
+            inviterCharacterId => FindOnlinePlayerByCharacterId(inviterCharacterId) is Entity inviter ? (inviter.Id, inviter.Name) : null,
+            out Party? party);
+
+        switch (result)
         {
-            SendSystemChat(conn, "Du bist bereits in einer Gruppe.");
-            return;
-        }
-        if (!_pendingPartyInvites.Remove(sender.Id, out int inviterId))
-        {
-            SendSystemChat(conn, "Keine offene Einladung.");
-            return;
-        }
-        if (!TryGetEntity(inviterId, out Entity? inviter) || inviter == null || inviter.Kind != EntityKind.Player)
-        {
-            SendSystemChat(conn, "Der Einladende ist nicht mehr online.");
-            return;
+            case PartyActionResult.AlreadyInParty:
+                SendSystemChat(conn, "Du bist bereits in einer Gruppe.");
+                return;
+            case PartyActionResult.NoInvite:
+                SendSystemChat(conn, "Keine offene Einladung.");
+                return;
+            case PartyActionResult.InviterGone:
+                SendSystemChat(conn, "Der Einladende ist nicht mehr online.");
+                return;
+            case PartyActionResult.NotLeader:
+                SendSystemChat(conn, "Der Einladende leitet die Gruppe nicht mehr.");
+                return;
+            case PartyActionResult.PartyFull:
+                SendSystemChat(conn, "Die Gruppe ist voll (max. " + _parties.Catalog.MaxMembers + ").");
+                return;
         }
 
-        if (!_partyByEntityId.TryGetValue(inviterId, out PartyState? party))
-        {
-            party = new PartyState { LeaderEntityId = inviterId };
-            party.Members.Add(inviterId);
-            _partyByEntityId[inviterId] = party;
-        }
-
-        if (party.Members.Count >= MaxPartySize)
-        {
-            SendSystemChat(conn, "Die Gruppe ist voll (max. " + MaxPartySize + ").");
-            return;
-        }
-
-        if (!party.Members.Contains(sender.Id))
-            party.Members.Add(sender.Id);
-        _partyByEntityId[sender.Id] = party;
-
-        SendSystemChat(conn, "Du bist der Gruppe von " + inviter.Name + " beigetreten.");
+        PartyMember leader = party!.Find(party.LeaderCharacterId)!;
+        SendSystemChat(conn, "Du bist der Gruppe von " + leader.Name + " beigetreten.");
         SendPartyChanged(party);
     }
 
     private void DeclinePartyInvite(ConnectionState conn, Entity sender)
     {
-        if (!_pendingPartyInvites.Remove(sender.Id, out int inviterId))
+        if (sender.CharacterId is not int senderCharacterId) return;
+        if (!_parties.TryTakeInvite(senderCharacterId, out int inviterCharacterId))
         {
             SendSystemChat(conn, "Keine offene Einladung.");
             return;
         }
 
         SendSystemChat(conn, "Einladung abgelehnt.");
-        ConnectionState? inviterConn = FindConnectionByEntityId(inviterId);
-        if (inviterConn != null)
+        if (FindOnlinePlayerByCharacterId(inviterCharacterId) is Entity inviter && FindConnectionByEntityId(inviter.Id) is ConnectionState inviterConn)
             SendSystemChat(inviterConn, sender.Name + " hat die Einladung abgelehnt.");
     }
 
-    private void LeaveParty(ConnectionState conn, int entityId)
+    private void LeaveParty(ConnectionState conn, Entity sender)
     {
-        if (!_partyByEntityId.ContainsKey(entityId))
+        if (sender.CharacterId is not int senderCharacterId
+            || _parties.Leave(senderCharacterId, out Party? remaining, out List<PartyMember> removed) != PartyActionResult.Ok)
         {
             conn.Peer.SendPacket(new PartyChangedPacket { LeaderEntityId = 0 });
             SendSystemChat(conn, "Du bist in keiner Gruppe.");
             return;
         }
 
-        RemoveFromParty(entityId, notifyRemaining: true);
-        conn.Peer.SendPacket(new PartyChangedPacket { LeaderEntityId = 0 });
         SendSystemChat(conn, "Du hast die Gruppe verlassen.");
+        NotifyPartyRemovals(remaining, removed);
     }
 
-    private void RemoveFromParty(int entityId, bool notifyRemaining)
+    private void KickFromParty(ConnectionState conn, Entity sender, string targetName)
     {
-        _pendingPartyInvites.Remove(entityId);
-        foreach (int invitee in new List<int>(_pendingPartyInvites.Keys))
+        if (string.IsNullOrWhiteSpace(targetName))
         {
-            if (_pendingPartyInvites[invitee] == entityId)
-                _pendingPartyInvites.Remove(invitee);
+            SendSystemChat(conn, "Verwendung: /kick <Name>");
+            return;
+        }
+        if (sender.CharacterId is not int senderCharacterId) return;
+
+        PartyActionResult result = _parties.Kick(senderCharacterId, targetName, out Party? remaining, out List<PartyMember> removed);
+        if (result != PartyActionResult.Ok)
+        {
+            SendSystemChat(conn, DescribePartyFailure(result, targetName));
+            return;
         }
 
-        if (!_partyByEntityId.Remove(entityId, out PartyState? party)) return;
-        party.Members.Remove(entityId);
-        if (party.Members.Count == 0) return;
-
-        if (party.LeaderEntityId == entityId)
-            party.LeaderEntityId = party.Members[0];
-
-        if (notifyRemaining)
-            SendPartyChanged(party);
+        foreach (PartyMember member in removed)
+        {
+            if (string.Equals(member.Name, targetName, StringComparison.OrdinalIgnoreCase)
+                && member.EntityId is int kickedEntityId && FindConnectionByEntityId(kickedEntityId) is ConnectionState kickedConn)
+                SendSystemChat(kickedConn, "Du wurdest aus der Gruppe entfernt.");
+        }
+        SendSystemChat(conn, targetName + " wurde aus der Gruppe entfernt.");
+        NotifyPartyRemovals(remaining, removed);
     }
 
-    private void SendPartySnapshot(ConnectionState conn, int entityId)
+    private void PromotePartyMember(ConnectionState conn, Entity sender, string targetName)
     {
-        if (_partyByEntityId.TryGetValue(entityId, out PartyState? party))
+        if (string.IsNullOrWhiteSpace(targetName))
+        {
+            SendSystemChat(conn, "Verwendung: /promote <Name>");
+            return;
+        }
+        if (sender.CharacterId is not int senderCharacterId) return;
+
+        PartyActionResult result = _parties.Promote(senderCharacterId, targetName, out Party? party);
+        if (result != PartyActionResult.Ok)
+        {
+            SendSystemChat(conn, DescribePartyFailure(result, targetName));
+            return;
+        }
+
+        SendPartyChanged(party!);
+        SendPartySystemChat(party!, party!.Find(party.LeaderCharacterId)!.Name + " leitet jetzt die Gruppe.");
+    }
+
+    private void SetPartyRole(ConnectionState conn, Entity sender, string targetName, PartyRole role)
+    {
+        if (sender.CharacterId is not int senderCharacterId) return;
+
+        PartyActionResult result = _parties.SetRole(senderCharacterId, targetName, role, out Party? party, out PartyMember? target);
+        if (result != PartyActionResult.Ok)
+        {
+            SendSystemChat(conn, DescribePartyFailure(result, targetName));
+            return;
+        }
+
+        SendPartyChanged(party!);
+        string roleName = role == PartyRole.None ? "keine Rolle"
+            : _parties.Catalog.TryGetRole(role, out PartyRoleDefinition definition) ? "die Rolle " + definition.Name : role.ToString();
+        SendPartySystemChat(party!, target!.Name + " hat jetzt " + roleName + ".");
+    }
+
+    private static string DescribePartyFailure(PartyActionResult result, string targetName) => result switch
+    {
+        PartyActionResult.NotInParty => "Du bist in keiner Gruppe.",
+        PartyActionResult.NotLeader => "Nur der Gruppenleiter kann das.",
+        PartyActionResult.TargetNotMember => targetName + " ist nicht in deiner Gruppe.",
+        PartyActionResult.TargetIsSelf => "Das geht nicht mit dir selbst.",
+        PartyActionResult.TargetOffline => targetName + " ist gerade offline.",
+        PartyActionResult.UnknownRole => "Diese Rolle gibt es nicht.",
+        _ => "Gruppenaktion fehlgeschlagen."
+    };
+
+    /// <summary>Verbliebene Gruppe neu synchronisieren, entfernten Online-Mitgliedern ein leeres
+    /// PartyChanged schicken und ihre Rollen-Boni zurücknehmen.</summary>
+    private void NotifyPartyRemovals(Party? remaining, List<PartyMember> removed)
+    {
+        foreach (PartyMember member in removed)
+        {
+            if (member.EntityId is not int entityId) continue;
+            FindConnectionByEntityId(entityId)?.Peer.SendPacket(new PartyChangedPacket { LeaderEntityId = 0 });
+            ApplyPartyRoleBonus(entityId, null);
+        }
+        if (remaining != null)
+            SendPartyChanged(remaining);
+    }
+
+    private void SendPartySystemChat(Party party, string text)
+    {
+        foreach (PartyMember member in party.Members)
+        {
+            if (member.EntityId is int entityId && FindConnectionByEntityId(entityId) is ConnectionState memberConn)
+                SendSystemChat(memberConn, text);
+        }
+    }
+
+    private void SendPartySnapshot(ConnectionState conn, Entity sender)
+    {
+        if (sender.CharacterId is int characterId && _parties.GetParty(characterId) is Party party)
             SendPartyChanged(party);
         else
             conn.Peer.SendPacket(new PartyChangedPacket { LeaderEntityId = 0 });
     }
 
-    private void SendPartyChanged(PartyState party)
+    /// <summary>Voller Gruppenstand an alle Online-Mitglieder; aktualisiert dabei auch deren Rollen-Boni
+    /// (Mitgliedschaft, Rolle und Online-Zahl können sich geändert haben).</summary>
+    private void SendPartyChanged(Party party)
     {
-        var packet = new PartyChangedPacket { LeaderEntityId = party.LeaderEntityId };
-        foreach (int memberId in party.Members)
+        PartyMember? leader = party.Find(party.LeaderCharacterId);
+        var packet = new PartyChangedPacket { LeaderEntityId = leader?.EntityId ?? 0 };
+        foreach (PartyMember member in party.Members)
         {
-            if (TryGetEntity(memberId, out Entity? entity) && entity != null)
-                packet.Members.Add((memberId, entity.Name, entity.Level, entity.CurrentHp, entity.MaxHp));
+            if (member.EntityId is int entityId && TryGetEntity(entityId, out Entity? entity) && entity != null)
+                packet.Members.Add((entityId, member.Name, entity.Level, entity.CurrentHp, entity.MaxHp));
+            else
+                packet.Members.Add((0, member.Name, member.LastLevel, member.LastHp, member.LastMaxHp));
+            packet.MemberStatus.Add((member.IsOnline, member.Role));
         }
 
         byte[] data = PacketCodec.Encode(packet);
-        foreach (int memberId in party.Members)
-            FindConnectionByEntityId(memberId)?.Peer.Send(data, DeliveryMethod.ReliableOrdered);
+        foreach (PartyMember member in party.Members)
+        {
+            if (member.EntityId is not int entityId) continue;
+            FindConnectionByEntityId(entityId)?.Peer.Send(data, DeliveryMethod.ReliableOrdered);
+            ApplyPartyRoleBonus(entityId, party.OnlineCount >= 2 ? member.Role : null);
+        }
     }
 
     private void SendPartyChangedForEntity(int entityId)
     {
-        if (_partyByEntityId.TryGetValue(entityId, out PartyState? party))
+        if (TryGetEntity(entityId, out Entity? entity) && entity?.CharacterId is int characterId
+            && _parties.GetParty(characterId) is Party party)
             SendPartyChanged(party);
     }
 
-    /// <summary>M7-Party: andere Gruppenmitglieder erhalten die Hälfte des Kill-XP (mind. 1) und ein
-    /// CharacterStatsPacket; bei Levelaufstieg wird sofort gespeichert. Kein Distanz-Check (eine Karte).</summary>
+    /// <summary>Setzt den Rollen-Bonus (data/party.json) auf die Entity; null bzw. PartyRole.None = kein
+    /// Bonus. Nur bei einer tatsächlichen Änderung werden Werte neu berechnet und ein CharacterStatsPacket
+    /// verschickt.</summary>
+    private void ApplyPartyRoleBonus(int entityId, PartyRole? role)
+    {
+        if (!TryGetEntity(entityId, out Entity? entity) || entity == null) return;
+
+        int attackPercent = 0;
+        int defensePercent = 0;
+        if (role is PartyRole activeRole && _parties.Catalog.TryGetRole(activeRole, out PartyRoleDefinition definition))
+        {
+            attackPercent = definition.AttackPercent;
+            defensePercent = definition.DefensePercent;
+        }
+        if (entity.PartyAttackBonusPercent == attackPercent && entity.PartyDefenseBonusPercent == defensePercent) return;
+
+        entity.PartyAttackBonusPercent = attackPercent;
+        entity.PartyDefenseBonusPercent = defensePercent;
+        FindWorldOfEntity(entityId)?.RecomputeDerivedStats(entityId);
+        FindConnectionByEntityId(entityId)?.Peer.SendPacket(BuildCharacterStatsPacket(entity));
+    }
+
+    private Entity? FindOnlinePlayerByCharacterId(int characterId)
+    {
+        foreach (World world in _worlds.Values)
+        {
+            foreach (Entity entity in world.Entities)
+            {
+                if (entity.Kind == EntityKind.Player && entity.CharacterId == characterId)
+                    return entity;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>Gruppenmitglieder (online) erhalten XpSharePercent des Kill-XP (mind. 1, data/party.json) und
+    /// ein CharacterStatsPacket; bei Levelaufstieg wird sofort gespeichert. Kein Distanz-Check.</summary>
     private void SharePartyXp(int attackerId, long xpAwarded)
     {
-        if (xpAwarded <= 0 || !_partyByEntityId.TryGetValue(attackerId, out PartyState? party)) return;
-        long share = Math.Max(1, xpAwarded / 2);
+        if (xpAwarded <= 0 || !TryGetEntity(attackerId, out Entity? attacker) || attacker?.CharacterId is not int attackerCharacterId) return;
+        if (_parties.GetParty(attackerCharacterId) is not Party party) return;
+        long share = _parties.Catalog.XpSharePercent <= 0 ? 0 : Math.Max(1, xpAwarded * _parties.Catalog.XpSharePercent / 100);
+        if (share <= 0) return;
 
-        foreach (int memberId in party.Members)
+        foreach (PartyMember partyMember in party.Members)
         {
-            if (memberId == attackerId) continue;
+            if (partyMember.EntityId is not int memberId || memberId == attackerId) continue;
             if (!TryGetEntity(memberId, out Entity? member) || member == null) continue;
 
             World? memberWorld = FindWorldOfEntity(memberId);
@@ -2010,7 +2196,7 @@ public sealed class GameServer : INetEventListener
 
             ConnectionState? memberConn = FindConnectionByEntityId(memberId);
             memberConn?.Peer.SendPacket(BuildCharacterStatsPacket(member));
-            if (leveledUp && member.CharacterId is int characterId)
+            if (leveledUp && member.CharacterId is int)
                 _characterSaveChannel.Writer.TryWrite(BuildCharacterSaveRequest(member));
         }
     }

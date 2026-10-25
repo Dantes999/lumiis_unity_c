@@ -6,6 +6,7 @@ using Lumiis.Data.Looks;
 using Lumiis.Data.Maps;
 using Lumiis.Data.Mobs;
 using Lumiis.Data.Npcs;
+using Lumiis.Data.Parties;
 using Lumiis.Data.Progression;
 using Lumiis.Data.Skills;
 using Lumiis.Data.Upgrade;
@@ -124,6 +125,18 @@ catch (Exception ex)
     return 1;
 }
 
+// Gruppenregeln (Größe, XP-Anteil, Offline-Frist, Rollen-Boni), Protocol.Version 20.
+PartyCatalog partyCatalog;
+try
+{
+    partyCatalog = PartyCatalog.LoadFromFile(Path.Combine(config.DataDir, "party.json"));
+}
+catch (Exception ex)
+{
+    logger.Error($"Serverstart fehlgeschlagen (Gruppen-Daten): {ex.Message}");
+    return 1;
+}
+
 // NPC-Typen (Sortimente) global; die Platzierungen je Karte kommen aus MapCatalog (maps/<id>/npcs.json).
 // looks.json wird hier erneut geladen (bewusst eine eigene, kleine Instanz statt Wiederverwendung der obigen -
 // günstig, hält die Datenblöcke unabhängig voneinander, siehe Item-Daten-Block).
@@ -210,7 +223,7 @@ Console.CancelKeyPress += (_, eventArgs) =>
     cts.Cancel();
 };
 
-GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, mobCatalog: mobCatalog, classCatalog: classCatalog, itemCatalog: itemCatalog, npcCatalog: npcCatalog, progressionCatalog: progressionCatalog, skillCatalog: skillCatalog, mapCatalog: mapCatalog, upgradeCatalog: upgradeCatalog, metinCatalog: metinCatalog, useGroundDrops: true, requireBlacksmithForUpgrade: true);
+GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, mobCatalog: mobCatalog, classCatalog: classCatalog, itemCatalog: itemCatalog, npcCatalog: npcCatalog, progressionCatalog: progressionCatalog, skillCatalog: skillCatalog, mapCatalog: mapCatalog, upgradeCatalog: upgradeCatalog, metinCatalog: metinCatalog, useGroundDrops: true, requireBlacksmithForUpgrade: true, partyCatalog: partyCatalog);
 
 try
 {

@@ -168,6 +168,74 @@ namespace Lumiis.Shared.Net
         }
     }
 
+    /// <summary>Gruppen-UI: der Leiter entfernt ein Mitglied (auch ein gerade offline gegangenes) per
+    /// Charaktername. Der Server prüft Leiterschaft und Mitgliedschaft.</summary>
+    public sealed class PartyKickRequestPacket : IPacket
+    {
+        public string TargetName = "";
+
+        public PacketId Id
+        {
+            get { return PacketId.PartyKickRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteString(TargetName);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            TargetName = reader.ReadString();
+        }
+    }
+
+    /// <summary>Gruppen-UI: der Leiter übergibt die Leitung an ein Mitglied, das online ist.</summary>
+    public sealed class PartyPromoteRequestPacket : IPacket
+    {
+        public string TargetName = "";
+
+        public PacketId Id
+        {
+            get { return PacketId.PartyPromoteRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteString(TargetName);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            TargetName = reader.ReadString();
+        }
+    }
+
+    /// <summary>Gruppen-UI: der Leiter weist einem Mitglied eine Rolle zu (PartyRole.None entfernt sie).
+    /// Unbekannte Rollenwerte werden vom Server abgelehnt, nicht getrennt (wie AllocateStatPoint).</summary>
+    public sealed class PartySetRoleRequestPacket : IPacket
+    {
+        public string TargetName = "";
+        public PartyRole Role;
+
+        public PacketId Id
+        {
+            get { return PacketId.PartySetRoleRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteString(TargetName);
+            writer.WriteByte((byte)Role);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            TargetName = reader.ReadString();
+            Role = (PartyRole)reader.ReadByte();
+        }
+    }
+
     /// <summary>Der Client greift eine sichtbare Entity an (M4a). Der Server prüft alles serverautoritativ
     /// erneut (Existenz, Leben, PvP, Cooldown, Reichweite) - siehe World.TryAttack.</summary>
     public sealed class AttackRequestPacket : IPacket

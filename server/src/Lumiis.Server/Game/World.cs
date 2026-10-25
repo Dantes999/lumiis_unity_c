@@ -1261,8 +1261,15 @@ public sealed class World
         if (entity.ActiveBuffs.TryGetValue(BuffType.AttackBuff, out (int Strength, long ExpiresAtMs) rage))
             attackAfterEquipment += (int)Math.Round(attackAfterEquipment * rage.Strength / 100.0);
 
+        int defenseAfterEquipment = entity.BaseDefense + defenseBonus;
+        // Gruppenrolle (data/party.json): zuletzt, auf den bereits verstärkten Wert, gerundet wie Kampfrausch.
+        if (entity.PartyAttackBonusPercent > 0)
+            attackAfterEquipment += (int)Math.Round(attackAfterEquipment * entity.PartyAttackBonusPercent / 100.0);
+        if (entity.PartyDefenseBonusPercent > 0)
+            defenseAfterEquipment += (int)Math.Round(defenseAfterEquipment * entity.PartyDefenseBonusPercent / 100.0);
+
         entity.Attack = attackAfterEquipment;
-        entity.Defense = entity.BaseDefense + defenseBonus;
+        entity.Defense = defenseAfterEquipment;
     }
 
     // ---- M5b: Shop/Yang (kein Netzwerkbezug, siehe GameServer für die Paket-Seite) ----

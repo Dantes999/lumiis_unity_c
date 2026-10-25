@@ -11,6 +11,7 @@ using Lumiis.Data.Looks;
 using Lumiis.Data.Maps;
 using Lumiis.Data.Mobs;
 using Lumiis.Data.Npcs;
+using Lumiis.Data.Parties;
 using Lumiis.Data.Progression;
 using Lumiis.Data.Skills;
 using Lumiis.Data.Upgrade;
@@ -71,7 +72,7 @@ namespace Lumiis.Tests.Integration
                 ItemCatalog? itemCatalog = null, NpcCatalog? npcCatalog = null, NpcSpawnCatalog? npcSpawnCatalog = null,
                 bool allowDebugCommands = false, ProgressionCatalog? progressionCatalog = null, SkillCatalog? skillCatalog = null,
                 MapCatalog? mapCatalog = null, UpgradeCatalog? upgradeCatalog = null, Random? random = null,
-                Action? beforeServerDbAccess = null)
+                Action? beforeServerDbAccess = null, PartyCatalog? partyCatalog = null)
             {
                 DbContextOptions<LumiisDbContext> options = new DbContextOptionsBuilder<LumiisDbContext>()
                     .UseInMemoryDatabase("gameserver-test-" + Guid.NewGuid())
@@ -92,7 +93,8 @@ namespace Lumiis.Tests.Integration
                     ? _dbFactory
                     : () => { beforeServerDbAccess(); return _dbFactory(); };
                 Server = new GameServer(config, new NullLogger(), TokenService, serverDbFactory, nowMs, collisionMap, mobCatalog, spawnCatalog, classCatalog,
-                    itemCatalog, npcCatalog, npcSpawnCatalog, progressionCatalog, skillCatalog, mapCatalog, upgradeCatalog, random);
+                    itemCatalog, npcCatalog, npcSpawnCatalog, progressionCatalog, skillCatalog, mapCatalog, upgradeCatalog, random,
+                    partyCatalog: partyCatalog);
             }
 
             /// <summary>level/xp/spent*/unspent*/currentHp/currentSp: M6a-Fortschrittsstand der neuen Zeile
@@ -503,10 +505,106 @@ namespace Lumiis.Tests.Integration
 
                 PumpForDuration(TimeSpan.FromMilliseconds(450), server, clientA, clientB);
                 clientB.Send(new ChatRequestPacket { Channel = ChatChannel.Map, Text = "/leave" });
+                // Eine Gruppe mit nur noch einem Mitglied löst sich auf (Protocol.Version 20).
                 Assert.True(Pump(() => clientA.Received.OfType<PartyChangedPacket>()
-                    .Any(p => p.Members.Count == 1), server, clientA, clientB));
+                    .Any(p => p.Members.Count == 0), server, clientA, clientB));
                 Assert.True(Pump(() => clientB.Received.OfType<PartyChangedPacket>()
                     .Any(p => p.Members.Count == 0), server, clientA, clientB));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void Party_MemberStaysInPartyWhileOffline_AndIsOnlineAgainAfterRejoin()
+        {
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var clientA = new TestClient();
+                var clientB = new TestClient();
+                clientA.Connect(server.ListenPort);
+                clientB.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, clientA, clientB));
+
+                (int aliceId, string aliceToken) = fixture.CreateCharacter("Alice");
+                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = aliceToken, CharacterId = aliceId });
+                Assert.True(Pump(() => clientA.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
+
+                (int bobId, string bobToken) = fixture.CreateCharacter("Bob");
+                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = bobToken, CharacterId = bobId });
+                Assert.True(Pump(() => clientB.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
+
+                clientA.Send(new ChatRequestPacket { Channel = ChatChannel.Map, Text = "/invite Bob" });
+                Assert.True(Pump(() => clientB.Received.OfType<PartyInviteReceivedPacket>().Any(), server, clientA, clientB));
+                clientB.Send(new PartyRespondRequestPacket { Accept = true });
+                Assert.True(Pump(() => clientA.Received.OfType<PartyChangedPacket>().Any(p => p.Members.Count == 2), server, clientA, clientB));
+
+                // Bob loggt aus: bleibt als offline (EntityId 0) in der Gruppe, Alice bleibt Leiterin.
+                clientB.Dispose();
+                Assert.True(Pump(() => clientA.Received.OfType<PartyChangedPacket>()
+                    .Any(p => p.Members.Count == 2 && !p.MemberStatus[p.Members.FindIndex(m => m.Name == "Bob")].Online), server, clientA));
+                PartyChangedPacket offline = clientA.Received.OfType<PartyChangedPacket>().Last();
+                Assert.Equal(0, offline.Members.Find(m => m.Name == "Bob").EntityId);
+                Assert.Equal(offline.Members.Find(m => m.Name == "Alice").EntityId, offline.LeaderEntityId);
+
+                // Bob kommt zurück: wieder online in derselben Gruppe, ohne neue Einladung.
+                using var clientB2 = new TestClient();
+                clientB2.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, clientA, clientB2));
+                clientB2.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = bobToken, CharacterId = bobId });
+                Assert.True(Pump(() => clientB2.Received.OfType<PartyChangedPacket>()
+                    .Any(p => p.Members.Count == 2 && p.MemberStatus.All(s => s.Online)), server, clientA, clientB2));
+                Assert.True(Pump(() => clientA.Received.OfType<PartyChangedPacket>().Last().MemberStatus.All(s => s.Online), server, clientA, clientB2));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void Party_LeaderAssignsRoleAndKicks()
+        {
+            var fixture = new ServerFixture(partyCatalog: PartyCatalog.LoadFromFile(Path.Combine(ResolveDataDirectory(), "party.json")));
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var clientA = new TestClient();
+                using var clientB = new TestClient();
+                clientA.Connect(server.ListenPort);
+                clientB.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, clientA, clientB));
+
+                (int aliceId, string aliceToken) = fixture.CreateCharacter("Alice");
+                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = aliceToken, CharacterId = aliceId });
+                Assert.True(Pump(() => clientA.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
+                (int bobId, string bobToken) = fixture.CreateCharacter("Bob");
+                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = bobToken, CharacterId = bobId });
+                Assert.True(Pump(() => clientB.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
+
+                clientA.Send(new PartyInviteRequestPacket { TargetName = "Bob" });
+                Assert.True(Pump(() => clientB.Received.OfType<PartyInviteReceivedPacket>().Any(), server, clientA, clientB));
+                clientB.Send(new PartyRespondRequestPacket { Accept = true });
+                Assert.True(Pump(() => clientA.Received.OfType<PartyChangedPacket>().Any(p => p.Members.Count == 2), server, clientA, clientB));
+
+                // Nicht-Leiter darf keine Rollen vergeben.
+                clientB.Send(new PartySetRoleRequestPacket { TargetName = "Bob", Role = PartyRole.Attacker });
+                Assert.True(Pump(() => clientB.Received.OfType<ChatMessagePacket>().Any(p => p.Text.Contains("Nur der Gruppenleiter")), server, clientA, clientB));
+
+                clientA.Send(new PartySetRoleRequestPacket { TargetName = "Bob", Role = PartyRole.Defender });
+                Assert.True(Pump(() => clientB.Received.OfType<PartyChangedPacket>()
+                    .Any(p => p.MemberStatus[p.Members.FindIndex(m => m.Name == "Bob")].Role == PartyRole.Defender), server, clientA, clientB));
+
+                clientA.Send(new PartyKickRequestPacket { TargetName = "Bob" });
+                Assert.True(Pump(() => clientB.Received.OfType<ChatMessagePacket>().Any(p => p.Text.Contains("entfernt")), server, clientA, clientB));
+                Assert.True(Pump(() => clientB.Received.OfType<PartyChangedPacket>().Last().Members.Count == 0, server, clientA, clientB));
+                Assert.True(Pump(() => clientA.Received.OfType<PartyChangedPacket>().Last().Members.Count == 0, server, clientA, clientB));
             }
             finally
             {

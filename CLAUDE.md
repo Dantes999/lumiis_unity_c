@@ -817,12 +817,21 @@ eine Gruppen-MVP (Protocol.Version 14):
 - `JoinAccepted`/Entity-Spawns bleiben unverändert; Chat ist nicht persistent. Chat kam mit
   Protocol.Version 13, aktuell ist 14 (Gruppe). Roundtrip-Tests für beide Chat-Pakete und ein
   LiteNetLib-Integrationstest (Karte + Whisper) sind grün.
-- Gruppe (Alpha-MVP, Protocol.Version 14): Chat-Befehle `/invite Name`, `/accept`, `/decline`, `/leave`,
-  `/party`; max. 8 Mitglieder, Einladender wird Leiter. Server hält die Gruppe nur im Speicher
-  (`PartyState`, `EntityId -> Party`), Leiterwechsel beim Verlassen; `PartyChangedPacket` (1021) ist ein
-  voller Resync (LeaderEntityId + Name/Level/HP der Mitglieder). Das HUD zeigt ein Party-Panel mit
-  Leader-Markierung, HP und Verlassen-Knopf; HP wird bei Treffern/Heilung/Respawn aktualisiert.
-  Kein DB-Save, keine Rollen. EXP-Teilen: andere Gruppenmitglieder erhalten die Hälfte des Kill-XP (mind. 1) und ein CharacterStatsPacket; bei Levelaufstieg sofortiger Save.
+- Gruppe (seit Protocol.Version 20): Chat-Befehle `/invite Name`, `/accept`, `/decline`, `/leave`,
+  `/party`, dazu für den Leiter `/kick Name`, `/promote Name`, `/role Name angreifer|verteidiger|keine`
+  (gleichwertig per Paket: `PartyKickRequest` 25, `PartyPromoteRequest` 26, `PartySetRoleRequest` 27).
+  Logik ohne Netzwerk in `Lumiis.Server.Game.PartyManager`, Mitglieder über die **CharacterId**: wer
+  ausloggt, bleibt offline in der Gruppe (`EntityId` 0 im Paket, letzter Level-/HP-Stand) und ist beim
+  nächsten Join ohne neue Einladung wieder drin; nach `offlineRemoveAfterSeconds` fliegt er raus. Leiter
+  ist immer ein Online-Mitglied (geht er offline/verlässt die Gruppe, übernimmt das erste Online-
+  Mitglied). Gruppen mit weniger als zwei Mitgliedern oder ohne Online-Mitglied lösen sich auf. Nur im
+  Speicher, überlebt keinen Serverneustart. Regeln in `data/party.json` (`PartyCatalog`,
+  `Lumiis.Data.Parties`): maxMembers 8, xpSharePercent 50, Offline-Frist 600 s, Rollen Angreifer (+5 %
+  Angriff) und Verteidiger (+5 % Verteidigung) - wirken, solange mindestens zwei Mitglieder online sind,
+  über `Entity.PartyAttack/DefenseBonusPercent` in `World.RecomputeDerivedStats`. `PartyChangedPacket`
+  (1021) bleibt ein voller Resync; `Members` unverändert, neu die parallele Liste `MemberStatus`
+  (Online, Rolle). EXP-Teilen: andere Online-Mitglieder erhalten xpSharePercent des Kill-XP (mind. 1);
+  Boden-Drop-Besitz gilt für die ganze Gruppe.
 - Audio (P1-Platzhalter): `AudioService` erzeugt Schwung-, Treffer-, Kill-, Schaden-, Loot-, Level-Up-
   und Klick-Clips prozedural (keine Audiodateien) und spielt sie bei Angriff/Skill, EntityDamaged,
   EntityDied, Inventar-Zuwachs und Levelaufstieg. Kein Musiksystem, noch kein Mute-UI.
@@ -1234,7 +1243,14 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   `Appearance`/`WeaponItemId`/`WeaponUpgradeLevel`), Holzschwert senkrecht über dem Kopf (Item-Waffen-PNGs
   auf 48-px-Figuren auf ~0,8 Einheiten skaliert, Ruhewinkel je Richtung in `WeaponSocketFrameConfig`).
   656 Tests grün.
-- Offen als nächster M7-Block: Party-Persistenz/Rollen und weitere soziale Integrationstests; siehe
+- Gruppe über Ausloggen hinweg + Rollen (2026-10-25, Protocol.Version 20): `PartyManager` (CharacterId-
+  basiert, Offline-Mitglieder, Leiterwechsel, Kick, Promote, Rollen), `data/party.json` + `PartyCatalog`,
+  Rollen-Boni in `RecomputeDerivedStats`, Pakete 25-27, `PartyChangedPacket.MemberStatus`. Außerdem Bugfix
+  Holzschwert: `CharacterView` erkannte den Lumiis-Provider hinter `CachingSpriteProvider` nicht (Hand-
+  Anker/Skalierung/Namensschild-Höhe der Platzhalter griffen) - in Unity per Screenshot bestätigt. 687 Tests
+  grün (PartyManager 12, PartyCatalog 10, Rollen-Bonus 1, 2 neue Integrationstests).
+- Offen: Map2 (Jayang, Quelldaten in `tools/map2-jayang-source.json`/`-mobs.json`, Exporter
+  `tools/export-lumiis-map.mjs`), Gruppen-UI für Kick/Promote/Rollen (UI-Thread); siehe
   `docs/feature-gap-lumiis.md`.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client
 War kein Codefehler. User hat den Test mit fokussiertem Unity-Fenster wiederholt (Server, Unity Play, dann Bots
