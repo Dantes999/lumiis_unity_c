@@ -5,6 +5,7 @@ using Lumiis.Data.Items;
 using Lumiis.Data.Maps;
 using Lumiis.Data.Progression;
 using Lumiis.Data.Skills;
+using Lumiis.Data.Upgrade;
 using Lumiis.Shared;
 using Lumiis.Shared.Net;
 
@@ -34,6 +35,7 @@ public sealed class World
     private readonly ItemCatalog? _itemCatalog;
     private readonly ProgressionCatalog? _progressionCatalog;
     private readonly SkillCatalog? _skillCatalog;
+    private readonly UpgradeCatalog? _upgradeCatalog;
     private readonly Random _random;
     private int _nextEntityId = 1;
 
@@ -54,15 +56,18 @@ public sealed class World
     /// lädt beim echten Serverstart immer eine Instanz aus data/progression.json (M6a). skillCatalog: null
     /// bedeutet "keine Skills nutzbar" (z. B. bestehende Tests ohne Skillbezug - World.TryUseSkill lehnt dann
     /// jeden Versuch mit NotLearned ab, siehe dort) - Program.cs lädt beim echten Serverstart immer eine
-    /// Instanz aus data/skills.json (M6b).</summary>
+    /// Instanz aus data/skills.json (M6b). upgradeCatalog: null bedeutet "keine Aufwertung möglich" (z. B.
+    /// bestehende Tests ohne Aufwertungsbezug - World.TryUpgrade lehnt dann mit NoMaterial ab) - Program.cs
+    /// lädt beim echten Serverstart immer eine Instanz aus data/upgrade.json (M6c).</summary>
     public World(int maxPlayers, CollisionMap? collisionMap = null, Random? random = null, ItemCatalog? itemCatalog = null,
-        ProgressionCatalog? progressionCatalog = null, SkillCatalog? skillCatalog = null)
+        ProgressionCatalog? progressionCatalog = null, SkillCatalog? skillCatalog = null, UpgradeCatalog? upgradeCatalog = null)
     {
         MaxPlayers = maxPlayers;
         _collisionMap = collisionMap;
         _itemCatalog = itemCatalog;
         _progressionCatalog = progressionCatalog;
         _skillCatalog = skillCatalog;
+        _upgradeCatalog = upgradeCatalog;
         _random = random ?? new Random();
     }
 
@@ -787,7 +792,8 @@ public sealed class World
     /// <summary>Legt das Item aus inventorySlotIndex an: prüft Slot belegt und dass der ItemType zu einem
     /// Ausrüstungs-Slot passt, tauscht dann Inventarplatz und Ausrüstungs-Slot (bisheriges Ausrüstungsitem
     /// landet zurück im selben Inventarplatz, 0 falls vorher nichts ausgerüstet war) und berechnet
-    /// Attack/Defense neu.</summary>
+    /// Attack/Defense neu. Seit M6c wandert die Aufwertungsstufe mit dem Item (Inventar &lt;-&gt; Ausrüstung),
+    /// damit eine aufgewertete Instanz beim An-/Ablegen ihre Stufe behält.</summary>
     public (bool Success, InventoryActionFailedReason Reason) TryEquip(int entityId, int inventorySlotIndex)
     {
         if (!_entities.TryGetValue(entityId, out Entity? entity)) return (false, InventoryActionFailedReason.InvalidSlot);
@@ -799,49 +805,35 @@ public sealed class World
         if (_itemCatalog == null || !_itemCatalog.TryGet(itemId, out ItemDefinition item))
             return (false, InventoryActionFailedReason.InvalidSlot); // sollte nicht vorkommen - Items im Inventar stammen immer aus dem Katalog.
 
-        int previousEquippedItemId;
-        switch (item.ItemType)
-        {
-            case ItemType.Armor: previousEquippedItemId = entity.EquippedArmorItemId; entity.EquippedArmorItemId = itemId; break;
-            case ItemType.Helmet: previousEquippedItemId = entity.EquippedHelmetItemId; entity.EquippedHelmetItemId = itemId; break;
-            case ItemType.Weapon: previousEquippedItemId = entity.EquippedWeaponItemId; entity.EquippedWeaponItemId = itemId; break;
-            case ItemType.Shield: previousEquippedItemId = entity.EquippedShieldItemId; entity.EquippedShieldItemId = itemId; break;
-            default: return (false, InventoryActionFailedReason.WrongItemType); // Consumable kann nicht angelegt werden.
-        }
+        if (!item.IsEquipment)
+            return (false, InventoryActionFailedReason.WrongItemType); // Consumable/Aufwertungsmaterial kann nicht angelegt werden.
 
+        EquipmentSlot slot = Entity.SlotForItemType(item.ItemType)!.Value;
+        (int previousEquippedItemId, int previousEquippedUpgradeLevel) = entity.GetEquipped(slot);
+        int newUpgradeLevel = entity.InventoryUpgradeLevels[inventorySlotIndex];
+
+        entity.SetEquipped(slot, itemId, newUpgradeLevel);
         entity.Inventory[inventorySlotIndex] = previousEquippedItemId;
+        entity.InventoryUpgradeLevels[inventorySlotIndex] = previousEquippedItemId == 0 ? 0 : previousEquippedUpgradeLevel;
         RecomputeDerivedStats(entity);
         return (true, default);
     }
 
     /// <summary>Legt das Item aus equipmentSlot ab: braucht einen freien Inventarplatz (erste freie Stelle),
-    /// sonst InventoryFull. Berechnet Attack/Defense neu.</summary>
+    /// sonst InventoryFull. Berechnet Attack/Defense neu. Seit M6c wandert die Aufwertungsstufe mit.</summary>
     public (bool Success, InventoryActionFailedReason Reason) TryUnequip(int entityId, EquipmentSlot equipmentSlot)
     {
         if (!_entities.TryGetValue(entityId, out Entity? entity)) return (false, InventoryActionFailedReason.EmptySlot);
 
-        int currentItemId = equipmentSlot switch
-        {
-            EquipmentSlot.Armor => entity.EquippedArmorItemId,
-            EquipmentSlot.Helmet => entity.EquippedHelmetItemId,
-            EquipmentSlot.Weapon => entity.EquippedWeaponItemId,
-            EquipmentSlot.Shield => entity.EquippedShieldItemId,
-            _ => 0
-        };
+        (int currentItemId, int currentUpgradeLevel) = entity.GetEquipped(equipmentSlot);
         if (currentItemId == 0) return (false, InventoryActionFailedReason.EmptySlot);
 
         int freeSlot = FindFirstFreeInventorySlot(entity);
         if (freeSlot < 0) return (false, InventoryActionFailedReason.InventoryFull);
 
-        switch (equipmentSlot)
-        {
-            case EquipmentSlot.Armor: entity.EquippedArmorItemId = 0; break;
-            case EquipmentSlot.Helmet: entity.EquippedHelmetItemId = 0; break;
-            case EquipmentSlot.Weapon: entity.EquippedWeaponItemId = 0; break;
-            case EquipmentSlot.Shield: entity.EquippedShieldItemId = 0; break;
-        }
-
+        entity.SetEquipped(equipmentSlot, 0, 0);
         entity.Inventory[freeSlot] = currentItemId;
+        entity.InventoryUpgradeLevels[freeSlot] = currentUpgradeLevel;
         RecomputeDerivedStats(entity);
         return (true, default);
     }
@@ -867,13 +859,14 @@ public sealed class World
 
         entity.CurrentHp = Math.Min(entity.MaxHp, entity.CurrentHp + item.HealAmount);
         entity.Inventory[inventorySlotIndex] = 0;
+        entity.InventoryUpgradeLevels[inventorySlotIndex] = 0;
         return (true, default);
     }
 
     /// <summary>Legt itemId auf die erste freie Inventarstelle. Gibt false zurück, wenn kein Platz frei ist
     /// (Inventar voll) - der Aufrufer entscheidet, wie er das meldet (siehe GameServer.HandleXxx bzw.
-    /// TryAttack für Monster-Drops).</summary>
-    public bool TryAddItemToInventory(int entityId, int itemId)
+    /// TryAttack für Monster-Drops). upgradeLevel (M6c, Default 0) ist die Stufe der neuen Item-Instanz.</summary>
+    public bool TryAddItemToInventory(int entityId, int itemId, int upgradeLevel = 0)
     {
         if (!_entities.TryGetValue(entityId, out Entity? entity)) return false;
 
@@ -881,6 +874,7 @@ public sealed class World
         if (freeSlot < 0) return false;
 
         entity.Inventory[freeSlot] = itemId;
+        entity.InventoryUpgradeLevels[freeSlot] = upgradeLevel;
         return true;
     }
 
@@ -889,6 +883,77 @@ public sealed class World
         for (int i = 0; i < entity.Inventory.Length; i++)
         {
             if (entity.Inventory[i] == 0) return i;
+        }
+        return -1;
+    }
+
+    /// <summary>M6c: Wertet die angelegte Ausrüstung im genannten Slot auf. Reihenfolge ist bewusst streng
+    /// (siehe docs/tasks/M6c-upgrade.md Abschnitt 4): ALLE Vorprüfungen (Slot belegt, nicht Maximalstufe,
+    /// Schleifstein vorhanden, ggf. Bewahrungsrolle vorhanden) laufen VOR jedem Verbrauch. Erst danach wird
+    /// gewürfelt (_random.Next(100), injizierbar für Tests) und der Schleifstein (immer) sowie die
+    /// Bewahrungsrolle (falls angefordert, immer) entfernt. Erfolg: Stufe +1 und RecomputeDerivedStats.
+    /// Fehlschlag MIT Rolle: Item/Stufe unverändert. Fehlschlag OHNE Rolle: Ausrüstungs-Slot wird komplett
+    /// geleert (Item zerstört). nowMs ist aktuell ungenutzt (keine Cooldown-/Zeitlogik), aber aus
+    /// Konsistenz mit den anderen World-Aktionen im Signaturvertrag.</summary>
+    public UpgradeAttemptResult TryUpgrade(int entityId, EquipmentSlot equipmentSlot, bool useProtectionScroll, long nowMs)
+    {
+        if (_upgradeCatalog == null || _itemCatalog == null)
+            return UpgradeAttemptResult.Reject(UpgradeActionFailedReason.NoMaterial);
+
+        if (!_entities.TryGetValue(entityId, out Entity? entity) || entity.Kind != EntityKind.Player)
+            return UpgradeAttemptResult.Reject(UpgradeActionFailedReason.SlotEmpty);
+
+        (int equippedItemId, int currentUpgradeLevel) = entity.GetEquipped(equipmentSlot);
+        if (equippedItemId == 0)
+            return UpgradeAttemptResult.Reject(UpgradeActionFailedReason.SlotEmpty);
+        if (currentUpgradeLevel >= _upgradeCatalog.MaxUpgradeLevel)
+            return UpgradeAttemptResult.Reject(UpgradeActionFailedReason.AlreadyMaxLevel);
+
+        int whetstoneSlot = FindInventorySlotWithItem(entity, _upgradeCatalog.WhetstoneItemId);
+        if (whetstoneSlot < 0)
+            return UpgradeAttemptResult.Reject(UpgradeActionFailedReason.NoMaterial);
+
+        int protectionScrollSlot = -1;
+        if (useProtectionScroll)
+        {
+            protectionScrollSlot = FindInventorySlotWithItem(entity, _upgradeCatalog.ProtectionScrollItemId);
+            if (protectionScrollSlot < 0)
+                return UpgradeAttemptResult.Reject(UpgradeActionFailedReason.NoProtectionScroll);
+        }
+
+        // Ab hier ist der Versuch unwiderruflich: Material wird IMMER verbraucht, unabhängig vom Ausgang.
+        int successChancePercent = _upgradeCatalog.GetSuccessChancePercent(currentUpgradeLevel);
+        bool success = _random.Next(100) < successChancePercent;
+
+        entity.Inventory[whetstoneSlot] = 0;
+        entity.InventoryUpgradeLevels[whetstoneSlot] = 0;
+        if (protectionScrollSlot >= 0)
+        {
+            entity.Inventory[protectionScrollSlot] = 0;
+            entity.InventoryUpgradeLevels[protectionScrollSlot] = 0;
+        }
+
+        if (success)
+        {
+            int newLevel = currentUpgradeLevel + 1;
+            entity.SetEquipped(equipmentSlot, equippedItemId, newLevel);
+            RecomputeDerivedStats(entity);
+            return UpgradeAttemptResult.Succeeded(newLevel);
+        }
+
+        if (useProtectionScroll)
+            return UpgradeAttemptResult.FailedWithProtection(currentUpgradeLevel);
+
+        entity.SetEquipped(equipmentSlot, 0, 0);
+        RecomputeDerivedStats(entity);
+        return UpgradeAttemptResult.DestroyedItem();
+    }
+
+    private static int FindInventorySlotWithItem(Entity entity, int itemId)
+    {
+        for (int i = 0; i < entity.Inventory.Length; i++)
+        {
+            if (entity.Inventory[i] == itemId) return i;
         }
         return -1;
     }
@@ -930,14 +995,23 @@ public sealed class World
         int defenseBonus = 0;
         if (_itemCatalog != null)
         {
-            int[] equippedItemIds = { entity.EquippedArmorItemId, entity.EquippedHelmetItemId, entity.EquippedWeaponItemId, entity.EquippedShieldItemId };
-            foreach (int equippedItemId in equippedItemIds)
+            (int ItemId, int UpgradeLevel)[] equipped =
+            {
+                (entity.EquippedArmorItemId, entity.EquippedArmorUpgradeLevel),
+                (entity.EquippedHelmetItemId, entity.EquippedHelmetUpgradeLevel),
+                (entity.EquippedWeaponItemId, entity.EquippedWeaponUpgradeLevel),
+                (entity.EquippedShieldItemId, entity.EquippedShieldUpgradeLevel)
+            };
+            foreach ((int equippedItemId, int upgradeLevel) in equipped)
             {
                 if (equippedItemId == 0) continue;
                 if (_itemCatalog.TryGet(equippedItemId, out ItemDefinition item))
                 {
-                    attackBonus += item.AttackBonus;
-                    defenseBonus += item.DefenseBonus;
+                    int upgradeBonus = item.UpgradeBonusPerLevel * Math.Clamp(upgradeLevel, 0, UpgradeCatalog.SupportedMaxUpgradeLevel);
+                    if (item.ItemType == ItemType.Weapon)
+                        attackBonus += item.AttackBonus + upgradeBonus;
+                    else
+                        defenseBonus += item.DefenseBonus + upgradeBonus;
                 }
             }
         }
@@ -1068,6 +1142,7 @@ public sealed class World
             return (false, ShopActionFailedReason.YangCapReached);
 
         player.Inventory[inventorySlotIndex] = 0;
+        player.InventoryUpgradeLevels[inventorySlotIndex] = 0;
         return (true, default);
     }
 

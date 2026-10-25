@@ -8,6 +8,7 @@ using Lumiis.Data.Mobs;
 using Lumiis.Data.Npcs;
 using Lumiis.Data.Progression;
 using Lumiis.Data.Skills;
+using Lumiis.Data.Upgrade;
 using Lumiis.Server;
 using Lumiis.Server.Logging;
 using Lumiis.Server.Net;
@@ -125,6 +126,20 @@ catch (Exception ex)
     return 1;
 }
 
+// M6c: Erfolgstabelle + Verbrauchsgüter-IDs für die Ausrüstungs-Aufwertung - referenziert items.json
+// (Schleifstein/Bewahrungsrolle müssen existieren und den richtigen ItemType haben), deshalb erst nach
+// dem ItemCatalog.
+UpgradeCatalog upgradeCatalog;
+try
+{
+    upgradeCatalog = UpgradeCatalog.LoadFromFile(Path.Combine(config.DataDir, "upgrade.json"), itemCatalog);
+}
+catch (Exception ex)
+{
+    logger.Error($"Serverstart fehlgeschlagen (Aufwertungs-Daten): {ex.Message}");
+    return 1;
+}
+
 // Ebenfalls nur "village" hartkodiert (siehe Kommentar oben). NpcSpawnCatalog braucht NpcCatalog+
 // CollisionMap zur Validierung (analog zu SpawnCatalog für Monster). looks.json wird hier erneut geladen
 // (bewusst eine eigene, kleine Instanz statt Wiederverwendung der obigen - günstig, hält die Datenblöcke
@@ -171,7 +186,7 @@ Console.CancelKeyPress += (_, eventArgs) =>
     cts.Cancel();
 };
 
-GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, collisionMap: collisionMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog, classCatalog: classCatalog, itemCatalog: itemCatalog, npcCatalog: npcCatalog, npcSpawnCatalog: npcSpawnCatalog, progressionCatalog: progressionCatalog, skillCatalog: skillCatalog);
+GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, collisionMap: collisionMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog, classCatalog: classCatalog, itemCatalog: itemCatalog, npcCatalog: npcCatalog, npcSpawnCatalog: npcSpawnCatalog, progressionCatalog: progressionCatalog, skillCatalog: skillCatalog, upgradeCatalog: upgradeCatalog);
 
 try
 {

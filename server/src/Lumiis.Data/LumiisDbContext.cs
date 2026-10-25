@@ -40,11 +40,20 @@ public sealed class LumiisDbContext : DbContext
             // die Migration bestehende Zeilen (und jede Zeile, die EF ohne explizit gesetztes Level einfügt)
             // auf 0 setzen, ein ungültiges Level (siehe ProgressionCatalog.MaxLevel-Bereich 1..25).
             entity.Property(c => c.Level).HasDefaultValue(1);
+
+            // M6c: Aufwertungsstufen der Ausrüstung - DB-Default 0, bestehende Zeilen bleiben +0.
+            entity.Property(c => c.EquippedArmorUpgradeLevel).HasDefaultValue(0);
+            entity.Property(c => c.EquippedHelmetUpgradeLevel).HasDefaultValue(0);
+            entity.Property(c => c.EquippedWeaponUpgradeLevel).HasDefaultValue(0);
+            entity.Property(c => c.EquippedShieldUpgradeLevel).HasDefaultValue(0);
         });
 
         modelBuilder.Entity<CharacterInventoryItem>(entity =>
         {
             entity.HasIndex(i => new { i.CharacterId, i.SlotIndex }).IsUnique();
+
+            // M6c: Item-Instanz-Aufwertungsstufe, Default 0 (bestehende Inventarzeilen bleiben +0).
+            entity.Property(i => i.UpgradeLevel).HasDefaultValue(0);
 
             entity.HasOne(i => i.Character)
                 .WithMany(c => c.InventoryItems)

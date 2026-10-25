@@ -42,6 +42,9 @@ namespace Lumiis.Shared.Net
         /// <summary>M7-Chat: Chat-Nachricht senden (Karte/Global/Flüstern).</summary>
         ChatRequest = 16,
 
+        /// <summary>M6c: angelegte Ausrüstung aufwerten (Schleifstein, optional Bewahrungsrolle).</summary>
+        UpgradeItemRequest = 17,
+
         // Server -> Client: ab 1000
         JoinAccepted = 1000,
         JoinRejected = 1001,
@@ -94,6 +97,14 @@ namespace Lumiis.Shared.Net
 
         /// <summary>M7-Party: voller Gruppenstand (Resync).</summary>
         PartyChanged = 1021,
+
+        /// <summary>M6c: Ergebnis eines abgeschlossenen Aufwertungsversuchs (auch Fehlschlag/Zerstörung) -
+        /// nur an den Anfragenden, siehe UpgradeItemResultPacket.</summary>
+        UpgradeItemResult = 1022,
+
+        /// <summary>M6c: Aufwertung gar nicht erst versucht (leerer Slot, Maximalstufe, fehlendes Material/
+        /// fehlende Schutzrolle) - nur an den Anfragenden, Verbindung bleibt bestehen.</summary>
+        UpgradeActionFailed = 1023,
     }
 
     /// <summary>Jede neue PacketId braucht hier eine Zeile (ein Test prüft das).</summary>
@@ -141,6 +152,9 @@ namespace Lumiis.Shared.Net
                 case PacketId.ChatRequest: return new ChatRequestPacket();
                 case PacketId.ChatMessage: return new ChatMessagePacket();
                 case PacketId.PartyChanged: return new PartyChangedPacket();
+                case PacketId.UpgradeItemRequest: return new UpgradeItemRequestPacket();
+                case PacketId.UpgradeItemResult: return new UpgradeItemResultPacket();
+                case PacketId.UpgradeActionFailed: return new UpgradeActionFailedPacket();
                 default: return null;
             }
         }

@@ -17,6 +17,7 @@ using Lumiis.Data.Mobs;
 using Lumiis.Data.Npcs;
 using Lumiis.Data.Progression;
 using Lumiis.Data.Skills;
+using Lumiis.Data.Upgrade;
 using Lumiis.Server.Game;
 using Lumiis.Server.Logging;
 using Lumiis.Server.Net;
@@ -82,8 +83,9 @@ public sealed class GameServer : INetEventListener
     /// Slots + alle vier Equipped-Ids), kein Delta - DropOldest bleibt dadurch sicher, genau wie bei Yang
     /// konvergiert der zuletzt geschriebene Stand immer zum korrekten Endstand, ein übersprungener
     /// Zwischenstand ist unkritisch.</summary>
-    private readonly record struct InventorySaveRequest(int CharacterId, List<(int SlotIndex, int ItemId)> Slots,
-        int EquippedArmorItemId, int EquippedHelmetItemId, int EquippedWeaponItemId, int EquippedShieldItemId);
+    private readonly record struct InventorySaveRequest(int CharacterId, List<(int SlotIndex, int ItemId, int UpgradeLevel)> Slots,
+        int EquippedArmorItemId, int EquippedHelmetItemId, int EquippedWeaponItemId, int EquippedShieldItemId,
+        int EquippedArmorUpgradeLevel, int EquippedHelmetUpgradeLevel, int EquippedWeaponUpgradeLevel, int EquippedShieldUpgradeLevel);
 
     /// <summary>Voller Yang- PLUS Inventar-/Ausrüstungs-Zustand (M5b, Kauf/Verkauf ändern beide zusammen),
     /// per Channel an den Hintergrund-Task übergeben (siehe RunCharacterSaveConsumerAsync) - eigener,
@@ -104,8 +106,9 @@ public sealed class GameServer : INetEventListener
     /// dort: sofort bei AllocateSkillPoint (analog zu AllocateStatPoint), sonst über denselben periodischen/
     /// Disconnect-Save wie der restliche Fortschritt (Skill-Cooldowns/aktive Buffs werden NICHT persistiert,
     /// siehe Entity.ActiveBuffs-Kommentar).</summary>
-    private readonly record struct CharacterSaveRequest(int CharacterId, long Yang, List<(int SlotIndex, int ItemId)> Slots,
+    private readonly record struct CharacterSaveRequest(int CharacterId, long Yang, List<(int SlotIndex, int ItemId, int UpgradeLevel)> Slots,
         int EquippedArmorItemId, int EquippedHelmetItemId, int EquippedWeaponItemId, int EquippedShieldItemId,
+        int EquippedArmorUpgradeLevel, int EquippedHelmetUpgradeLevel, int EquippedWeaponUpgradeLevel, int EquippedShieldUpgradeLevel,
         int Level, long Xp, int SpentSt, int SpentHt, int SpentDx, int SpentIq,
         int UnspentStatPoints, int UnspentSkillPoints, int CurrentHp, int CurrentSp,
         List<(int SkillId, int Level)> SkillLevels);
@@ -144,6 +147,7 @@ public sealed class GameServer : INetEventListener
     /// <summary>Für BuildCharacterStatsPacket gehalten (XpToNext, siehe dort) - an World durchgereicht
     /// (siehe World-Konstruktor) für AwardXp/TryDebugSetLevel.</summary>
     private readonly ProgressionCatalog? _progressionCatalog;
+    private readonly UpgradeCatalog? _upgradeCatalog;
     private readonly NetManager _netManager;
     private readonly ILogger _logger;
     private readonly Func<long> _nowMs;
@@ -190,11 +194,15 @@ public sealed class GameServer : INetEventListener
     /// Instanz aus data/progression.json (M6a). skillCatalog: null bedeutet "keine Skills nutzbar" (z. B.
     /// bestehende Tests ohne Skillbezug, siehe World-Konstruktor) - Program.cs lädt beim echten Serverstart
     /// immer eine Instanz aus data/skills.json (M6b). Nur an World durchgereicht, GameServer selbst braucht
-    /// den Katalog nicht (anders als z. B. itemCatalog für ToAppearance).</summary>
+    /// den Katalog nicht (anders als z. B. itemCatalog für ToAppearance). upgradeCatalog: M6c, an World
+    /// durchgereicht; null bedeutet "keine Aufwertung möglich" (bestehende Tests ohne Aufwertungsbezug).
+    /// random: injizierbare Zufallsquelle (M6c, für deterministische Integrationstests des Aufwertungswurfs) -
+    /// wird an World weitergereicht, Default dort eine echte Instanz.</summary>
     public GameServer(ServerConfig config, ILogger logger, TokenService tokenService, Func<LumiisDbContext> dbContextFactory,
         Func<long>? nowMs = null, CollisionMap? collisionMap = null, MobCatalog? mobCatalog = null, SpawnCatalog? spawnCatalog = null,
         ClassCatalog? classCatalog = null, ItemCatalog? itemCatalog = null, NpcCatalog? npcCatalog = null, NpcSpawnCatalog? npcSpawnCatalog = null,
-        ProgressionCatalog? progressionCatalog = null, SkillCatalog? skillCatalog = null)
+        ProgressionCatalog? progressionCatalog = null, SkillCatalog? skillCatalog = null, UpgradeCatalog? upgradeCatalog = null,
+        Random? random = null)
     {
         _config = config;
         _logger = logger;
@@ -204,7 +212,9 @@ public sealed class GameServer : INetEventListener
         _mobCatalog = mobCatalog;
         _itemCatalog = itemCatalog;
         _progressionCatalog = progressionCatalog;
-        _world = new World(config.MaxPlayers, collisionMap, itemCatalog: itemCatalog, progressionCatalog: progressionCatalog, skillCatalog: skillCatalog);
+        _upgradeCatalog = upgradeCatalog;
+        _world = new World(config.MaxPlayers, collisionMap, random: random, itemCatalog: itemCatalog, progressionCatalog: progressionCatalog,
+            skillCatalog: skillCatalog, upgradeCatalog: upgradeCatalog);
         _netManager = new NetManager(this) { UpdateTime = 15 };
         _nowMs = nowMs ?? DefaultNowMs;
 
@@ -586,10 +596,14 @@ public sealed class GameServer : INetEventListener
                     character.EquippedHelmetItemId = request.EquippedHelmetItemId == 0 ? null : request.EquippedHelmetItemId;
                     character.EquippedWeaponItemId = request.EquippedWeaponItemId == 0 ? null : request.EquippedWeaponItemId;
                     character.EquippedShieldItemId = request.EquippedShieldItemId == 0 ? null : request.EquippedShieldItemId;
+                    character.EquippedArmorUpgradeLevel = request.EquippedArmorItemId == 0 ? 0 : request.EquippedArmorUpgradeLevel;
+                    character.EquippedHelmetUpgradeLevel = request.EquippedHelmetItemId == 0 ? 0 : request.EquippedHelmetUpgradeLevel;
+                    character.EquippedWeaponUpgradeLevel = request.EquippedWeaponItemId == 0 ? 0 : request.EquippedWeaponUpgradeLevel;
+                    character.EquippedShieldUpgradeLevel = request.EquippedShieldItemId == 0 ? 0 : request.EquippedShieldUpgradeLevel;
 
                     db.CharacterInventoryItems.RemoveRange(character.InventoryItems);
-                    foreach ((int slotIndex, int itemId) in request.Slots)
-                        character.InventoryItems.Add(new CharacterInventoryItem { CharacterId = request.CharacterId, SlotIndex = slotIndex, ItemId = itemId });
+                    foreach ((int slotIndex, int itemId, int upgradeLevel) in request.Slots)
+                        character.InventoryItems.Add(new CharacterInventoryItem { CharacterId = request.CharacterId, SlotIndex = slotIndex, ItemId = itemId, UpgradeLevel = upgradeLevel });
 
                     await db.SaveChangesAsync(cancellationToken);
                 }
@@ -629,6 +643,10 @@ public sealed class GameServer : INetEventListener
                     character.EquippedHelmetItemId = request.EquippedHelmetItemId == 0 ? null : request.EquippedHelmetItemId;
                     character.EquippedWeaponItemId = request.EquippedWeaponItemId == 0 ? null : request.EquippedWeaponItemId;
                     character.EquippedShieldItemId = request.EquippedShieldItemId == 0 ? null : request.EquippedShieldItemId;
+                    character.EquippedArmorUpgradeLevel = request.EquippedArmorItemId == 0 ? 0 : request.EquippedArmorUpgradeLevel;
+                    character.EquippedHelmetUpgradeLevel = request.EquippedHelmetItemId == 0 ? 0 : request.EquippedHelmetUpgradeLevel;
+                    character.EquippedWeaponUpgradeLevel = request.EquippedWeaponItemId == 0 ? 0 : request.EquippedWeaponUpgradeLevel;
+                    character.EquippedShieldUpgradeLevel = request.EquippedShieldItemId == 0 ? 0 : request.EquippedShieldUpgradeLevel;
 
                     // M6a: voller Fortschritts-Stand, siehe CharacterSaveRequest-Kommentar.
                     character.Level = request.Level;
@@ -643,8 +661,8 @@ public sealed class GameServer : INetEventListener
                     character.CurrentSp = request.CurrentSp;
 
                     db.CharacterInventoryItems.RemoveRange(character.InventoryItems);
-                    foreach ((int slotIndex, int itemId) in request.Slots)
-                        character.InventoryItems.Add(new CharacterInventoryItem { CharacterId = request.CharacterId, SlotIndex = slotIndex, ItemId = itemId });
+                    foreach ((int slotIndex, int itemId, int upgradeLevel) in request.Slots)
+                        character.InventoryItems.Add(new CharacterInventoryItem { CharacterId = request.CharacterId, SlotIndex = slotIndex, ItemId = itemId, UpgradeLevel = upgradeLevel });
 
                     // M6b: voller Skillstufen-Snapshot, kein Delta - gleiches Muster wie Inventar oben.
                     db.CharacterSkillLevels.RemoveRange(character.SkillLevels);
@@ -841,6 +859,9 @@ public sealed class GameServer : INetEventListener
             case UseConsumableRequestPacket useConsumable:
                 HandleUseConsumableRequest(conn, useConsumable);
                 break;
+            case UpgradeItemRequestPacket upgradeItem:
+                HandleUpgradeItemRequest(conn, upgradeItem);
+                break;
             case OpenShopRequestPacket openShop:
                 HandleOpenShopRequest(conn, openShop);
                 break;
@@ -1007,10 +1028,17 @@ public sealed class GameServer : INetEventListener
         entity.EquippedHelmetItemId = character.EquippedHelmetItemId ?? 0;
         entity.EquippedWeaponItemId = character.EquippedWeaponItemId ?? 0;
         entity.EquippedShieldItemId = character.EquippedShieldItemId ?? 0;
+        entity.EquippedArmorUpgradeLevel = entity.EquippedArmorItemId == 0 ? 0 : character.EquippedArmorUpgradeLevel;
+        entity.EquippedHelmetUpgradeLevel = entity.EquippedHelmetItemId == 0 ? 0 : character.EquippedHelmetUpgradeLevel;
+        entity.EquippedWeaponUpgradeLevel = entity.EquippedWeaponItemId == 0 ? 0 : character.EquippedWeaponUpgradeLevel;
+        entity.EquippedShieldUpgradeLevel = entity.EquippedShieldItemId == 0 ? 0 : character.EquippedShieldUpgradeLevel;
         foreach (CharacterInventoryItem inventoryItem in character.InventoryItems)
         {
             if (inventoryItem.SlotIndex >= 0 && inventoryItem.SlotIndex < entity.Inventory.Length)
+            {
                 entity.Inventory[inventoryItem.SlotIndex] = inventoryItem.ItemId;
+                entity.InventoryUpgradeLevels[inventoryItem.SlotIndex] = inventoryItem.ItemId == 0 ? 0 : inventoryItem.UpgradeLevel;
+            }
         }
 
         // M6b: gelernte Skillstufen aus der Character-Zeile übertragen (kein Eintrag = Stufe 0/nicht gelernt,
@@ -1666,14 +1694,18 @@ public sealed class GameServer : INetEventListener
             EquippedArmorItemId = entity.EquippedArmorItemId,
             EquippedHelmetItemId = entity.EquippedHelmetItemId,
             EquippedWeaponItemId = entity.EquippedWeaponItemId,
-            EquippedShieldItemId = entity.EquippedShieldItemId
+            EquippedShieldItemId = entity.EquippedShieldItemId,
+            EquippedArmorUpgradeLevel = entity.EquippedArmorUpgradeLevel,
+            EquippedHelmetUpgradeLevel = entity.EquippedHelmetUpgradeLevel,
+            EquippedWeaponUpgradeLevel = entity.EquippedWeaponUpgradeLevel,
+            EquippedShieldUpgradeLevel = entity.EquippedShieldUpgradeLevel
         };
 
         for (int slotIndex = 0; slotIndex < entity.Inventory.Length; slotIndex++)
         {
             int itemId = entity.Inventory[slotIndex];
             if (itemId != 0)
-                packet.Slots.Add((slotIndex, itemId));
+                packet.Slots.Add((slotIndex, itemId, entity.InventoryUpgradeLevels[slotIndex]));
         }
 
         return packet;
@@ -1728,16 +1760,17 @@ public sealed class GameServer : INetEventListener
     /// aus, siehe Handle-Methoden unten).</summary>
     private static InventorySaveRequest BuildInventorySaveRequest(Entity entity)
     {
-        var slots = new List<(int SlotIndex, int ItemId)>();
+        var slots = new List<(int SlotIndex, int ItemId, int UpgradeLevel)>();
         for (int slotIndex = 0; slotIndex < entity.Inventory.Length; slotIndex++)
         {
             int itemId = entity.Inventory[slotIndex];
             if (itemId != 0)
-                slots.Add((slotIndex, itemId));
+                slots.Add((slotIndex, itemId, entity.InventoryUpgradeLevels[slotIndex]));
         }
 
         return new InventorySaveRequest(entity.CharacterId!.Value, slots,
-            entity.EquippedArmorItemId, entity.EquippedHelmetItemId, entity.EquippedWeaponItemId, entity.EquippedShieldItemId);
+            entity.EquippedArmorItemId, entity.EquippedHelmetItemId, entity.EquippedWeaponItemId, entity.EquippedShieldItemId,
+            entity.EquippedArmorUpgradeLevel, entity.EquippedHelmetUpgradeLevel, entity.EquippedWeaponUpgradeLevel, entity.EquippedShieldUpgradeLevel);
     }
 
     /// <summary>M5b: wie BuildInventorySaveRequest, zusätzlich Yang - für den kombinierten
@@ -1745,12 +1778,12 @@ public sealed class GameServer : INetEventListener
     /// siehe CharacterSaveRequest-Kommentar). Seit M6a zusätzlich der volle Fortschritts-Stand.</summary>
     private static CharacterSaveRequest BuildCharacterSaveRequest(Entity entity)
     {
-        var slots = new List<(int SlotIndex, int ItemId)>();
+        var slots = new List<(int SlotIndex, int ItemId, int UpgradeLevel)>();
         for (int slotIndex = 0; slotIndex < entity.Inventory.Length; slotIndex++)
         {
             int itemId = entity.Inventory[slotIndex];
             if (itemId != 0)
-                slots.Add((slotIndex, itemId));
+                slots.Add((slotIndex, itemId, entity.InventoryUpgradeLevels[slotIndex]));
         }
 
         var skillLevels = new List<(int SkillId, int Level)>();
@@ -1759,6 +1792,7 @@ public sealed class GameServer : INetEventListener
 
         return new CharacterSaveRequest(entity.CharacterId!.Value, entity.Yang, slots,
             entity.EquippedArmorItemId, entity.EquippedHelmetItemId, entity.EquippedWeaponItemId, entity.EquippedShieldItemId,
+            entity.EquippedArmorUpgradeLevel, entity.EquippedHelmetUpgradeLevel, entity.EquippedWeaponUpgradeLevel, entity.EquippedShieldUpgradeLevel,
             entity.Level, entity.Xp, entity.SpentSt, entity.SpentHt, entity.SpentDx, entity.SpentIq,
             entity.UnspentStatPoints, entity.UnspentSkillPoints, entity.CurrentHp, entity.CurrentSp, skillLevels);
     }
@@ -1841,6 +1875,69 @@ public sealed class GameServer : INetEventListener
             // Save holt den neuen Stand ein.
             conn.Peer.SendPacket(BuildCharacterStatsPacket(entity));
         }
+    }
+
+    /// <summary>M6c: UpgradeItemRequestPacket-Handler. Die reine Logik (Vorprüfung, Verbrauch, Wurf,
+    /// Zerstörung) sitzt in World.TryUpgrade. Ein abgeschlossener Versuch (Erfolg, Fehlschlag mit Rolle oder
+    /// Zerstörung) liefert UpgradeItemResult + InventorySync + CharacterStats an den Anfragenden, bei einer
+    /// Zerstörung zusätzlich AppearanceChanged an alle AOI-Beobachter (ausgerüstete Waffe/Rüstung verschwindet)
+    /// und wird SOFORT über den kombinierten CharacterSaveRequest-Channel gespeichert - das Ergebnis ist zu
+    /// wichtig für den periodischen 30s-Save. Eine abgelehnte Vorprüfung liefert nur
+    /// UpgradeActionFailedPacket (kein Verbrauch, Verbindung bleibt bestehen).</summary>
+    private void HandleUpgradeItemRequest(ConnectionState conn, UpgradeItemRequestPacket request)
+    {
+        if (conn.EntityId is not int entityId)
+        {
+            _logger.Warn($"UpgradeItemRequest vor Join von Verbindung {conn.Peer.Id}");
+            conn.Peer.Disconnect();
+            return;
+        }
+
+        if (!_world.TryGet(entityId, out Entity? entity))
+            return;
+
+        (int itemIdBefore, int levelBefore) = entity!.GetEquipped(request.EquipmentSlot);
+        string itemName = itemIdBefore != 0 && _itemCatalog != null && _itemCatalog.TryGet(itemIdBefore, out ItemDefinition item)
+            ? item.Name
+            : "Ausrüstung";
+
+        UpgradeAttemptResult result = _world.TryUpgrade(entityId, request.EquipmentSlot, request.UseProtectionScroll, _nowMs());
+        if (result.Rejected)
+        {
+            conn.Peer.SendPacket(new UpgradeActionFailedPacket { Reason = result.FailureReason });
+            _logger.Info($"Aufwertung abgelehnt für Verbindung {conn.Peer.Id}: {result.FailureReason}");
+            return;
+        }
+
+        conn.Peer.SendPacket(new UpgradeItemResultPacket
+        {
+            EquipmentSlot = request.EquipmentSlot,
+            Success = result.Success,
+            Destroyed = result.Destroyed,
+            NewUpgradeLevel = result.NewUpgradeLevel
+        });
+        conn.Peer.SendPacket(BuildInventorySyncPacket(entity!));
+
+        if (result.Destroyed)
+        {
+            entity!.Appearance = ToAppearance(entity);
+            SendToVisible(entityId, new AppearanceChangedPacket { EntityId = entityId, Appearance = entity.Appearance });
+        }
+
+        conn.Peer.SendPacket(BuildCharacterStatsPacket(entity!));
+        _characterSaveChannel.Writer.TryWrite(BuildCharacterSaveRequest(entity!));
+
+        string message;
+        if (result.Success)
+            message = $"{itemName} ist jetzt +{result.NewUpgradeLevel}!";
+        else if (result.Destroyed)
+            message = $"Aufwertung fehlgeschlagen - {itemName} wurde zerstört!";
+        else
+            message = "Aufwertung fehlgeschlagen, durch die Bewahrungsrolle gerettet.";
+
+        conn.Peer.SendPacket(new ChatMessagePacket { Channel = ChatChannel.System, SenderName = "System", Text = message });
+        _logger.Info($"Aufwertung {request.EquipmentSlot} (vorher +{levelBefore}) für Verbindung {conn.Peer.Id}: " +
+                     $"success={result.Success}, destroyed={result.Destroyed}, neu=+{result.NewUpgradeLevel}");
     }
 
     /// <summary>Gemeinsame Netzwerk-Seite von Equip/Unequip (M5a) - beide ändern das Inventar UND

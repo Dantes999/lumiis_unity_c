@@ -23,6 +23,15 @@ public sealed class Character
     public int? EquippedWeaponItemId { get; set; }
     public int? EquippedShieldItemId { get; set; }
 
+    /// <summary>M6c: Aufwertungsstufe der jeweiligen ausgerüsteten Item-Instanz (0-9). Getrennt von der
+    /// ItemId gespeichert, weil Inventar und Ausrüstung denselben Charakter-Slot teilen und ein Item seine
+    /// Stufe beim Anlegen/Ablegen mitnehmen muss (siehe CharacterInventoryItem.UpgradeLevel und
+    /// World.TryEquip/TryUnequip).</summary>
+    public int EquippedArmorUpgradeLevel { get; set; }
+    public int EquippedHelmetUpgradeLevel { get; set; }
+    public int EquippedWeaponUpgradeLevel { get; set; }
+    public int EquippedShieldUpgradeLevel { get; set; }
+
     /// <summary>Inventar-Slots (M5a) - siehe CharacterInventoryItem.</summary>
     public List<CharacterInventoryItem> InventoryItems { get; set; } = new();
 

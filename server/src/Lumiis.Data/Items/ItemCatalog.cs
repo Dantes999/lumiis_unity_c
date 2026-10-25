@@ -6,15 +6,19 @@ using Lumiis.Data.Looks;
 
 namespace Lumiis.Data.Items;
 
-/// <summary>Art eines Items (M5a) - Armor/Helmet/Weapon/Shield sind Ausrüstungs-Slots mit LookId+Boni,
-/// Consumable ist ein Verbrauchsgegenstand mit HealAmount.</summary>
+/// <summary>Art eines Items (M5a, M6c) - Armor/Helmet/Weapon/Shield sind Ausrüstungs-Slots mit LookId+Boni,
+/// Consumable ist ein Verbrauchsgegenstand mit HealAmount. UpgradeMaterial (Schleifstein) und
+/// ProtectionScroll (Bewahrungsrolle) sind reine Aufwertungs-Verbrauchsgüter ohne LookId/Boni und können
+/// weder angelegt noch als normaler Heiltrank benutzt werden (siehe World.TryUpgrade).</summary>
 public enum ItemType
 {
     Armor,
     Helmet,
     Weapon,
     Shield,
-    Consumable
+    Consumable,
+    UpgradeMaterial,
+    ProtectionScroll
 }
 
 /// <summary>Ein Item aus data/items.json. LookId/AttackBonus/DefenseBonus nur bei Ausrüstungs-ItemTypes
@@ -28,6 +32,10 @@ public sealed class ItemDefinition
     public int AttackBonus { get; }
     public int DefenseBonus { get; }
     public int HealAmount { get; }
+
+    /// <summary>M6c: Bonus auf Attack/Defense je Aufwertungsstufe (nur Ausrüstung, Default 0). Wird bei
+    /// Waffen auf Attack, bei Armor/Helmet/Shield auf Defense addiert (siehe World.RecomputeDerivedStats).</summary>
+    public int UpgradeBonusPerLevel { get; }
 
     /// <summary>M5b: Kaufpreis im Shop - 0 bedeutet "nicht direkt kaufbar" (z. B. Startwaffe), ein NPC-Sortiment
     /// darf ein solches Item nicht listen (siehe NpcCatalog).</summary>
@@ -53,7 +61,7 @@ public sealed class ItemDefinition
 
     public ItemDefinition(int id, string name, ItemType itemType, int lookId, int attackBonus, int defenseBonus, int healAmount,
         long buyPrice, long sellPrice, string spriteKey = "", float pivotOffsetX = 0f, float pivotOffsetY = 0f, int upgradeLevel = 0,
-        string iconKey = "")
+        string iconKey = "", int upgradeBonusPerLevel = 0)
     {
         Id = id;
         Name = name;
@@ -62,6 +70,7 @@ public sealed class ItemDefinition
         AttackBonus = attackBonus;
         DefenseBonus = defenseBonus;
         HealAmount = healAmount;
+        UpgradeBonusPerLevel = upgradeBonusPerLevel;
         BuyPrice = buyPrice;
         SellPrice = sellPrice;
         SpriteKey = spriteKey;
@@ -71,8 +80,9 @@ public sealed class ItemDefinition
         IconKey = iconKey;
     }
 
-    /// <summary>Nur bei Armor/Helmet/Weapon/Shield true - Consumables können nicht angelegt werden.</summary>
-    public bool IsEquipment => ItemType != ItemType.Consumable;
+    /// <summary>Nur bei Armor/Helmet/Weapon/Shield true - Consumables/Aufwertungsmaterial können nicht
+    /// angelegt werden.</summary>
+    public bool IsEquipment => ItemType is ItemType.Armor or ItemType.Helmet or ItemType.Weapon or ItemType.Shield;
 }
 
 /// <summary>Lädt und validiert data/items.json. Fehler beim Laden bedeuten Abbruch beim Serverstart (analog zu
@@ -132,13 +142,22 @@ public sealed class ItemCatalog
             {
                 throw new ItemCatalogException(
                     $"items.json: Item {entry.Id} ({entry.Name}) hat einen ungültigen itemType '{entry.ItemType}' " +
-                    "(erwartet: Armor/Helmet/Weapon/Shield/Consumable).");
+                    "(erwartet: Armor/Helmet/Weapon/Shield/Consumable/UpgradeMaterial/ProtectionScroll).");
             }
 
             if (itemType == ItemType.Consumable)
             {
                 if (entry.HealAmount <= 0)
                     throw new ItemCatalogException($"items.json: Item {entry.Id} ({entry.Name}) ist Consumable, hat aber healAmount <= 0.");
+            }
+            else if (itemType is ItemType.UpgradeMaterial or ItemType.ProtectionScroll)
+            {
+                // M6c: reine Verbrauchsgüter ohne Aussehen/Boni - eine LookId wäre hier ein Datenfehler.
+                if (entry.LookId != 0 || entry.AttackBonus != 0 || entry.DefenseBonus != 0 || entry.HealAmount != 0)
+                {
+                    throw new ItemCatalogException(
+                        $"items.json: Item {entry.Id} ({entry.Name}) ist {itemType} und darf keine LookId/Boni/healAmount haben.");
+                }
             }
             else
             {
@@ -148,6 +167,14 @@ public sealed class ItemCatalog
                     throw new ItemCatalogException(
                         $"items.json: Item {entry.Id} ({entry.Name}) verweist auf unbekannte LookId {entry.LookId} im Slot {slot}.");
                 }
+            }
+
+            if (entry.UpgradeBonusPerLevel < 0)
+                throw new ItemCatalogException($"items.json: Item {entry.Id} ({entry.Name}) hat upgradeBonusPerLevel < 0.");
+            if (!IsEquipmentType(itemType) && entry.UpgradeBonusPerLevel != 0)
+            {
+                throw new ItemCatalogException(
+                    $"items.json: Item {entry.Id} ({entry.Name}) ist {itemType} und darf kein upgradeBonusPerLevel haben.");
             }
 
             if (entry.BuyPrice < 0)
@@ -160,7 +187,7 @@ public sealed class ItemCatalog
 
             byId[entry.Id] = new ItemDefinition(entry.Id, entry.Name, itemType, entry.LookId, entry.AttackBonus, entry.DefenseBonus, entry.HealAmount,
                 entry.BuyPrice, entry.SellPrice, entry.SpriteKey ?? "", entry.PivotOffset?.X ?? 0f, entry.PivotOffset?.Y ?? 0f, entry.UpgradeLevel,
-                entry.IconKey ?? "");
+                entry.IconKey ?? "", entry.UpgradeBonusPerLevel);
         }
 
         if (byId.Count == 0)
@@ -172,6 +199,11 @@ public sealed class ItemCatalog
     public bool TryGet(int itemId, out ItemDefinition definition)
     {
         return _byId.TryGetValue(itemId, out definition!);
+    }
+
+    private static bool IsEquipmentType(ItemType itemType)
+    {
+        return itemType is ItemType.Armor or ItemType.Helmet or ItemType.Weapon or ItemType.Shield;
     }
 }
 

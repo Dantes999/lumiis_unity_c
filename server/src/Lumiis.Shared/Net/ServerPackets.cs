@@ -318,17 +318,22 @@ namespace Lumiis.Shared.Net
         }
     }
 
-    /// <summary>Voller Inventar-/Ausrüstungs-Zustand (M5a) - nur an den Empfänger, bei Join und nach jeder
-    /// Änderung neu verschickt (voller Resync statt Delta, das Inventar ist mit maximal 20 Plätzen klein
-    /// genug dafür). Slots enthält nur belegte Plätze (SlotIndex, ItemId) - ein fehlender SlotIndex bedeutet
-    /// leer, genau wie 0 bei den vier Equipped-Feldern.</summary>
+    /// <summary>Voller Inventar-/Ausrüstungs-Zustand (M5a, seit M6c inklusive Aufwertungsstufen) - nur an den
+    /// Empfänger, bei Join und nach jeder Änderung neu verschickt (voller Resync statt Delta, das Inventar ist
+    /// mit maximal 20 Plätzen klein genug dafür). Slots enthält nur belegte Plätze (SlotIndex, ItemId,
+    /// UpgradeLevel 0-9) - ein fehlender SlotIndex bedeutet leer, genau wie 0 bei den vier Equipped-Feldern.
+    /// Die vier Equipped...UpgradeLevel gehören jeweils zur Equipped...ItemId desselben Slots.</summary>
     public sealed class InventorySyncPacket : IPacket
     {
-        public List<(int SlotIndex, int ItemId)> Slots = new List<(int SlotIndex, int ItemId)>();
+        public List<(int SlotIndex, int ItemId, int UpgradeLevel)> Slots = new List<(int SlotIndex, int ItemId, int UpgradeLevel)>();
         public int EquippedArmorItemId;
         public int EquippedHelmetItemId;
         public int EquippedWeaponItemId;
         public int EquippedShieldItemId;
+        public int EquippedArmorUpgradeLevel;
+        public int EquippedHelmetUpgradeLevel;
+        public int EquippedWeaponUpgradeLevel;
+        public int EquippedShieldUpgradeLevel;
 
         public PacketId Id
         {
@@ -338,31 +343,41 @@ namespace Lumiis.Shared.Net
         public void Write(PacketWriter writer)
         {
             writer.WriteByte((byte)Slots.Count);
-            foreach ((int slotIndex, int itemId) in Slots)
+            foreach ((int slotIndex, int itemId, int upgradeLevel) in Slots)
             {
                 writer.WriteByte((byte)slotIndex);
                 writer.WriteInt32(itemId);
+                writer.WriteByte((byte)upgradeLevel);
             }
             writer.WriteInt32(EquippedArmorItemId);
             writer.WriteInt32(EquippedHelmetItemId);
             writer.WriteInt32(EquippedWeaponItemId);
             writer.WriteInt32(EquippedShieldItemId);
+            writer.WriteByte((byte)EquippedArmorUpgradeLevel);
+            writer.WriteByte((byte)EquippedHelmetUpgradeLevel);
+            writer.WriteByte((byte)EquippedWeaponUpgradeLevel);
+            writer.WriteByte((byte)EquippedShieldUpgradeLevel);
         }
 
         public void Read(PacketReader reader)
         {
             int count = reader.ReadByte();
-            Slots = new List<(int SlotIndex, int ItemId)>(count);
+            Slots = new List<(int SlotIndex, int ItemId, int UpgradeLevel)>(count);
             for (int i = 0; i < count; i++)
             {
                 int slotIndex = reader.ReadByte();
                 int itemId = reader.ReadInt32();
-                Slots.Add((slotIndex, itemId));
+                int upgradeLevel = reader.ReadByte();
+                Slots.Add((slotIndex, itemId, upgradeLevel));
             }
             EquippedArmorItemId = reader.ReadInt32();
             EquippedHelmetItemId = reader.ReadInt32();
             EquippedWeaponItemId = reader.ReadInt32();
             EquippedShieldItemId = reader.ReadInt32();
+            EquippedArmorUpgradeLevel = reader.ReadByte();
+            EquippedHelmetUpgradeLevel = reader.ReadByte();
+            EquippedWeaponUpgradeLevel = reader.ReadByte();
+            EquippedShieldUpgradeLevel = reader.ReadByte();
         }
     }
 
@@ -398,6 +413,71 @@ namespace Lumiis.Shared.Net
         public void Read(PacketReader reader)
         {
             Reason = (InventoryActionFailedReason)reader.ReadByte();
+        }
+    }
+
+    /// <summary>Grund, warum eine Aufwertung gar nicht erst versucht wurde (M6c) - bei allen Gründen wird
+    /// NICHTS verbraucht. Siehe World.TryUpgrade/UpgradeActionFailedPacket.</summary>
+    public enum UpgradeActionFailedReason : byte
+    {
+        SlotEmpty = 1,
+        AlreadyMaxLevel = 2,
+        NoMaterial = 3,
+        NoProtectionScroll = 4
+    }
+
+    /// <summary>M6c: Ergebnis eines tatsächlich durchgeführten Aufwertungsversuchs (Schleifstein wurde
+    /// verbraucht) - nur an den Anfragenden. Success=false + Destroyed=true: Item wurde zerstört, Slot ist
+    /// jetzt leer (NewUpgradeLevel=0). Success=false + Destroyed=false: Fehlschlag MIT Bewahrungsrolle, Item
+    /// bleibt auf NewUpgradeLevel. Success=true: Stufe ist jetzt NewUpgradeLevel.</summary>
+    public sealed class UpgradeItemResultPacket : IPacket
+    {
+        public EquipmentSlot EquipmentSlot;
+        public bool Success;
+        public bool Destroyed;
+        public int NewUpgradeLevel;
+
+        public PacketId Id
+        {
+            get { return PacketId.UpgradeItemResult; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteByte((byte)EquipmentSlot);
+            writer.WriteByte((byte)(Success ? 1 : 0));
+            writer.WriteByte((byte)(Destroyed ? 1 : 0));
+            writer.WriteByte((byte)NewUpgradeLevel);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            EquipmentSlot = (EquipmentSlot)reader.ReadByte();
+            Success = reader.ReadByte() != 0;
+            Destroyed = reader.ReadByte() != 0;
+            NewUpgradeLevel = reader.ReadByte();
+        }
+    }
+
+    /// <summary>M6c: Vorprüfung fehlgeschlagen (leerer Slot, Maximalstufe, fehlendes Material/Schutzrolle) -
+    /// kein Verbrauch, kein Zufallswurf, Verbindung bleibt bestehen. Nur an den Anfragenden.</summary>
+    public sealed class UpgradeActionFailedPacket : IPacket
+    {
+        public UpgradeActionFailedReason Reason;
+
+        public PacketId Id
+        {
+            get { return PacketId.UpgradeActionFailed; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteByte((byte)Reason);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            Reason = (UpgradeActionFailedReason)reader.ReadByte();
         }
     }
 

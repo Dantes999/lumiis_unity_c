@@ -82,14 +82,34 @@ namespace Lumiis.Data.Migrations
                     b.Property<int?>("EquippedArmorItemId")
                         .HasColumnType("integer");
 
+                    b.Property<int>("EquippedArmorUpgradeLevel")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.Property<int?>("EquippedHelmetItemId")
                         .HasColumnType("integer");
+
+                    b.Property<int>("EquippedHelmetUpgradeLevel")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
 
                     b.Property<int?>("EquippedShieldItemId")
                         .HasColumnType("integer");
 
+                    b.Property<int>("EquippedShieldUpgradeLevel")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.Property<int?>("EquippedWeaponItemId")
                         .HasColumnType("integer");
+
+                    b.Property<int>("EquippedWeaponUpgradeLevel")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
 
                     b.Property<int>("HairColorId")
                         .HasColumnType("integer");
@@ -167,6 +187,11 @@ namespace Lumiis.Data.Migrations
 
                     b.Property<int>("SlotIndex")
                         .HasColumnType("integer");
+
+                    b.Property<int>("UpgradeLevel")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
 
                     b.HasKey("Id");
 

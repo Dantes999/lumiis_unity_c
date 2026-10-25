@@ -12,6 +12,7 @@ using Lumiis.Data.Mobs;
 using Lumiis.Data.Npcs;
 using Lumiis.Data.Progression;
 using Lumiis.Data.Skills;
+using Lumiis.Data.Upgrade;
 using Lumiis.Server;
 using Lumiis.Server.Logging;
 using Lumiis.Server.Net;
@@ -28,6 +29,23 @@ namespace Lumiis.Tests.Integration
     public class GameServerIntegrationTests
     {
         private const string TokenSecret = "integration-test-token-secret-at-least-32b";
+
+        /// <summary>Deterministische Zufallsquelle für die M6c-Aufwertungs-Integrationstests: Next(100)
+        /// liefert immer roll (0 = Erfolg bei jeder Chance &gt; 0, 99 = Fehlschlag bei jeder Chance &lt; 100).</summary>
+        private sealed class FixedRandom : Random
+        {
+            private readonly int _value;
+
+            public FixedRandom(int value)
+            {
+                _value = value;
+            }
+
+            public override int Next(int maxValue)
+            {
+                return Math.Min(_value, Math.Max(0, maxValue - 1));
+            }
+        }
 
         private sealed class NullLogger : ILogger
         {
@@ -49,7 +67,8 @@ namespace Lumiis.Tests.Integration
             public ServerFixture(Func<long>? nowMs = null, Func<long>? tokenNowUnixSeconds = null, CollisionMap? collisionMap = null,
                 MobCatalog? mobCatalog = null, SpawnCatalog? spawnCatalog = null, ClassCatalog? classCatalog = null,
                 ItemCatalog? itemCatalog = null, NpcCatalog? npcCatalog = null, NpcSpawnCatalog? npcSpawnCatalog = null,
-                bool allowDebugCommands = false, ProgressionCatalog? progressionCatalog = null, SkillCatalog? skillCatalog = null)
+                bool allowDebugCommands = false, ProgressionCatalog? progressionCatalog = null, SkillCatalog? skillCatalog = null,
+                UpgradeCatalog? upgradeCatalog = null, Random? random = null)
             {
                 DbContextOptions<LumiisDbContext> options = new DbContextOptionsBuilder<LumiisDbContext>()
                     .UseInMemoryDatabase("gameserver-test-" + Guid.NewGuid())
@@ -65,7 +84,7 @@ namespace Lumiis.Tests.Integration
                     AllowDebugCommands = allowDebugCommands
                 };
                 Server = new GameServer(config, new NullLogger(), TokenService, _dbFactory, nowMs, collisionMap, mobCatalog, spawnCatalog, classCatalog,
-                    itemCatalog, npcCatalog, npcSpawnCatalog, progressionCatalog, skillCatalog);
+                    itemCatalog, npcCatalog, npcSpawnCatalog, progressionCatalog, skillCatalog, upgradeCatalog, random);
             }
 
             /// <summary>level/xp/spent*/unspent*/currentHp/currentSp: M6a-Fortschrittsstand der neuen Zeile
@@ -2805,6 +2824,191 @@ namespace Lumiis.Tests.Integration
                 Assert.Contains((1, 1), rejoinStats.Skills);
                 Assert.Contains((3, 1), rejoinStats.Skills);
                 Assert.Equal(0, rejoinStats.UnspentSkillPoints);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        // ---- M6c: Ausrüstungs-Aufwertung (+0..+9) ----
+
+        private const string UpgradeItemsJson = @"{
+  ""items"": [
+    { ""id"": 1, ""name"": ""Testschwert"", ""itemType"": ""Weapon"", ""lookId"": 1, ""attackBonus"": 5, ""defenseBonus"": 0, ""upgradeBonusPerLevel"": 2 },
+    { ""id"": 9, ""name"": ""Schleifstein"", ""itemType"": ""UpgradeMaterial"" },
+    { ""id"": 10, ""name"": ""Bewahrungsrolle"", ""itemType"": ""ProtectionScroll"" }
+  ]
+}";
+
+        private const string UpgradeJson = @"{
+  ""maxUpgradeLevel"": 9,
+  ""successChancePercent"": [ 90, 80, 70, 60, 50, 40, 30, 20, 10 ],
+  ""whetstoneItemId"": 9,
+  ""protectionScrollItemId"": 10
+}";
+
+        private static ItemCatalog CreateUpgradeItemCatalog()
+        {
+            return ItemCatalog.LoadFromJson(UpgradeItemsJson, TestLookCatalogs.CreateMinimal());
+        }
+
+        private static UpgradeCatalog CreateUpgradeCatalog(ItemCatalog items)
+        {
+            return UpgradeCatalog.LoadFromJson(UpgradeJson, items);
+        }
+
+        private static void SeedEquippedWeaponWithWhetstone(ServerFixture fixture, int characterId, int upgradeLevel)
+        {
+            using LumiisDbContext db = fixture.OpenDb();
+            Character character = db.Characters.Single(c => c.Id == characterId);
+            character.EquippedWeaponItemId = 1;
+            character.EquippedWeaponUpgradeLevel = upgradeLevel;
+            db.CharacterInventoryItems.Add(new CharacterInventoryItem { CharacterId = characterId, SlotIndex = 0, ItemId = 9 });
+            db.SaveChanges();
+        }
+
+        [Fact]
+        public void Upgrade_Success_SendsResultInventorySyncAndCharacterStatsWithHigherAttack()
+        {
+            ItemCatalog items = CreateUpgradeItemCatalog();
+            UpgradeCatalog upgrades = CreateUpgradeCatalog(items);
+            var fixture = new ServerFixture(itemCatalog: items, upgradeCatalog: upgrades, random: new FixedRandom(0));
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice");
+                SeedEquippedWeaponWithWhetstone(fixture, characterId, upgradeLevel: 2);
+
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<CharacterStatsPacket>().Any(), server, client));
+                int attackBefore = client.Received.OfType<CharacterStatsPacket>().First().Attack;
+                Assert.Equal(10 + 5 + 2 * 2, attackBefore); // Fallback-Angriff 10 + Waffe 5 + Stufe 2 * 2.
+
+                client.Send(new UpgradeItemRequestPacket { EquipmentSlot = EquipmentSlot.Weapon, UseProtectionScroll = false });
+                Assert.True(Pump(() => client.Received.OfType<UpgradeItemResultPacket>().Any()
+                    && client.Received.OfType<InventorySyncPacket>().Any(s => s.EquippedWeaponUpgradeLevel == 3)
+                    && client.Received.OfType<CharacterStatsPacket>().Any(s => s.Attack == attackBefore + 2), server, client));
+
+                UpgradeItemResultPacket result = client.Received.OfType<UpgradeItemResultPacket>().Single();
+                Assert.True(result.Success);
+                Assert.False(result.Destroyed);
+                Assert.Equal(3, result.NewUpgradeLevel);
+
+                InventorySyncPacket sync = client.Received.OfType<InventorySyncPacket>().Last(s => s.EquippedWeaponUpgradeLevel == 3);
+                Assert.Equal(1, sync.EquippedWeaponItemId);
+                Assert.DoesNotContain(sync.Slots, s => s.ItemId == 9); // Schleifstein verbraucht.
+                Assert.Equal(attackBefore + 2, client.Received.OfType<CharacterStatsPacket>().Last().Attack);
+                Assert.Contains(client.Received.OfType<ChatMessagePacket>(),
+                    m => m.Channel == ChatChannel.System && m.Text.Contains("ist jetzt +3"));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void Upgrade_ForcedFailureWithoutProtection_DestroysItemAndSyncsEmptySlot()
+        {
+            ItemCatalog items = CreateUpgradeItemCatalog();
+            UpgradeCatalog upgrades = CreateUpgradeCatalog(items);
+            var fixture = new ServerFixture(itemCatalog: items, upgradeCatalog: upgrades, random: new FixedRandom(99));
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice");
+                SeedEquippedWeaponWithWhetstone(fixture, characterId, upgradeLevel: 2);
+
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<CharacterStatsPacket>().Any(), server, client));
+                int attackBefore = client.Received.OfType<CharacterStatsPacket>().First().Attack;
+
+                client.Send(new UpgradeItemRequestPacket { EquipmentSlot = EquipmentSlot.Weapon, UseProtectionScroll = false });
+                Assert.True(Pump(() => client.Received.OfType<UpgradeItemResultPacket>().Any()
+                    && client.Received.OfType<InventorySyncPacket>().Any(s => s.EquippedWeaponItemId == 0)
+                    && client.Received.OfType<CharacterStatsPacket>().Any(s => s.Attack == attackBefore - (5 + 2 * 2)), server, client));
+
+                UpgradeItemResultPacket result = client.Received.OfType<UpgradeItemResultPacket>().Single();
+                Assert.False(result.Success);
+                Assert.True(result.Destroyed);
+                Assert.Equal(0, result.NewUpgradeLevel);
+
+                InventorySyncPacket sync = client.Received.OfType<InventorySyncPacket>().Last();
+                Assert.Equal(0, sync.EquippedWeaponItemId);
+                Assert.Equal(0, sync.EquippedWeaponUpgradeLevel);
+                Assert.DoesNotContain(sync.Slots, s => s.ItemId == 9);
+                Assert.Equal(attackBefore - (5 + 2 * 2), client.Received.OfType<CharacterStatsPacket>().Last().Attack);
+                Assert.Contains(client.Received.OfType<ChatMessagePacket>(),
+                    m => m.Channel == ChatChannel.System && m.Text.Contains("zerstört"));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        /// <summary>Regression: die Aufwertungsstufe überlebt Disconnect und Rejoin (sofortiger
+        /// CharacterSaveRequest nach dem Versuch, kein Warten auf den periodischen 30s-Save).</summary>
+        [Fact]
+        public void Upgrade_LevelSurvivesDisconnectAndRejoin()
+        {
+            ItemCatalog items = CreateUpgradeItemCatalog();
+            UpgradeCatalog upgrades = CreateUpgradeCatalog(items);
+            var fixture = new ServerFixture(itemCatalog: items, upgradeCatalog: upgrades, random: new FixedRandom(0));
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                int characterId;
+                string token;
+
+                using (var client = new TestClient())
+                {
+                    client.Connect(server.ListenPort);
+                    Assert.True(WaitConnected(server, client));
+
+                    (characterId, token) = fixture.CreateCharacter("Alice");
+                    SeedEquippedWeaponWithWhetstone(fixture, characterId, upgradeLevel: 4);
+
+                    client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                    Assert.True(Pump(() => client.Received.OfType<InventorySyncPacket>().Any(s => s.EquippedWeaponUpgradeLevel == 4), server, client));
+
+                    client.Send(new UpgradeItemRequestPacket { EquipmentSlot = EquipmentSlot.Weapon, UseProtectionScroll = false });
+                    Assert.True(Pump(() => client.Received.OfType<InventorySyncPacket>().Any(s => s.EquippedWeaponUpgradeLevel == 5), server, client));
+
+                    client.Peer!.Disconnect();
+                    Assert.True(Pump(() => client.Disconnected, server, client));
+                }
+
+                Assert.True(Pump(() =>
+                {
+                    using LumiisDbContext db = fixture.OpenDb();
+                    Character? character = db.Characters.SingleOrDefault(c => c.Id == characterId);
+                    return character != null && character.EquippedWeaponUpgradeLevel == 5;
+                }, server));
+
+                using var rejoinClient = new TestClient();
+                rejoinClient.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, rejoinClient));
+                rejoinClient.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => rejoinClient.Received.OfType<InventorySyncPacket>().Any(), server, rejoinClient));
+
+                InventorySyncPacket rejoinSync = rejoinClient.Received.OfType<InventorySyncPacket>().First();
+                Assert.Equal(1, rejoinSync.EquippedWeaponItemId);
+                Assert.Equal(5, rejoinSync.EquippedWeaponUpgradeLevel);
+                CharacterStatsPacket rejoinStats = rejoinClient.Received.OfType<CharacterStatsPacket>().First();
+                Assert.Equal(10 + 5 + 5 * 2, rejoinStats.Attack);
             }
             finally
             {

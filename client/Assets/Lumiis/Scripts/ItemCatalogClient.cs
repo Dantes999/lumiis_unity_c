@@ -27,6 +27,10 @@ namespace Lumiis.Client
         public int defenseBonus;
         public int healAmount;
 
+        /// <summary>M6c: Bonus auf Attack/Defense je Aufwertungsstufe (nur Ausrüstung, sonst 0) - reine
+        /// Anzeige-/Testinfo, die tatsächlichen Werte kommen weiterhin vom Server (CharacterStats).</summary>
+        public int upgradeBonusPerLevel;
+
         /// <summary>M5b: Verkaufspreis (0 = nicht verkäuflich) - fürs Shop-Panel gebraucht (kein Paket trägt
         /// Verkaufspreise, nur BuyPrice über ShopContentPacket, siehe GameClient.DrawShopPanel). BuyPrice wird
         /// hier bewusst NICHT geladen - die kommt beim Kaufen ohnehin autoritativ vom Server.</summary>
@@ -110,6 +114,13 @@ namespace Lumiis.Client
         public string DisplayName(int itemId)
         {
             return TryGet(itemId, out ItemEntryJson entry) ? entry.name : "#" + itemId;
+        }
+
+        /// <summary>M6c: erster Eintrag eines ItemTyps (z. B. "ProtectionScroll") - für die rein
+        /// clientseitige Vorprüfung "ist überhaupt eine Bewahrungsrolle im Inventar?".</summary>
+        public bool HasType(string itemType)
+        {
+            return FirstOfType(itemType) != null;
         }
     }
 }

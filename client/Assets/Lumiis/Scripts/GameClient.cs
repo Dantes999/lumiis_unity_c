@@ -102,12 +102,24 @@ namespace Lumiis.Client
         // ---- Inventar/Ausrüstung (M5a, Debug-Panel-Stil - siehe DrawInventoryPanel/DrawEquipmentPanel) ----
         // Voller Resync bei Join und nach jeder Änderung (siehe InventorySyncPacket) - rein lokaler Cache für
         // die Debug-UI, keine eigene ClientWorld-Anbindung nötig (analog zu _yangTotal/_targetEntityId).
-        private readonly List<(int SlotIndex, int ItemId)> _inventorySlots = new List<(int, int)>();
+        // Seit M6c trägt jeder Slot zusätzlich seine Aufwertungsstufe (0-9).
+        private readonly List<(int SlotIndex, int ItemId, int UpgradeLevel)> _inventorySlots = new List<(int, int, int)>();
         private int _equippedArmorItemId;
         private int _equippedHelmetItemId;
         private int _equippedWeaponItemId;
         private int _equippedShieldItemId;
+        private int _equippedArmorUpgradeLevel;
+        private int _equippedHelmetUpgradeLevel;
+        private int _equippedWeaponUpgradeLevel;
+        private int _equippedShieldUpgradeLevel;
         private string _lastInventoryActionFailedMessage = "";
+
+        // ---- Aufwertung (M6c, Debug-Panel-Stil - siehe DrawEquipmentRow) ----
+        // Index = (int)EquipmentSlot (1-4); Checkbox-Zustand je Slot. Reine Komfort-Vorprüfung, der Server
+        // validiert Material/Rolle final (World.TryUpgrade).
+        private readonly bool[] _useProtectionScroll = new bool[5];
+        private string _lastUpgradeMessage = "";
+        private string _lastUpgradeItemName = "Ausrüstung";
 
         // ---- Shop (M5b, Debug-Panel-Stil - siehe DrawShopPanel) ----
         // -1 = kein Shop offen. Sortiment kommt per ShopContentPacket (Resync bei jedem OpenShopRequest,
@@ -800,30 +812,61 @@ namespace Lumiis.Client
             GUILayout.EndHorizontal();
         }
 
-        /// <summary>M5a: die vier Ausrüstungs-Slots mit aktuellem Item-Namen (oder "leer") plus
-        /// Ablegen-Knopf. Item-Namen kommen aus ItemCatalogClient (items.json, StreamingAssets), aufgelöst
-        /// über die vom Server per InventorySyncPacket verschickten EquippedXItemId-Werte.</summary>
+        /// <summary>M5a/M6c: die vier Ausrüstungs-Slots mit aktuellem Item-Namen (+N), Ablegen-Knopf sowie
+        /// (nur bei belegtem Slot und Stufe &lt; 9) einer "Aufwerten"-Aktion mit optionaler Bewahrungsrolle.
+        /// Item-Namen kommen aus ItemCatalogClient, die Stufe aus dem InventorySyncPacket (Server autoritativ).</summary>
         private void DrawEquipmentPanel()
         {
             GUILayout.Space(6);
             GUILayout.Label("Ausrüstung");
-            DrawEquipmentRow("Ruestung", EquipmentSlot.Armor, _equippedArmorItemId);
-            DrawEquipmentRow("Helm", EquipmentSlot.Helmet, _equippedHelmetItemId);
-            DrawEquipmentRow("Waffe", EquipmentSlot.Weapon, _equippedWeaponItemId);
-            DrawEquipmentRow("Schild", EquipmentSlot.Shield, _equippedShieldItemId);
+            DrawEquipmentRow("Ruestung", EquipmentSlot.Armor, _equippedArmorItemId, _equippedArmorUpgradeLevel);
+            DrawEquipmentRow("Helm", EquipmentSlot.Helmet, _equippedHelmetItemId, _equippedHelmetUpgradeLevel);
+            DrawEquipmentRow("Waffe", EquipmentSlot.Weapon, _equippedWeaponItemId, _equippedWeaponUpgradeLevel);
+            DrawEquipmentRow("Schild", EquipmentSlot.Shield, _equippedShieldItemId, _equippedShieldUpgradeLevel);
         }
 
-        private void DrawEquipmentRow(string label, EquipmentSlot slot, int equippedItemId)
+        private void DrawEquipmentRow(string label, EquipmentSlot slot, int equippedItemId, int upgradeLevel)
         {
             GUILayout.BeginHorizontal();
             DrawItemIcon(equippedItemId);
             string itemName = equippedItemId == 0 ? "leer" : _itemCatalog.DisplayName(equippedItemId);
-            GUILayout.Label(label + ": " + itemName, GUILayout.Width(140));
+            string levelSuffix = equippedItemId != 0 && upgradeLevel > 0 ? " +" + upgradeLevel : "";
+            GUILayout.Label(label + ": " + itemName + levelSuffix, GUILayout.Width(140));
             GUI.enabled = equippedItemId != 0;
             if (GUILayout.Button("Ablegen", GUILayout.Width(60)))
                 _netClient.SendUnequipItem(slot);
             GUI.enabled = true;
             GUILayout.EndHorizontal();
+
+            if (equippedItemId != 0 && upgradeLevel < ItemEntryJson.MaxUpgradeLevel)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Space(28);
+                bool hasProtectionScroll = HasProtectionScrollInInventory();
+                GUI.enabled = hasProtectionScroll;
+                int slotIndex = (int)slot;
+                _useProtectionScroll[slotIndex] = GUILayout.Toggle(_useProtectionScroll[slotIndex],
+                    hasProtectionScroll ? "Bewahrungsrolle" : "keine Bewahrungsrolle", GUILayout.Width(150));
+                GUI.enabled = true;
+                if (GUILayout.Button("Aufwerten", GUILayout.Width(80)))
+                {
+                    _lastUpgradeItemName = itemName;
+                    _netClient.SendUpgradeItem(slot, _useProtectionScroll[slotIndex]);
+                }
+                GUILayout.EndHorizontal();
+            }
+        }
+
+        /// <summary>M6c: rein clientseitige Vorprüfung für die Checkbox-Aktivierung - zählt die Rollen im
+        /// lokalen Inventar-Cache (ItemType "ProtectionScroll" aus items.json). Der Server validiert final.</summary>
+        private bool HasProtectionScrollInInventory()
+        {
+            foreach ((int SlotIndex, int ItemId, int UpgradeLevel) entry in _inventorySlots)
+            {
+                if (_itemCatalog.TryGet(entry.ItemId, out ItemEntryJson item) && item.itemType == "ProtectionScroll")
+                    return true;
+            }
+            return false;
         }
 
         private void DrawItemIcon(int itemId)
@@ -851,9 +894,11 @@ namespace Lumiis.Client
             for (int slotIndex = 0; slotIndex < GameConstants.InventorySize; slotIndex++)
             {
                 int itemId = FindItemInSlot(slotIndex);
+                int upgradeLevel = FindUpgradeLevelInSlot(slotIndex);
                 GUILayout.BeginHorizontal();
                 DrawItemIcon(itemId);
-                string text = slotIndex + ": " + (itemId == 0 ? "leer" : _itemCatalog.DisplayName(itemId));
+                string levelSuffix = itemId != 0 && upgradeLevel > 0 ? " +" + upgradeLevel : "";
+                string text = slotIndex + ": " + (itemId == 0 ? "leer" : _itemCatalog.DisplayName(itemId) + levelSuffix);
                 GUI.enabled = itemId != 0;
                 if (GUILayout.Button(text, GUILayout.Width(186)))
                     HandleInventorySlotClick(slotIndex, itemId);
@@ -864,9 +909,18 @@ namespace Lumiis.Client
 
         private int FindItemInSlot(int slotIndex)
         {
-            foreach ((int SlotIndex, int ItemId) entry in _inventorySlots)
+            foreach ((int SlotIndex, int ItemId, int UpgradeLevel) entry in _inventorySlots)
             {
                 if (entry.SlotIndex == slotIndex) return entry.ItemId;
+            }
+            return 0;
+        }
+
+        private int FindUpgradeLevelInSlot(int slotIndex)
+        {
+            foreach ((int SlotIndex, int ItemId, int UpgradeLevel) entry in _inventorySlots)
+            {
+                if (entry.SlotIndex == slotIndex) return entry.UpgradeLevel;
             }
             return 0;
         }
@@ -1103,7 +1157,14 @@ namespace Lumiis.Client
             _equippedHelmetItemId = 0;
             _equippedWeaponItemId = 0;
             _equippedShieldItemId = 0;
+            _equippedArmorUpgradeLevel = 0;
+            _equippedHelmetUpgradeLevel = 0;
+            _equippedWeaponUpgradeLevel = 0;
+            _equippedShieldUpgradeLevel = 0;
             _lastInventoryActionFailedMessage = "";
+            _lastUpgradeMessage = "";
+            _lastUpgradeItemName = "Ausrüstung";
+            for (int i = 0; i < _useProtectionScroll.Length; i++) _useProtectionScroll[i] = false;
             _shopOpenNpcEntityId = -1;
             _shopItems.Clear();
             _lastShopActionFailedMessage = "";
@@ -1218,6 +1279,10 @@ namespace Lumiis.Client
                 _equippedHelmetItemId = inventorySync.EquippedHelmetItemId;
                 _equippedWeaponItemId = inventorySync.EquippedWeaponItemId;
                 _equippedShieldItemId = inventorySync.EquippedShieldItemId;
+                _equippedArmorUpgradeLevel = inventorySync.EquippedArmorUpgradeLevel;
+                _equippedHelmetUpgradeLevel = inventorySync.EquippedHelmetUpgradeLevel;
+                _equippedWeaponUpgradeLevel = inventorySync.EquippedWeaponUpgradeLevel;
+                _equippedShieldUpgradeLevel = inventorySync.EquippedShieldUpgradeLevel;
                 if (_inventorySlots.Count > previousInventoryCount) _audio?.PlayLoot();
                 ApplyLocalWeaponVisual();
                 return;
@@ -1227,6 +1292,26 @@ namespace Lumiis.Client
             if (inventoryFailed != null)
             {
                 _lastInventoryActionFailedMessage = InventoryActionFailedReasonText(inventoryFailed.Reason);
+                return;
+            }
+
+            UpgradeItemResultPacket upgradeResult = packet as UpgradeItemResultPacket;
+            if (upgradeResult != null)
+            {
+                _lastInventoryActionFailedMessage = "";
+                if (upgradeResult.Success)
+                    _lastUpgradeMessage = _lastUpgradeItemName + " ist jetzt +" + upgradeResult.NewUpgradeLevel + "!";
+                else if (upgradeResult.Destroyed)
+                    _lastUpgradeMessage = "Aufwertung fehlgeschlagen - " + _lastUpgradeItemName + " wurde zerstört!";
+                else
+                    _lastUpgradeMessage = "Aufwertung fehlgeschlagen, durch die Bewahrungsrolle gerettet.";
+                return;
+            }
+
+            UpgradeActionFailedPacket upgradeFailed = packet as UpgradeActionFailedPacket;
+            if (upgradeFailed != null)
+            {
+                _lastUpgradeMessage = UpgradeActionFailedReasonText(upgradeFailed.Reason);
                 return;
             }
 
@@ -1423,6 +1508,18 @@ namespace Lumiis.Client
             }
         }
 
+        private static string UpgradeActionFailedReasonText(UpgradeActionFailedReason reason)
+        {
+            switch (reason)
+            {
+                case UpgradeActionFailedReason.SlotEmpty: return "Dieser Ausrüstungsplatz ist leer.";
+                case UpgradeActionFailedReason.AlreadyMaxLevel: return "Maximale Aufwertungsstufe (+9) erreicht.";
+                case UpgradeActionFailedReason.NoMaterial: return "Kein Schleifstein im Inventar.";
+                case UpgradeActionFailedReason.NoProtectionScroll: return "Keine Bewahrungsrolle im Inventar.";
+                default: return "Aufwertung nicht möglich.";
+            }
+        }
+
         private static string AttackFailedReasonText(AttackFailedReason reason)
         {
             switch (reason)
@@ -1554,7 +1651,7 @@ namespace Lumiis.Client
                 ? new Vector2(entry.pivotOffset.x, entry.pivotOffset.y)
                 : Vector2.zero;
 
-            int upgradeLevel = entry.ClampedUpgradeLevel;
+            int upgradeLevel = _equippedWeaponUpgradeLevel;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             upgradeLevel = _debugWeaponUpgradeLevel;
 #endif
@@ -1587,6 +1684,7 @@ namespace Lumiis.Client
                 if (!string.IsNullOrEmpty(_lastDodgeMessage)) return _lastDodgeMessage;
                 if (!string.IsNullOrEmpty(_lastAttackFailedMessage)) return _lastAttackFailedMessage;
                 if (!string.IsNullOrEmpty(_lastSkillFailedMessage)) return _lastSkillFailedMessage;
+                if (!string.IsNullOrEmpty(_lastUpgradeMessage)) return _lastUpgradeMessage;
                 if (!string.IsNullOrEmpty(_lastInventoryActionFailedMessage)) return _lastInventoryActionFailedMessage;
                 if (!string.IsNullOrEmpty(_lastShopActionFailedMessage)) return _lastShopActionFailedMessage;
                 return "";
@@ -1841,6 +1939,7 @@ namespace Lumiis.Client
             if (_isDead) text += " | Du bist gestorben, Respawn in Kürze...";
             else if (!string.IsNullOrEmpty(_lastAttackFailedMessage)) text += " | " + _lastAttackFailedMessage;
             if (!string.IsNullOrEmpty(_lastInventoryActionFailedMessage)) text += " | " + _lastInventoryActionFailedMessage;
+            if (!string.IsNullOrEmpty(_lastUpgradeMessage)) text += " | " + _lastUpgradeMessage;
             if (!string.IsNullOrEmpty(_lastShopActionFailedMessage)) text += " | " + _lastShopActionFailedMessage;
             if (!string.IsNullOrEmpty(_lastLevelUpMessage)) text += " | " + _lastLevelUpMessage;
             if (!string.IsNullOrEmpty(_lastDodgeMessage)) text += " | " + _lastDodgeMessage;

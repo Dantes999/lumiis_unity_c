@@ -10,4 +10,8 @@ public sealed class CharacterInventoryItem
     public Character? Character { get; set; }
     public int SlotIndex { get; set; }
     public int ItemId { get; set; }
+
+    /// <summary>M6c: Aufwertungsstufe dieser konkreten Item-Instanz (0-9) - bleibt beim Anlegen/Ablegen
+    /// erhalten (siehe World.TryEquip/TryUnequip). 0 = nicht aufgewertet.</summary>
+    public int UpgradeLevel { get; set; }
 }

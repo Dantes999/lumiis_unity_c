@@ -91,6 +91,14 @@ namespace Lumiis.Client
             Send(new UseConsumableRequestPacket { InventorySlotIndex = inventorySlotIndex });
         }
 
+        /// <summary>M6c: "Aufwerten"-Knopf im Ausrüstungs-Bereich (nur angelegte Ausrüstung) - der Server
+        /// prüft Slot/Stufe/Material/Bewahrungsrolle erneut (siehe World.TryUpgrade).</summary>
+        public void SendUpgradeItem(EquipmentSlot equipmentSlot, bool useProtectionScroll)
+        {
+            if (_peer == null || !IsConnected) return;
+            Send(new UpgradeItemRequestPacket { EquipmentSlot = equipmentSlot, UseProtectionScroll = useProtectionScroll });
+        }
+
         /// <summary>M5b: Rechtsklick auf einen sichtbaren NPC (siehe GameClient.HandleRightClickAttack).</summary>
         public void SendOpenShop(int npcEntityId)
         {
