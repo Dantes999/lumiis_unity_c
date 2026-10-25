@@ -8,11 +8,11 @@ Generator: `tools/import-lumiis-assets.py`
 
 ## Bestand
 
-- 533 PNGs im Archiv; `icons.json` nennt 545 Keys. 13 Dateien fehlen im Archiv
-  (u. a. `sword_1`, `sword_5`, `sword_10`, `sword_15`, `sword_20`, `sword_25`,
-  `twohand_10`, `armor_warrior_1/9/18/26`, `wolf_claw`, `boar_tusk`).
-  Sie liegen in `lumiis-2d@19cd9dc:assets/icons/` und können bei Bedarf nachgeladen werden.
-- Importiert sind aktuell **533 Icons** in 34 Kategorien; `yang_boden` liegt unter `misc`.
+- `icons.json` nennt 545 Keys; 13 Dateien fehlten im Archiv
+  (`sword_1/5/10/15/20/25`, `twohand_10`, `armor_warrior_1/9/18/26`, `wolf_claw`, `boar_tusk`).
+  Sie wurden aus `lumiis-2d@19cd9dc:assets/icons/` nachgeladen.
+- Importiert sind aktuell **546 Icons** in 34 Kategorien (545 Keys aus `icons.json` plus
+  `yang_boden`); alle Manifest-Keys sind vorhanden.
 - 48 Buch-Icons hießen im Archiv `book:*.png` (unter Windows unzulässig). Der Import
   saniert sie zu `book_*.png`; der ursprüngliche Key bleibt als `sourceKey` im Manifest.
 - Format: 32×32, 32×64, 32×96 (selten); RGBA, transparenter Hintergrund.
@@ -64,12 +64,11 @@ Point-Filter, keine Kompression). Das Manifest ist JsonUtility-freundlich:
 | 7 | Rundschild | `shield_1` | 32×32 |
 | 8 | Heiltrank | `red_s` | 32×32 |
 
-Wenn die 13 fehlenden Dateien nachgeladen werden, können die Low-Level-Varianten
-(`sword_1`/`sword_20`/`twohand_10`/`armor_warrior_1`) bevorzugt werden.
+Die nachgeladenen Low-Level-Varianten (`sword_1`/`sword_20`/`twohand_10`/`armor_warrior_1`)
+stehen jetzt für frühe Item-Tiers zur Verfügung.
 
 ## Offene Punkte
 
-- 13 fehlende Archivdateien nachladen (nicht blockierend für die 8 Items).
 - Weitere Item-Typen mit `iconKey` versorgen (Material, Buch, Geiststein, Truhe,
   Schlüssel, Karte, Teleport, Schmuck, Schuhe, Kostüm, Pferd).
 - Optional: Sprite-Atlas, sobald Profiling es rechtfertigt.

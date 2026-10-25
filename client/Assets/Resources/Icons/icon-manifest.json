@@ -274,6 +274,27 @@
    "resource": "Icons/armor/armor_sura_9"
   },
   {
+   "key": "armor_warrior_1",
+   "sourceKey": "armor_warrior_1",
+   "category": "armor",
+   "file": "armor/armor_warrior_1.png",
+   "resource": "Icons/armor/armor_warrior_1"
+  },
+  {
+   "key": "armor_warrior_18",
+   "sourceKey": "armor_warrior_18",
+   "category": "armor",
+   "file": "armor/armor_warrior_18.png",
+   "resource": "Icons/armor/armor_warrior_18"
+  },
+  {
+   "key": "armor_warrior_26",
+   "sourceKey": "armor_warrior_26",
+   "category": "armor",
+   "file": "armor/armor_warrior_26.png",
+   "resource": "Icons/armor/armor_warrior_26"
+  },
+  {
    "key": "armor_warrior_34",
    "sourceKey": "armor_warrior_34",
    "category": "armor",
@@ -321,6 +342,13 @@
    "category": "armor",
    "file": "armor/armor_warrior_80.png",
    "resource": "Icons/armor/armor_warrior_80"
+  },
+  {
+   "key": "armor_warrior_9",
+   "sourceKey": "armor_warrior_9",
+   "category": "armor",
+   "file": "armor/armor_warrior_9.png",
+   "resource": "Icons/armor/armor_warrior_9"
   },
   {
    "key": "gold_bar_1m",
@@ -1653,6 +1681,13 @@
    "resource": "Icons/material/blue_crystal"
   },
   {
+   "key": "boar_tusk",
+   "sourceKey": "boar_tusk",
+   "category": "material",
+   "file": "material/boar_tusk.png",
+   "resource": "Icons/material/boar_tusk"
+  },
+  {
    "key": "cloth_plus",
    "sourceKey": "cloth_plus",
    "category": "material",
@@ -1980,6 +2015,13 @@
    "category": "material",
    "file": "material/water_crystal.png",
    "resource": "Icons/material/water_crystal"
+  },
+  {
+   "key": "wolf_claw",
+   "sourceKey": "wolf_claw",
+   "category": "material",
+   "file": "material/wolf_claw.png",
+   "resource": "Icons/material/wolf_claw"
   },
   {
    "key": "yeti_fur",
@@ -3480,6 +3522,41 @@
    "resource": "Icons/weapon/fan_80"
   },
   {
+   "key": "sword_1",
+   "sourceKey": "sword_1",
+   "category": "weapon",
+   "file": "weapon/sword_1.png",
+   "resource": "Icons/weapon/sword_1"
+  },
+  {
+   "key": "sword_10",
+   "sourceKey": "sword_10",
+   "category": "weapon",
+   "file": "weapon/sword_10.png",
+   "resource": "Icons/weapon/sword_10"
+  },
+  {
+   "key": "sword_15",
+   "sourceKey": "sword_15",
+   "category": "weapon",
+   "file": "weapon/sword_15.png",
+   "resource": "Icons/weapon/sword_15"
+  },
+  {
+   "key": "sword_20",
+   "sourceKey": "sword_20",
+   "category": "weapon",
+   "file": "weapon/sword_20.png",
+   "resource": "Icons/weapon/sword_20"
+  },
+  {
+   "key": "sword_25",
+   "sourceKey": "sword_25",
+   "category": "weapon",
+   "file": "weapon/sword_25.png",
+   "resource": "Icons/weapon/sword_25"
+  },
+  {
    "key": "sword_30",
    "sourceKey": "sword_30",
    "category": "weapon",
@@ -3513,6 +3590,13 @@
    "category": "weapon",
    "file": "weapon/sword_45.png",
    "resource": "Icons/weapon/sword_45"
+  },
+  {
+   "key": "sword_5",
+   "sourceKey": "sword_5",
+   "category": "weapon",
+   "file": "weapon/sword_5.png",
+   "resource": "Icons/weapon/sword_5"
   },
   {
    "key": "sword_50",
@@ -3618,6 +3702,13 @@
    "category": "weapon",
    "file": "weapon/twohand_1.png",
    "resource": "Icons/weapon/twohand_1"
+  },
+  {
+   "key": "twohand_10",
+   "sourceKey": "twohand_10",
+   "category": "weapon",
+   "file": "weapon/twohand_10.png",
+   "resource": "Icons/weapon/twohand_10"
   },
   {
    "key": "twohand_15",
