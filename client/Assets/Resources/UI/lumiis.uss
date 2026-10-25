@@ -641,10 +641,12 @@
     left: 0;
     right: 0;
     top: 194px;
-    color: rgb(236, 224, 190);
-    font-size: 11px;
+    color: rgb(255, 244, 214);
+    font-size: 12px;
+    -unity-font-style: bold;
     -unity-text-align: middle-center;
-    -unity-text-outline-width: 1px;
+    text-shadow: 1px 1px 0 rgb(0, 0, 0);
+    -unity-text-outline-width: 0px;
     -unity-text-outline-color: rgb(0, 0, 0);
 }
 
@@ -737,13 +739,13 @@
 }
 
 .hud-chat-hint {
-    color: rgba(240, 230, 200, 0.85);
-    font-size: 10px;
+    color: rgb(245, 236, 210);
+    font-size: 11px;
     margin-top: 1px;
     padding: 1px 4px;
-    background-color: rgba(0, 0, 0, 0.45);
-    -unity-text-outline-width: 1px;
-    -unity-text-outline-color: rgb(0, 0, 0);
+    background-color: rgba(0, 0, 0, 0.6);
+    -unity-text-outline-width: 0;
+    text-shadow: 1px 1px 0 rgb(0, 0, 0);
 }
 
 /* ---- Taskleiste unten ---- */
@@ -884,12 +886,13 @@
 }
 
 .hud-exp-text {
-    color: rgb(230, 220, 190);
-    font-size: 10px;
+    color: rgb(255, 236, 170);
+    font-size: 12px;
+    -unity-font-style: bold;
     margin-left: 5px;
-    width: 52px;
-    -unity-text-outline-width: 1px;
-    -unity-text-outline-color: rgb(0, 0, 0);
+    width: 56px;
+    -unity-text-outline-width: 0;
+    text-shadow: 1px 1px 0 rgb(0, 0, 0);
 }
 
 .hud-menu-buttons {
