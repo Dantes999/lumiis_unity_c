@@ -1270,7 +1270,7 @@ Voraussetzung: laufender Server, Charakter ausgewählt; Editor-Play oder Develop
 - **F12** oder "Screenshot aufnehmen" im Labor erzeugt sofort ein PNG unter `/tmp`; alternativ
   `tools/request-screenshot.sh` aus einer Shell, während Unity im Play-Modus läuft (kein Neustart).
 - Icon-Galerie: Kategorie/Seite durchklicken; es werden 64 Icons je Seite aus dem importierten
-  Lumiis-Archiv angezeigt (533 Icons, 34 Kategorien).
+  Lumiis-Archiv angezeigt (546 Icons, 34 Kategorien).
 - "Charakter-Galerie zeigen": acht echte Lumiis-Figuren (Krieger/Ninja/Sura/Schamane, m/w) mit
   Waffe/Rüstung; der automatische Screenshot-Lauf legt `/tmp/lumiis-asset-lab-characters.png` ab.
 - "Karten-Vorschau (Greenfield)": zeigt die importierte 80×80-Karte als Weltbild; der automatische
