@@ -12,18 +12,39 @@ namespace Lumiis.Client
         /// werden proportional skaliert, statt dass die Oberfläche in einer Ecke klebt oder abgeschnitten wird.</summary>
         public static readonly Vector2Int ReferenceResolution = new Vector2Int(1280, 720);
 
-        /// <summary>Erzeugt PanelSettings mit "Scale With Screen Size" (Breite/Höhe je zur Hälfte gewichtet).
-        /// sortingOrder: höher = weiter vorn (Login/Escape-Menü liegt über dem HUD).</summary>
+        /// <summary>Kleinster Skalierungsfaktor - darunter würde die Schrift bei kleinen Fenstern unlesbar.
+        /// Nur wenn das Fenster so klein ist, dass die Oberfläche sonst nicht mehr passt, geht es tiefer.</summary>
+        public const float MinReadableScale = 1f;
+
+        /// <summary>Kleinste logische Fläche, die die Oberfläche mindestens braucht (Taskleiste + Fenster).</summary>
+        private static readonly Vector2 MinLayoutSize = new Vector2(1000f, 600f);
+
+        /// <summary>Erzeugt PanelSettings mit konstantem, von <see cref="ComputeScale"/> gesteuertem Faktor
+        /// (siehe <see cref="UiScaler"/>). sortingOrder: höher = weiter vorn (Login/Escape-Menü liegt über
+        /// dem HUD).</summary>
         public static PanelSettings CreatePanelSettings(float sortingOrder)
         {
             var settings = ScriptableObject.CreateInstance<PanelSettings>();
             settings.themeStyleSheet = Resources.Load<ThemeStyleSheet>("UI/DefaultRuntimeTheme");
-            settings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
-            settings.referenceResolution = ReferenceResolution;
-            settings.screenMatchMode = PanelScreenMatchMode.MatchWidthOrHeight;
-            settings.match = 0.5f;
+            settings.scaleMode = PanelScaleMode.ConstantPixelSize;
+            settings.scale = ComputeScale(Screen.width, Screen.height);
             settings.sortingOrder = sortingOrder;
             return settings;
+        }
+
+        /// <summary>Wie "Scale With Screen Size" (geometrisches Mittel aus Breiten- und Höhenverhältnis zur
+        /// Referenz 1280x720), aber nie kleiner als <see cref="MinReadableScale"/> - auf kleinen Fenstern
+        /// bleibt die Schrift so in voller Referenzgröße statt mitzuschrumpfen. Nur wenn selbst das nicht mehr
+        /// passt (Fenster unter 1000x600), wird so weit verkleinert, dass die Oberfläche noch hineinpasst.</summary>
+        public static float ComputeScale(int screenWidth, int screenHeight)
+        {
+            if (screenWidth <= 0 || screenHeight <= 0) return 1f;
+            float wRatio = screenWidth / (float)ReferenceResolution.x;
+            float hRatio = screenHeight / (float)ReferenceResolution.y;
+            float scale = Mathf.Sqrt(wRatio * hRatio);
+            scale = Mathf.Max(scale, MinReadableScale);
+            float fit = Mathf.Min(screenWidth / MinLayoutSize.x, screenHeight / MinLayoutSize.y);
+            return Mathf.Min(scale, fit);
         }
 
         /// <summary>CloneTree() liefert einen TemplateContainer, der als normales Flex-Kind nur so hoch wird

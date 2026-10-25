@@ -96,8 +96,9 @@ namespace Lumiis.Client
             go.SetActive(false); // Erst konfigurieren, dann aktivieren - UIDocument.OnEnable soll nicht mit leeren Panel-Settings laufen.
 
             _uiDocument = go.AddComponent<UIDocument>();
-            // Eigene Skalierung (Referenz 1280x720) und Sortierung über dem HUD - Escape-Menü liegt vorn.
+            // Eigene Skalierung (Referenz 1280x720, Mindestfaktor 1, siehe UiSkin.ComputeScale) und Sortierung über dem HUD - Escape-Menü liegt vorn.
             _uiDocument.panelSettings = UiSkin.CreatePanelSettings(100f);
+            go.AddComponent<UiScaler>().Initialize(_uiDocument.panelSettings);
 
             // Erst jetzt aktivieren: UIDocument.OnEnable() erzeugt rootVisualElement aus den PanelSettings,
             // das braucht ein aktives GameObject. Vorher zugewiesene PanelSettings sorgen dafür, dass

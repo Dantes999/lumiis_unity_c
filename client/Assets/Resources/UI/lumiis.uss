@@ -49,10 +49,11 @@
 .m2-title {
     flex-grow: 1;
     color: rgb(246, 222, 160);
-    font-size: 13px;
+    font-size: 15px;
     -unity-font-style: bold;
     -unity-text-align: middle-center;
-    -unity-text-outline-width: 1px;
+    -unity-text-outline-width: 0;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
     -unity-text-outline-color: rgb(30, 8, 4);
     padding: 0;
     margin: 0;
@@ -73,7 +74,7 @@
 
 .m2-section {
     color: rgb(226, 190, 112);
-    font-size: 12px;
+    font-size: 14px;
     -unity-font-style: bold;
     margin: 6px 0 3px 0;
 }
@@ -90,9 +91,10 @@
     border-width: 0;
     border-radius: 0;
     color: rgb(250, 232, 190);
-    font-size: 12px;
+    font-size: 14px;
     -unity-font-style: bold;
-    -unity-text-outline-width: 1px;
+    -unity-text-outline-width: 0;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
     -unity-text-outline-color: rgb(24, 12, 4);
     margin: 3px;
     padding: 4px 12px;
@@ -163,7 +165,7 @@
     border-width: 0;
     border-radius: 0;
     color: rgb(240, 228, 200);
-    font-size: 13px;
+    font-size: 15px;
     min-height: 24px;
     padding: 3px 8px;
     flex-grow: 1;
@@ -176,7 +178,7 @@
 
 .m2-input > .unity-label {
     color: rgb(214, 196, 160);
-    font-size: 12px;
+    font-size: 14px;
     min-width: 90px;
     -unity-text-align: middle-left;
 }
@@ -187,7 +189,7 @@
 
 .m2-foldout .unity-foldout__text {
     color: rgb(190, 170, 130);
-    font-size: 11px;
+    font-size: 13px;
 }
 
 .m2-toggle {
@@ -220,7 +222,7 @@
 .m2-toggle .unity-toggle__text,
 .m2-toggle > .unity-label {
     color: rgb(214, 196, 160);
-    font-size: 11px;
+    font-size: 13px;
 }
 
 .button-row {
@@ -231,7 +233,7 @@
 
 .error-text {
     color: rgb(255, 110, 90);
-    font-size: 12px;
+    font-size: 14px;
     white-space: normal;
     -unity-text-align: middle-center;
     margin-top: 2px;
@@ -240,7 +242,7 @@
 
 .status-text {
     color: rgb(220, 205, 170);
-    font-size: 12px;
+    font-size: 14px;
     -unity-text-align: middle-center;
     margin-top: 4px;
 }
@@ -300,10 +302,11 @@
 
 .login-tagline {
     color: rgb(232, 214, 176);
-    font-size: 15px;
+    font-size: 17px;
     -unity-font-style: italic;
     -unity-text-align: middle-center;
-    -unity-text-outline-width: 1px;
+    -unity-text-outline-width: 0;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
     -unity-text-outline-color: rgb(20, 10, 4);
 }
 
@@ -320,7 +323,7 @@
 .login-field-label {
     width: 72px;
     color: rgb(226, 204, 158);
-    font-size: 12px;
+    font-size: 14px;
     -unity-font-style: bold;
     -unity-text-align: middle-right;
     margin-right: 8px;
@@ -346,7 +349,7 @@
 
 .login-version {
     color: rgba(220, 200, 160, 0.6);
-    font-size: 11px;
+    font-size: 13px;
 }
 
 .charselect-window {
@@ -373,16 +376,17 @@
 
 .charselect-selected-name {
     color: rgb(250, 230, 170);
-    font-size: 16px;
+    font-size: 18px;
     -unity-font-style: bold;
     -unity-text-align: middle-center;
-    -unity-text-outline-width: 1px;
+    -unity-text-outline-width: 0;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
     -unity-text-outline-color: rgb(20, 10, 4);
 }
 
 .charselect-selected-info {
     color: rgb(200, 184, 150);
-    font-size: 12px;
+    font-size: 14px;
     -unity-text-align: middle-center;
 }
 
@@ -413,7 +417,7 @@
     -unity-slice-top: 10;
     -unity-slice-bottom: 10;
     color: rgb(230, 214, 180);
-    font-size: 12px;
+    font-size: 14px;
     white-space: normal;
     -unity-text-align: middle-center;
 }
@@ -488,25 +492,28 @@
 
 .hud-player-name {
     color: rgb(255, 232, 150);
-    font-size: 15px;
+    font-size: 17px;
     -unity-font-style: bold;
-    -unity-text-outline-width: 1px;
+    -unity-text-outline-width: 0;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
     -unity-text-outline-color: rgb(16, 8, 2);
 }
 
 .hud-player-level {
     color: rgb(250, 242, 220);
-    font-size: 13px;
+    font-size: 15px;
     -unity-font-style: bold;
-    -unity-text-outline-width: 1px;
+    -unity-text-outline-width: 0;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
     -unity-text-outline-color: rgb(16, 8, 2);
 }
 
 .hud-buffs {
     color: rgb(160, 230, 160);
-    font-size: 11px;
+    font-size: 13px;
     margin-top: 4px;
-    -unity-text-outline-width: 1px;
+    -unity-text-outline-width: 0;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
     -unity-text-outline-color: rgb(8, 16, 4);
 }
 
@@ -523,16 +530,17 @@
 
 .hud-target-name {
     color: rgb(255, 214, 180);
-    font-size: 13px;
+    font-size: 15px;
     -unity-font-style: bold;
-    -unity-text-outline-width: 1px;
+    -unity-text-outline-width: 0;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
     -unity-text-outline-color: rgb(20, 4, 2);
     margin-bottom: 2px;
 }
 
 .hud-target-bar {
     width: 240px;
-    height: 14px;
+    height: 18px;
     padding: 2px;
     background-image: resource("UI/Skin/bar_frame");
     -unity-slice-left: 3;
@@ -555,9 +563,10 @@
     right: 0;
     top: -1px;
     color: rgb(255, 240, 230);
-    font-size: 10px;
+    font-size: 12px;
     -unity-text-align: middle-center;
-    -unity-text-outline-width: 1px;
+    -unity-text-outline-width: 0;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
     -unity-text-outline-color: rgb(0, 0, 0);
 }
 
@@ -568,10 +577,11 @@
     width: 520px;
     margin-left: -260px;
     color: rgb(255, 226, 140);
-    font-size: 14px;
+    font-size: 16px;
     -unity-font-style: bold;
     -unity-text-align: middle-center;
-    -unity-text-outline-width: 1px;
+    -unity-text-outline-width: 0;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
     -unity-text-outline-color: rgb(20, 10, 2);
     white-space: normal;
 }
@@ -583,24 +593,25 @@
     right: 10px;
     top: 6px;
     width: 176px;
-    height: 212px;
+    height: 218px;
     align-items: center;
 }
 
 .hud-minimap-title {
     color: rgb(250, 226, 160);
-    font-size: 12px;
+    font-size: 14px;
     -unity-font-style: bold;
     -unity-text-align: middle-center;
-    -unity-text-outline-width: 1px;
+    -unity-text-outline-width: 0;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
     -unity-text-outline-color: rgb(16, 8, 2);
-    height: 16px;
+    height: 20px;
 }
 
 .hud-minimap-frame {
     position: absolute;
     left: 14px;
-    top: 30px;
+    top: 34px;
     width: 148px;
     height: 148px;
     border-radius: 74px;
@@ -630,7 +641,7 @@
 .hud-minimap-ring {
     position: absolute;
     left: 0;
-    top: 16px;
+    top: 20px;
     width: 176px;
     height: 176px;
     background-image: resource("UI/Skin/minimap_frame");
@@ -640,9 +651,9 @@
     position: absolute;
     left: 0;
     right: 0;
-    top: 194px;
+    top: 198px;
     color: rgb(255, 244, 214);
-    font-size: 12px;
+    font-size: 14px;
     -unity-font-style: bold;
     -unity-text-align: middle-center;
     text-shadow: 1px 1px 0 rgb(0, 0, 0);
@@ -655,26 +666,26 @@
 .hud-party {
     position: absolute;
     right: 12px;
-    top: 226px;
+    top: 232px;
     width: 180px;
 }
 
 .hud-party-title {
     color: rgb(246, 222, 160);
-    font-size: 12px;
+    font-size: 14px;
     -unity-font-style: bold;
     margin-bottom: 3px;
 }
 
 .hud-party-member {
     color: rgb(230, 220, 200);
-    font-size: 11px;
+    font-size: 13px;
 }
 
 .hud-small-button {
     min-width: 60px;
-    min-height: 20px;
-    font-size: 10px;
+    min-height: 22px;
+    font-size: 12px;
     padding: 1px 6px;
 }
 
@@ -695,9 +706,10 @@
 
 .hud-chat-line {
     color: rgb(248, 244, 232);
-    font-size: 12px;
+    font-size: 14px;
     white-space: normal;
-    -unity-text-outline-width: 1px;
+    -unity-text-outline-width: 0;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
     -unity-text-outline-color: rgba(0, 0, 0, 0.9);
 }
 
@@ -715,8 +727,8 @@
 
 .hud-chat-channel-button {
     min-width: 58px;
-    min-height: 22px;
-    font-size: 10px;
+    min-height: 24px;
+    font-size: 12px;
     padding: 1px 4px;
     margin: 1px;
 }
@@ -732,15 +744,15 @@
 
 .hud-chat-send {
     min-width: 50px;
-    min-height: 22px;
-    font-size: 10px;
+    min-height: 24px;
+    font-size: 12px;
     padding: 1px 4px;
     margin: 1px;
 }
 
 .hud-chat-hint {
     color: rgb(245, 236, 210);
-    font-size: 11px;
+    font-size: 13px;
     margin-top: 1px;
     padding: 1px 4px;
     background-color: rgba(0, 0, 0, 0.6);
@@ -807,10 +819,11 @@
     right: 3px;
     bottom: 3px;
     color: rgb(255, 240, 200);
-    font-size: 12px;
+    font-size: 14px;
     -unity-font-style: bold;
     -unity-text-align: middle-center;
-    -unity-text-outline-width: 1px;
+    -unity-text-outline-width: 0;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
     -unity-text-outline-color: rgb(0, 0, 0);
 }
 
@@ -823,8 +836,9 @@
     right: 3px;
     bottom: 1px;
     color: rgb(255, 255, 255);
-    font-size: 9px;
-    -unity-text-outline-width: 1px;
+    font-size: 11px;
+    -unity-text-outline-width: 0;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
     -unity-text-outline-color: rgb(0, 0, 0);
 }
 
@@ -833,9 +847,10 @@
     left: 3px;
     top: 1px;
     color: rgb(255, 214, 110);
-    font-size: 10px;
+    font-size: 12px;
     -unity-font-style: bold;
-    -unity-text-outline-width: 1px;
+    -unity-text-outline-width: 0;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
     -unity-text-outline-color: rgb(0, 0, 0);
 }
 
@@ -851,10 +866,11 @@
 
 .hud-exp-label {
     color: rgb(250, 226, 140);
-    font-size: 11px;
+    font-size: 13px;
     -unity-font-style: bold;
     margin-right: 4px;
-    -unity-text-outline-width: 1px;
+    -unity-text-outline-width: 0;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
     -unity-text-outline-color: rgb(0, 0, 0);
 }
 
@@ -887,10 +903,10 @@
 
 .hud-exp-text {
     color: rgb(255, 236, 170);
-    font-size: 12px;
+    font-size: 14px;
     -unity-font-style: bold;
     margin-left: 5px;
-    width: 56px;
+    width: 66px;
     -unity-text-outline-width: 0;
     text-shadow: 1px 1px 0 rgb(0, 0, 0);
 }
@@ -903,7 +919,7 @@
     min-width: 0;
     min-height: 24px;
     padding: 2px 7px;
-    font-size: 10px;
+    font-size: 12px;
     margin: 1px;
 }
 
@@ -917,9 +933,10 @@
     border-color: rgba(150, 110, 60, 0.7);
     border-radius: 3px;
     color: rgb(255, 222, 110);
-    font-size: 12px;
+    font-size: 14px;
     -unity-font-style: bold;
-    -unity-text-outline-width: 1px;
+    -unity-text-outline-width: 0;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
     -unity-text-outline-color: rgb(0, 0, 0);
 }
 
@@ -988,10 +1005,11 @@
     right: 0;
     top: 30px;
     color: rgba(255, 245, 230, 0.85);
-    font-size: 11px;
+    font-size: 13px;
     -unity-font-style: bold;
     -unity-text-align: middle-center;
-    -unity-text-outline-width: 1px;
+    -unity-text-outline-width: 0;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
     -unity-text-outline-color: rgb(0, 0, 0);
 }
 
@@ -1001,9 +1019,10 @@
     right: 0;
     top: 46px;
     color: rgb(255, 255, 255);
-    font-size: 11px;
+    font-size: 13px;
     -unity-text-align: middle-center;
-    -unity-text-outline-width: 1px;
+    -unity-text-outline-width: 0;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
     -unity-text-outline-color: rgb(0, 0, 0);
 }
 
@@ -1054,7 +1073,7 @@
 .hud-equip-label {
     position: absolute;
     color: rgb(190, 170, 130);
-    font-size: 9px;
+    font-size: 11px;
 }
 
 .hud-item-grid {
@@ -1091,7 +1110,7 @@
 
 .hud-item-text {
     color: rgb(230, 214, 180);
-    font-size: 8px;
+    font-size: 11px;
     white-space: normal;
     -unity-text-align: middle-center;
 }
@@ -1101,9 +1120,10 @@
     right: 3px;
     bottom: 1px;
     color: rgb(255, 230, 120);
-    font-size: 9px;
+    font-size: 11px;
     -unity-font-style: bold;
-    -unity-text-outline-width: 1px;
+    -unity-text-outline-width: 0;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
     -unity-text-outline-color: rgb(0, 0, 0);
 }
 
@@ -1114,7 +1134,7 @@
 
 .hud-window-hint {
     color: rgb(200, 184, 150);
-    font-size: 10px;
+    font-size: 12px;
     white-space: normal;
     margin: 4px 0 8px 0;
 }
@@ -1131,7 +1151,7 @@
 
 .hud-yang-value {
     color: rgb(255, 222, 110);
-    font-size: 12px;
+    font-size: 14px;
     -unity-font-style: bold;
 }
 
@@ -1144,12 +1164,12 @@
 
 .hud-stat-name {
     color: rgb(214, 196, 160);
-    font-size: 11px;
+    font-size: 13px;
 }
 
 .hud-stat-value {
     color: rgb(255, 245, 225);
-    font-size: 11px;
+    font-size: 13px;
     -unity-font-style: bold;
     flex-grow: 1;
     -unity-text-align: middle-right;
@@ -1157,13 +1177,13 @@
 }
 
 .hud-plus-button {
-    min-width: 20px;
-    width: 20px;
-    min-height: 18px;
-    height: 18px;
+    min-width: 22px;
+    width: 22px;
+    min-height: 20px;
+    height: 20px;
     padding: 0;
     margin: 1px;
-    font-size: 11px;
+    font-size: 13px;
 }
 
 /* ---- Tooltip ---- */
@@ -1182,13 +1202,13 @@
 
 .hud-tooltip-title {
     color: rgb(255, 222, 130);
-    font-size: 12px;
+    font-size: 14px;
     -unity-font-style: bold;
 }
 
 .hud-tooltip-body {
     color: rgb(230, 220, 200);
-    font-size: 11px;
+    font-size: 13px;
     white-space: normal;
 }
 

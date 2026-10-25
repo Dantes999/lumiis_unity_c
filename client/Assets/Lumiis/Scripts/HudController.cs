@@ -167,6 +167,7 @@ namespace Lumiis.Client
             _uiDocument = go.AddComponent<UIDocument>();
             _panelSettings = UiSkin.CreatePanelSettings(0f);
             _uiDocument.panelSettings = _panelSettings;
+            go.AddComponent<UiScaler>().Initialize(_panelSettings);
             go.SetActive(true);
 
             VisualTreeAsset asset = Resources.Load<VisualTreeAsset>("UI/Hud");
