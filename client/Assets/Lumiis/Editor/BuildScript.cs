@@ -36,6 +36,8 @@ namespace Lumiis.Editor
                 options = BuildOptions.Development
             };
 
+            // Marker für die Fortschrittsanzeige in tools/build-client.sh.
+            Debug.Log("LUMIIS-BUILD: Player bauen (" + scenes.Length + " Szene(n), Ziel " + options.target + ")");
             BuildReport report = BuildPipeline.BuildPlayer(options);
 
             if (report.summary.result != BuildResult.Succeeded)
@@ -45,7 +47,7 @@ namespace Lumiis.Editor
                 return;
             }
 
-            Debug.Log("BuildScript: Build erfolgreich -> " + outputPath);
+            Debug.Log("LUMIIS-BUILD: Player fertig -> " + outputPath);
             EditorApplication.Exit(0);
         }
 
