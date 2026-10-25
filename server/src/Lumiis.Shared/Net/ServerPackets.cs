@@ -18,11 +18,21 @@ namespace Lumiis.Shared.Net
     {
         Player = 0,
         Monster = 1,
-        Npc = 2
+        Npc = 2,
+        GroundItem = 3
+    }
+
+    /// <summary>Technischer NPC-Dienst für die UI (z. B. Shop oder Schmied). Wird mit EntitySpawn übertragen;
+    /// die eigentliche Reichweiten-/Zustandsprüfung bleibt serverseitig.</summary>
+    public enum NpcService : byte
+    {
+        None = 0,
+        Merchant = 1,
+        Blacksmith = 2
     }
 
     /// <summary>Der Client wurde aufgenommen und an der genannten Position gespawnt. Appearance ist die eigene
-    /// Figur - der Client berechnet sie nie selbst, siehe CLAUDE.md-Konvention. Seit Protocol.Version 17
+    /// Figur - der Client berechnet sie nie selbst, siehe CLAUDE.md-Konvention. Seit Protocol.Version 19
     /// zusätzlich die Karte (Id/Name/Maße), damit der Client Boden/Portale/Kartenname korrekt aufbaut.</summary>
     public sealed class JoinAcceptedPacket : IPacket
     {
@@ -103,6 +113,12 @@ namespace Lumiis.Shared.Net
         public EntityKind Kind;
         public int TypeId;
 
+        /// <summary>Nur Kind=GroundItem: Aufwertungsstufe der Instanz (0-9).</summary>
+        public byte ItemUpgradeLevel;
+
+        /// <summary>Nur Kind=Npc: Dienst des NPCs (Shop/Schmied).</summary>
+        public NpcService NpcService;
+
         public PacketId Id
         {
             get { return PacketId.EntitySpawn; }
@@ -117,6 +133,8 @@ namespace Lumiis.Shared.Net
             Appearance.Write(writer);
             writer.WriteByte((byte)Kind);
             writer.WriteInt32(TypeId);
+            writer.WriteByte(ItemUpgradeLevel);
+            writer.WriteByte((byte)NpcService);
         }
 
         public void Read(PacketReader reader)
@@ -128,6 +146,8 @@ namespace Lumiis.Shared.Net
             Appearance.Read(reader);
             Kind = (EntityKind)reader.ReadByte();
             TypeId = reader.ReadInt32();
+            ItemUpgradeLevel = reader.ReadByte();
+            NpcService = (NpcService)reader.ReadByte();
         }
     }
 
@@ -405,7 +425,9 @@ namespace Lumiis.Shared.Net
         WrongItemType = 3,
         NotConsumable = 4,
         InventoryFull = 5,
-        TargetAtFullHp = 6
+        TargetAtFullHp = 6,
+        GroundItemNotFound = 7,
+        PickupOutOfRange = 8
     }
 
     /// <summary>Ein Inventar-/Ausrüstungs-Request wurde abgelehnt - nur an den Anfragenden.</summary>
@@ -436,7 +458,9 @@ namespace Lumiis.Shared.Net
         SlotEmpty = 1,
         AlreadyMaxLevel = 2,
         NoMaterial = 3,
-        NoProtectionScroll = 4
+        NoProtectionScroll = 4,
+        NoBlacksmith = 5,
+        BlacksmithOutOfRange = 6
     }
 
     /// <summary>M6c: Ergebnis eines tatsächlich durchgeführten Aufwertungsversuchs (Schleifstein wurde
@@ -899,7 +923,29 @@ namespace Lumiis.Shared.Net
         }
     }
 
-    /// <summary>Multi-Map (Protocol.Version 17): eigener Kartenwechsel. Enthält die neue Karte, ihre Maße und
+    /// <summary>Gruppen-UI: der eigene Spieler wurde eingeladen. Die UI kann darauf ein Annehmen/-
+    /// Ablehnen-Dialog zeigen; `PartyRespondRequestPacket` beantwortet sie.</summary>
+    public sealed class PartyInviteReceivedPacket : IPacket
+    {
+        public string InviterName = "";
+
+        public PacketId Id
+        {
+            get { return PacketId.PartyInviteReceived; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteString(InviterName);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            InviterName = reader.ReadString();
+        }
+    }
+
+    /// <summary>Multi-Map (Protocol.Version 19): eigener Kartenwechsel. Enthält die neue Karte, ihre Maße und
     /// die bereits gesetzte Zielposition. Der Client verwirft alle Entities/Views, baut Boden/Portale neu und
     /// legt seine eigene Figur an der Zielposition an; fremde Entities der neuen Karte folgen über den
     /// normalen AOI-Diff (EntitySpawn).</summary>

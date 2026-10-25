@@ -31,7 +31,7 @@ public sealed class Entity
 
     public EntityKind Kind { get; }
 
-    /// <summary>Id der Karte, auf der diese Entity aktuell steht (Multi-Map, Protocol.Version 17). Wird von
+    /// <summary>Id der Karte, auf der diese Entity aktuell steht (Multi-Map, Protocol.Version 19). Wird von
     /// World beim Anlegen/Transfer gesetzt und von GameServer für Persistenz (Position/CharacterSave) genutzt -
     /// Mobs/NPCs bleiben zeitlebens auf ihrer Karte, Spieler wechseln per Portal/Dev-Tool.</summary>
     public string MapId { get; set; } = "village";
@@ -49,6 +49,12 @@ public sealed class Entity
     /// bei Kind=Player ungenutzt/0 - bis M5a "MobId" genannt, seit M5b umbenannt (reiner Rename, siehe
     /// docs/tasks/M5b-shop.md Abschnitt 0b und EntitySpawnPacket.TypeId).</summary>
     public int TypeId { get; }
+
+    /// <summary>Nur Kind=GroundItem: ItemId (TypeId) und Aufwertungsstufe dieser Boden-Instanz.</summary>
+    public int ItemUpgradeLevel { get; set; }
+
+    /// <summary>Nur Kind=Npc: technischer Dienst (Shop/Schmied), aus data/npcs.json.</summary>
+    public NpcService Service { get; set; }
 
     /// <summary>Nur bei Kind=Monster gesetzt - die Id des SpawnPoint aus spawns.json, an dem dieses Monster
     /// entstanden ist (siehe World.SpawnMonster/GameServer-Konstruktor). Null bei Spielern UND bei per
@@ -410,6 +416,18 @@ public sealed class Entity
     /// gelesen: TryAttack lehnt Kind=Npc-Ziele ab, bevor irgendein Kampfwert relevant würde, siehe
     /// docs/tasks/M5b-shop.md Abschnitt 0a). Appearance wird von außen gesetzt (siehe Entity.Appearance,
     /// GameServer-Konstruktor - analog zu Spielern/CompleteJoin, nicht wie bei Monstern ungenutzt).</summary>
+    public static Entity CreateGroundItem(int id, int itemId, int upgradeLevel, string name, int x, int y)
+    {
+        Entity entity = new(id, EntityKind.GroundItem, characterId: null, itemId, spawnPointId: null, respawnSeconds: 0, name, x, y, movementSpeed: 0,
+            wanderRadiusWire: 0, wanderIntervalMinMs: 0, wanderIntervalMaxMs: 0,
+            maxHp: 1, attack: 0, defense: 0,
+            meleeRangeWire: 0, attackCooldownMs: 0, yangMin: 0, yangMax: 0,
+            aggressive: false, aggroRangeWire: 0, leashRangeWire: 0, drops: System.Array.Empty<(int, int)>(),
+            classDef: null, baseXp: 0);
+        entity.ItemUpgradeLevel = upgradeLevel;
+        return entity;
+    }
+
     public static Entity CreateNpc(int id, int npcId, string name, int x, int y)
     {
         return new Entity(id, EntityKind.Npc, characterId: null, npcId, spawnPointId: null, respawnSeconds: 0, name, x, y, movementSpeed: 0,

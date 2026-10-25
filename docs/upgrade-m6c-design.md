@@ -5,7 +5,7 @@ Kurzfassung der Umsetzung; die verbindliche Beschreibung steht in `CLAUDE.md` im
 
 ## Datenfluss
 
-1. Client sendet `UpgradeItemRequestPacket { EquipmentSlot, UseProtectionScroll }` (Protocol.Version 17).
+1. Client sendet `UpgradeItemRequestPacket { EquipmentSlot, UseProtectionScroll }` (Protocol.Version 19).
 2. `GameServer.HandleUpgradeItemRequest` ruft `World.TryUpgrade` auf (Game-Loop-Thread, kein Netzwerk,
    injizierbare `Random`-Quelle).
 3. `World.TryUpgrade` prüft in dieser Reihenfolge: Katalog vorhanden, Slot belegt, Stufe < 9,

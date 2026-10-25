@@ -40,6 +40,8 @@ public sealed class World
     private readonly UpgradeCatalog? _upgradeCatalog;
     private readonly MobCatalog? _mobCatalog;
     private readonly MetinCatalog? _metinCatalog;
+    private readonly bool _useGroundDrops;
+    private readonly bool _requireBlacksmithForUpgrade;
     private readonly Random _random;
     private readonly Func<int> _allocateEntityId;
     private int _nextEntityId = 1;
@@ -70,7 +72,8 @@ public sealed class World
     public World(int maxPlayers, CollisionMap? collisionMap = null, Random? random = null, ItemCatalog? itemCatalog = null,
         ProgressionCatalog? progressionCatalog = null, SkillCatalog? skillCatalog = null,
         MapDefinition? mapDefinition = null, Func<int>? entityIdGenerator = null, UpgradeCatalog? upgradeCatalog = null,
-        MobCatalog? mobCatalog = null, MetinCatalog? metinCatalog = null)
+        MobCatalog? mobCatalog = null, MetinCatalog? metinCatalog = null, bool useGroundDrops = false,
+        bool requireBlacksmithForUpgrade = false)
     {
         MaxPlayers = maxPlayers;
         _mapDefinition = mapDefinition;
@@ -82,6 +85,8 @@ public sealed class World
         _upgradeCatalog = upgradeCatalog;
         _mobCatalog = mobCatalog;
         _metinCatalog = metinCatalog;
+        _useGroundDrops = useGroundDrops;
+        _requireBlacksmithForUpgrade = requireBlacksmithForUpgrade;
         _random = random ?? new Random();
         _allocateEntityId = entityIdGenerator ?? (() => _nextEntityId++);
     }
@@ -229,7 +234,8 @@ public sealed class World
     /// (anders als bei Monstern: NPCs haben eine echte, sichtbare Ausrüstung, siehe Entity.CreateNpc-
     /// Kommentar). shopItemIds: Sortiment aus der NpcCatalog (siehe Entity.ShopItemIds) - leer = kein Shop
     /// (aktuell kein Anwendungsfall, alle NpcCatalog-Einträge haben ein validiertes, nicht-leeres Sortiment).</summary>
-    public Entity SpawnNpc(int npcId, string name, int x, int y, Appearance appearance, IReadOnlyList<int>? shopItemIds = null)
+    public Entity SpawnNpc(int npcId, string name, int x, int y, Appearance appearance, IReadOnlyList<int>? shopItemIds = null,
+        NpcService service = NpcService.None)
     {
         int clampedX = Math.Clamp(x, 0, GameConstants.MapWidth);
         int clampedY = Math.Clamp(y, 0, GameConstants.MapHeight);
@@ -238,9 +244,51 @@ public sealed class World
         Entity entity = Entity.CreateNpc(id, npcId, name, clampedX, clampedY);
         entity.Appearance = appearance;
         entity.ShopItemIds = shopItemIds ?? Array.Empty<int>();
+        entity.Service = service;
         entity.MapId = MapId;
         _entities[id] = entity;
         return entity;
+    }
+
+    /// <summary>Legt einen Boden-Drop an. Nur bei aktiviertem Ground-Drop-Modus (Produktion); Tests ohne
+    /// diesen Modus behalten das bisherige Auto-Loot-Verhalten.</summary>
+    public Entity SpawnGroundItem(int itemId, int x, int y, int upgradeLevel = 0)
+    {
+        string name = _itemCatalog != null && _itemCatalog.TryGet(itemId, out ItemDefinition item)
+            ? item.Name
+            : "Gegenstand";
+
+        int id = _allocateEntityId();
+        Entity entity = Entity.CreateGroundItem(id, itemId, upgradeLevel, name, x, y);
+        entity.MapId = MapId;
+        _entities[id] = entity;
+        return entity;
+    }
+
+    /// <summary>Hebt einen Boden-Drop auf. Prüft Distanz und Inventarplatz; bei Erfolg wird die Ground-
+    /// Entity entfernt. Der Aufrufer (GameServer) verschickt InventorySync/EntityDespawn.</summary>
+    public (bool Success, InventoryActionFailedReason Reason) TryPickupItem(int playerEntityId, int groundItemEntityId)
+    {
+        if (!_entities.TryGetValue(playerEntityId, out Entity? player) || player.Kind != EntityKind.Player)
+            return (false, InventoryActionFailedReason.InvalidSlot);
+
+        if (!_entities.TryGetValue(groundItemEntityId, out Entity? ground) || ground.Kind != EntityKind.GroundItem)
+            return (false, InventoryActionFailedReason.GroundItemNotFound);
+
+        long dx = player.IntX - ground.IntX;
+        long dy = player.IntY - ground.IntY;
+        long rangeSq = (long)GameConstants.NpcInteractRangeWire * GameConstants.NpcInteractRangeWire;
+        if (dx * dx + dy * dy > rangeSq)
+            return (false, InventoryActionFailedReason.PickupOutOfRange);
+
+        if (FindFirstFreeInventorySlot(player) < 0)
+            return (false, InventoryActionFailedReason.InventoryFull);
+
+        if (!TryAddItemToInventory(playerEntityId, ground.TypeId, ground.ItemUpgradeLevel))
+            return (false, InventoryActionFailedReason.InventoryFull);
+
+        Remove(groundItemEntityId);
+        return (true, default);
     }
 
     /// <summary>Dev-Tools-Debug-Spawn (siehe GameServer.HandleDebugSpawnMonster): ein Punkt in zufälliger
@@ -524,6 +572,12 @@ public sealed class World
             {
                 if (_random.Next(100) >= chancePercent)
                     continue;
+
+                if (_useGroundDrops)
+                {
+                    SpawnGroundItem(itemId, target.IntX, target.IntY, 0);
+                    continue;
+                }
 
                 if (TryAddItemToInventory(attacker.Id, itemId))
                 {
@@ -1015,6 +1069,23 @@ public sealed class World
 
         if (!_entities.TryGetValue(entityId, out Entity? entity) || entity.Kind != EntityKind.Player)
             return UpgradeAttemptResult.Reject(UpgradeActionFailedReason.SlotEmpty);
+
+        if (_requireBlacksmithForUpgrade)
+        {
+            bool nearBlacksmith = false;
+            foreach (Entity npc in _entities.Values)
+            {
+                if (npc.Kind != EntityKind.Npc || npc.Service != NpcService.Blacksmith) continue;
+                long dx = entity.IntX - npc.IntX;
+                long dy = entity.IntY - npc.IntY;
+                if (dx * dx + dy * dy <= (long)GameConstants.NpcInteractRangeWire * GameConstants.NpcInteractRangeWire)
+                {
+                    nearBlacksmith = true;
+                    break;
+                }
+            }
+            if (!nearBlacksmith) return UpgradeAttemptResult.Reject(UpgradeActionFailedReason.NoBlacksmith);
+        }
 
         (int equippedItemId, int currentUpgradeLevel) = entity.GetEquipped(equipmentSlot);
         if (equippedItemId == 0)

@@ -71,6 +71,103 @@ namespace Lumiis.Shared.Net
         }
     }
 
+    /// <summary>Der Client hebt einen Boden-Drop auf. Der Server prüft Existenz, Reichweite und Inventarplatz.</summary>
+    public sealed class PickupItemRequestPacket : IPacket
+    {
+        public int GroundItemEntityId;
+
+        public PacketId Id
+        {
+            get { return PacketId.PickupItemRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteInt32(GroundItemEntityId);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            GroundItemEntityId = reader.ReadInt32();
+        }
+    }
+
+    /// <summary>Gruppen-UI: lädt einen Spieler per Name ein (ersetzt den Chat-Befehl).</summary>
+    public sealed class PartyInviteRequestPacket : IPacket
+    {
+        public string TargetName = "";
+
+        public PacketId Id
+        {
+            get { return PacketId.PartyInviteRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteString(TargetName);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            TargetName = reader.ReadString();
+        }
+    }
+
+    /// <summary>Gruppen-UI: nimmt eine offene Einladung an oder lehnt sie ab.</summary>
+    public sealed class PartyRespondRequestPacket : IPacket
+    {
+        public bool Accept;
+
+        public PacketId Id
+        {
+            get { return PacketId.PartyRespondRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteByte((byte)(Accept ? 1 : 0));
+        }
+
+        public void Read(PacketReader reader)
+        {
+            Accept = reader.ReadByte() != 0;
+        }
+    }
+
+    /// <summary>Gruppen-UI: verlässt die aktuelle Gruppe.</summary>
+    public sealed class PartyLeaveRequestPacket : IPacket
+    {
+        public PacketId Id
+        {
+            get { return PacketId.PartyLeaveRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+        }
+
+        public void Read(PacketReader reader)
+        {
+        }
+    }
+
+    /// <summary>Gruppen-UI: fordert den vollen Gruppenstand an (Resync).</summary>
+    public sealed class PartySnapshotRequestPacket : IPacket
+    {
+        public PacketId Id
+        {
+            get { return PacketId.PartySnapshotRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+        }
+
+        public void Read(PacketReader reader)
+        {
+        }
+    }
+
     /// <summary>Der Client greift eine sichtbare Entity an (M4a). Der Server prüft alles serverautoritativ
     /// erneut (Existenz, Leben, PvP, Cooldown, Reichweite) - siehe World.TryAttack.</summary>
     public sealed class AttackRequestPacket : IPacket
@@ -465,7 +562,7 @@ namespace Lumiis.Shared.Net
         }
     }
 
-    /// <summary>Multi-Map (Protocol.Version 17): nur wirksam mit --allow-debug-commands (sonst still
+    /// <summary>Multi-Map (Protocol.Version 19): nur wirksam mit --allow-debug-commands (sonst still
     /// verworfen, siehe DebugSpawnMonsterRequestPacket). Versetzt den eigenen Charakter auf die
     /// Startposition der Zielkarte - Debug-API zum Testen des Kartenwechsels ohne Portal.</summary>
     public sealed class DebugChangeMapRequestPacket : IPacket

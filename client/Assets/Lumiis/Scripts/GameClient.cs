@@ -19,6 +19,7 @@ namespace Lumiis.Client
         // Blickrichtung/Animation) - deshalb ein eigenes, kleineres Dictionary statt _views/_animators
         // mitzubenutzen (siehe MonsterView-Klassenkommentar).
         private readonly Dictionary<int, MonsterView> _monsterViews = new Dictionary<int, MonsterView>();
+        private readonly Dictionary<int, GroundItemView> _groundItemViews = new Dictionary<int, GroundItemView>();
 
         /// <summary>M7-Chat: eingehende ChatMessagePacket für die HUD-/Chat-UI. Reines Anzeige-Event,
         /// der Client sendet nur ChatRequestPacket und berechnet keine Chat-Zustände.</summary>
@@ -26,6 +27,7 @@ namespace Lumiis.Client
 
         /// <summary>M7-Party: voller Gruppenstand (Resync) für das HUD.</summary>
         public event System.Action<PartyChangedPacket> PartyChangedReceived;
+        public event System.Action<string> PartyInviteReceived;
         private Sprite _squareSprite;
         private Sprite _localMarkerSprite;
         private Sprite _monsterCircleSprite;
@@ -1386,6 +1388,15 @@ namespace Lumiis.Client
             if (Mouse.current.leftButton.wasPressedThisFrame)
             {
                 Vector3 worldPos = ScreenToWorldPoint(Mouse.current.position.ReadValue());
+                foreach (KeyValuePair<int, GroundItemView> kvp in _groundItemViews)
+                {
+                    if (kvp.Value != null && kvp.Value.ContainsWorldPoint(worldPos))
+                    {
+                        _netClient.SendPickupItem(kvp.Key);
+                        return;
+                    }
+                }
+
                 int wireX = Mathf.RoundToInt(worldPos.x * 100f);
                 int wireY = Mathf.RoundToInt(worldPos.y * 100f);
                 _netClient.SendMoveTo(wireX, wireY); // Klemmung an Kartengrenzen macht der Server.
@@ -1513,7 +1524,8 @@ namespace Lumiis.Client
             if (spawn != null)
             {
                 Debug.Log("EntitySpawn: Id=" + spawn.EntityId + " Kind=" + spawn.Kind + " Name=" + spawn.Name + " Pos=(" + (spawn.X / 100.0) + "," + (spawn.Y / 100.0) + ")");
-                _world.HandleEntitySpawn(spawn.EntityId, spawn.Name, spawn.Kind, spawn.TypeId, spawn.X, spawn.Y, spawn.Appearance);
+                _world.HandleEntitySpawn(spawn.EntityId, spawn.Name, spawn.Kind, spawn.TypeId, spawn.X, spawn.Y, spawn.Appearance,
+                    spawn.ItemUpgradeLevel, spawn.NpcService);
                 return;
             }
 
@@ -1902,6 +1914,21 @@ namespace Lumiis.Client
 
         private void OnEntitySpawned(ClientEntity entity)
         {
+            if (entity.Kind == EntityKind.GroundItem)
+            {
+                var groundGo = new GameObject("GroundItem_" + entity.Id + "_" + entity.Name);
+                var groundView = groundGo.AddComponent<GroundItemView>();
+                Texture2D icon = _iconCatalog != null ? _iconCatalog.GetTextureForItem(entity.TypeId, _itemCatalog) : null;
+                Sprite iconSprite = icon != null
+                    ? Sprite.Create(icon, new Rect(0, 0, icon.width, icon.height), new Vector2(0.5f, 0.5f), 32f)
+                    : _squareSprite;
+                groundView.Initialize(iconSprite, entity.Name);
+                groundView.SetWorldPosition(entity.X / 100.0, entity.Y / 100.0);
+                _groundItemViews[entity.Id] = groundView;
+                if (_assetLabActive) HideForAssetLab(groundGo);
+                return;
+            }
+
             if (entity.Kind == EntityKind.Monster)
             {
                 var monsterGo = new GameObject("Monster_" + entity.Id + "_" + entity.Name);
@@ -2177,6 +2204,12 @@ namespace Lumiis.Client
             _netClient?.SendChat(channel, targetName, text);
         }
 
+        public void PickupItem(int groundItemEntityId) => _netClient?.SendPickupItem(groundItemEntityId);
+        public void PartyInvite(string targetName) => _netClient?.SendPartyInvite(targetName);
+        public void PartyRespond(bool accept) => _netClient?.SendPartyRespond(accept);
+        public void PartyLeave() => _netClient?.SendPartyLeave();
+        public void RequestPartySnapshot() => _netClient?.RequestPartySnapshot();
+
         public Vector3 LocalPlayerWorldPosition
         {
             get
@@ -2204,6 +2237,8 @@ namespace Lumiis.Client
                     HideForAssetLab(view != null ? view.gameObject : null);
                 foreach (MonsterView monsterView in _monsterViews.Values)
                     HideForAssetLab(monsterView != null ? monsterView.gameObject : null);
+                foreach (GroundItemView groundItemView in _groundItemViews.Values)
+                    HideForAssetLab(groundItemView != null ? groundItemView.gameObject : null);
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 HideForAssetLab(_testboard != null ? _testboard.gameObject : null);
@@ -2275,6 +2310,12 @@ namespace Lumiis.Client
             if (entityId == _targetEntityId) _targetEntityId = -1;
             if (entityId == _shopOpenNpcEntityId) _shopOpenNpcEntityId = -1; // NPCs despawnen praktisch nie, defensiv trotzdem.
 
+            if (_groundItemViews.TryGetValue(entityId, out GroundItemView groundItemView))
+            {
+                if (groundItemView != null) Destroy(groundItemView.gameObject);
+                _groundItemViews.Remove(entityId);
+            }
+
             if (_monsterViews.TryGetValue(entityId, out MonsterView monsterView))
             {
                 if (monsterView != null) Destroy(monsterView.gameObject);
@@ -2316,6 +2357,10 @@ namespace Lumiis.Client
             foreach (MonsterView monsterView in _monsterViews.Values)
                 if (monsterView != null) Destroy(monsterView.gameObject);
             _monsterViews.Clear();
+
+            foreach (GroundItemView groundItemView in _groundItemViews.Values)
+                if (groundItemView != null) Destroy(groundItemView.gameObject);
+            _groundItemViews.Clear();
 
             if (_rangeRingView != null) Destroy(_rangeRingView.gameObject);
             _rangeRingView = null;

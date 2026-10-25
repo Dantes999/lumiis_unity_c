@@ -17,13 +17,15 @@ public sealed class NpcDefinition
     public string Name { get; }
     public Appearance Appearance { get; }
     public IReadOnlyList<int> ShopItemIds { get; }
+    public NpcService Service { get; }
 
-    public NpcDefinition(int id, string name, Appearance appearance, IReadOnlyList<int> shopItemIds)
+    public NpcDefinition(int id, string name, Appearance appearance, IReadOnlyList<int> shopItemIds, NpcService service = NpcService.None)
     {
         Id = id;
         Name = name;
         Appearance = appearance;
         ShopItemIds = shopItemIds;
+        Service = service;
     }
 }
 
@@ -82,6 +84,12 @@ public sealed class NpcCatalog
                 throw new NpcCatalogException($"npcs.json: NPC {entry.Id} ohne Namen.");
 
             Appearance appearance = ValidateAndBuildAppearance(entry, lookCatalog);
+            NpcService service = NpcService.None;
+            if (!string.IsNullOrWhiteSpace(entry.Service)
+                && !Enum.TryParse(entry.Service, ignoreCase: true, out service))
+            {
+                throw new NpcCatalogException($"npcs.json: NPC {entry.Id} ({entry.Name}) hat einen unbekannten Service '{entry.Service}'.");
+            }
 
             if (entry.ShopItemIds.Count == 0)
                 throw new NpcCatalogException($"npcs.json: NPC {entry.Id} ({entry.Name}) hat ein leeres Sortiment (shopItemIds).");
@@ -98,7 +106,7 @@ public sealed class NpcCatalog
                 }
             }
 
-            byId[entry.Id] = new NpcDefinition(entry.Id, entry.Name, appearance, entry.ShopItemIds);
+            byId[entry.Id] = new NpcDefinition(entry.Id, entry.Name, appearance, entry.ShopItemIds, service);
         }
 
         if (byId.Count == 0)

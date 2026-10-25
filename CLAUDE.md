@@ -89,7 +89,7 @@ fest als "botpass-<name>-2026" (nur Test-Tool). Option --auth-url (Default http:
 
 ## Kartenkollision
 Bewegung wird seit M3a serverseitig gegen eine pro Karte hinterlegte Blockierkarte geprüft (nicht mehr nur an
-die Kartengrenzen geklemmt). Seit dem Multi-Map-Umbau (2026-10-25, Protocol.Version 17) gibt es mehrere
+die Kartengrenzen geklemmt). Seit dem Multi-Map-Umbau (2026-10-25, Protocol.Version 19) gibt es mehrere
 Karten; `Lumiis.Server/Program.cs` lädt sie über `MapCatalog` aus `data/maps/index.json` (nicht mehr
 hartkodiert nur `village`). Jede `World` hält ihre eigene `CollisionMap`.
 
@@ -117,7 +117,7 @@ eine Ellipse, per Pillow-Skript erzeugt, keine echte Kartengrafik) - der User er
 echte, handbemalte Version, sobald Kartengrafik existiert. Danach `tools/bake-collision.py` erneut ausführen
 und beide Dateien neu committen.
 
-## Multi-Map und Portale (Protocol.Version 17)
+## Multi-Map und Portale (Protocol.Version 19)
 Seit 2026-10-25 gibt es echte, begehbare Karten statt einer einzigen Welt. Details/Plan:
 `docs/map-import-plan.md`.
 
@@ -165,8 +165,16 @@ Seit 2026-10-25 gibt es echte, begehbare Karten statt einer einzigen Welt. Detai
   (`tiles.json`) werden mit `tools/import-map1.py` zu `Resources/Maps/map1.png` (4096×4096, 32 px/Tile)
   und einer 1000×1000-`collision.bin` gebacken. Dorfplatz, Häuser, Wege, Wasser und Baumrand stammen aus
   dem Referenzlayout; der Start liegt außerhalb des Dorfes auf einer offenen Wiese.
-- Spawns: drei Wildhunde (Mob 1) und drei Hungrige Wildhunde (Mob 5), alle mindestens 20 Weltenheiten
-  vom Start entfernt; im Startbereich steht kein Monster. Ein Dorfhändler sitzt im Dorfplatz.
+- Spawns: drei Wildhunde (Mob 1), drei Hungrige Wildhunde (Mob 5), ein Lumiis-Stein (Mob 3) und der
+  Waldboss (Mob 4) - die normalen Mobs mindestens 20 Weltenheiten vom Start entfernt, im Startbereich
+  steht kein Monster. Dorfhändler und **Schmied** sitzen im Dorfplatz.
+- Drops: Produktionsserver nutzt echte **Boden-Drops** (`EntityKind.GroundItem`): Monster lassen Items mit
+  Icon/Name auf dem Boden fallen, Aufheben per Klick (`PickupItemRequestPacket` 20) prüft Distanz und
+  Inventarplatz. Tests ohne `useGroundDrops` behalten das bisherige Auto-Loot-Verhalten.
+- NPC-Dienste: `data/npcs.json` hat `service` (`Merchant`/`Blacksmith`), wird als `NpcService` in
+  `EntitySpawnPacket` übertragen. Aufwertung verlangt auf dem Produktionsserver einen Schmied in
+  `NpcInteractRangeWire`; ohne ihn kommt `NoBlacksmith`.
+
 - Bewegung: WASD oder Pfeiltasten senden alle 100 ms ein neues MoveTo-Ziel; beim Loslassen geht sofort
   `StopMovePacket` (19) an den Server, der die Bewegung mit `EntityStop` beendet. Linksklick auf den
   Boden bleibt als Komfort erhalten.
@@ -185,6 +193,9 @@ Seit 2026-10-25 gibt es echte, begehbare Karten statt einer einzigen Welt. Detai
 - Monster: `alpha_wolf`/`boar`/`dummy` sind als 40×32-Sheets (5 Frames, unten/links/rechts/oben) aus dem
   Lumiis-Referenzprojekt importiert; `MonsterView` animiert Laufrichtung und zeigt bei Schaden einen
   kleinen HP-Balken. Hungrige Wildhunde nutzen dasselbe Wolf-Sheet mit rötlicher Tönung.
+- Gruppen-Technik: zusätzlich zu den Chat-Befehlen gibt es `PartyInviteRequest` (21), `PartyRespondRequest`
+  (22), `PartyLeaveRequest` (23) und `PartySnapshotRequest` (24); der Server schickt
+  `PartyInviteReceived` (1025) an den Eingeladenen. Die UI kann damit ohne Chat arbeiten.
 - HUD: siehe Abschnitt "Spiel-UI (klassischer MMO-Stil)". `F1` bleibt das optionale Debug-Overlay; der
   Reichweitenring im regulären Spiel wurde entfernt. Leertaste schwingt auch ohne Monster (lokale
   Animation/Sound/Kombo), der Server bekommt nur bei einem echten Ziel ein `AttackRequest`.
@@ -662,7 +673,7 @@ kombinierte Save-Kanal (`CharacterSaveRequest`, voller Snapshot wie Inventar/Yan
 enthält jetzt auch die Stufen und wird SOFORT nach jedem abgeschlossenen Aufwertungsversuch ausgelöst.
 `CompleteJoin` lädt die Stufen beim Join wieder in die Entity.
 
-Netzwerk (Protocol.Version 17): `UpgradeItemRequestPacket` (Client->Server: EquipmentSlot,
+Netzwerk (Protocol.Version 19): `UpgradeItemRequestPacket` (Client->Server: EquipmentSlot,
 UseProtectionScroll), `UpgradeItemResultPacket` (Server->Client: EquipmentSlot, Success, Destroyed,
 NewUpgradeLevel) und `UpgradeActionFailedPacket` (Reason-Enum). Ein abgeschlossener Versuch (auch
 Fehlschlag/Zerstörung) liefert zusätzlich `InventorySyncPacket` und `CharacterStatsPacket` an den
@@ -978,7 +989,7 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
 - Kein YangChangedPacket bei Join: `GameServer.CompleteJoin` lädt `Character.Yang` in die Entity, verschickt dafür aber kein Paket (YangChangedPacket wird nur bei Monster-Kill/Kauf/Verkauf/Debug-Give-Yang ausgelöst) - die Debug-Overlay-Anzeige zeigt bis zum ersten Yang-Ereignis nach dem Login 0 statt des echten Standes. Bislang kein Auftrag, das zu beheben (analog zur inzwischen behobenen HP-Sync-Lücke, siehe Status-Eintrag "Bugfix HP-Anzeige").
 
 ## Status
-- Multi-Map + Portale (2026-10-25, Protocol.Version 17) fertig: `MapCatalog`/`MapDefinition`/
+- Multi-Map + Portale (2026-10-25, Protocol.Version 19) fertig: `MapCatalog`/`MapDefinition`/
   `PortalDefinition` + `data/maps/index.json` (village Default + generiertes greenfield), `Character.MapId`
   (Migration `AddCharacterMapId`), eine `World` pro Karte im `GameServer`, `MapChangedPacket`/
   `DebugChangeMapRequestPacket`, AOI-/Chat-Trennung pro Karte, Portal-Sofortsave, Client-Kartenwechsel
@@ -1209,7 +1220,7 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   unter `Resources/Characters`; `CharacterSheetGallery` zeigt Krieger/Ninja/Sura/Schamane (m/w) im
   Labor und der Screenshot-Lauf legt `/tmp/lumiis-asset-lab-characters.png` ab. (4) Feature-Gap-,
   Icon- und Kartenplanung als `docs/feature-gap-lumiis.md`, `docs/icon-integration-plan.md`,
-  `docs/map-import-plan.md`. 638 Server-/Unit-Tests und 15 PlayMode-Tests grün.
+  `docs/map-import-plan.md`. 644 Server-/Unit-Tests und 15 PlayMode-Tests grün.
 - M7-HUD + Chat-MVP: (1) `Hud.uxml`/`HudController` zeigen Name/Level, HP/SP/EXP/Yang, Ziel + HP,
   Meldungen, vier Skill-Slots mit Cooldowns, aktive Buffs und einen Chat mit Karte/Global/Flüstern.
   Das alte IMGUI-Overlay bleibt F1-Debug. (2) Chat-Protokoll: `ChatRequestPacket` (16),
@@ -1229,9 +1240,9 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   + vier `Character.Equipped...UpgradeLevel`), Save/Load über den kombinierten Kanal, Stufen wandern bei
   Equip/Unequip mit. `World.TryUpgrade` prüft alles vor jedem Verbrauch, würfelt mit injizierbarem
   `Random`, verbraucht Schleifstein (und Rolle) immer, zerstört bei Fehlschlag ohne Rolle das Item.
-  Protocol.Version 17 mit `UpgradeItemRequest/Result/ActionFailed`; `InventorySyncPacket` trägt Stufen
+  Protocol.Version 19 mit `UpgradeItemRequest/Result/ActionFailed`; `InventorySyncPacket` trägt Stufen
   pro Slot und je Equipped-Slot. Client: +N-Anzeige, Aufwerten-Knopf + Bewahrungsrollen-Checkbox im
-  Debug-Panel, deutsche Overlay-/Systemmeldungen. 638 Server-Tests grün (inkl. 20 neue Aufwertungs-/
+  Debug-Panel, deutsche Overlay-/Systemmeldungen. 644 Server-Tests grün (inkl. 20 neue Aufwertungs-/
   Katalog-/Packet-Tests und 3 LiteNetLib-Integrationstests inkl. Disconnect/Rejoin), Unity-PlayMode
   grün.
 - Offen als nächster M7-Block: Party-Persistenz/Rollen und weitere soziale Integrationstests; siehe

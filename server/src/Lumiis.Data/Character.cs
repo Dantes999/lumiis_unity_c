@@ -43,7 +43,7 @@ public sealed class Character
     public int? PositionX { get; set; }
     public int? PositionY { get; set; }
 
-    /// <summary>Multi-Map (Protocol.Version 17): Id der Karte aus data/maps/index.json. Neue Zeilen bekommen
+    /// <summary>Multi-Map (Protocol.Version 19): Id der Karte aus data/maps/index.json. Neue Zeilen bekommen
     /// per DB-Default "map1" (Migration Map1Default); alte "village"-Zeilen werden dabei auf Map1 gehoben.
     /// Ein unbekannter Wert beim Join fällt auf die Startkarte zurück (GameServer.CompleteJoin).</summary>
     public string MapId { get; set; } = "map1";

@@ -49,12 +49,12 @@ namespace Lumiis.Tests.Game
             }
         }
 
-        private static World CreateWorld(int roll)
+        private static World CreateWorld(int roll, bool requireBlacksmith = false)
         {
             ItemCatalog items = ItemCatalog.LoadFromJson(ItemsJson, TestLookCatalogs.CreateMinimal());
             UpgradeCatalog upgrades = UpgradeCatalog.LoadFromJson(UpgradeJson, items);
             return new World(maxPlayers: 10, collisionMap: null, random: new FixedRandom(roll),
-                itemCatalog: items, upgradeCatalog: upgrades);
+                itemCatalog: items, upgradeCatalog: upgrades, requireBlacksmithForUpgrade: requireBlacksmith);
         }
 
         private static Entity JoinPlayer(World world)
@@ -86,6 +86,37 @@ namespace Lumiis.Tests.Game
             Assert.Equal(3, player.EquippedWeaponUpgradeLevel);
             Assert.Equal(0, player.Inventory[0]); // Schleifstein verbraucht.
             Assert.Equal(PlayerAttack + 5 + 3 * 2, player.Attack); // +5 Basis, +2 je Stufe (jetzt Stufe 3).
+        }
+
+        [Fact]
+        public void TryUpgrade_WithoutBlacksmith_IsRejectedBeforeConsuming()
+        {
+            World world = CreateWorld(roll: 0, requireBlacksmith: true);
+            Entity player = JoinPlayer(world);
+            EquipWeapon(world, player, upgradeLevel: 0);
+            player.Inventory[0] = 9;
+
+            UpgradeAttemptResult result = world.TryUpgrade(player.Id, EquipmentSlot.Weapon, useProtectionScroll: false, nowMs: 0);
+
+            Assert.True(result.Rejected);
+            Assert.Equal(UpgradeActionFailedReason.NoBlacksmith, result.FailureReason);
+            Assert.Equal(9, player.Inventory[0]);
+            Assert.Equal(0, player.EquippedWeaponUpgradeLevel);
+        }
+
+        [Fact]
+        public void TryUpgrade_NearBlacksmith_Succeeds()
+        {
+            World world = CreateWorld(roll: 0, requireBlacksmith: true);
+            Entity player = JoinPlayer(world);
+            EquipWeapon(world, player, upgradeLevel: 0);
+            player.Inventory[0] = 9;
+            world.SpawnNpc(2, "Schmied", 50000, 50000, default, service: NpcService.Blacksmith);
+
+            UpgradeAttemptResult result = world.TryUpgrade(player.Id, EquipmentSlot.Weapon, useProtectionScroll: false, nowMs: 0);
+
+            Assert.True(result.Success);
+            Assert.Equal(1, player.EquippedWeaponUpgradeLevel);
         }
 
         [Fact]

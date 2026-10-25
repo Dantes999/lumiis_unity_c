@@ -1,10 +1,60 @@
 {
   "spawns": [
-    { "id": 1, "mobId": 1, "positionX": 42000, "positionY": 43700, "respawnSeconds": 25 },
-    { "id": 2, "mobId": 1, "positionX": 50000, "positionY": 43700, "respawnSeconds": 25 },
-    { "id": 3, "mobId": 1, "positionX": 51500, "positionY": 46700, "respawnSeconds": 25 },
-    { "id": 4, "mobId": 5, "positionX": 41000, "positionY": 43700, "respawnSeconds": 35 },
-    { "id": 5, "mobId": 5, "positionX": 48000, "positionY": 50700, "respawnSeconds": 35 },
-    { "id": 6, "mobId": 5, "positionX": 50000, "positionY": 48700, "respawnSeconds": 35 }
+    {
+      "id": 1,
+      "mobId": 1,
+      "positionX": 42000,
+      "positionY": 43700,
+      "respawnSeconds": 25
+    },
+    {
+      "id": 2,
+      "mobId": 1,
+      "positionX": 50000,
+      "positionY": 43700,
+      "respawnSeconds": 25
+    },
+    {
+      "id": 3,
+      "mobId": 1,
+      "positionX": 51500,
+      "positionY": 46700,
+      "respawnSeconds": 25
+    },
+    {
+      "id": 4,
+      "mobId": 5,
+      "positionX": 41000,
+      "positionY": 43700,
+      "respawnSeconds": 35
+    },
+    {
+      "id": 5,
+      "mobId": 5,
+      "positionX": 48000,
+      "positionY": 50700,
+      "respawnSeconds": 35
+    },
+    {
+      "id": 6,
+      "mobId": 5,
+      "positionX": 50000,
+      "positionY": 48700,
+      "respawnSeconds": 35
+    },
+    {
+      "id": 7,
+      "mobId": 3,
+      "positionX": 50000,
+      "positionY": 50700,
+      "respawnSeconds": 180
+    },
+    {
+      "id": 8,
+      "mobId": 4,
+      "positionX": 51000,
+      "positionY": 42700,
+      "respawnSeconds": 240
+    }
   ]
 }

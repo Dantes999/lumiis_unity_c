@@ -27,6 +27,25 @@ namespace Lumiis.Tests
         }
 
         [Fact]
+        public void PartyRequests_RoundTrip()
+        {
+            var invite = new PartyInviteRequestPacket { TargetName = "Bob" };
+            var inviteDecoded = Assert.IsType<PartyInviteRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(invite)));
+            Assert.Equal("Bob", inviteDecoded.TargetName);
+
+            var respond = new PartyRespondRequestPacket { Accept = true };
+            var respondDecoded = Assert.IsType<PartyRespondRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(respond)));
+            Assert.True(respondDecoded.Accept);
+
+            Assert.IsType<PartyLeaveRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(new PartyLeaveRequestPacket())));
+            Assert.IsType<PartySnapshotRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(new PartySnapshotRequestPacket())));
+
+            var inviteReceived = new PartyInviteReceivedPacket { InviterName = "Alice" };
+            var inviteReceivedDecoded = Assert.IsType<PartyInviteReceivedPacket>(PacketCodec.Decode(PacketCodec.Encode(inviteReceived)));
+            Assert.Equal("Alice", inviteReceivedDecoded.InviterName);
+        }
+
+        [Fact]
         public void StopMove_RoundTrip()
         {
             var original = new StopMovePacket();

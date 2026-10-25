@@ -20,6 +20,7 @@ internal sealed class NpcEntryDto
     public int Id { get; set; }
     public string Name { get; set; } = "";
     public NpcAppearanceDto Appearance { get; set; } = new();
+    public string? Service { get; set; }
     public List<int> ShopItemIds { get; set; } = new();
 }
 
