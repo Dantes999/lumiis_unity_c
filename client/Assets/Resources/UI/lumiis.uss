@@ -679,6 +679,26 @@
     border-color: rgb(60, 30, 0);
 }
 
+.hud-minimap-markers {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 148px;
+    height: 148px;
+}
+
+.hud-minimap-boss {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    translate: -8px -8px;
+    background-image: resource("UI/Skin/boss_marker");
+}
+
+.hud-minimap-boss-edge {
+    opacity: 0.85;
+}
+
 .hud-minimap-ring {
     position: absolute;
     left: 0;

@@ -294,6 +294,11 @@ Seit 2026-10-25 sind Login, Charakterauswahl, Systemmenü und HUD im Stil klassi
   (`RespawnRemainingSeconds`, fix 3 s wie der Server); im Tod sperrt der Client Laufen, Angriff, Skills,
   Heiltrank und Aufheben (rein kosmetisch, der Server muss trotzdem selbst ablehnen). Screenshot-Hilfen
   `DebugShowCombatPreview()`/`DebugSimulateDeath()`.
+- Mini-Boss-Events auf der Minimap: `HudController.RefreshMinimapMarkers` zeigt jeden Eintrag aus
+  `ClientWorld.MapEvents` (MapEventsPacket, unabhängig von der AOI) als pulsierenden Totenkopf
+  (`Resources/UI/Skin/boss_marker.png`, aus `tools/generate-ui-skin.py`); liegt der Boss außerhalb des
+  Ausschnitts, sitzt das Symbol am Kreisrand in seiner Richtung. Eine große Weltkarte gibt es noch nicht.
+  Screenshot-Hilfe `GameClient.DebugShowMapEventPreview()`.
 - Klick-Abschirmung: Elemente mit Klasse `ui-block` fangen Mausklicks ab
   (`HudController.IsPointerOverUi` -> `GameClient.UiPointerHitTest`), ein Klick auf HUD/Fenster bewegt
   oder greift also nicht an.

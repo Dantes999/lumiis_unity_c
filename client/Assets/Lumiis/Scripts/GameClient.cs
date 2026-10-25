@@ -797,6 +797,19 @@ namespace Lumiis.Client
 
         public void DebugEndSimulatedDeath() => _isDead = false;
 
+        /// <summary>Screenshot-Hilfe: zwei erfundene Mini-Boss-Events (einer im Minimap-Ausschnitt, einer weit
+        /// weg am Rand) - der nächste echte MapEventsPacket ersetzt sie.</summary>
+        public void DebugShowMapEventPreview()
+        {
+            Vector3 position = LocalPlayerWorldPosition;
+            var events = new List<MapEventInfo>
+            {
+                new MapEventInfo { EventId = 1, MobId = 0, Name = "Vorschau-Boss", PositionX = Mathf.RoundToInt((position.x + 12f) * 100f), PositionY = Mathf.RoundToInt((position.y + 8f) * 100f) },
+                new MapEventInfo { EventId = 2, MobId = 0, Name = "Ferner Boss", PositionX = Mathf.RoundToInt((position.x - 200f) * 100f), PositionY = Mathf.RoundToInt((position.y - 150f) * 100f) },
+            };
+            _world.HandleMapEvents(events);
+        }
+
         public void DebugHideAssetLabMapPreview()
         {
             _assetTestLab?.DebugHideMapPreview();

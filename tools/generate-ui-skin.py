@@ -506,6 +506,42 @@ def checkbox():
     save(checked, "checkbox_checked")
 
 
+def boss_marker():
+    """Minimap-Symbol für Mini-Boss-Events: Totenkopf auf rotem Siegel mit Goldrand (16x16, ohne Zufall)."""
+    size = 16
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    px = img.load()
+    c = (size - 1) / 2.0
+    for y in range(size):
+        for x in range(size):
+            r = ((x - c) ** 2 + (y - c) ** 2) ** 0.5
+            if r <= 5.6:
+                px[x, y] = lerp((196, 40, 30, 255), (120, 16, 12, 255), min(1.0, max(0.0, (y - 2) / 12.0)))
+            elif r <= 6.6:
+                px[x, y] = GOLD_LIGHT if y < c else GOLD
+            elif r <= 7.6:
+                px[x, y] = BLACK
+    skull = [
+        "..XXXXX..",
+        ".XXXXXXX.",
+        ".XoXXXoX.",
+        ".XooXooX.",
+        ".XXXoXXX.",
+        "..XXXXX..",
+        "..X.X.X..",
+    ]
+    bone = (244, 236, 214, 255)
+    shade = (40, 8, 6, 255)
+    for row, line in enumerate(skull):
+        for col, ch in enumerate(line):
+            x, y = 4 + col, 4 + row
+            if ch == "X":
+                px[x, y] = bone
+            elif ch == "o":
+                px[x, y] = shade
+    save(img, "boss_marker")
+
+
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     folder_meta = OUT_DIR + ".meta"
@@ -529,6 +565,7 @@ def main():
     tooltip()
     silhouette()
     checkbox()
+    boss_marker()
 
 
 if __name__ == "__main__":

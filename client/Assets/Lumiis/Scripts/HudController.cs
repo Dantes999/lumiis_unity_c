@@ -69,6 +69,8 @@ namespace Lumiis.Client
         private Label _minimapTitle;
         private Label _minimapCoords;
         private string _minimapMapId = "";
+        private VisualElement _minimapMarkerLayer;
+        private readonly List<VisualElement> _minimapMarkers = new List<VisualElement>();
 
         // ---- Gruppe ----
         private VisualElement _partyRoot;
@@ -314,6 +316,11 @@ namespace Lumiis.Client
             _minimapMap = _root.Q<VisualElement>("hud-minimap-map");
             _minimapTitle = _root.Q<Label>("hud-minimap-title");
             _minimapCoords = _root.Q<Label>("hud-minimap-coords");
+            // Event-Symbole (Mini-Bosse) über dem Kartenausschnitt, aber unter dem Spielerpunkt.
+            _minimapMarkerLayer = new VisualElement { name = "hud-minimap-markers", pickingMode = PickingMode.Ignore };
+            _minimapMarkerLayer.AddToClassList("hud-minimap-markers");
+            VisualElement frame = _root.Q<VisualElement>("hud-minimap-frame");
+            frame.Insert(frame.IndexOf(_minimapMap) + 1, _minimapMarkerLayer);
         }
 
         private void BindParty()
@@ -1449,8 +1456,60 @@ namespace Lumiis.Client
 
             float x = Mathf.Clamp01((position.x - visual.OriginX) / visual.Width);
             float y = Mathf.Clamp01(1f - (position.y - visual.OriginY) / visual.Height);
-            _minimapMap.style.left = MinimapSize / 2f - x * mapSize;
-            _minimapMap.style.top = MinimapSize / 2f - y * mapSize;
+            float mapLeft = MinimapSize / 2f - x * mapSize;
+            float mapTop = MinimapSize / 2f - y * mapSize;
+            _minimapMap.style.left = mapLeft;
+            _minimapMap.style.top = mapTop;
+            RefreshMinimapMarkers(visual, mapLeft, mapTop, mapSize);
+        }
+
+        /// <summary>Mini-Boss-Events (ClientWorld.MapEvents, unabhängig von der Sichtweite) als Totenkopf auf
+        /// der Minimap. Liegt der Boss außerhalb des Ausschnitts, sitzt das Symbol am Rand in seiner Richtung
+        /// (etwas kleiner), damit man weiß, wohin man laufen muss.</summary>
+        private void RefreshMinimapMarkers(MapVisual visual, float mapLeft, float mapTop, float mapSize)
+        {
+            List<MapEventInfo> events = _gameClient.World.MapEvents;
+            while (_minimapMarkers.Count < events.Count)
+            {
+                var marker = new VisualElement { pickingMode = PickingMode.Ignore };
+                marker.AddToClassList("hud-minimap-boss");
+                _minimapMarkerLayer.Add(marker);
+                _minimapMarkers.Add(marker);
+            }
+
+            const float center = MinimapSize / 2f;
+            const float edgeRadius = MinimapSize / 2f - 11f;
+            float pulse = 1f + 0.12f * Mathf.Sin(Time.unscaledTime * 5f);
+            for (int i = 0; i < _minimapMarkers.Count; i++)
+            {
+                VisualElement marker = _minimapMarkers[i];
+                if (i >= events.Count)
+                {
+                    marker.style.display = DisplayStyle.None;
+                    continue;
+                }
+
+                float worldX = events[i].PositionX / 100f;
+                float worldY = events[i].PositionY / 100f;
+                float px = mapLeft + (worldX - visual.OriginX) / visual.Width * mapSize;
+                float py = mapTop + (1f - (worldY - visual.OriginY) / visual.Height) * mapSize;
+                float dx = px - center;
+                float dy = py - center;
+                float distance = Mathf.Sqrt(dx * dx + dy * dy);
+                bool outside = distance > edgeRadius;
+                if (outside)
+                {
+                    px = center + dx / distance * edgeRadius;
+                    py = center + dy / distance * edgeRadius;
+                }
+
+                float scale = outside ? 0.8f : pulse;
+                marker.style.display = DisplayStyle.Flex;
+                marker.style.left = px;
+                marker.style.top = py;
+                marker.style.scale = new Scale(new Vector3(scale, scale, 1f));
+                marker.EnableInClassList("hud-minimap-boss-edge", outside);
+            }
         }
 
         private static void SetOrb(VisualElement fill, float current, float max)
