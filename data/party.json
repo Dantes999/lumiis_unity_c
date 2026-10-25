@@ -1,0 +1,10 @@
+{
+  "_hinweis": "Gruppenregeln (Protocol.Version 20). Alle Zahlen sind Platzhalter. Rollen-Boni wirken, solange das Mitglied online in einer Gruppe mit mindestens zwei Online-Mitgliedern ist.",
+  "maxMembers": 8,
+  "xpSharePercent": 50,
+  "offlineRemoveAfterSeconds": 600,
+  "roles": [
+    { "role": "Attacker", "name": "Angreifer", "attackPercent": 5, "defensePercent": 0 },
+    { "role": "Defender", "name": "Verteidiger", "attackPercent": 0, "defensePercent": 5 }
+  ]
+}

@@ -29,5 +29,16 @@ namespace Lumiis.Shared
         /// <summary>Obergrenze für Entity.Yang (M5b) - Monster-Drops, Verkäufe und Debug-Tools kappen ihre
         /// Gutschrift daran (siehe World.CreditYang), damit der Wert nie überläuft oder unbegrenzt wächst.</summary>
         public const long MaxYang = 2_000_000_000;
+
+        /// <summary>Boden-Drops: so lange (ms) darf nur der Spieler, der das Monster getötet hat (oder ein
+        /// Mitglied seiner Gruppe), den Drop aufheben - danach jeder. Wie im Vorbild 10 s.</summary>
+        public const int GroundItemOwnershipMs = 10_000;
+
+        /// <summary>Boden-Drops verschwinden nach dieser Zeit (ms) von selbst, damit liegengelassene Items die
+        /// Welt nicht unbegrenzt füllen. Wie im Vorbild 5 Minuten.</summary>
+        public const int GroundItemLifetimeMs = 300_000;
+
+        /// <summary>Reichweite (1/100 Welteinheiten), in der ein Spieler einen Boden-Drop aufheben kann.</summary>
+        public const int PickupRangeWire = 300;
     }
 }

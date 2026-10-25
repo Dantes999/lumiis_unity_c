@@ -190,6 +190,19 @@ namespace Lumiis.Tests.Client
         }
 
         [Fact]
+        public async Task CreateCharacterAsync_PassesLookChoiceToAuthClient()
+        {
+            var auth = new FakeAuthClient { CreateCharacterResult = AuthResult<CharacterInfo>.Success(new CharacterInfo(9, "Magier")) };
+            var flow = new LoginFlow(auth);
+
+            await flow.CreateCharacterAsync(AuthUrl, "Magier", new CharacterLookChoice(2, null, 3));
+
+            Assert.Equal(2, auth.LastLookChoice.BodyId);
+            Assert.Null(auth.LastLookChoice.HairStyleId);
+            Assert.Equal(3, auth.LastLookChoice.HairColorId);
+        }
+
+        [Fact]
         public async Task CreateCharacterAsync_NameTaken409_SetsConflictError()
         {
             var fake = new FakeAuthClient { CreateCharacterResult = AuthResult<CharacterInfo>.Http(409, null) };

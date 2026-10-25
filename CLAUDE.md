@@ -66,9 +66,10 @@ Setup: `cp .env.example .env`, eigene Werte eintragen, dann **immer** `source to
 
 Lumiis.Auth (server/src/Lumiis.Auth, ASP.NET Core Minimal API, nur HTTP, Port 5080 per appsettings.json/launchSettings.json, überschreibbar über die Standard-ASPNETCORE_URLS/--urls-Mechanismen):
 - POST /register { username, password } -> 201 { accountId } | 409 | 400
-- POST /login { username, password } -> 200 { token, expiresAtUnix, characters: [{ id, name }] } | 401 (keine Unterscheidung Name/Passwort in der Antwort)
-- GET /characters, Header "Authorization: Bearer <token>" -> 200 [{ id, name }] | 401
-- POST /characters, Header "Authorization: Bearer <token>", Body { name } -> 201 { id, name } | 401 | 400 | 409 (Aussehen wird automatisch aus data/looks.json vergeben, `LookCatalog.CreateDefaultAppearance()` - erster gültiger Eintrag je Slot, keine Auswahl in M2a)
+- POST /login { username, password } -> 200 { token, expiresAtUnix, characters: [Charakter] } | 401 (keine Unterscheidung Name/Passwort in der Antwort)
+- GET /characters, Header "Authorization: Bearer <token>" -> 200 { characters: [Charakter] } | 401
+- POST /characters, Header "Authorization: Bearer <token>", Body { name, bodyId?, hairStyleId?, hairColorId? } -> 201 Charakter | 401 | 400 | 409 (fehlende Aussehenswerte: `LookCatalog.CreateDefaultAppearance()`; angegebene werden gegen looks.json geprüft, sonst 400 "Ungültiges Aussehen.")
+- Charakter = { id, name, level, mapId, appearance: { bodyId, hairStyleId, hairColorId, armorId, helmetId, weaponId, shieldId } (LookIds, über `Lumiis.Data.CharacterAppearance` genauso aufgelöst wie im Spielserver), equipment: { armorItemId, helmetItemId, weaponItemId, shieldItemId, ...UpgradeLevel } } - für die Vorschau in der Charakterauswahl. Lumiis.Auth lädt dafür zusätzlich items.json.
 
 Fehlerantworten immer als knappes JSON { error: "..." }, nie ein Stacktrace nach außen. Session-Token: eigenes, minimales Format (kein JWT-Standard), signiert per HMACSHA256, 30 Minuten gültig, trägt nur die AccountId (siehe server/src/Lumiis.Data/TokenService.cs).
 
@@ -76,7 +77,9 @@ Spielserver-Join (Lumiis.Server, seit M2b, Protocol.Version 3): JoinRequestPacke
 statt Name. Ablauf: Token sofort synchron per TokenService.Validate geprüft (InvalidToken/TokenExpired als
 unterschiedliche JoinRejectReason) -> bei gültigem Token läuft der Charakter-Lookup (CharacterId + AccountId
 aus dem Token, Eigentümerschaft geprüft) asynchron auf einem Threadpool-Thread, Ergebnis kommt über eine
-Queue zurück und wird einmal pro Tick eingesammelt (World bleibt ausschließlich dem Game-Loop-Thread
+Queue zurück und wird einmal pro Tick eingesammelt (sobald das Token gültig ist, gilt statt der 5-s-Join-Frist
+`ServerConfig.JoinLookupTimeoutMs` = 30 s, und `Program.cs` wärmt EF Core/Npgsql beim Start mit einer Leerabfrage
+vor - sonst lief der erste Login nach Serverstart in den Timeout; World bleibt ausschließlich dem Game-Loop-Thread
 vorbehalten) -> nicht gefunden/falscher Account: CharacterNotFound; Charakter bereits online (eigenes
 Dictionary CharacterId->EntityId in World): CharacterAlreadyOnline. Erfolgreicher Join: Appearance und
 Startposition kommen aus der geladenen Character-Zeile (null-Position = Kartenmitte). Position wird alle 30s
@@ -169,8 +172,12 @@ Seit 2026-10-25 gibt es echte, begehbare Karten statt einer einzigen Welt. Detai
   Waldboss (Mob 4) - die normalen Mobs mindestens 20 Weltenheiten vom Start entfernt, im Startbereich
   steht kein Monster. Dorfhändler und **Schmied** sitzen im Dorfplatz.
 - Drops: Produktionsserver nutzt echte **Boden-Drops** (`EntityKind.GroundItem`): Monster lassen Items mit
-  Icon/Name auf dem Boden fallen, Aufheben per Klick (`PickupItemRequestPacket` 20) prüft Distanz und
-  Inventarplatz. Tests ohne `useGroundDrops` behalten das bisherige Auto-Loot-Verhalten.
+  Icon/Name auf dem Boden fallen, Aufheben per Klick (`PickupItemRequestPacket` 20) prüft Distanz
+  (`GameConstants.PickupRangeWire`), Besitz und Inventarplatz. Besitz: 10 s nur Killer oder dessen Gruppe
+  (`GroundItemOwnershipMs`, sonst `PickupNotOwner`), nach 5 min verschwindet der Drop
+  (`GroundItemLifetimeMs`, `World.RemoveExpiredGroundItems` + EntityDespawn). Mehrere Drops eines Kills
+  liegen leicht versetzt. Boden-Drops und NPCs sind nie angreifbar (`World.IsCombatKind`, auch nicht per
+  Kreisschlag). Tests ohne `useGroundDrops` behalten das bisherige Auto-Loot-Verhalten.
 - NPC-Dienste: `data/npcs.json` hat `service` (`Merchant`/`Blacksmith`), wird als `NpcService` in
   `EntitySpawnPacket` übertragen. Aufwertung verlangt auf dem Produktionsserver einen Schmied in
   `NpcInteractRangeWire`; ohne ihn kommt `NoBlacksmith`.
@@ -810,12 +817,21 @@ eine Gruppen-MVP (Protocol.Version 14):
 - `JoinAccepted`/Entity-Spawns bleiben unverändert; Chat ist nicht persistent. Chat kam mit
   Protocol.Version 13, aktuell ist 14 (Gruppe). Roundtrip-Tests für beide Chat-Pakete und ein
   LiteNetLib-Integrationstest (Karte + Whisper) sind grün.
-- Gruppe (Alpha-MVP, Protocol.Version 14): Chat-Befehle `/invite Name`, `/accept`, `/decline`, `/leave`,
-  `/party`; max. 8 Mitglieder, Einladender wird Leiter. Server hält die Gruppe nur im Speicher
-  (`PartyState`, `EntityId -> Party`), Leiterwechsel beim Verlassen; `PartyChangedPacket` (1021) ist ein
-  voller Resync (LeaderEntityId + Name/Level/HP der Mitglieder). Das HUD zeigt ein Party-Panel mit
-  Leader-Markierung, HP und Verlassen-Knopf; HP wird bei Treffern/Heilung/Respawn aktualisiert.
-  Kein DB-Save, keine Rollen. EXP-Teilen: andere Gruppenmitglieder erhalten die Hälfte des Kill-XP (mind. 1) und ein CharacterStatsPacket; bei Levelaufstieg sofortiger Save.
+- Gruppe (seit Protocol.Version 20): Chat-Befehle `/invite Name`, `/accept`, `/decline`, `/leave`,
+  `/party`, dazu für den Leiter `/kick Name`, `/promote Name`, `/role Name angreifer|verteidiger|keine`
+  (gleichwertig per Paket: `PartyKickRequest` 25, `PartyPromoteRequest` 26, `PartySetRoleRequest` 27).
+  Logik ohne Netzwerk in `Lumiis.Server.Game.PartyManager`, Mitglieder über die **CharacterId**: wer
+  ausloggt, bleibt offline in der Gruppe (`EntityId` 0 im Paket, letzter Level-/HP-Stand) und ist beim
+  nächsten Join ohne neue Einladung wieder drin; nach `offlineRemoveAfterSeconds` fliegt er raus. Leiter
+  ist immer ein Online-Mitglied (geht er offline/verlässt die Gruppe, übernimmt das erste Online-
+  Mitglied). Gruppen mit weniger als zwei Mitgliedern oder ohne Online-Mitglied lösen sich auf. Nur im
+  Speicher, überlebt keinen Serverneustart. Regeln in `data/party.json` (`PartyCatalog`,
+  `Lumiis.Data.Parties`): maxMembers 8, xpSharePercent 50, Offline-Frist 600 s, Rollen Angreifer (+5 %
+  Angriff) und Verteidiger (+5 % Verteidigung) - wirken, solange mindestens zwei Mitglieder online sind,
+  über `Entity.PartyAttack/DefenseBonusPercent` in `World.RecomputeDerivedStats`. `PartyChangedPacket`
+  (1021) bleibt ein voller Resync; `Members` unverändert, neu die parallele Liste `MemberStatus`
+  (Online, Rolle). EXP-Teilen: andere Online-Mitglieder erhalten xpSharePercent des Kill-XP (mind. 1);
+  Boden-Drop-Besitz gilt für die ganze Gruppe.
 - Audio (P1-Platzhalter): `AudioService` erzeugt Schwung-, Treffer-, Kill-, Schaden-, Loot-, Level-Up-
   und Klick-Clips prozedural (keine Audiodateien) und spielt sie bei Angriff/Skill, EntityDamaged,
   EntityDied, Inventar-Zuwachs und Levelaufstieg. Kein Musiksystem, noch kein Mute-UI.
@@ -925,7 +941,7 @@ Das ist bewusst so gebaut, damit ein künftiges Monster-Respawn-pro-SpawnPoint (
 einen Respawn an einem (evtl. schon belegten) SpawnPoint aus.
 
 ## Alpha-Umfang (Ziel)
-Zwei Karten (Startdorf + Feld) mit Portalwechsel, Krieger, Level 1-25, Monster/Bosse/Lumiis-Steine, Items/Drops/Shop, Chat, Gruppe. NICHT: Quests/Lua, Reittiere, Kostüme, Drachenseelen, Gildenkrieg, weitere Reiche.
+Zwei Karten (Map1 Yongan + Map2 Jayang) mit Portalwechsel, Krieger, Level 1-25, Monster/Bosse/Lumiis-Steine, Items/Drops/Shop, Chat, Gruppe. NICHT: Quests/Lua, Reittiere, Kostüme, Drachenseelen, Gildenkrieg, weitere Reiche.
 
 ## Meilensteine
 M0 Fundament (fertig) | M1 Walking Skeleton (fertig, inkl. M1b Unity-Client, M1c Sichtbarkeit/Testing, M1c-layered-characters Paper-Doll-Charaktere) | M2 Account & Charakter (komplett fertig): M2a Datenbank & Auth-Dienst, M2b Server-Join über Account/Token/Charakter, M2c Unity-Login-UI (UI Toolkit) | M3 Welt (Grid, AOI, Mobs) komplett fertig: M3a Kartenkollision, M3b Sichtbarkeitsbereich (kein Grid - siehe Abschnitt "Sichtbarkeitsbereich (AOI)"), M3c Monster (Spawns, Wander-KI, AOI-Integration - siehe Abschnitt "Monster") | M4 Kampf komplett fertig (inkl. Gegenwehr): M4a Kampf-Grundlagen, M4b Monster-Respawn, M4c Monster-Aggro/Verfolgung/Leine (siehe Abschnitt "Kampf") | M5 Items komplett fertig: M5a Items/Inventar/Ausrüstung/Drops (siehe Abschnitt "Items und Inventar"), M5b Shop/NPCs (siehe Abschnitt "Shop und NPCs") | M6 Metin-Kern abgeschlossen: M6a Level/XP/Werte/SP/Ausweichen/Regeneration (siehe Abschnitt "Fortschritt: Level, XP, Werte"), M6b Skills (siehe Abschnitt "Skills"), M6c Ausruestungs-Aufwertung +0..+9 (siehe Abschnitt "Ausruestungs-Aufwertung"); M6d Lumiis-Stein/Boss inkl. Wellen umgesetzt | M7 Sozial inkl. Multi-Map/Portale | M8 Alpha-Betrieb.
@@ -1219,7 +1235,33 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   Debug-Panel, deutsche Overlay-/Systemmeldungen. 644 Server-Tests grün (inkl. 20 neue Aufwertungs-/
   Katalog-/Packet-Tests und 3 LiteNetLib-Integrationstests inkl. Disconnect/Rejoin), Unity-PlayMode
   grün.
-- Offen als nächster M7-Block: Party-Persistenz/Rollen und weitere soziale Integrationstests; siehe
+- Technik-Review des Boden-Drop/Schmied/Party-Blocks (2026-10-25): Boden-Drops waren angreifbar (normaler
+  Angriff, Wuchtschlag, Kreisschlag) und blieben für immer liegen - jetzt unangreifbar, 10 s Killer-/
+  Gruppenbesitz, 5 min Lebensdauer, versetzt abgelegt. Bugfixes: erster Login nach Serverstart lief in den
+  Join-Timeout (DB-Vorwärmen + `JoinLookupTimeoutMs`), Charakterliste ohne Aussehen (Auth liefert jetzt
+  Level/Karte/Aussehen/Ausrüstung, Erstellen mit Körper/Frisur/Haarfarbe; Client-`CharacterInfo` trägt
+  `Appearance`/`WeaponItemId`/`WeaponUpgradeLevel`), Holzschwert senkrecht über dem Kopf (Item-Waffen-PNGs
+  auf 48-px-Figuren auf ~0,8 Einheiten skaliert, Ruhewinkel je Richtung in `WeaponSocketFrameConfig`).
+  656 Tests grün.
+- Gruppe über Ausloggen hinweg + Rollen (2026-10-25, Protocol.Version 20): `PartyManager` (CharacterId-
+  basiert, Offline-Mitglieder, Leiterwechsel, Kick, Promote, Rollen), `data/party.json` + `PartyCatalog`,
+  Rollen-Boni in `RecomputeDerivedStats`, Pakete 25-27, `PartyChangedPacket.MemberStatus`. Außerdem Bugfix
+  Holzschwert: `CharacterView` erkannte den Lumiis-Provider hinter `CachingSpriteProvider` nicht (Hand-
+  Anker/Skalierung/Namensschild-Höhe der Platzhalter griffen) - in Unity per Screenshot bestätigt. 687 Tests
+  grün (PartyManager 12, PartyCatalog 10, Rollen-Bonus 1, 2 neue Integrationstests).
+- Map2 = Jayang (2026-10-25): Quelldaten aus `lumiis-2d` (`buildMap("jayang")`, Stand 4376dae) per
+  `tools/export-lumiis-map.mjs` nach `tools/map2-jayang-source.json`/`-mobs.json` exportiert,
+  `tools/import-map2-jayang.py` schneidet 256×256 Tiles (Original x 136-391, y 200-455: Dorf + erstes
+  Jagdgebiet "Lager des Weißen Eids", Lv 18-25) mittig in die 1000×1000-Zellenkarte (Origin 372) und
+  schreibt `Resources/Maps/map2.png` (16 px/Tile, 4096²), `collision.bin`, `map.json`, `portals.json`,
+  `npcs.json` (Schmied + Händler an den Originalplätzen), `spawns.json` (alle Zone-1-Gruppen 1:1 = 340
+  Monster außerhalb der Dorf-Sicherheitszone, dazu 3 feste "Lumiis der Schwärze"). Neue Mobs 10-15, 18 in
+  `mobs.json` (Werte bewusst nach unserer Formel skaliert, Originalwerte bleiben in `-mobs.json`), Wellen
+  für Mob 18 in `metins.json`. Map1 bekam ein Nordportal am oberen Wegende (das Original-Portal liegt
+  außerhalb des Map1-Ausschnitts), Jayang führt am Osttor zurück. Nicht übernommen: Zonen 2-5 (Lv 25-45,
+  über dem Alpha-Levelcap), Hasun-Dong-Portal, Lager des Alten Mannes, eigene Monstergrafik für die neuen
+  Mobs (Platzhalterform). 684 Tests grün.
+- Offen: Monster-Sheets für die Jayang-Mobs, weitere Zonen/Dungeons, Reittiere; siehe
   `docs/feature-gap-lumiis.md`.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client
 War kein Codefehler. User hat den Test mit fokussiertem Unity-Fenster wiederholt (Server, Unity Play, dann Bots

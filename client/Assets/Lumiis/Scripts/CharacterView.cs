@@ -57,6 +57,10 @@ namespace Lumiis.Client
         public int TrailPositionCount => _weaponTrail != null ? _weaponTrail.positionCount : 0;
 
         private ISpriteProvider _spriteProvider;
+        /// <summary>GameClient reicht den Provider in einem CachingSpriteProvider gekapselt durch - ein direkter
+        /// "is LumiisSpriteProvider"-Check schlug deshalb im echten Spiel immer fehl (Waffe am Platzhalter-Anker
+        /// auf Kopfhöhe, ungeskaliert). Einmal beim Initialize aufgelöst.</summary>
+        private bool _usesLumiisSheets;
         private LookCatalogClient _lookCatalog;
         private readonly Dictionary<CharacterSlot, SpriteRenderer> _renderers = new Dictionary<CharacterSlot, SpriteRenderer>();
         private Appearance _appearance;
@@ -98,6 +102,7 @@ namespace Lumiis.Client
             EntityId = entityId;
             EntityName = entityName;
             _spriteProvider = spriteProvider;
+            _usesLumiisSheets = CachingSpriteProvider.Unwrap(spriteProvider) is LumiisSpriteProvider;
             _lookCatalog = lookCatalog;
 
             SortingGroup sortingGroup = gameObject.AddComponent<SortingGroup>();
@@ -125,7 +130,7 @@ namespace Lumiis.Client
 
             _armorMaterial = Resources.Load<Material>(ArmorMaterialResourcePath);
             _armorPropertyBlock = new MaterialPropertyBlock();
-            if (_armorMaterial != null && !(_spriteProvider is LumiisSpriteProvider)
+            if (_armorMaterial != null && !_usesLumiisSheets
                 && _renderers.TryGetValue(CharacterSlot.Armor, out SpriteRenderer armorRenderer))
                 armorRenderer.sharedMaterial = _armorMaterial;
 
@@ -199,9 +204,8 @@ namespace Lumiis.Client
             {
                 _weaponRenderer.enabled = true;
                 _weaponRenderer.sprite = weaponSprite;
-                _weaponRenderer.transform.localScale = _spriteProvider is LumiisSpriteProvider
-                    ? new Vector3(0.85f, 0.85f, 1f)
-                    : Vector3.one;
+                float weaponScale = WeaponScaleFor(weaponSprite);
+                _weaponRenderer.transform.localScale = new Vector3(weaponScale, weaponScale, 1f);
                 SetWeaponPixelOffset();
                 UpdateTrailAnchor();
             }
@@ -214,6 +218,18 @@ namespace Lumiis.Client
 
             UpdateUpgradeEffects();
             RefreshWeaponSocketPose();
+        }
+
+        /// <summary>Die Item-PNGs sind für den 128-px-Platzhalter-Körper gezeichnet (Klinge ~1,9 Welteinheiten).
+        /// Die echten Lumiis-Sheets sind nur 48 px bei 32 PPU (~1,5 Einheiten hoch) - mit fester Skalierung ragte
+        /// das Holzschwert deshalb weit über den Kopf. Hier wird die sichtbare Waffenlänge auf einen Anteil der
+        /// Figurenhöhe begrenzt.</summary>
+        private float WeaponScaleFor(Sprite weaponSprite)
+        {
+            if (!_usesLumiisSheets || weaponSprite == null) return 1f;
+            const float targetLengthWorld = 0.8f;
+            float length = weaponSprite.bounds.size.y;
+            return length > 0.01f ? Mathf.Min(1f, targetLengthWorld / length) : 1f;
         }
 
         /// <summary>Zurück auf die Appearance-Waffe (Platzhalter) - z. B. beim lokalen F7-Look-Cycler.</summary>
@@ -270,7 +286,7 @@ namespace Lumiis.Client
         /// Höhe zurück, wenn kein Anker im Katalog hinterlegt ist.</summary>
         public Vector3 GetHeadWorldOffset()
         {
-            if (_spriteProvider is LumiisSpriteProvider)
+            if (_usesLumiisSheets)
                 return new Vector3(0f, 1.55f, 0f);
 
             LookAnchorJson anchor = GetBodyAnchor(_facing.Direction);
@@ -373,7 +389,7 @@ namespace Lumiis.Client
 
         private Vector2 GetHandAnchorLocal()
         {
-            if (_spriteProvider is LumiisSpriteProvider)
+            if (_usesLumiisSheets)
             {
                 Vector2 native = _facing.Direction == FacingDirection.Side
                     ? new Vector2(0.20f, 0.48f)
@@ -480,7 +496,7 @@ namespace Lumiis.Client
         {
             // Die echten Lumiis-Rüstungs-Sheets bringen ihre Farben mit; der Palette-Shader würde sie
             // multiplikativ verfälschen. Nur der Platzhalter-Pfad nutzt die Farbpalette.
-            if (_spriteProvider is LumiisSpriteProvider)
+            if (_usesLumiisSheets)
             {
                 if (_renderers.TryGetValue(CharacterSlot.Armor, out SpriteRenderer nativeArmor))
                     nativeArmor.color = Color.white;

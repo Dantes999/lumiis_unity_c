@@ -11,6 +11,7 @@ using Lumiis.Data.Looks;
 using Lumiis.Data.Maps;
 using Lumiis.Data.Mobs;
 using Lumiis.Data.Npcs;
+using Lumiis.Data.Parties;
 using Lumiis.Data.Progression;
 using Lumiis.Data.Skills;
 using Lumiis.Data.Upgrade;
@@ -70,7 +71,8 @@ namespace Lumiis.Tests.Integration
                 MobCatalog? mobCatalog = null, SpawnCatalog? spawnCatalog = null, ClassCatalog? classCatalog = null,
                 ItemCatalog? itemCatalog = null, NpcCatalog? npcCatalog = null, NpcSpawnCatalog? npcSpawnCatalog = null,
                 bool allowDebugCommands = false, ProgressionCatalog? progressionCatalog = null, SkillCatalog? skillCatalog = null,
-                MapCatalog? mapCatalog = null, UpgradeCatalog? upgradeCatalog = null, Random? random = null)
+                MapCatalog? mapCatalog = null, UpgradeCatalog? upgradeCatalog = null, Random? random = null,
+                Action? beforeServerDbAccess = null, PartyCatalog? partyCatalog = null)
             {
                 DbContextOptions<LumiisDbContext> options = new DbContextOptionsBuilder<LumiisDbContext>()
                     .UseInMemoryDatabase("gameserver-test-" + Guid.NewGuid())
@@ -85,8 +87,14 @@ namespace Lumiis.Tests.Integration
                     RejectGraceMs = 100, // echte Uhr, kleiner Wert - siehe M1-fixes.md Punkt 2
                     AllowDebugCommands = allowDebugCommands
                 };
-                Server = new GameServer(config, new NullLogger(), TokenService, _dbFactory, nowMs, collisionMap, mobCatalog, spawnCatalog, classCatalog,
-                    itemCatalog, npcCatalog, npcSpawnCatalog, progressionCatalog, skillCatalog, mapCatalog, upgradeCatalog, random);
+                // beforeServerDbAccess: nur die DB-Zugriffe des Servers (nicht die Test-Helfer) lassen sich so
+                // gezielt verzögern, z. B. um einen langsamen ersten DB-Zugriff nach Serverstart nachzustellen.
+                Func<LumiisDbContext> serverDbFactory = beforeServerDbAccess == null
+                    ? _dbFactory
+                    : () => { beforeServerDbAccess(); return _dbFactory(); };
+                Server = new GameServer(config, new NullLogger(), TokenService, serverDbFactory, nowMs, collisionMap, mobCatalog, spawnCatalog, classCatalog,
+                    itemCatalog, npcCatalog, npcSpawnCatalog, progressionCatalog, skillCatalog, mapCatalog, upgradeCatalog, random,
+                    partyCatalog: partyCatalog);
             }
 
             /// <summary>level/xp/spent*/unspent*/currentHp/currentSp: M6a-Fortschrittsstand der neuen Zeile
@@ -256,6 +264,41 @@ namespace Lumiis.Tests.Integration
 
                 int aliceEntityId = accepted.EntityId;
                 Assert.Equal("village", server.MapIdOfEntity(aliceEntityId));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void MultiMap_Map1NorthPortal_LeadsToJayangVillage()
+        {
+            (ServerFixture fixture, _) = CreateMultiMapFixture();
+            GameServer server = fixture.Server;
+            Assert.True(server.WorldForMap("map2").Entities.Count(e => e.Kind == EntityKind.Monster) > 100);
+            Assert.Equal(2, server.WorldForMap("map2").Entities.Count(e => e.Kind == EntityKind.Npc));
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                // Auf dem Weg knapp südlich des Nordportals (44200..44399 / 52300..52599) starten.
+                (int aliceId, string aliceToken) = fixture.CreateCharacter("Alice", positionX: 44250, positionY: 52000, mapId: "map1");
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = aliceToken, CharacterId = aliceId });
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+                Assert.Equal("map1", client.Received.OfType<JoinAcceptedPacket>().First().MapId);
+
+                client.Send(new MoveToPacket { X = 44250, Y = 52450 });
+                Assert.True(Pump(() => client.Received.OfType<MapChangedPacket>().Any(), server, client),
+                    "kein MapChangedPacket nach Betreten des Map1-Nordportals");
+                MapChangedPacket changed = client.Received.OfType<MapChangedPacket>().First();
+                Assert.Equal("map2", changed.MapId);
+                Assert.Equal("Jayang", changed.MapName);
+                Assert.Equal(50650, changed.X);
+                Assert.Equal(51850, changed.Y);
             }
             finally
             {
@@ -497,10 +540,106 @@ namespace Lumiis.Tests.Integration
 
                 PumpForDuration(TimeSpan.FromMilliseconds(450), server, clientA, clientB);
                 clientB.Send(new ChatRequestPacket { Channel = ChatChannel.Map, Text = "/leave" });
+                // Eine Gruppe mit nur noch einem Mitglied löst sich auf (Protocol.Version 20).
                 Assert.True(Pump(() => clientA.Received.OfType<PartyChangedPacket>()
-                    .Any(p => p.Members.Count == 1), server, clientA, clientB));
+                    .Any(p => p.Members.Count == 0), server, clientA, clientB));
                 Assert.True(Pump(() => clientB.Received.OfType<PartyChangedPacket>()
                     .Any(p => p.Members.Count == 0), server, clientA, clientB));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void Party_MemberStaysInPartyWhileOffline_AndIsOnlineAgainAfterRejoin()
+        {
+            var fixture = new ServerFixture();
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var clientA = new TestClient();
+                var clientB = new TestClient();
+                clientA.Connect(server.ListenPort);
+                clientB.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, clientA, clientB));
+
+                (int aliceId, string aliceToken) = fixture.CreateCharacter("Alice");
+                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = aliceToken, CharacterId = aliceId });
+                Assert.True(Pump(() => clientA.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
+
+                (int bobId, string bobToken) = fixture.CreateCharacter("Bob");
+                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = bobToken, CharacterId = bobId });
+                Assert.True(Pump(() => clientB.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
+
+                clientA.Send(new ChatRequestPacket { Channel = ChatChannel.Map, Text = "/invite Bob" });
+                Assert.True(Pump(() => clientB.Received.OfType<PartyInviteReceivedPacket>().Any(), server, clientA, clientB));
+                clientB.Send(new PartyRespondRequestPacket { Accept = true });
+                Assert.True(Pump(() => clientA.Received.OfType<PartyChangedPacket>().Any(p => p.Members.Count == 2), server, clientA, clientB));
+
+                // Bob loggt aus: bleibt als offline (EntityId 0) in der Gruppe, Alice bleibt Leiterin.
+                clientB.Dispose();
+                Assert.True(Pump(() => clientA.Received.OfType<PartyChangedPacket>()
+                    .Any(p => p.Members.Count == 2 && !p.MemberStatus[p.Members.FindIndex(m => m.Name == "Bob")].Online), server, clientA));
+                PartyChangedPacket offline = clientA.Received.OfType<PartyChangedPacket>().Last();
+                Assert.Equal(0, offline.Members.Find(m => m.Name == "Bob").EntityId);
+                Assert.Equal(offline.Members.Find(m => m.Name == "Alice").EntityId, offline.LeaderEntityId);
+
+                // Bob kommt zurück: wieder online in derselben Gruppe, ohne neue Einladung.
+                using var clientB2 = new TestClient();
+                clientB2.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, clientA, clientB2));
+                clientB2.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = bobToken, CharacterId = bobId });
+                Assert.True(Pump(() => clientB2.Received.OfType<PartyChangedPacket>()
+                    .Any(p => p.Members.Count == 2 && p.MemberStatus.All(s => s.Online)), server, clientA, clientB2));
+                Assert.True(Pump(() => clientA.Received.OfType<PartyChangedPacket>().Last().MemberStatus.All(s => s.Online), server, clientA, clientB2));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void Party_LeaderAssignsRoleAndKicks()
+        {
+            var fixture = new ServerFixture(partyCatalog: PartyCatalog.LoadFromFile(Path.Combine(ResolveDataDirectory(), "party.json")));
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var clientA = new TestClient();
+                using var clientB = new TestClient();
+                clientA.Connect(server.ListenPort);
+                clientB.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, clientA, clientB));
+
+                (int aliceId, string aliceToken) = fixture.CreateCharacter("Alice");
+                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = aliceToken, CharacterId = aliceId });
+                Assert.True(Pump(() => clientA.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
+                (int bobId, string bobToken) = fixture.CreateCharacter("Bob");
+                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = bobToken, CharacterId = bobId });
+                Assert.True(Pump(() => clientB.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
+
+                clientA.Send(new PartyInviteRequestPacket { TargetName = "Bob" });
+                Assert.True(Pump(() => clientB.Received.OfType<PartyInviteReceivedPacket>().Any(), server, clientA, clientB));
+                clientB.Send(new PartyRespondRequestPacket { Accept = true });
+                Assert.True(Pump(() => clientA.Received.OfType<PartyChangedPacket>().Any(p => p.Members.Count == 2), server, clientA, clientB));
+
+                // Nicht-Leiter darf keine Rollen vergeben.
+                clientB.Send(new PartySetRoleRequestPacket { TargetName = "Bob", Role = PartyRole.Attacker });
+                Assert.True(Pump(() => clientB.Received.OfType<ChatMessagePacket>().Any(p => p.Text.Contains("Nur der Gruppenleiter")), server, clientA, clientB));
+
+                clientA.Send(new PartySetRoleRequestPacket { TargetName = "Bob", Role = PartyRole.Defender });
+                Assert.True(Pump(() => clientB.Received.OfType<PartyChangedPacket>()
+                    .Any(p => p.MemberStatus[p.Members.FindIndex(m => m.Name == "Bob")].Role == PartyRole.Defender), server, clientA, clientB));
+
+                clientA.Send(new PartyKickRequestPacket { TargetName = "Bob" });
+                Assert.True(Pump(() => clientB.Received.OfType<ChatMessagePacket>().Any(p => p.Text.Contains("entfernt")), server, clientA, clientB));
+                Assert.True(Pump(() => clientB.Received.OfType<PartyChangedPacket>().Last().Members.Count == 0, server, clientA, clientB));
+                Assert.True(Pump(() => clientA.Received.OfType<PartyChangedPacket>().Last().Members.Count == 0, server, clientA, clientB));
             }
             finally
             {
@@ -1214,6 +1353,43 @@ namespace Lumiis.Tests.Integration
             }
             finally
             {
+                server.Stop();
+            }
+        }
+
+        /// <summary>Bugfix "erster Login nach Serverstart läuft in den Timeout": dauert der Charakter-Lookup nach
+        /// einem gültigen JoinRequest länger als JoinTimeoutMs (kalte DB), darf der Join nicht abgebrochen werden.
+        /// Erst JoinLookupTimeoutMs (ab Annahme des JoinRequests) trennt.</summary>
+        [Fact]
+        public void JoinTimeout_SlowCharacterLookup_IsNotCutOffAfterJoinTimeout()
+        {
+            long fakeNow = 0;
+            using var dbGate = new ManualResetEventSlim(false);
+            var fixture = new ServerFixture(nowMs: () => fakeNow, beforeServerDbAccess: () => dbGate.Wait(TimeSpan.FromSeconds(10)));
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Langsam");
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                for (int i = 0; i < 5; i++) { server.Update(); client.Poll(); Thread.Sleep(15); }
+
+                // Lookup hängt noch (DB-Gate zu), Uhr weit über die 5-s-Join-Frist - Verbindung bleibt.
+                fakeNow = 5000 + 1;
+                for (int i = 0; i < 5; i++) { server.Update(); client.Poll(); Thread.Sleep(15); }
+                Assert.False(client.Disconnected);
+
+                dbGate.Set();
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+                Assert.False(client.Disconnected);
+            }
+            finally
+            {
+                dbGate.Set();
                 server.Stop();
             }
         }

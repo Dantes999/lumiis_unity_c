@@ -39,9 +39,12 @@ namespace Lumiis.Tests.Client
             return Task.FromResult(GetCharactersResult);
         }
 
-        public Task<AuthResult<CharacterInfo>> CreateCharacterAsync(string authUrl, string token, string name)
+        public CharacterLookChoice LastLookChoice { get; private set; }
+
+        public Task<AuthResult<CharacterInfo>> CreateCharacterAsync(string authUrl, string token, string name, CharacterLookChoice look = default)
         {
             CreateCharacterCalled = true;
+            LastLookChoice = look;
             return Task.FromResult(CreateCharacterResult);
         }
     }

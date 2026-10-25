@@ -6,6 +6,7 @@ using Lumiis.Data.Looks;
 using Lumiis.Data.Maps;
 using Lumiis.Data.Mobs;
 using Lumiis.Data.Npcs;
+using Lumiis.Data.Parties;
 using Lumiis.Data.Progression;
 using Lumiis.Data.Skills;
 using Lumiis.Data.Upgrade;
@@ -124,6 +125,18 @@ catch (Exception ex)
     return 1;
 }
 
+// Gruppenregeln (Größe, XP-Anteil, Offline-Frist, Rollen-Boni), Protocol.Version 20.
+PartyCatalog partyCatalog;
+try
+{
+    partyCatalog = PartyCatalog.LoadFromFile(Path.Combine(config.DataDir, "party.json"));
+}
+catch (Exception ex)
+{
+    logger.Error($"Serverstart fehlgeschlagen (Gruppen-Daten): {ex.Message}");
+    return 1;
+}
+
 // NPC-Typen (Sortimente) global; die Platzierungen je Karte kommen aus MapCatalog (maps/<id>/npcs.json).
 // looks.json wird hier erneut geladen (bewusst eine eigene, kleine Instanz statt Wiederverwendung der obigen -
 // günstig, hält die Datenblöcke unabhängig voneinander, siehe Item-Daten-Block).
@@ -187,6 +200,22 @@ DbContextOptions<LumiisDbContext> dbOptions = new DbContextOptionsBuilder<Lumiis
     .Options;
 Func<LumiisDbContext> dbContextFactory = () => new LumiisDbContext(dbOptions);
 
+// DB vorwärmen: der erste EF-Core-Zugriff baut das Modell auf und öffnet die erste Npgsql-Verbindung - das
+// kann mehrere Sekunden dauern und traf sonst den ersten Join nach dem Serverstart. Fehler hier brechen den
+// Start nicht ab (Joins melden DB-Probleme ohnehin einzeln), sie werden nur gewarnt.
+try
+{
+    var warmupWatch = System.Diagnostics.Stopwatch.StartNew();
+    using LumiisDbContext warmupDb = dbContextFactory();
+    _ = warmupDb.Characters.AsNoTracking().Include(c => c.InventoryItems).Include(c => c.SkillLevels)
+        .Where(c => c.Id == -1).ToList();
+    logger.Info($"Datenbank vorgewärmt ({warmupWatch.ElapsedMilliseconds} ms).");
+}
+catch (Exception ex)
+{
+    logger.Warn($"Datenbank-Vorwärmen fehlgeschlagen (Server startet trotzdem): {ex.Message}");
+}
+
 using CancellationTokenSource cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, eventArgs) =>
 {
@@ -194,7 +223,7 @@ Console.CancelKeyPress += (_, eventArgs) =>
     cts.Cancel();
 };
 
-GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, mobCatalog: mobCatalog, classCatalog: classCatalog, itemCatalog: itemCatalog, npcCatalog: npcCatalog, progressionCatalog: progressionCatalog, skillCatalog: skillCatalog, mapCatalog: mapCatalog, upgradeCatalog: upgradeCatalog, metinCatalog: metinCatalog, useGroundDrops: true, requireBlacksmithForUpgrade: true);
+GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, mobCatalog: mobCatalog, classCatalog: classCatalog, itemCatalog: itemCatalog, npcCatalog: npcCatalog, progressionCatalog: progressionCatalog, skillCatalog: skillCatalog, mapCatalog: mapCatalog, upgradeCatalog: upgradeCatalog, metinCatalog: metinCatalog, useGroundDrops: true, requireBlacksmithForUpgrade: true, partyCatalog: partyCatalog);
 
 try
 {

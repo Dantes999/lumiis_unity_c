@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Lumiis.Shared.Net;
 
 namespace Lumiis.Client
 {
@@ -54,16 +55,53 @@ namespace Lumiis.Client
         public static AuthResult<T> Network() => new AuthResult<T>(AuthOutcome.NetworkFailure, 0, null, default);
     }
 
+    /// <summary>Eintrag der Charakterliste. Appearance enthält LookIds (wie EntitySpawn/JoinAccepted) für die
+    /// Vorschau in der Charakterauswahl; WeaponItemId/WeaponUpgradeLevel erlauben dieselbe Item-Waffe
+    /// (spriteKey aus items.json, +7/+9-Glanz) wie im Spiel. Alle Werte kommen vom Auth-Dienst.</summary>
     public readonly struct CharacterInfo
     {
         public int Id { get; }
         public string Name { get; }
+        public int Level { get; }
+        public string MapId { get; }
+        public Appearance Appearance { get; }
+        public int WeaponItemId { get; }
+        public int WeaponUpgradeLevel { get; }
 
         public CharacterInfo(int id, string name)
+            : this(id, name, 1, null, default, 0, 0)
+        {
+        }
+
+        public CharacterInfo(int id, string name, int level, string mapId, Appearance appearance, int weaponItemId, int weaponUpgradeLevel)
         {
             Id = id;
             Name = name;
+            Level = level;
+            MapId = mapId;
+            Appearance = appearance;
+            WeaponItemId = weaponItemId;
+            WeaponUpgradeLevel = weaponUpgradeLevel;
         }
+    }
+
+    /// <summary>Optionale Aussehens-Wahl bei der Charaktererstellung (LookIds aus looks.json, HairColorId
+    /// 1-basiert). null = Server-Default (erster gültiger Eintrag), default(CharacterLookChoice) = heutiges
+    /// Verhalten ohne Auswahl. Der Server validiert jeden Wert (400 "Ungültiges Aussehen.").</summary>
+    public readonly struct CharacterLookChoice
+    {
+        public int? BodyId { get; }
+        public int? HairStyleId { get; }
+        public int? HairColorId { get; }
+
+        public CharacterLookChoice(int? bodyId, int? hairStyleId, int? hairColorId)
+        {
+            BodyId = bodyId;
+            HairStyleId = hairStyleId;
+            HairColorId = hairColorId;
+        }
+
+        public bool IsEmpty => !BodyId.HasValue && !HairStyleId.HasValue && !HairColorId.HasValue;
     }
 
     /// <summary>Vertrag gegen Lumiis.Auth (HTTP), ohne UnityEngine-/UnityWebRequest-Typen im Signatur - so bleibt
@@ -73,6 +111,6 @@ namespace Lumiis.Client
         Task<AuthResult> RegisterAsync(string authUrl, string username, string password);
         Task<AuthResult<string>> LoginAsync(string authUrl, string username, string password);
         Task<AuthResult<IReadOnlyList<CharacterInfo>>> GetCharactersAsync(string authUrl, string token);
-        Task<AuthResult<CharacterInfo>> CreateCharacterAsync(string authUrl, string token, string name);
+        Task<AuthResult<CharacterInfo>> CreateCharacterAsync(string authUrl, string token, string name, CharacterLookChoice look = default);
     }
 }

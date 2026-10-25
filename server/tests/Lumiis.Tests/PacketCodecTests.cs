@@ -40,6 +40,17 @@ namespace Lumiis.Tests
             Assert.IsType<PartyLeaveRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(new PartyLeaveRequestPacket())));
             Assert.IsType<PartySnapshotRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(new PartySnapshotRequestPacket())));
 
+            var kick = new PartyKickRequestPacket { TargetName = "Carol" };
+            Assert.Equal("Carol", Assert.IsType<PartyKickRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(kick))).TargetName);
+
+            var promote = new PartyPromoteRequestPacket { TargetName = "Dave" };
+            Assert.Equal("Dave", Assert.IsType<PartyPromoteRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(promote))).TargetName);
+
+            var setRole = new PartySetRoleRequestPacket { TargetName = "Eve", Role = PartyRole.Defender };
+            var setRoleDecoded = Assert.IsType<PartySetRoleRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(setRole)));
+            Assert.Equal("Eve", setRoleDecoded.TargetName);
+            Assert.Equal(PartyRole.Defender, setRoleDecoded.Role);
+
             var inviteReceived = new PartyInviteReceivedPacket { InviterName = "Alice" };
             var inviteReceivedDecoded = Assert.IsType<PartyInviteReceivedPacket>(PacketCodec.Decode(PacketCodec.Encode(inviteReceived)));
             Assert.Equal("Alice", inviteReceivedDecoded.InviterName);
@@ -598,6 +609,23 @@ namespace Lumiis.Tests
             Assert.Equal(2, decoded.Members.Count);
             Assert.Equal((1, "Alice", 12, 200, 240), decoded.Members[0]);
             Assert.Equal((2, "Bob", 10, 150, 200), decoded.Members[1]);
+            // Ohne MemberStatus-Einträge gilt jedes Mitglied als online ohne Rolle.
+            Assert.Equal((true, PartyRole.None), decoded.MemberStatus[0]);
+            Assert.Equal((true, PartyRole.None), decoded.MemberStatus[1]);
+        }
+
+        [Fact]
+        public void PartyChanged_WithOfflineMemberAndRoles_RoundTrip()
+        {
+            var original = new PartyChangedPacket { LeaderEntityId = 1 };
+            original.Members.Add((1, "Alice", 12, 200, 240));
+            original.MemberStatus.Add((true, PartyRole.Attacker));
+            original.Members.Add((0, "Bob", 10, 150, 200));
+            original.MemberStatus.Add((false, PartyRole.Defender));
+            var decoded = Assert.IsType<PartyChangedPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal((0, "Bob", 10, 150, 200), decoded.Members[1]);
+            Assert.Equal((true, PartyRole.Attacker), decoded.MemberStatus[0]);
+            Assert.Equal((false, PartyRole.Defender), decoded.MemberStatus[1]);
         }
 
         [Theory]

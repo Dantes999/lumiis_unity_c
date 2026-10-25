@@ -181,7 +181,7 @@ namespace Lumiis.Client
             State = LoginFlowState.Connecting;
         }
 
-        public async Task CreateCharacterAsync(string authUrl, string name)
+        public async Task CreateCharacterAsync(string authUrl, string name, CharacterLookChoice look = default)
         {
             name = (name ?? "").Trim();
             if (!NameRules.IsValid(name))
@@ -195,7 +195,7 @@ namespace Lumiis.Client
 
             try
             {
-                AuthResult<CharacterInfo> result = await _authClient.CreateCharacterAsync(authUrl, Token, name);
+                AuthResult<CharacterInfo> result = await _authClient.CreateCharacterAsync(authUrl, Token, name, look);
 
                 if (result.Outcome == AuthOutcome.NetworkFailure)
                 {

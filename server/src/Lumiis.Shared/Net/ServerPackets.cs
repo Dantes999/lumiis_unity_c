@@ -427,7 +427,8 @@ namespace Lumiis.Shared.Net
         InventoryFull = 5,
         TargetAtFullHp = 6,
         GroundItemNotFound = 7,
-        PickupOutOfRange = 8
+        PickupOutOfRange = 8,
+        PickupNotOwner = 9
     }
 
     /// <summary>Ein Inventar-/Ausrüstungs-Request wurde abgelehnt - nur an den Anfragenden.</summary>
@@ -880,12 +881,26 @@ namespace Lumiis.Shared.Net
         }
     }
 
+    /// <summary>Gruppenrolle (Protocol.Version 20). Die Boni je Rolle stehen in data/party.json; der Client
+    /// zeigt nur den Namen an.</summary>
+    public enum PartyRole : byte
+    {
+        None = 0,
+        Attacker = 1,
+        Defender = 2
+    }
+
     /// <summary>M7-Party: voller Gruppenstand (Resync, kein Delta). Members enthält Leader und Mitglieder
     /// in stabiler Reihenfolge; eine leere Liste bedeutet "keine Gruppe" (Panel ausblenden).</summary>
     public sealed class PartyChangedPacket : IPacket
     {
         public int LeaderEntityId;
+        /// <summary>EntityId ist 0 bei einem Mitglied, das gerade offline ist (seit Protocol.Version 20
+        /// bleiben Mitglieder beim Ausloggen in der Gruppe). Hp/MaxHp sind dann der letzte bekannte Stand.</summary>
         public List<(int EntityId, string Name, int Level, int Hp, int MaxHp)> Members = new List<(int, string, int, int, int)>();
+        /// <summary>Parallel zu Members (gleiche Reihenfolge und Länge): Online-Status und Rolle. Als eigene
+        /// Liste, damit bestehende Auswerter von Members unverändert weiter kompilieren.</summary>
+        public List<(bool Online, PartyRole Role)> MemberStatus = new List<(bool, PartyRole)>();
 
         public PacketId Id
         {
@@ -896,13 +911,19 @@ namespace Lumiis.Shared.Net
         {
             writer.WriteInt32(LeaderEntityId);
             writer.WriteByte((byte)Members.Count);
-            foreach ((int entityId, string name, int level, int hp, int maxHp) in Members)
+            for (int i = 0; i < Members.Count; i++)
             {
+                (int entityId, string name, int level, int hp, int maxHp) = Members[i];
                 writer.WriteInt32(entityId);
                 writer.WriteString(name);
                 writer.WriteInt32(level);
                 writer.WriteInt32(hp);
                 writer.WriteInt32(maxHp);
+                // Fehlt ein Status-Eintrag, gilt das Mitglied als online ohne Rolle (Default für alte Aufrufer).
+                bool online = i < MemberStatus.Count ? MemberStatus[i].Online : true;
+                PartyRole role = i < MemberStatus.Count ? MemberStatus[i].Role : PartyRole.None;
+                writer.WriteBool(online);
+                writer.WriteByte((byte)role);
             }
         }
 
@@ -911,6 +932,7 @@ namespace Lumiis.Shared.Net
             LeaderEntityId = reader.ReadInt32();
             int count = reader.ReadByte();
             Members = new List<(int, string, int, int, int)>(count);
+            MemberStatus = new List<(bool, PartyRole)>(count);
             for (int i = 0; i < count; i++)
             {
                 int entityId = reader.ReadInt32();
@@ -918,7 +940,10 @@ namespace Lumiis.Shared.Net
                 int level = reader.ReadInt32();
                 int hp = reader.ReadInt32();
                 int maxHp = reader.ReadInt32();
+                bool online = reader.ReadBool();
+                PartyRole role = (PartyRole)reader.ReadByte();
                 Members.Add((entityId, name, level, hp, maxHp));
+                MemberStatus.Add((online, role));
             }
         }
     }

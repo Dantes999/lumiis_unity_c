@@ -1,5 +1,6 @@
 using System.Linq;
 using Lumiis.Data;
+using Lumiis.Data.Items;
 using Lumiis.Data.Looks;
 using Lumiis.Tests;
 using Microsoft.AspNetCore.Hosting;
@@ -25,6 +26,13 @@ namespace Lumiis.Tests.Auth;
 public sealed class AuthWebApplicationFactory : WebApplicationFactory<Lumiis.Auth.AuthEntryPointMarker>
 {
     public const string TestTokenSecret = "test-only-token-secret-at-least-32-bytes";
+
+    /// <summary>Startwaffe Id 1 (AuthEndpoints.StartingWeaponItemId) mit LookId 1 aus TestLookCatalogs.</summary>
+    public const string TestItemsJson = @"{
+  ""items"": [
+    { ""id"": 1, ""name"": ""Testschwert"", ""itemType"": ""Weapon"", ""lookId"": 1, ""attackBonus"": 1, ""defenseBonus"": 0 }
+  ]
+}";
 
     private readonly string _inMemoryDbName = "lumiis-test-" + Guid.NewGuid();
 
@@ -52,6 +60,9 @@ public sealed class AuthWebApplicationFactory : WebApplicationFactory<Lumiis.Aut
 
             services.RemoveAll<LookCatalog>();
             services.AddSingleton(TestLookCatalogs.CreateMinimal());
+
+            services.RemoveAll<ItemCatalog>();
+            services.AddSingleton(ItemCatalog.LoadFromJson(TestItemsJson, TestLookCatalogs.CreateMinimal()));
         });
     }
 }
