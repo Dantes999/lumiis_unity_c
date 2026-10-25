@@ -191,7 +191,30 @@
 }
 
 .m2-toggle {
-    margin: 2px 0;
+    margin: 4px 0 2px 0;
+    align-items: center;
+}
+
+.m2-toggle .unity-toggle__input {
+    align-items: center;
+}
+
+.m2-toggle .unity-toggle__checkmark {
+    width: 14px;
+    height: 14px;
+    margin-right: 5px;
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+    background-image: resource("UI/Skin/checkbox");
+    -unity-background-image-tint-color: rgb(255, 255, 255);
+}
+
+.m2-toggle:checked .unity-toggle__checkmark {
+    background-image: resource("UI/Skin/checkbox_checked");
+}
+
+.m2-toggle:hover .unity-toggle__checkmark {
+    -unity-background-image-tint-color: rgb(255, 236, 190);
 }
 
 .m2-toggle .unity-toggle__text,
@@ -454,8 +477,13 @@
 
 .hud-player {
     position: absolute;
-    left: 12px;
-    top: 10px;
+    left: 10px;
+    top: 8px;
+    padding: 4px 10px 5px 8px;
+    background-color: rgba(0, 0, 0, 0.5);
+    border-width: 1px;
+    border-color: rgba(150, 110, 60, 0.7);
+    border-radius: 3px;
 }
 
 .hud-player-name {
@@ -467,8 +495,9 @@
 }
 
 .hud-player-level {
-    color: rgb(230, 220, 200);
-    font-size: 12px;
+    color: rgb(250, 242, 220);
+    font-size: 13px;
+    -unity-font-style: bold;
     -unity-text-outline-width: 1px;
     -unity-text-outline-color: rgb(16, 8, 2);
 }
@@ -554,7 +583,7 @@
     right: 10px;
     top: 6px;
     width: 176px;
-    height: 200px;
+    height: 212px;
     align-items: center;
 }
 
@@ -611,9 +640,9 @@
     position: absolute;
     left: 0;
     right: 0;
-    top: 186px;
-    color: rgb(220, 206, 170);
-    font-size: 10px;
+    top: 194px;
+    color: rgb(236, 224, 190);
+    font-size: 11px;
     -unity-text-align: middle-center;
     -unity-text-outline-width: 1px;
     -unity-text-outline-color: rgb(0, 0, 0);
@@ -624,7 +653,7 @@
 .hud-party {
     position: absolute;
     right: 12px;
-    top: 214px;
+    top: 226px;
     width: 180px;
 }
 
@@ -651,20 +680,20 @@
 
 .hud-chat {
     position: absolute;
-    left: 8px;
+    left: 112px;
     bottom: 70px;
-    width: 360px;
+    width: 340px;
 }
 
 .hud-chat-log {
     height: 120px;
-    background-color: rgba(0, 0, 0, 0.35);
+    background-color: rgba(0, 0, 0, 0.55);
     padding: 3px 5px;
 }
 
 .hud-chat-line {
-    color: rgb(236, 230, 214);
-    font-size: 11px;
+    color: rgb(248, 244, 232);
+    font-size: 12px;
     white-space: normal;
     -unity-text-outline-width: 1px;
     -unity-text-outline-color: rgba(0, 0, 0, 0.9);
@@ -708,9 +737,13 @@
 }
 
 .hud-chat-hint {
-    color: rgba(230, 220, 190, 0.55);
-    font-size: 9px;
+    color: rgba(240, 230, 200, 0.85);
+    font-size: 10px;
     margin-top: 1px;
+    padding: 1px 4px;
+    background-color: rgba(0, 0, 0, 0.45);
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgb(0, 0, 0);
 }
 
 /* ---- Taskleiste unten ---- */
@@ -873,10 +906,16 @@
 
 .hud-taskbar-yang {
     position: absolute;
-    right: 120px;
-    bottom: 2px;
+    right: 112px;
+    bottom: 68px;
+    padding: 2px 8px;
+    background-color: rgba(0, 0, 0, 0.55);
+    border-width: 1px;
+    border-color: rgba(150, 110, 60, 0.7);
+    border-radius: 3px;
     color: rgb(255, 222, 110);
-    font-size: 10px;
+    font-size: 12px;
+    -unity-font-style: bold;
     -unity-text-outline-width: 1px;
     -unity-text-outline-color: rgb(0, 0, 0);
 }
@@ -1074,7 +1113,7 @@
     color: rgb(200, 184, 150);
     font-size: 10px;
     white-space: normal;
-    margin: 2px 0 4px 0;
+    margin: 4px 0 8px 0;
 }
 
 .hud-window-hint-active {

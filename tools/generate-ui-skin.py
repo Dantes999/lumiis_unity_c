@@ -285,19 +285,22 @@ def input_field():
 
 
 def taskbar():
+    # Die Taskleiste wird per stretch-to-fill auf die volle Bildschirmbreite gezogen. Jede Variation
+    # in X-Richtung würde dabei zu breiten Blöcken/Nähten gestreckt - deshalb nur zeilenweise
+    # Variation (leichter Verlauf + Fugenlinien), jede Zeile ist in sich einfarbig.
     w, h = 64, 64
     img = Image.new("RGBA", (w, h), BLACK)
-    fill_noise(img, (0, 5, w, h), STONE_DARK, 4)
+    # Zufallsfolge wie in früheren Versionen verbrauchen, damit alle nachfolgend erzeugten Bilder
+    # bytegleich bleiben (deterministischer Generator, kleine Diffs).
+    fill_noise(Image.new("RGBA", (w, h)), (0, 5, w, h), STONE_DARK, 4)
     px = img.load()
-    # Steinfugen
+    for y in range(5, h):
+        t = (y - 5) / (h - 5)
+        c = lerp(lerp(STONE_DARK, STONE, 0.25), lerp(STONE_DARK, BLACK, 0.35), t)
+        for x in range(w):
+            px[x, y] = c
     for y in (22, 42):
         for x in range(w):
-            px[x, y] = lerp(STONE_DARK, BLACK, 0.6)
-    for x in (10, 42):
-        for y in range(6, 22):
-            px[x, y] = lerp(STONE_DARK, BLACK, 0.6)
-    for x in (26, 58):
-        for y in range(23, 42):
             px[x, y] = lerp(STONE_DARK, BLACK, 0.6)
     d = ImageDraw.Draw(img)
     d.line([(0, 0), (w, 0)], fill=BLACK)
@@ -486,6 +489,23 @@ def silhouette():
     save(img, "silhouette")
 
 
+def checkbox():
+    # 14x14-Kästchen für Toggles: bronzener Rahmen, dunkle Mulde; die Variante "checked" trägt
+    # einen goldenen Haken.
+    size = 14
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.rectangle([0, 0, size - 1, size - 1], fill=BLACK)
+    d.rectangle([1, 1, size - 2, size - 2], fill=BRONZE)
+    d.rectangle([2, 2, size - 3, size - 3], fill=(22, 16, 12, 255))
+    d.line([(2, 2), (size - 3, 2)], fill=BLACK)
+    save(img, "checkbox")
+    checked = img.copy()
+    d = ImageDraw.Draw(checked)
+    d.line([(3, 7), (5, 10), (10, 3)], fill=GOLD_LIGHT, width=2)
+    save(checked, "checkbox_checked")
+
+
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     folder_meta = OUT_DIR + ".meta"
@@ -508,6 +528,7 @@ def main():
     charslot("charslot_selected", GOLD_LIGHT, (60, 42, 22, 255))
     tooltip()
     silhouette()
+    checkbox()
 
 
 if __name__ == "__main__":
