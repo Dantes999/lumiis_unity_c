@@ -23,6 +23,7 @@ namespace Lumiis.Client
             public Vector3 LastWorld;
             public float StartTime;
             public float OffsetX;
+            public float OffsetY;
         }
 
         private readonly GameClient _gameClient;
@@ -184,8 +185,14 @@ namespace Lumiis.Client
             label.style.translate = new Translate(Length.Percent(-50), Length.Percent(-100));
             _floatLayer.Add(label);
             // Aufeinanderfolgende Zahlen leicht versetzt, damit Mehrfachtreffer nicht übereinander liegen.
-            float offsetX = ((_floatCounter++ % 3) - 1) * 14f;
-            _floating.Add(new FloatingText { Label = label, EntityId = entityId, LastWorld = world, StartTime = Time.time, OffsetX = offsetX });
+            // Gleichzeitige Zahlen am selben Ziel stapeln sich nach oben und leicht seitlich versetzt, damit
+            // Mehrfachtreffer/Kreisschlag lesbar bleiben.
+            int stack = 0;
+            foreach (FloatingText other in _floating)
+                if (other.EntityId == entityId && Time.time - other.StartTime < FloatDuration * 0.6f) stack++;
+            float offsetX = ((_floatCounter++ % 3) - 1) * 16f;
+            float offsetY = Mathf.Min(stack, 4) * 20f;
+            _floating.Add(new FloatingText { Label = label, EntityId = entityId, LastWorld = world, StartTime = Time.time, OffsetX = offsetX, OffsetY = offsetY });
         }
 
         private void UpdateFloatingTexts(Camera camera, IPanel panel)
@@ -212,7 +219,7 @@ namespace Lumiis.Client
                 text.Label.style.display = DisplayStyle.Flex;
                 float ease = 1f - (1f - t) * (1f - t);
                 text.Label.style.left = panelPos.x + text.OffsetX;
-                text.Label.style.top = panelPos.y - 16f - ease * FloatRisePx;
+                text.Label.style.top = panelPos.y - 16f - text.OffsetY - ease * FloatRisePx;
                 text.Label.style.opacity = t < 0.55f ? 1f : 1f - (t - 0.55f) / 0.45f;
                 float scale = t < 0.12f ? 1.35f - t * 2.9f : 1f;
                 text.Label.style.scale = new Scale(new Vector3(scale, scale, 1f));
@@ -228,8 +235,11 @@ namespace Lumiis.Client
             if (!dead) return;
 
             float remaining = _gameClient.RespawnRemainingSeconds;
+            // Der Client erfährt vom Tod erst eine Paketlaufzeit nach dem Server; gerundet statt aufgerundet,
+            // damit 3 - 2 - 1 trotzdem sichtbar durchläuft, bevor der Respawn ankommt.
+            int seconds = Mathf.Max(1, Mathf.RoundToInt(remaining));
             _deathCountdown.text = remaining > 0.05f
-                ? "Wiederbelebung in " + Mathf.CeilToInt(remaining) + " ..."
+                ? "Wiederbelebung in " + seconds + " ..."
                 : "Wiederbelebung ...";
         }
 
