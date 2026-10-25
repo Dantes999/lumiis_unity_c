@@ -249,7 +249,10 @@ namespace Lumiis.Shared.Net
 
         /// <summary>M5b: Ziel ist ein NPC (Kind=Npc) - NPCs sind unangreifbar/statisch, siehe CLAUDE.md
         /// "Shop und NPCs".</summary>
-        TargetNotAttackable = 6
+        TargetNotAttackable = 6,
+
+        /// <summary>Der Angreifer selbst ist tot (bis zum Respawn keine Kampfaktionen).</summary>
+        AttackerDead = 7
     }
 
     /// <summary>Eine Entity wurde getroffen (M4a) - an alle AOI-Beobachter des Ziels (inklusive Angreifer,
@@ -780,7 +783,10 @@ namespace Lumiis.Shared.Net
         TargetAlreadyDead = 6,
         OutOfRange = 7,
         TargetIsPlayer = 8,
-        TargetNotAttackable = 9
+        TargetNotAttackable = 9,
+
+        /// <summary>Der Nutzer ist tot (bis zum Respawn keine Skills).</summary>
+        UserDead = 10
     }
 
     /// <summary>Ein UseSkillRequestPacket wurde abgelehnt - nur an den Anfragenden, Verbindung bleibt

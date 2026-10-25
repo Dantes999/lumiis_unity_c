@@ -1939,6 +1939,7 @@ namespace Lumiis.Client
                 case AttackFailedReason.OnCooldown: return "Angriff noch im Abklingen.";
                 case AttackFailedReason.TargetIsPlayer: return "Spieler können nicht angegriffen werden.";
                 case AttackFailedReason.TargetNotAttackable: return "Dieses Ziel kann nicht angegriffen werden.";
+                case AttackFailedReason.AttackerDead: return "Du bist tot.";
                 default: return "Angriff fehlgeschlagen.";
             }
         }
@@ -1956,6 +1957,7 @@ namespace Lumiis.Client
                 case UseSkillFailedReason.OutOfRange: return "Ziel außer Reichweite.";
                 case UseSkillFailedReason.TargetIsPlayer: return "Spieler können nicht angegriffen werden.";
                 case UseSkillFailedReason.TargetNotAttackable: return "Dieses Ziel kann nicht angegriffen werden.";
+                case UseSkillFailedReason.UserDead: return "Du bist tot.";
                 default: return "Skill fehlgeschlagen.";
             }
         }

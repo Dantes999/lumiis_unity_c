@@ -1310,6 +1310,13 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   außerhalb des Map1-Ausschnitts), Jayang führt am Osttor zurück. Nicht übernommen: Zonen 2-5 (Lv 25-45,
   über dem Alpha-Levelcap), Hasun-Dong-Portal, Lager des Alten Mannes, eigene Monstergrafik für die neuen
   Mobs (Platzhalterform). 684 Tests grün.
+- Spielbarkeit I (2026-10-25, Protocol.Version 21): Tote Spieler können bis zum Respawn nichts mehr -
+  `World.TryAttack` liefert `AttackFailedReason.AttackerDead`, `TryUseSkill` `UseSkillFailedReason.UserDead`,
+  `SetDestination` lehnt ab; `GameServer.IsDeadPlayerAction` verwirft MoveTo/StopMove/Aufheben/Inventar/
+  Shop/Aufwerten eines toten Spielers still, und beim Spielertod geht sofort ein `EntityStop` an die
+  Beobachter. Ruckeln beim Laufen behoben: `ClientWorld` setzte bei jedem EntityMove die Anzeige hart auf
+  die Server-Startposition zurück (WASD schickt alle 100 ms ein neues Ziel); jetzt wird die Abweichung als
+  Offset mit 0,1 s Zeitkonstante ausgeblendet, ab 300 Wire (Teleport/Respawn) hart gesetzt.
 - Offen: Monster-Sheets für die Jayang-Mobs, weitere Zonen/Dungeons, Reittiere; siehe
   `docs/feature-gap-lumiis.md`.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client

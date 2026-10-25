@@ -323,5 +323,51 @@ namespace Lumiis.Tests.Client
             var world = new ClientWorld();
             world.SetFacingOverride(entityId: 999, targetX: 0, targetY: 0); // keine Exception, kein Effekt.
         }
+    
+        [Fact]
+        public void HandleEntityMove_WhileMoving_DoesNotSnapBackToServerStart()
+        {
+            var world = new ClientWorld();
+            world.HandleJoinAccepted(entityId: 1, x: 50000, y: 50000, localName: "Me", appearance: SomeAppearance);
+            world.Tick(0.0);
+            world.HandleEntityMove(1, 50000, 50000, 51000, 50000, speed: 500, receivedAtTime: 0.0);
+            world.Tick(0.1); // angezeigt: 50050
+
+            // Der Server meldet einen leicht zurückliegenden Start (Latenz/Tick-Raster) - die Figur darf
+            // dadurch nicht sichtbar zurückspringen.
+            world.HandleEntityMove(1, 50030, 50000, 51030, 50000, speed: 500, receivedAtTime: 0.1);
+            Assert.Equal(50050, world.Entities[1].X, 3);
+
+            // Der Versatz wird weich ausgeblendet und die Figur läuft danach exakt auf dem Server-Pfad.
+            world.Tick(0.2);
+            Assert.InRange(world.Entities[1].X, 50080, 50100);
+            world.Tick(1.1);
+            Assert.Equal(50530, world.Entities[1].X, 0);
+        }
+
+        [Fact]
+        public void HandleEntityStop_FarAway_SnapsImmediately()
+        {
+            var world = new ClientWorld();
+            world.HandleJoinAccepted(entityId: 1, x: 50000, y: 50000, localName: "Me", appearance: SomeAppearance);
+            world.Tick(0.0);
+
+            world.HandleEntityStop(1, 20000, 20000); // z. B. Respawn - kein Hinübergleiten über die Karte.
+            Assert.Equal(20000, world.Entities[1].IntX);
+            Assert.Equal(20000, world.Entities[1].IntY);
+        }
+
+        [Fact]
+        public void HandleEntityStop_SmallOffset_BlendsOutWithoutJump()
+        {
+            var world = new ClientWorld();
+            world.HandleJoinAccepted(entityId: 1, x: 50000, y: 50000, localName: "Me", appearance: SomeAppearance);
+            world.Tick(0.0);
+
+            world.HandleEntityStop(1, 50040, 50000);
+            Assert.Equal(50000, world.Entities[1].IntX);
+            world.Tick(1.0);
+            Assert.Equal(50040, world.Entities[1].IntX);
+        }
     }
 }

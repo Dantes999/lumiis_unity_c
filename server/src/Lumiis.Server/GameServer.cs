@@ -1028,6 +1028,12 @@ public sealed class GameServer : INetEventListener
 
     private void HandlePacket(ConnectionState conn, IPacket packet)
     {
+        // Tote Spieler handeln bis zum Respawn nicht: Laufen, Aufheben, Tränke, Ausrüstung, Aufwerten und
+        // Handel werden still verworfen (der Client sperrt das selbst, das hier ist die serverseitige
+        // Absicherung). Angriff und Skills lehnt World mit eigenem Grund ab (AttackerDead/UserDead).
+        if (IsDeadPlayerAction(conn, packet))
+            return;
+
         switch (packet)
         {
             case JoinRequestPacket join:
@@ -1120,6 +1126,15 @@ public sealed class GameServer : INetEventListener
                 conn.Peer.Disconnect();
                 break;
         }
+    }
+
+    private bool IsDeadPlayerAction(ConnectionState conn, IPacket packet)
+    {
+        bool action = packet is MoveToPacket or StopMovePacket or PickupItemRequestPacket or UseConsumableRequestPacket
+            or EquipItemRequestPacket or UnequipItemRequestPacket or UpgradeItemRequestPacket
+            or OpenShopRequestPacket or BuyItemRequestPacket or SellItemRequestPacket;
+        if (!action || conn.EntityId is not int entityId) return false;
+        return TryGetEntity(entityId, out Entity? entity) && entity != null && entity.Kind == EntityKind.Player && entity.IsDead;
     }
 
     /// <summary>Token wird sofort (synchron, reine Kryptografie) geprüft. Der Charakter-Lookup läuft
@@ -1532,6 +1547,10 @@ public sealed class GameServer : INetEventListener
 
             if (result.TargetKind == EntityKind.Monster)
                 BroadcastDespawn(targetEntityId);
+            else if (TryGetEntity(targetEntityId, out Entity? deadPlayer) && deadPlayer != null)
+                // World.ApplyDamage hat die Bewegung schon gestoppt - ohne dieses Stop liefe die Figur bei
+                // allen Beobachtern bis zum alten Ziel weiter.
+                SendToVisible(targetEntityId, new EntityStopPacket { EntityId = targetEntityId, X = deadPlayer.IntX, Y = deadPlayer.IntY });
         }
     }
 

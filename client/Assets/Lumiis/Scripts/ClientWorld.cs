@@ -29,6 +29,15 @@ namespace Lumiis.Client
         public int Speed;
         public double MoveStartTime;
 
+        /// <summary>Autoritative Position laut Server-Pfad (ohne Glättung). X/Y = Path + Error.</summary>
+        public double PathX;
+        public double PathY;
+        /// <summary>Sichtbarer Restversatz zur Server-Position, der in Tick weich ausgeblendet wird - statt
+        /// bei jedem EntityMove/EntityStop hart auf die Startposition zu springen (Ursache des Laufruckelns:
+        /// WASD schickt alle 100 ms ein neues MoveTo, jede Antwort setzte die Figur ein Stück zurück).</summary>
+        public double ErrorX;
+        public double ErrorY;
+
         /// <summary>-1 = noch unbekannt (M4a: JoinAccepted/EntitySpawn tragen kein Leben, der Client erfährt
         /// es erst reaktiv über das erste EntityDamagedPacket für diese Entity, siehe HandleEntityDamaged).</summary>
         public int CurrentHp = -1;
@@ -182,7 +191,7 @@ namespace Lumiis.Client
         {
             var entity = new ClientEntity
             {
-                Id = entityId, Name = name, Kind = kind, TypeId = typeId, X = x, Y = y, Appearance = appearance,
+                Id = entityId, Name = name, Kind = kind, TypeId = typeId, X = x, Y = y, PathX = x, PathY = y, Appearance = appearance,
                 ItemUpgradeLevel = itemUpgradeLevel, NpcService = npcService
             };
             _entities[entityId] = entity;
@@ -215,8 +224,7 @@ namespace Lumiis.Client
             entity.TargetY = targetY;
             entity.Speed = speed;
             entity.MoveStartTime = receivedAtTime;
-            entity.X = startX;
-            entity.Y = startY;
+            Resync(entity, startX, startY);
             entity.Facing = FacingMath.FromDelta(targetX - startX, targetY - startY, entity.Facing);
         }
 
@@ -230,8 +238,35 @@ namespace Lumiis.Client
             }
 
             entity.IsMoving = false;
-            entity.X = x;
-            entity.Y = y;
+            Resync(entity, x, y);
+        }
+
+        /// <summary>Ab diesem Abstand (Wire) zwischen angezeigter und neuer Server-Position wird hart
+        /// gesetzt statt geglättet - Respawn, Portal, Teleport.</summary>
+        public const double SnapDistanceWire = 300;
+
+        /// <summary>Zeitkonstante (s), mit der ein Positionsversatz exponentiell ausgeblendet wird.</summary>
+        public const double SmoothingSeconds = 0.1;
+
+        private double _lastTickTime = double.NaN;
+
+        /// <summary>Übernimmt eine neue autoritative Position, ohne die sichtbare Figur springen zu lassen:
+        /// der Versatz zur bisher angezeigten Position bleibt als Error stehen und wird in Tick ausgeblendet.</summary>
+        private static void Resync(ClientEntity entity, int x, int y)
+        {
+            double errorX = entity.X - x;
+            double errorY = entity.Y - y;
+            if (errorX * errorX + errorY * errorY > SnapDistanceWire * SnapDistanceWire)
+            {
+                errorX = 0;
+                errorY = 0;
+            }
+            entity.PathX = x;
+            entity.PathY = y;
+            entity.ErrorX = errorX;
+            entity.ErrorY = errorY;
+            entity.X = x + errorX;
+            entity.Y = y + errorY;
         }
 
         /// <summary>combat-visuals Abschnitt 5: dreht eine Entity kurzzeitig zu einem Zielpunkt (z. B. beim
@@ -314,15 +349,37 @@ namespace Lumiis.Client
         /// <summary>Aktualisiert die interpolierte Position aller bewegten Entities für den gegebenen Zeitpunkt (Sekunden, Client-Uhr).</summary>
         public void Tick(double currentTime)
         {
+            double dt = double.IsNaN(_lastTickTime) ? 0 : Math.Max(0, currentTime - _lastTickTime);
+            _lastTickTime = currentTime;
+            double decay = Math.Exp(-dt / SmoothingSeconds);
+
             foreach (ClientEntity entity in _entities.Values)
             {
-                if (!entity.IsMoving) continue;
+                bool smoothing = entity.ErrorX != 0 || entity.ErrorY != 0;
+                if (!entity.IsMoving && !smoothing) continue;
 
-                double elapsed = currentTime - entity.MoveStartTime;
-                MovementSample sample = MovementMath.Evaluate(entity.StartX, entity.StartY, entity.TargetX, entity.TargetY, entity.Speed, elapsed);
-                entity.X = sample.X;
-                entity.Y = sample.Y;
-                if (sample.Arrived) entity.IsMoving = false;
+                if (entity.IsMoving)
+                {
+                    double elapsed = currentTime - entity.MoveStartTime;
+                    MovementSample sample = MovementMath.Evaluate(entity.StartX, entity.StartY, entity.TargetX, entity.TargetY, entity.Speed, elapsed);
+                    entity.PathX = sample.X;
+                    entity.PathY = sample.Y;
+                    if (sample.Arrived) entity.IsMoving = false;
+                }
+
+                if (smoothing)
+                {
+                    entity.ErrorX *= decay;
+                    entity.ErrorY *= decay;
+                    if (Math.Abs(entity.ErrorX) < 0.5 && Math.Abs(entity.ErrorY) < 0.5)
+                    {
+                        entity.ErrorX = 0;
+                        entity.ErrorY = 0;
+                    }
+                }
+
+                entity.X = entity.PathX + entity.ErrorX;
+                entity.Y = entity.PathY + entity.ErrorY;
             }
         }
     }

@@ -409,6 +409,7 @@ public sealed class World
     public bool SetDestination(int entityId, int targetX, int targetY)
     {
         if (!_entities.TryGetValue(entityId, out Entity? entity)) return false;
+        if (entity.IsDead) return false; // Tote laufen nicht bis zum Respawn.
 
         int clampedX = Math.Clamp(targetX, 0, GameConstants.MapWidth);
         int clampedY = Math.Clamp(targetY, 0, GameConstants.MapHeight);
@@ -497,6 +498,9 @@ public sealed class World
     {
         if (!_entities.TryGetValue(attackerEntityId, out Entity? attacker))
             return AttackResult.Fail(AttackFailedReason.TargetNotFound);
+
+        if (attacker.IsDead)
+            return AttackResult.Fail(AttackFailedReason.AttackerDead);
 
         if (!_entities.TryGetValue(targetEntityId, out Entity? target))
             return AttackResult.Fail(AttackFailedReason.TargetNotFound);
@@ -893,6 +897,9 @@ public sealed class World
     {
         if (!_entities.TryGetValue(userEntityId, out Entity? user))
             return SkillUseResult.Fail(UseSkillFailedReason.NotLearned); // sollte nicht vorkommen, siehe GameServer.HandleUseSkillRequest.
+
+        if (user.IsDead)
+            return SkillUseResult.Fail(UseSkillFailedReason.UserDead);
 
         if (_skillCatalog == null || !_skillCatalog.TryGet(skillId, out SkillDefinition skillDef))
             return SkillUseResult.Fail(UseSkillFailedReason.NotLearned);
