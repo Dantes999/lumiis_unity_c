@@ -187,6 +187,22 @@ DbContextOptions<LumiisDbContext> dbOptions = new DbContextOptionsBuilder<Lumiis
     .Options;
 Func<LumiisDbContext> dbContextFactory = () => new LumiisDbContext(dbOptions);
 
+// DB vorwärmen: der erste EF-Core-Zugriff baut das Modell auf und öffnet die erste Npgsql-Verbindung - das
+// kann mehrere Sekunden dauern und traf sonst den ersten Join nach dem Serverstart. Fehler hier brechen den
+// Start nicht ab (Joins melden DB-Probleme ohnehin einzeln), sie werden nur gewarnt.
+try
+{
+    var warmupWatch = System.Diagnostics.Stopwatch.StartNew();
+    using LumiisDbContext warmupDb = dbContextFactory();
+    _ = warmupDb.Characters.AsNoTracking().Include(c => c.InventoryItems).Include(c => c.SkillLevels)
+        .Where(c => c.Id == -1).ToList();
+    logger.Info($"Datenbank vorgewärmt ({warmupWatch.ElapsedMilliseconds} ms).");
+}
+catch (Exception ex)
+{
+    logger.Warn($"Datenbank-Vorwärmen fehlgeschlagen (Server startet trotzdem): {ex.Message}");
+}
+
 using CancellationTokenSource cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, eventArgs) =>
 {

@@ -151,4 +151,60 @@ public class CharactersEndpointTests : IClassFixture<AuthWebApplicationFactory>
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
+
+    private async Task<HttpResponseMessage> CreateCharacterWithLookAsync(string token, object body)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/characters") { Content = JsonContent.Create(body) };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return await _client.SendAsync(request);
+    }
+
+    /// <summary>Charakterauswahl-Vorschau: die Liste trägt Level, Karte, das aufgelöste Aussehen (Startwaffe
+    /// Item 1 -> LookId 1) und die ausgerüsteten Item-IDs - sonst sah jede Vorschau gleich aus.</summary>
+    [Fact]
+    public async Task GetCharacters_IncludesLevelAppearanceAndEquipment()
+    {
+        string token = await RegisterAndLoginAsync("chars_preview");
+        await CreateCharacterWithLookAsync(token, new { name = "Vorschau", hairColorId = 2 });
+
+        HttpResponseMessage response = await GetCharactersAsync(token);
+
+        JsonElement character = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("characters")[0];
+        Assert.Equal(1, character.GetProperty("level").GetInt32());
+        Assert.Equal("map1", character.GetProperty("mapId").GetString());
+        JsonElement appearance = character.GetProperty("appearance");
+        Assert.Equal(1, appearance.GetProperty("bodyId").GetInt32());
+        Assert.Equal(2, appearance.GetProperty("hairColorId").GetInt32());
+        Assert.Equal(1, appearance.GetProperty("weaponId").GetInt32());
+        Assert.Equal(0, appearance.GetProperty("armorId").GetInt32());
+        JsonElement equipment = character.GetProperty("equipment");
+        Assert.Equal(1, equipment.GetProperty("weaponItemId").GetInt32());
+        Assert.Equal(0, equipment.GetProperty("weaponUpgradeLevel").GetInt32());
+    }
+
+    [Fact]
+    public async Task Login_CharacterListIncludesAppearance()
+    {
+        string token = await RegisterAndLoginAsync("chars_login_preview");
+        await CreateCharacterWithLookAsync(token, new { name = "LoginVorschau" });
+
+        HttpResponseMessage loginResponse = await _client.PostAsJsonAsync("/login", new { username = "chars_login_preview", password = "correct horse battery" });
+
+        JsonElement character = (await loginResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("characters")[0];
+        Assert.Equal(1, character.GetProperty("appearance").GetProperty("weaponId").GetInt32());
+    }
+
+    [Theory]
+    [InlineData(99, null, null)]
+    [InlineData(null, 99, null)]
+    [InlineData(null, null, 0)]
+    [InlineData(null, null, 3)]
+    public async Task PostCharacters_InvalidAppearance_Returns400(int? bodyId, int? hairStyleId, int? hairColorId)
+    {
+        string token = await RegisterAndLoginAsync("chars_badlook_" + (bodyId ?? 0) + "_" + (hairStyleId ?? 0) + "_" + (hairColorId ?? 0));
+
+        HttpResponseMessage response = await CreateCharacterWithLookAsync(token, new { name = "Falsch", bodyId, hairStyleId, hairColorId });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
 }

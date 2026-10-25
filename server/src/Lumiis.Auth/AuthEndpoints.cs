@@ -1,4 +1,5 @@
 using Lumiis.Data;
+using Lumiis.Data.Items;
 using Lumiis.Data.Looks;
 using Lumiis.Shared;
 using Lumiis.Shared.Net;
@@ -9,8 +10,8 @@ namespace Lumiis.Auth;
 public static class AuthEndpoints
 {
     /// <summary>M5a: Startwaffe für neu erstellte Charaktere - Id 1 in data/items.json ("Holzschwert").
-    /// Bewusst als Konstante statt per ItemCatalog aufgelöst (analog zu GameServer.DefaultClassName) - Lumiis.Auth
-    /// braucht dafür keinen vollen Item-Katalog, nur diese eine feste Id.</summary>
+    /// Bewusst als Konstante (analog zu GameServer.DefaultClassName). Den ItemCatalog lädt Lumiis.Auth seit dem
+    /// Vorschau-Fix trotzdem - nur um ausgerüstete Item-IDs in der Charakterliste zu LookIds aufzulösen.</summary>
     private const int StartingWeaponItemId = 1;
 
     public static void MapAuthEndpoints(this WebApplication app)
@@ -56,7 +57,26 @@ public static class AuthEndpoints
         return Results.Json(new RegisterResponse(account.Id), statusCode: StatusCodes.Status201Created);
     }
 
-    private static async Task<IResult> Login(LoginRequest request, LumiisDbContext db, TokenService tokenService)
+    /// <summary>Character-Zeile -> Listeneintrag inkl. aufgelöstem Aussehen (siehe CharacterAppearance).</summary>
+    private static CharacterSummary ToSummary(Character c, ItemCatalog itemCatalog)
+    {
+        Appearance a = CharacterAppearance.FromCharacter(c, itemCatalog);
+        return new CharacterSummary(c.Id, c.Name, c.Level, c.MapId,
+            new AppearanceDto(a.BodyId, a.HairStyleId, a.HairColorId, a.ArmorId, a.HelmetId, a.WeaponId, a.ShieldId),
+            new EquipmentDto(c.EquippedArmorItemId ?? 0, c.EquippedHelmetItemId ?? 0, c.EquippedWeaponItemId ?? 0, c.EquippedShieldItemId ?? 0,
+                c.EquippedArmorUpgradeLevel, c.EquippedHelmetUpgradeLevel, c.EquippedWeaponUpgradeLevel, c.EquippedShieldUpgradeLevel));
+    }
+
+    private static async Task<List<CharacterSummary>> LoadSummariesAsync(LumiisDbContext db, int accountId, ItemCatalog itemCatalog)
+    {
+        List<Character> rows = await db.Characters.AsNoTracking()
+            .Where(c => c.AccountId == accountId)
+            .OrderBy(c => c.Id)
+            .ToListAsync();
+        return rows.Select(c => ToSummary(c, itemCatalog)).ToList();
+    }
+
+    private static async Task<IResult> Login(LoginRequest request, LumiisDbContext db, TokenService tokenService, ItemCatalog itemCatalog)
     {
         Account? account = string.IsNullOrEmpty(request.Username)
             ? null
@@ -70,29 +90,24 @@ public static class AuthEndpoints
         }
 
         (string token, long expiresAtUnix) = tokenService.IssueWithExpiry(account.Id);
-        List<CharacterSummary> characters = await db.Characters
-            .Where(c => c.AccountId == account.Id)
-            .Select(c => new CharacterSummary(c.Id, c.Name))
-            .ToListAsync();
+        List<CharacterSummary> characters = await LoadSummariesAsync(db, account.Id, itemCatalog);
 
         return Results.Json(new LoginResponse(token, expiresAtUnix, characters));
     }
 
-    private static async Task<IResult> GetCharacters(HttpContext context, LumiisDbContext db, TokenService tokenService)
+    private static async Task<IResult> GetCharacters(HttpContext context, LumiisDbContext db, TokenService tokenService, ItemCatalog itemCatalog)
     {
         if (!TryAuthenticate(context, tokenService, out int accountId))
             return Unauthorized();
 
-        List<CharacterSummary> characters = await db.Characters
-            .Where(c => c.AccountId == accountId)
-            .Select(c => new CharacterSummary(c.Id, c.Name))
-            .ToListAsync();
+        List<CharacterSummary> characters = await LoadSummariesAsync(db, accountId, itemCatalog);
 
         return Results.Json(new CharacterListResponse(characters));
     }
 
     private static async Task<IResult> CreateCharacter(
-        HttpContext context, CreateCharacterRequest request, LumiisDbContext db, TokenService tokenService, LookCatalog lookCatalog)
+        HttpContext context, CreateCharacterRequest request, LumiisDbContext db, TokenService tokenService, LookCatalog lookCatalog,
+        ItemCatalog itemCatalog)
     {
         if (!TryAuthenticate(context, tokenService, out int accountId))
             return Unauthorized();
@@ -111,6 +126,22 @@ public static class AuthEndpoints
         // ueber echte Items (leeres Inventar, kein automatisches Zuweisen mehr), die Waffe startet mit dem
         // Holzschwert (siehe StartingWeaponItemId).
         Appearance appearance = lookCatalog.CreateDefaultAppearance();
+        // Optionale Aussehens-Wahl (Charaktererstellung): jeder Wert muss in looks.json existieren.
+        if (request.BodyId is int bodyId)
+        {
+            if (!lookCatalog.Exists(LookCatalog.BodySlot, bodyId)) return InvalidAppearance();
+            appearance.BodyId = bodyId;
+        }
+        if (request.HairStyleId is int hairStyleId)
+        {
+            if (!lookCatalog.Exists(LookCatalog.HairSlot, hairStyleId)) return InvalidAppearance();
+            appearance.HairStyleId = hairStyleId;
+        }
+        if (request.HairColorId is int hairColorId)
+        {
+            if (hairColorId < 1 || hairColorId > lookCatalog.HairColors.Count) return InvalidAppearance();
+            appearance.HairColorId = hairColorId;
+        }
         var character = new Character
         {
             AccountId = accountId,
@@ -132,7 +163,12 @@ public static class AuthEndpoints
             return Results.Json(new ErrorResponse("Charaktername bereits vergeben."), statusCode: StatusCodes.Status409Conflict);
         }
 
-        return Results.Json(new CharacterSummary(character.Id, character.Name), statusCode: StatusCodes.Status201Created);
+        return Results.Json(ToSummary(character, itemCatalog), statusCode: StatusCodes.Status201Created);
+    }
+
+    private static IResult InvalidAppearance()
+    {
+        return Results.Json(new ErrorResponse("Ungültiges Aussehen."), statusCode: StatusCodes.Status400BadRequest);
     }
 
     private static IResult Unauthorized()

@@ -448,6 +448,9 @@ public sealed class GameServer : INetEventListener
             monsterAttacks.AddRange(worldMonsterAttacks);
             regeneratedPlayers.AddRange(worldRegeneratedPlayers);
             buffsExpired.AddRange(worldBuffsExpired);
+
+            foreach (int expiredGroundItemId in world.RemoveExpiredGroundItems(tickNowMs))
+                BroadcastDespawn(expiredGroundItemId);
         }
 
         foreach (Entity entity in arrived)
@@ -1129,6 +1132,10 @@ public sealed class GameServer : INetEventListener
         }
 
         conn.JoinPending = true;
+        // Die 5-s-Join-Frist gilt nur bis zu einem gültigen JoinRequest. Der DB-Lookup danach darf länger
+        // dauern (erster Zugriff nach Serverstart: EF-Core-Modellaufbau + Verbindungsaufbau) - sonst lief der
+        // erste Login nach jedem Serverstart in den Join-Timeout.
+        conn.CloseAtMs = Math.Max(conn.CloseAtMs, _nowMs() + _config.JoinLookupTimeoutMs);
         int peerId = conn.Peer.Id;
         int characterId = join.CharacterId;
         _ = Task.Run(() => LookupCharacterForJoinAsync(peerId, accountId, characterId));
@@ -1371,19 +1378,7 @@ public sealed class GameServer : INetEventListener
     /// Character-Zeile aufgelöst (LookId nachschlagen) - beim Join, bevor die Entity überhaupt eine eigene
     /// Appearance hat (siehe CompleteJoin). Für spätere Equip/Unequip-Änderungen siehe die Entity-Overload
     /// unten (Body/Hair ändern sich dabei nicht, nur die vier Ausrüstungs-Slots).</summary>
-    private Appearance ToAppearance(Character character)
-    {
-        return new Appearance
-        {
-            BodyId = character.BodyId,
-            HairStyleId = character.HairStyleId,
-            HairColorId = character.HairColorId,
-            ArmorId = ResolveLookId(character.EquippedArmorItemId ?? 0),
-            HelmetId = ResolveLookId(character.EquippedHelmetItemId ?? 0),
-            WeaponId = ResolveLookId(character.EquippedWeaponItemId ?? 0),
-            ShieldId = ResolveLookId(character.EquippedShieldItemId ?? 0)
-        };
-    }
+    private Appearance ToAppearance(Character character) => CharacterAppearance.FromCharacter(character, _itemCatalog);
 
     /// <summary>M5a: nach Equip/Unequip (siehe HandleEquipItemRequest/HandleUnequipItemRequest) - Body/Hair
     /// bleiben unverändert (aus der bisherigen, beim Join gesetzten Appearance übernommen), nur die vier
@@ -1403,12 +1398,7 @@ public sealed class GameServer : INetEventListener
         };
     }
 
-    private int ResolveLookId(int itemId)
-    {
-        if (itemId == 0 || _itemCatalog == null || !_itemCatalog.TryGet(itemId, out ItemDefinition item))
-            return 0;
-        return item.LookId;
-    }
+    private int ResolveLookId(int itemId) => CharacterAppearance.ResolveLookId(itemId, _itemCatalog);
 
     private void RejectJoin(ConnectionState conn, JoinRejectReason reason)
     {
@@ -1463,7 +1453,9 @@ public sealed class GameServer : INetEventListener
     {
         if (conn.EntityId is not int entityId) return;
         World world = conn.World ?? _world;
-        (bool success, InventoryActionFailedReason reason) = world.TryPickupItem(entityId, request.GroundItemEntityId);
+        // Beute des Killers darf während der Besitzfrist auch dessen Gruppe aufheben.
+        (bool success, InventoryActionFailedReason reason) = world.TryPickupItem(entityId, request.GroundItemEntityId, _nowMs(),
+            ownerEntityId => _partyByEntityId.TryGetValue(entityId, out PartyState? party) && party.Members.Contains(ownerEntityId));
         if (!success)
         {
             conn.Peer.SendPacket(new InventoryActionFailedPacket { Reason = reason });

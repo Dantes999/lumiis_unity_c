@@ -66,9 +66,10 @@ Setup: `cp .env.example .env`, eigene Werte eintragen, dann **immer** `source to
 
 Lumiis.Auth (server/src/Lumiis.Auth, ASP.NET Core Minimal API, nur HTTP, Port 5080 per appsettings.json/launchSettings.json, überschreibbar über die Standard-ASPNETCORE_URLS/--urls-Mechanismen):
 - POST /register { username, password } -> 201 { accountId } | 409 | 400
-- POST /login { username, password } -> 200 { token, expiresAtUnix, characters: [{ id, name }] } | 401 (keine Unterscheidung Name/Passwort in der Antwort)
-- GET /characters, Header "Authorization: Bearer <token>" -> 200 [{ id, name }] | 401
-- POST /characters, Header "Authorization: Bearer <token>", Body { name } -> 201 { id, name } | 401 | 400 | 409 (Aussehen wird automatisch aus data/looks.json vergeben, `LookCatalog.CreateDefaultAppearance()` - erster gültiger Eintrag je Slot, keine Auswahl in M2a)
+- POST /login { username, password } -> 200 { token, expiresAtUnix, characters: [Charakter] } | 401 (keine Unterscheidung Name/Passwort in der Antwort)
+- GET /characters, Header "Authorization: Bearer <token>" -> 200 { characters: [Charakter] } | 401
+- POST /characters, Header "Authorization: Bearer <token>", Body { name, bodyId?, hairStyleId?, hairColorId? } -> 201 Charakter | 401 | 400 | 409 (fehlende Aussehenswerte: `LookCatalog.CreateDefaultAppearance()`; angegebene werden gegen looks.json geprüft, sonst 400 "Ungültiges Aussehen.")
+- Charakter = { id, name, level, mapId, appearance: { bodyId, hairStyleId, hairColorId, armorId, helmetId, weaponId, shieldId } (LookIds, über `Lumiis.Data.CharacterAppearance` genauso aufgelöst wie im Spielserver), equipment: { armorItemId, helmetItemId, weaponItemId, shieldItemId, ...UpgradeLevel } } - für die Vorschau in der Charakterauswahl. Lumiis.Auth lädt dafür zusätzlich items.json.
 
 Fehlerantworten immer als knappes JSON { error: "..." }, nie ein Stacktrace nach außen. Session-Token: eigenes, minimales Format (kein JWT-Standard), signiert per HMACSHA256, 30 Minuten gültig, trägt nur die AccountId (siehe server/src/Lumiis.Data/TokenService.cs).
 
@@ -76,7 +77,9 @@ Spielserver-Join (Lumiis.Server, seit M2b, Protocol.Version 3): JoinRequestPacke
 statt Name. Ablauf: Token sofort synchron per TokenService.Validate geprüft (InvalidToken/TokenExpired als
 unterschiedliche JoinRejectReason) -> bei gültigem Token läuft der Charakter-Lookup (CharacterId + AccountId
 aus dem Token, Eigentümerschaft geprüft) asynchron auf einem Threadpool-Thread, Ergebnis kommt über eine
-Queue zurück und wird einmal pro Tick eingesammelt (World bleibt ausschließlich dem Game-Loop-Thread
+Queue zurück und wird einmal pro Tick eingesammelt (sobald das Token gültig ist, gilt statt der 5-s-Join-Frist
+`ServerConfig.JoinLookupTimeoutMs` = 30 s, und `Program.cs` wärmt EF Core/Npgsql beim Start mit einer Leerabfrage
+vor - sonst lief der erste Login nach Serverstart in den Timeout; World bleibt ausschließlich dem Game-Loop-Thread
 vorbehalten) -> nicht gefunden/falscher Account: CharacterNotFound; Charakter bereits online (eigenes
 Dictionary CharacterId->EntityId in World): CharacterAlreadyOnline. Erfolgreicher Join: Appearance und
 Startposition kommen aus der geladenen Character-Zeile (null-Position = Kartenmitte). Position wird alle 30s
@@ -169,8 +172,12 @@ Seit 2026-10-25 gibt es echte, begehbare Karten statt einer einzigen Welt. Detai
   Waldboss (Mob 4) - die normalen Mobs mindestens 20 Weltenheiten vom Start entfernt, im Startbereich
   steht kein Monster. Dorfhändler und **Schmied** sitzen im Dorfplatz.
 - Drops: Produktionsserver nutzt echte **Boden-Drops** (`EntityKind.GroundItem`): Monster lassen Items mit
-  Icon/Name auf dem Boden fallen, Aufheben per Klick (`PickupItemRequestPacket` 20) prüft Distanz und
-  Inventarplatz. Tests ohne `useGroundDrops` behalten das bisherige Auto-Loot-Verhalten.
+  Icon/Name auf dem Boden fallen, Aufheben per Klick (`PickupItemRequestPacket` 20) prüft Distanz
+  (`GameConstants.PickupRangeWire`), Besitz und Inventarplatz. Besitz: 10 s nur Killer oder dessen Gruppe
+  (`GroundItemOwnershipMs`, sonst `PickupNotOwner`), nach 5 min verschwindet der Drop
+  (`GroundItemLifetimeMs`, `World.RemoveExpiredGroundItems` + EntityDespawn). Mehrere Drops eines Kills
+  liegen leicht versetzt. Boden-Drops und NPCs sind nie angreifbar (`World.IsCombatKind`, auch nicht per
+  Kreisschlag). Tests ohne `useGroundDrops` behalten das bisherige Auto-Loot-Verhalten.
 - NPC-Dienste: `data/npcs.json` hat `service` (`Merchant`/`Blacksmith`), wird als `NpcService` in
   `EntitySpawnPacket` übertragen. Aufwertung verlangt auf dem Produktionsserver einen Schmied in
   `NpcInteractRangeWire`; ohne ihn kommt `NoBlacksmith`.
@@ -1219,6 +1226,14 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   Debug-Panel, deutsche Overlay-/Systemmeldungen. 644 Server-Tests grün (inkl. 20 neue Aufwertungs-/
   Katalog-/Packet-Tests und 3 LiteNetLib-Integrationstests inkl. Disconnect/Rejoin), Unity-PlayMode
   grün.
+- Technik-Review des Boden-Drop/Schmied/Party-Blocks (2026-10-25): Boden-Drops waren angreifbar (normaler
+  Angriff, Wuchtschlag, Kreisschlag) und blieben für immer liegen - jetzt unangreifbar, 10 s Killer-/
+  Gruppenbesitz, 5 min Lebensdauer, versetzt abgelegt. Bugfixes: erster Login nach Serverstart lief in den
+  Join-Timeout (DB-Vorwärmen + `JoinLookupTimeoutMs`), Charakterliste ohne Aussehen (Auth liefert jetzt
+  Level/Karte/Aussehen/Ausrüstung, Erstellen mit Körper/Frisur/Haarfarbe; Client-`CharacterInfo` trägt
+  `Appearance`/`WeaponItemId`/`WeaponUpgradeLevel`), Holzschwert senkrecht über dem Kopf (Item-Waffen-PNGs
+  auf 48-px-Figuren auf ~0,8 Einheiten skaliert, Ruhewinkel je Richtung in `WeaponSocketFrameConfig`).
+  656 Tests grün.
 - Offen als nächster M7-Block: Party-Persistenz/Rollen und weitere soziale Integrationstests; siehe
   `docs/feature-gap-lumiis.md`.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client

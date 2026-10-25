@@ -427,7 +427,8 @@ namespace Lumiis.Shared.Net
         InventoryFull = 5,
         TargetAtFullHp = 6,
         GroundItemNotFound = 7,
-        PickupOutOfRange = 8
+        PickupOutOfRange = 8,
+        PickupNotOwner = 9
     }
 
     /// <summary>Ein Inventar-/Ausrüstungs-Request wurde abgelehnt - nur an den Anfragenden.</summary>

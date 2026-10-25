@@ -70,7 +70,8 @@ namespace Lumiis.Tests.Integration
                 MobCatalog? mobCatalog = null, SpawnCatalog? spawnCatalog = null, ClassCatalog? classCatalog = null,
                 ItemCatalog? itemCatalog = null, NpcCatalog? npcCatalog = null, NpcSpawnCatalog? npcSpawnCatalog = null,
                 bool allowDebugCommands = false, ProgressionCatalog? progressionCatalog = null, SkillCatalog? skillCatalog = null,
-                MapCatalog? mapCatalog = null, UpgradeCatalog? upgradeCatalog = null, Random? random = null)
+                MapCatalog? mapCatalog = null, UpgradeCatalog? upgradeCatalog = null, Random? random = null,
+                Action? beforeServerDbAccess = null)
             {
                 DbContextOptions<LumiisDbContext> options = new DbContextOptionsBuilder<LumiisDbContext>()
                     .UseInMemoryDatabase("gameserver-test-" + Guid.NewGuid())
@@ -85,7 +86,12 @@ namespace Lumiis.Tests.Integration
                     RejectGraceMs = 100, // echte Uhr, kleiner Wert - siehe M1-fixes.md Punkt 2
                     AllowDebugCommands = allowDebugCommands
                 };
-                Server = new GameServer(config, new NullLogger(), TokenService, _dbFactory, nowMs, collisionMap, mobCatalog, spawnCatalog, classCatalog,
+                // beforeServerDbAccess: nur die DB-Zugriffe des Servers (nicht die Test-Helfer) lassen sich so
+                // gezielt verzögern, z. B. um einen langsamen ersten DB-Zugriff nach Serverstart nachzustellen.
+                Func<LumiisDbContext> serverDbFactory = beforeServerDbAccess == null
+                    ? _dbFactory
+                    : () => { beforeServerDbAccess(); return _dbFactory(); };
+                Server = new GameServer(config, new NullLogger(), TokenService, serverDbFactory, nowMs, collisionMap, mobCatalog, spawnCatalog, classCatalog,
                     itemCatalog, npcCatalog, npcSpawnCatalog, progressionCatalog, skillCatalog, mapCatalog, upgradeCatalog, random);
             }
 
@@ -1214,6 +1220,43 @@ namespace Lumiis.Tests.Integration
             }
             finally
             {
+                server.Stop();
+            }
+        }
+
+        /// <summary>Bugfix "erster Login nach Serverstart läuft in den Timeout": dauert der Charakter-Lookup nach
+        /// einem gültigen JoinRequest länger als JoinTimeoutMs (kalte DB), darf der Join nicht abgebrochen werden.
+        /// Erst JoinLookupTimeoutMs (ab Annahme des JoinRequests) trennt.</summary>
+        [Fact]
+        public void JoinTimeout_SlowCharacterLookup_IsNotCutOffAfterJoinTimeout()
+        {
+            long fakeNow = 0;
+            using var dbGate = new ManualResetEventSlim(false);
+            var fixture = new ServerFixture(nowMs: () => fakeNow, beforeServerDbAccess: () => dbGate.Wait(TimeSpan.FromSeconds(10)));
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Langsam");
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                for (int i = 0; i < 5; i++) { server.Update(); client.Poll(); Thread.Sleep(15); }
+
+                // Lookup hängt noch (DB-Gate zu), Uhr weit über die 5-s-Join-Frist - Verbindung bleibt.
+                fakeNow = 5000 + 1;
+                for (int i = 0; i < 5; i++) { server.Update(); client.Poll(); Thread.Sleep(15); }
+                Assert.False(client.Disconnected);
+
+                dbGate.Set();
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+                Assert.False(client.Disconnected);
+            }
+            finally
+            {
+                dbGate.Set();
                 server.Stop();
             }
         }

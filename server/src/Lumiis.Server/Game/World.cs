@@ -251,23 +251,39 @@ public sealed class World
     }
 
     /// <summary>Legt einen Boden-Drop an. Nur bei aktiviertem Ground-Drop-Modus (Produktion); Tests ohne
-    /// diesen Modus behalten das bisherige Auto-Loot-Verhalten.</summary>
-    public Entity SpawnGroundItem(int itemId, int x, int y, int upgradeLevel = 0)
+    /// diesen Modus behalten das bisherige Auto-Loot-Verhalten. ownerEntityId: Killer, dem der Drop für
+    /// GameConstants.GroundItemOwnershipMs gehört (null = sofort frei). nowMs: Basis für Besitz- und
+    /// Lebensdauer (GameConstants.GroundItemLifetimeMs); null = kein Besitz, kein automatisches Verschwinden.</summary>
+    public Entity SpawnGroundItem(int itemId, int x, int y, int upgradeLevel = 0, int? ownerEntityId = null, long? nowMs = null)
     {
         string name = _itemCatalog != null && _itemCatalog.TryGet(itemId, out ItemDefinition item)
             ? item.Name
             : "Gegenstand";
 
         int id = _allocateEntityId();
-        Entity entity = Entity.CreateGroundItem(id, itemId, upgradeLevel, name, x, y);
+        Entity entity = Entity.CreateGroundItem(id, itemId, upgradeLevel, name,
+            Math.Clamp(x, 0, GameConstants.MapWidth), Math.Clamp(y, 0, GameConstants.MapHeight));
         entity.MapId = MapId;
+        if (nowMs is long now)
+        {
+            if (ownerEntityId is int owner)
+            {
+                entity.LootOwnerEntityId = owner;
+                entity.LootOwnershipEndsAtMs = now + GameConstants.GroundItemOwnershipMs;
+            }
+            entity.DespawnAtMs = now + GameConstants.GroundItemLifetimeMs;
+        }
         _entities[id] = entity;
         return entity;
     }
 
-    /// <summary>Hebt einen Boden-Drop auf. Prüft Distanz und Inventarplatz; bei Erfolg wird die Ground-
-    /// Entity entfernt. Der Aufrufer (GameServer) verschickt InventorySync/EntityDespawn.</summary>
-    public (bool Success, InventoryActionFailedReason Reason) TryPickupItem(int playerEntityId, int groundItemEntityId)
+    /// <summary>Hebt einen Boden-Drop auf. Prüft Existenz, Besitz (Killer bzw. dessen Gruppe, solange
+    /// LootOwnershipEndsAtMs nicht erreicht ist), Distanz und Inventarplatz; bei Erfolg wird die Ground-
+    /// Entity entfernt. sharesLootWith(ownerEntityId): true, wenn der Aufhebende Beute dieses Besitzers
+    /// nehmen darf (GameServer: gleiche Gruppe) - null = nur der Besitzer selbst. Der Aufrufer (GameServer)
+    /// verschickt InventorySync/EntityDespawn.</summary>
+    public (bool Success, InventoryActionFailedReason Reason) TryPickupItem(int playerEntityId, int groundItemEntityId,
+        long nowMs = 0, Func<int, bool>? sharesLootWith = null)
     {
         if (!_entities.TryGetValue(playerEntityId, out Entity? player) || player.Kind != EntityKind.Player)
             return (false, InventoryActionFailedReason.InvalidSlot);
@@ -275,20 +291,49 @@ public sealed class World
         if (!_entities.TryGetValue(groundItemEntityId, out Entity? ground) || ground.Kind != EntityKind.GroundItem)
             return (false, InventoryActionFailedReason.GroundItemNotFound);
 
+        if (ground.LootOwnerEntityId is int owner && owner != player.Id && nowMs < ground.LootOwnershipEndsAtMs
+            && !(sharesLootWith?.Invoke(owner) ?? false))
+            return (false, InventoryActionFailedReason.PickupNotOwner);
+
         long dx = player.IntX - ground.IntX;
         long dy = player.IntY - ground.IntY;
-        long rangeSq = (long)GameConstants.NpcInteractRangeWire * GameConstants.NpcInteractRangeWire;
+        long rangeSq = (long)GameConstants.PickupRangeWire * GameConstants.PickupRangeWire;
         if (dx * dx + dy * dy > rangeSq)
             return (false, InventoryActionFailedReason.PickupOutOfRange);
-
-        if (FindFirstFreeInventorySlot(player) < 0)
-            return (false, InventoryActionFailedReason.InventoryFull);
 
         if (!TryAddItemToInventory(playerEntityId, ground.TypeId, ground.ItemUpgradeLevel))
             return (false, InventoryActionFailedReason.InventoryFull);
 
         Remove(groundItemEntityId);
         return (true, default);
+    }
+
+    /// <summary>Entfernt abgelaufene Boden-Drops (DespawnAtMs erreicht) und liefert ihre EntityIds, damit
+    /// GameServer EntityDespawn an die Beobachter schicken kann. Einmal pro Tick aufgerufen.</summary>
+    public List<int> RemoveExpiredGroundItems(long nowMs)
+    {
+        List<int> expired = new();
+        foreach (Entity entity in _entities.Values)
+        {
+            if (entity.Kind == EntityKind.GroundItem && entity.DespawnAtMs > 0 && nowMs >= entity.DespawnAtMs)
+                expired.Add(entity.Id);
+        }
+        foreach (int id in expired) Remove(id);
+        return expired;
+    }
+
+    /// <summary>Verteilt mehrere Drops eines Kills leicht um den Todesort, damit sie nicht exakt übereinander
+    /// liegen (deterministisch nach Index, ohne Zufall). Blockierte Versatzpunkte fallen auf den Todesort zurück.</summary>
+    private (int X, int Y) GroundDropPosition(int centerX, int centerY, int index)
+    {
+        if (index == 0) return (centerX, centerY);
+        const int step = 40;
+        int ring = (index - 1) / 8 + 1;
+        (int ox, int oy)[] directions = { (1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, 1), (1, -1), (-1, -1) };
+        (int ox, int oy) = directions[(index - 1) % 8];
+        int x = Math.Clamp(centerX + ox * step * ring, 0, GameConstants.MapWidth);
+        int y = Math.Clamp(centerY + oy * step * ring, 0, GameConstants.MapHeight);
+        return IsBlockedAtWire(x, y) ? (centerX, centerY) : (x, y);
     }
 
     /// <summary>Dev-Tools-Debug-Spawn (siehe GameServer.HandleDebugSpawnMonster): ein Punkt in zufälliger
@@ -462,7 +507,7 @@ public sealed class World
         // M5b: NPCs sind unangreifbar/statisch (siehe docs/tasks/M5b-shop.md Abschnitt 0a) - vor dem
         // Gleiche-Kinds-Check, weil der ("attacker.Kind == target.Kind") einen Player-vs-Npc-Angriff sonst
         // NICHT blocken würde (unterschiedliche Kinds).
-        if (target.Kind == EntityKind.Npc)
+        if (!IsCombatKind(target.Kind))
             return AttackResult.Fail(AttackFailedReason.TargetNotAttackable);
 
         if (attacker.Kind == target.Kind)
@@ -481,6 +526,10 @@ public sealed class World
 
         return ResolveHit(attacker, target, damageMultiplierPercent: 100, nowMs);
     }
+
+    /// <summary>Nur Spieler und Monster nehmen am Kampf teil - NPCs und Boden-Drops (GroundItem) sind nie
+    /// angreifbar, weder per normalem Angriff noch per Wuchtschlag/Kreisschlag.</summary>
+    private static bool IsCombatKind(EntityKind kind) => kind == EntityKind.Player || kind == EntityKind.Monster;
 
     /// <summary>M6b: normaler Angriffs-Cooldown, ggf. durch einen aktiven Hast-Buff verkürzt (siehe
     /// docs/tasks/M6b-skills.md Abschnitt 0d) - effektiver Cooldown = Basis * (100 - CooldownReductionPercent)
@@ -568,6 +617,7 @@ public sealed class World
         bool itemLostToFullInventory = false;
         if (died && target.Kind == EntityKind.Monster && targetDrops.Count > 0)
         {
+            int groundDropIndex = 0;
             foreach ((int itemId, int chancePercent) in targetDrops)
             {
                 if (_random.Next(100) >= chancePercent)
@@ -575,7 +625,9 @@ public sealed class World
 
                 if (_useGroundDrops)
                 {
-                    SpawnGroundItem(itemId, target.IntX, target.IntY, 0);
+                    (int dropX, int dropY) = GroundDropPosition(target.IntX, target.IntY, groundDropIndex++);
+                    int? owner = attacker.Kind == EntityKind.Player ? attacker.Id : null;
+                    SpawnGroundItem(itemId, dropX, dropY, 0, owner, nowMs);
                     continue;
                 }
 
@@ -875,7 +927,7 @@ public sealed class World
         if (target.IsDead)
             return SkillUseResult.Fail(UseSkillFailedReason.TargetAlreadyDead);
 
-        if (target.Kind == EntityKind.Npc)
+        if (!IsCombatKind(target.Kind))
             return SkillUseResult.Fail(UseSkillFailedReason.TargetNotAttackable);
 
         if (user.Kind == target.Kind)
@@ -903,7 +955,7 @@ public sealed class World
         // Iterieren über _entities.Values würde dabei die Sammlung während der Iteration verändern.
         foreach (Entity candidate in new List<Entity>(_entities.Values))
         {
-            if (candidate.Id == user.Id || candidate.Kind == user.Kind || candidate.Kind == EntityKind.Npc || candidate.IsDead)
+            if (candidate.Id == user.Id || candidate.Kind == user.Kind || !IsCombatKind(candidate.Kind) || candidate.IsDead)
                 continue;
 
             long dx = user.IntX - candidate.IntX;

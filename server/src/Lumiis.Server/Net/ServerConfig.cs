@@ -15,6 +15,11 @@ public sealed class ServerConfig
     /// <summary>Verbindungen ohne gültiges JoinRequest werden nach dieser Wandzeit getrennt, in ms (Default 5 s).</summary>
     public int JoinTimeoutMs = 5000;
 
+    /// <summary>Sobald ein JoinRequest mit gültigem Token angenommen wurde, läuft der Charakter-Lookup asynchron
+    /// gegen die DB. Die Frist wird dann auf diesen Wert (ab Annahme) verlängert, damit ein langsamer erster
+    /// DB-Zugriff (EF-Core-Kaltstart, Verbindungsaufbau) den Join nicht abbricht (Default 30 s).</summary>
+    public int JoinLookupTimeoutMs = 30000;
+
     /// <summary>Frist nach JoinRejected, bevor die Verbindung getrennt wird, damit das Paket noch ankommt, in ms (Default 1 s).</summary>
     public int RejectGraceMs = 1000;
 
