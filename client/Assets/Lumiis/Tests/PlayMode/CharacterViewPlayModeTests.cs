@@ -117,11 +117,19 @@ namespace Lumiis.Client.Tests.PlayMode
             Assert.AreEqual(128f, map.rect.width / map.pixelsPerUnit, 0.01f);
             Assert.AreEqual(128f, map.rect.height / map.pixelsPerUnit, 0.01f);
 
-            Sprite[] wolf = MonsterArt.LoadFrames("alpha_wolf");
-            Assert.IsNotNull(wolf, "alpha_wolf.png fehlt unter Resources/Sprites/Monsters/.");
-            Assert.AreEqual(20, wolf.Length);
-            Assert.AreEqual(1.25f, wolf[0].rect.width / wolf[0].pixelsPerUnit, 0.01f);
-            Assert.IsNotNull(MonsterArt.LoadFrames("boar"));
+            var monsterArt = new MonsterArt();
+            try
+            {
+                Sprite[] wolf = monsterArt.LoadFrames("alpha_wolf");
+                Assert.IsNotNull(wolf, "alpha_wolf.png fehlt unter Resources/Sprites/Monsters/.");
+                Assert.AreEqual(20, wolf.Length);
+                Assert.AreEqual(1.25f, wolf[0].rect.width / wolf[0].pixelsPerUnit, 0.01f);
+                Assert.IsNotNull(monsterArt.LoadFrames("boar"));
+            }
+            finally
+            {
+                monsterArt.Dispose();
+            }
             Assert.IsNotNull(ItemIconCatalog.LoadFromResources().GetTexture("book_bash"), "book_bash-Icon fehlt.");
 
             var lumiis = new LumiisSpriteProvider(128, 64);
