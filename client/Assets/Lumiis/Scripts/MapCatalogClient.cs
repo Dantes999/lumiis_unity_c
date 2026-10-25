@@ -30,6 +30,7 @@ namespace Lumiis.Client
         public int visualWidth;
         public int visualHeight;
         public int visualPixelsPerUnit;
+        public bool terrain;
     }
 
     /// <summary>Optionales Kartenbild (Resources/Maps/&lt;mapId&gt;). Herkunft/Breite/Höhe stehen in map.json;
@@ -70,6 +71,7 @@ namespace Lumiis.Client
         private readonly Dictionary<string, List<PortalJson>> _portals = new Dictionary<string, List<PortalJson>>();
         private readonly Dictionary<string, MapVisual> _visuals = new Dictionary<string, MapVisual>();
         private readonly List<string> _mapIds = new List<string>();
+        private readonly HashSet<string> _terrainMaps = new HashSet<string>();
 
         public string StartMapId { get; private set; } = "village";
         public IReadOnlyList<string> MapIds => _mapIds;
@@ -98,6 +100,7 @@ namespace Lumiis.Client
                     if (mapFile != null)
                     {
                         if (!string.IsNullOrEmpty(mapFile.name)) _names[entry.id] = mapFile.name;
+                        if (mapFile.terrain) _terrainMaps.Add(entry.id);
                         if (mapFile.visualWidth > 0 && mapFile.visualHeight > 0)
                         {
                             _visuals[entry.id] = new MapVisual
@@ -133,6 +136,12 @@ namespace Lumiis.Client
             return _portals.TryGetValue(mapId, out List<PortalJson>? portals)
                 ? portals
                 : (IReadOnlyList<PortalJson>)Array.Empty<PortalJson>();
+        }
+
+        /// <summary>Karte hat terrain.bin/props.json (Boden wird zur Laufzeit gezeichnet, siehe TerrainRenderer).</summary>
+        public bool HasTerrain(string mapId)
+        {
+            return _terrainMaps.Contains(mapId);
         }
 
         public bool TryGetVisual(string mapId, out MapVisual visual)

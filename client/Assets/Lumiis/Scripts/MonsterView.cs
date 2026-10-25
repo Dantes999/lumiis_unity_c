@@ -24,6 +24,8 @@ namespace Lumiis.Client
             _renderer = gameObject.AddComponent<SpriteRenderer>();
             _renderer.color = color;
             _renderer.sortingOrder = 0;
+            // Sortierung am Fußpunkt (wie Bäume/Häuser im TerrainRenderer), damit Monster hinter Bäumen verschwinden
+            _renderer.spriteSortPoint = SpriteSortPoint.Pivot;
             transform.localScale = new Vector3(uniformScale, uniformScale, 1f);
 
             if (frames != null && frames.Length > 0) _renderer.sprite = frames[0];

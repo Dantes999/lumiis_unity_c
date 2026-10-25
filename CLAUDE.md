@@ -164,18 +164,30 @@ Seit 2026-10-25 gibt es echte, begehbare Karten statt einer einzigen Welt. Detai
 
 ## Map1, Steuerung und Spiel-UI (Release-Optik)
 
-- `data/maps/map1/`: Startareal aus `yongan` (Lumiis-2D-Referenzkarte, Crop 128×128). Die Kacheln
-  (`tiles.json`) werden mit `tools/import-map1.py` zu `Resources/Maps/map1.png` (4096×4096, 32 px/Tile)
-  und einer 1000×1000-`collision.bin` gebacken. Dorfplatz, Häuser, Wege, Wasser und Baumrand stammen aus
-  dem Referenzlayout; der Start liegt außerhalb des Dorfes auf einer offenen Wiese.
-- Spawns (seit 2026-10-25 Originaldaten): `tools/import-map1-spawns.py` setzt aus `tools/map1-yongan-spawns.json`
-  (lumiis-2d@4376dae, nur der Map1-Ausschnitt) alle 47 Originalgruppen außerhalb der Dorf-Sicherheitszone:
-  Wilder Hund (Mob 20, Lv 1), Wolf (21, Lv 3), Alphawolf (22, Lv 5, aggressiv), Wildschwein (23, Lv 7) und
-  5 feste Lumiis des Kummers (24, Lv 5, wehrt sich nicht, Wellen aus Wölfen/Hund wie im Original). Level/HP/
-  Angriff/Verteidigung/EXP/Angriffstempo/aggressiv 1:1 aus dem Original, Laufgeschwindigkeit (×140 Wire),
-  Reichweiten, Yang und Beute an unser System angepasst. Kein Boss (gibt es im Original auf Yongan nicht).
-  Start und Respawn liegen jetzt auf dem Dorfplatz. Dorfhändler und **Schmied** sitzen im Dorfplatz.
-  Sheets: `dog`/`wolf`/`metin_sorrow` aus dem Lumiis-Asset-Archiv (`MonsterArt`, Steine als Einzelbild).
+- **Yongan (map1) und Jayang (map2) nach dem Metin2-Wiki** (2026-10-25, nur Shinsoo/rotes Reich): Maßstab
+  1 Kachel = 2 Wiki-Einheiten = 1 Zelle = 1 Unity-Einheit = 32 Bildpunkte. Yongan 512×640 Kacheln (Ursprung
+  244/180), Jayang 512×512 (244/244), mittig in der 1000×1000-Zellenkarte. Quelle: Wiki-Karten/-Monsterlisten
+  (lokal `~/Desktop/m2-game/wiki-ref`, nicht im Repo).
+  - `tools/derive-wiki-map.py` erzeugt je Karte `terrain.bin` ("LTR1", u16 w/h, i16 originX/Y, Kachel-Bytes,
+    Zeile 0 = Norden; GRASS0 FLOWERS1 PATH2 WATER3 SAND4 TREE5 ROCK6 STONE7 WALL8 BRIDGE9 PORTAL10, blockiert:
+    3/5/6/8), `collision.bin` und die Häuser in `props.json` (Laternen/Brunnen/Denkmäler von Hand,
+    `village` = Dorfplatzmitte in Kacheln).
+  - `tools/build-wiki-content.py <wiki-ref>` erzeugt `mobs.json` (ids ≤ 6 bleiben), `metins.json`,
+    `npcs.json`, `monster-looks.json` und je Karte `map/spawns/npcs/portals.json`: Monster mit Wiki-Level,
+    -Stufe und -EXP, HP/Angriff/Verteidigung nach eigener Formel (Tiere aus Level/Stufe, Menschen TP×2,5),
+    Spawngebiete aus den Wiki-Monsterkarten, Metins aus der Wiki-Metinkarte, Händler mit Sortiment,
+    Schmied, übrige NPCs (Wächter, Alte Frau, ...) ohne Dienst grüßen nur im Chat (`NpcService.None`).
+    Yongan: 625 Spawns (24 Metins), 31 NPCs; Jayang: 501 Spawns (18 Metins), 22 NPCs; Portal Yongan-Nord ↔
+    Jayang-Ost.
+  - Client: `TerrainArt` (UnityEngine-frei, per `dotnet test` geprüft, Port des eigenen lumiis-2d-Kartenstils)
+    zeichnet den Boden in 16×16-Kachel-Chunks (512×512 px, runde Ufer/Wege, Felswände, Wald auf Bergen,
+    Brücken, Dorfplatz-Steinkreis) und die Deko (Bäume, Hanok-Häuser mit Shinsoo-Dach, Denkmäler, Portal-
+    Wirbel). `TerrainRenderer` rechnet Chunks um die Kamera auf Hintergrund-Threads (bis 72 im Speicher,
+    nur bis orthographicSize 28), darunter liegt immer ein 1-px-je-Kachel-Bild; Deko sind SpriteRenderer mit
+    `SpriteSortPoint.Pivot` (Figuren verschwinden dahinter). Karten mit `"terrain": true` in `map.json`
+    nutzen das; Minimap kommt aus `GameClient.CurrentMinimapTexture`. Monster-Aussehen je MobId aus
+    `monster-looks.json` (`MonsterLookCatalogClient`, Sheets unter `Resources/Sprites/Monsters`).
+  - `Resources/Maps/map1.png` bleibt nur als Hintergrund von Login/Asset-Labor.
 - Drops: Produktionsserver nutzt echte **Boden-Drops** (`EntityKind.GroundItem`): Monster lassen Items mit
   Icon/Name auf dem Boden fallen, Aufheben per Klick (`PickupItemRequestPacket` 20) prüft Distanz
   (`GameConstants.PickupRangeWire`), Besitz und Inventarplatz. Besitz: 10 s nur Killer oder dessen Gruppe
@@ -1342,6 +1354,12 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   Server-Reichweite ("Treffer" sichtbar, Server: außer Reichweite) - jetzt exakte `MeleeRangeWire` an den
   Server-Pfadpositionen, dazu serverseitig `GameConstants.PlayerMeleeRangeToleranceWire` (50) als
   Latenz-Spanne nur für Spieler-Angriffe/-Skills. 697 Tests grün.
+- Yongan + Jayang nach Metin2-Wiki (2026-10-25): Gelände/Kollision (`tools/derive-wiki-map.py`), Monster,
+  Spawngebiete, Metins, NPCs, Portale (`tools/build-wiki-content.py`), 52 Monster-Sheets aus dem Lumiis-Archiv,
+  Client-Gelände (`TerrainArt`/`TerrainRenderer`), Gruß-NPCs ohne Dienst. Ersetzt den 128×128-Ausschnitt
+  (Map1) und den 256×256-Jayang-Ausschnitt von vorher. 702 Tests grün. Annahmen: Tier-HP nach Formel (das Wiki
+  nennt keine TP), Menschen-HP = TP×2,5, hungrige Varianten aggressiv, Metin-Werte eigene Wahl, Nachbarkarten
+  fehlen. Noch zu prüfen im Unity-Build: Chunk-Nachladen beim Laufen, Sortierung hinter Bäumen/Häusern.
 - Offen: Monster-Sheets für die Jayang-Mobs, weitere Zonen/Dungeons, Reittiere; siehe
   `docs/feature-gap-lumiis.md`.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client

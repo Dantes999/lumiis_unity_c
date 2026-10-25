@@ -53,6 +53,9 @@ namespace Lumiis.Client
         private SkillCatalogClient _skillCatalog;
         private ClassCatalogClient _classCatalog;
         private MapCatalogClient _mapCatalogClient;
+        private MonsterLookCatalogClient _monsterLooks;
+        private readonly MonsterArt _monsterArt = new MonsterArt();
+        private TerrainRenderer _terrainRenderer;
         private UpgradeCatalogClient _upgradeCatalog;
         private GameObject _mapRoot;
         private CachingSpriteProvider _spriteProvider;
@@ -225,8 +228,20 @@ namespace Lumiis.Client
         /// <summary>Kartenbild-Metadaten (Ursprung/Größe) für HUD-Minimap und Bodenanzeige.</summary>
         public bool TryGetCurrentMapVisual(out MapVisual visual)
         {
+            if (_terrainRenderer != null)
+            {
+                visual = _terrainRenderer.MinimapVisual;
+                return true;
+            }
             visual = null;
             return _mapCatalogClient != null && _mapCatalogClient.TryGetVisual(_world.MapId, out visual);
+        }
+
+        /// <summary>Minimap-Bild der aktuellen Karte aus dem Gelände (null = keins, dann lädt das HUD
+        /// Resources/Maps/&lt;mapId&gt;). Passt zu TryGetCurrentMapVisual.</summary>
+        public Texture2D CurrentMinimapTexture
+        {
+            get { return _terrainRenderer != null ? _terrainRenderer.MinimapTexture : null; }
         }
 
         /// <summary>Icon-Textur für HUD-Elemente (z. B. Skill-Symbole aus dem Lumiis-Icon-Manifest).</summary>
@@ -316,6 +331,16 @@ namespace Lumiis.Client
                 Debug.LogWarning("upgrade.json nicht gefunden, Schmied zeigt keine Erfolgschancen: " + ex.Message);
             }
 
+            // Monster-Aussehen (Sheet/Größe/Tönung) - fehlt die Kopie, bleiben unbekannte Monster beim Platzhalter.
+            try
+            {
+                _monsterLooks = MonsterLookCatalogClient.LoadFromStreamingAssets();
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning("monster-looks.json nicht gefunden, Monster nutzen Platzhalter: " + ex.Message);
+            }
+
             // Multi-Map: Kartenname/Portale nur für die Anzeige - fehlt die Kopie (z. B. alter Build), läuft
             // der Client ohne Portalmarkierungen weiter statt am fehlenden Anzeige-Katalog zu scheitern.
             try
@@ -350,6 +375,9 @@ namespace Lumiis.Client
             if (_assetTestLab != null) _assetTestLab.Close();
 #endif
             _spriteProvider?.DestroyAll();
+            _monsterArt.Dispose();
+            _terrainRenderer?.Dispose();
+            _terrainRenderer = null;
         }
 
         private void Update()
@@ -1259,6 +1287,7 @@ namespace Lumiis.Client
                 Vector3 camPos = _camera.transform.position;
                 _camera.transform.position = new Vector3(target.x, target.y, camPos.z);
             }
+            _terrainRenderer?.Tick(_camera);
         }
 
         /// <summary>Blickrichtung folgt dem Mauszeiger, nicht der Laufrichtung. So kann man weglaufen und
@@ -1545,10 +1574,39 @@ namespace Lumiis.Client
                 }
                 if (entity.Kind != EntityKind.Npc) continue;
 
+                if (entity.NpcService == NpcService.None)
+                {
+                    // NPCs ohne Händler-/Schmied-Dienst: nur ein Gruß im Chat (rein lokal, kein Paket)
+                    ChatMessageReceived?.Invoke(new ChatMessagePacket
+                    {
+                        Channel = ChatChannel.System,
+                        SenderName = entity.Name,
+                        Text = NpcGreeting(entity.Name)
+                    });
+                    return;
+                }
+
                 _shopOpenNpcEntityId = kvp.Key;
                 _shopItems.Clear();
                 _netClient.SendOpenShop(kvp.Key);
                 return;
+            }
+        }
+
+        private static string NpcGreeting(string npcName)
+        {
+            switch (npcName)
+            {
+                case "Wächter des Dorfplatzes":
+                case "Stadtwächter":
+                    return "Halte die Augen offen, Reisender. Draußen vor dem Dorf streunen hungrige Wildhunde.";
+                case "Lagerverwalter": return "Dein Lager ist noch im Aufbau. Komm später wieder.";
+                case "Teleporter": return "Meine Reisen sind gerade nicht möglich.";
+                case "Alte Frau": return "Ach, die jungen Leute heute ... pass gut auf dich auf, Kind.";
+                case "Alter Mann": return "Hinter mir beginnen gefährliche Lande. Komm wieder, wenn du stärker bist.";
+                case "Stallbursche": return "Pferde gibt es bei mir erst später. Bis dahin musst du laufen.";
+                case "Schlachtenverwalter": return "Für Schlachten bist du noch nicht bereit.";
+                default: return "Sei gegrüßt, Reisender.";
             }
         }
 
@@ -2060,13 +2118,16 @@ namespace Lumiis.Client
             {
                 var monsterGo = new GameObject("Monster_" + entity.Id + "_" + entity.Name);
                 var monsterView = monsterGo.AddComponent<MonsterView>();
-                string artKey = MonsterArt.ResourceForMob(entity.TypeId);
-                Sprite[] frames = artKey != null ? MonsterArt.LoadFrames(artKey) : null;
-                Sprite stone = frames == null ? MonsterArt.LoadStone(MonsterArt.StoneResourceForMob(entity.TypeId)) : null;
+                MonsterLookJson look = null;
+                bool hasLook = _monsterLooks != null && _monsterLooks.TryGet(entity.TypeId, out look);
+                Sprite[] frames = hasLook && !look.stone ? _monsterArt.LoadFrames(look.sheet, look.desaturate) : null;
+                Sprite stone = hasLook && look.stone ? _monsterArt.LoadStone(look.sheet) : null;
+                Color tint = hasLook ? MonsterLookCatalogClient.TintOf(look) : MonsterColorFor(entity.TypeId);
+                float scale = hasLook ? MonsterLookCatalogClient.ScaleOf(look) : MonsterScaleFor(entity.TypeId);
                 if (frames != null)
-                    monsterView.Initialize(frames, MonsterColorFor(entity.TypeId), MonsterScaleFor(entity.TypeId));
+                    monsterView.Initialize(frames, tint, scale);
                 else if (stone != null)
-                    monsterView.Initialize(stone, MonsterColorFor(entity.TypeId), MonsterScaleFor(entity.TypeId));
+                    monsterView.Initialize(stone, tint, scale);
                 else
                     monsterView.Initialize(MonsterShapeFor(entity.TypeId), MonsterColorFor(entity.TypeId), MonsterScaleFor(entity.TypeId));
                 monsterView.SetWorldPosition(entity.X / 100.0, entity.Y / 100.0);
@@ -2586,11 +2647,20 @@ namespace Lumiis.Client
 
         private void CreateFloorAndBoundary()
         {
+            _terrainRenderer?.Dispose();
+            _terrainRenderer = null;
             if (_mapRoot != null) Destroy(_mapRoot);
             _mapRoot = new GameObject("MapRoot");
 
             float mapUnitsX = _world.MapWidth / 100f;
             float mapUnitsY = _world.MapHeight / 100f;
+
+            // Karten mit terrain.bin (Yongan, Jayang): Boden, Bäume und Häuser zur Laufzeit gezeichnet
+            if (_mapCatalogClient != null && _mapCatalogClient.HasTerrain(_world.MapId))
+            {
+                _terrainRenderer = TerrainRenderer.TryCreate(_world.MapId, _mapRoot.transform);
+                if (_terrainRenderer != null) return;
+            }
 
             // Echte, aus den Referenz-Tiles gebackene Karte (Resources/Maps/<mapId>). Die Metadaten
             // (Ursprung/Größe/PixelsPerUnit) stehen in data/maps/<mapId>/map.json. Fehlt das Bild, bleibt ein
@@ -2637,6 +2707,15 @@ namespace Lumiis.Client
             {
                 var go = new GameObject("Portal_" + portal.id + "_" + portal.targetMapId);
                 go.transform.SetParent(_mapRoot.transform, false);
+                if (_terrainRenderer != null)
+                {
+                    // Gezeichneter Wirbel statt Rechteck (3x3 Kacheln, Portalmitte)
+                    var swirl = go.AddComponent<SpriteRenderer>();
+                    swirl.sprite = _terrainRenderer.CreatePortalSprite(portal.id);
+                    swirl.sortingOrder = -60;
+                    go.transform.position = new Vector3((portal.x1 + portal.x2) / 200f, (portal.y1 + portal.y2) / 200f, 0f);
+                    continue;
+                }
                 var renderer = go.AddComponent<SpriteRenderer>();
                 renderer.sprite = _squareSprite;
                 renderer.color = portalColor;

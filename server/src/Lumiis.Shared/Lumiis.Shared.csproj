@@ -18,6 +18,7 @@
       <SkillsJsonSource>$(MSBuildThisFileDirectory)../../../data/skills.json</SkillsJsonSource>
       <ClassesJsonSource>$(MSBuildThisFileDirectory)../../../data/classes.json</ClassesJsonSource>
       <UpgradeJsonSource>$(MSBuildThisFileDirectory)../../../data/upgrade.json</UpgradeJsonSource>
+      <MonsterLooksJsonSource>$(MSBuildThisFileDirectory)../../../data/monster-looks.json</MonsterLooksJsonSource>
       <MapsDataDir>$(MSBuildThisFileDirectory)../../../data/maps/</MapsDataDir>
     </PropertyGroup>
     <ItemGroup>
@@ -30,6 +31,7 @@
       <UnityDataFiles Include="$(SkillsJsonSource)" Condition="Exists('$(SkillsJsonSource)')" />
       <UnityDataFiles Include="$(ClassesJsonSource)" Condition="Exists('$(ClassesJsonSource)')" />
       <UnityDataFiles Include="$(UpgradeJsonSource)" Condition="Exists('$(UpgradeJsonSource)')" />
+      <UnityDataFiles Include="$(MonsterLooksJsonSource)" Condition="Exists('$(MonsterLooksJsonSource)')" />
       <UnityMapFiles Include="$(MapsDataDir)**/*.json" Condition="Exists('$(MapsDataDir)')" />
       <UnityMapFiles Include="$(MapsDataDir)**/*.bin" Condition="Exists('$(MapsDataDir)')" />
     </ItemGroup>

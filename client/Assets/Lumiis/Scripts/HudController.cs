@@ -1422,8 +1422,12 @@ namespace Lumiis.Client
             if (!string.Equals(_minimapMapId, _gameClient.CurrentMapId, StringComparison.Ordinal))
             {
                 _minimapMapId = _gameClient.CurrentMapId;
-                Sprite mapSprite = Resources.Load<Sprite>("Maps/" + _minimapMapId);
-                Texture2D mapTexture = mapSprite != null ? mapSprite.texture : Resources.Load<Texture2D>("Maps/" + _minimapMapId);
+                Texture2D mapTexture = _gameClient.CurrentMinimapTexture;
+                if (mapTexture == null)
+                {
+                    Sprite mapSprite = Resources.Load<Sprite>("Maps/" + _minimapMapId);
+                    mapTexture = mapSprite != null ? mapSprite.texture : Resources.Load<Texture2D>("Maps/" + _minimapMapId);
+                }
                 _minimapMap.style.backgroundImage = mapTexture != null ? new StyleBackground(mapTexture) : new StyleBackground(StyleKeyword.None);
                 _minimapTitle.text = _gameClient.CurrentMapName;
             }
