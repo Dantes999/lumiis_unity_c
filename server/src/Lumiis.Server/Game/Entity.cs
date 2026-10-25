@@ -43,7 +43,7 @@ public sealed class Entity
     /// <summary>M6d: Bitmaske der bereits ausgeloesten Lumiis-Wellen (Bit i = Welle i aus data/metins.json).
     /// Nur bei Kind=Monster mit einem Stein-Eintrag relevant; ein Respawn erzeugt eine neue Entity und damit
     /// wieder 0.</summary>
-    public int MetinWavesTriggeredMask { get; set; }
+    public ulong MetinWavesTriggeredMask { get; set; }
 
     /// <summary>Bei Kind=Monster ein Index in data/mobs.json, bei Kind=Npc (M5b) ein Index in data/npcs.json,
     /// bei Kind=Player ungenutzt/0 - bis M5a "MobId" genannt, seit M5b umbenannt (reiner Rename, siehe

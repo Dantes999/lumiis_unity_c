@@ -353,6 +353,22 @@ namespace Lumiis.Tests.Game
             Assert.Empty(visibility);
         }
 
+        [Fact]
+        public void ComputeVisibleTo_MatchesComputeVisibility()
+        {
+            var world = new World(maxPlayers: 10);
+            world.TryJoin(characterId: 1, "A", x: 50000, y: 50000, out Entity? a, out _);
+            world.TryJoin(characterId: 2, "B", x: 50000, y: 50000 + GameConstants.AoiRadiusWire, out _, out _);
+            world.TryJoin(characterId: 3, "C", x: 50000, y: 50000 + GameConstants.AoiRadiusWire + 1, out _, out _);
+            world.TryJoin(characterId: 4, "D", x: 50300, y: 49800, out _, out _);
+
+            var all = world.ComputeVisibility(GameConstants.AoiRadiusWire);
+            foreach (Entity e in world.Entities)
+                Assert.Equal(all[e.Id].OrderBy(x => x), world.ComputeVisibleTo(e.Id, GameConstants.AoiRadiusWire).OrderBy(x => x));
+            Assert.Empty(world.ComputeVisibleTo(9999, GameConstants.AoiRadiusWire));
+            Assert.DoesNotContain(a!.Id, world.ComputeVisibleTo(a.Id, GameConstants.AoiRadiusWire));
+        }
+
         // ---- M3c: Wander-KI (siehe docs/tasks/M3c-monsters.md Abschnitt 7) ----
 
         [Fact]

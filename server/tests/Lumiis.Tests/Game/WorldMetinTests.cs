@@ -44,18 +44,18 @@ namespace Lumiis.Tests.Game
 
             world.TryAttack(player.Id, stone.Id, 1000);
             Assert.Equal(600, stone.CurrentHp);
-            Assert.Equal(0b001, stone.MetinWavesTriggeredMask);
+            Assert.Equal(0b001UL, stone.MetinWavesTriggeredMask);
             Assert.Equal(2, world.Entities.Count(e => e.Kind == EntityKind.Monster && e.Id != stone.Id));
 
             world.TryAttack(player.Id, stone.Id, 2000);
             Assert.Equal(400, stone.CurrentHp);
-            Assert.Equal(0b011, stone.MetinWavesTriggeredMask);
+            Assert.Equal(0b011UL, stone.MetinWavesTriggeredMask);
             Assert.Equal(5, world.Entities.Count(e => e.Kind == EntityKind.Monster && e.Id != stone.Id));
 
             world.TryAttack(player.Id, stone.Id, 3000);
             // 25 %-Welle: 200/800 = 25 %.
             Assert.Equal(200, stone.CurrentHp);
-            Assert.Equal(0b111, stone.MetinWavesTriggeredMask);
+            Assert.Equal(0b111UL, stone.MetinWavesTriggeredMask);
             Assert.Equal(6, world.Entities.Count(e => e.Kind == EntityKind.Monster && e.Id != stone.Id));
 
             // Ein weiterer Treffer toetet den Stein - es darf keine weitere Welle geben.

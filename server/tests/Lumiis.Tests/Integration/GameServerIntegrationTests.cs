@@ -229,7 +229,7 @@ namespace Lumiis.Tests.Integration
             List<Entity> greenfieldMonsters = fixture.Server.WorldForMap("greenfield").Entities
                 .Where(e => e.Kind == EntityKind.Monster).ToList();
 
-            // Wiki-Spawns (Monsterkarte) + Lumiis-Steine (Metinkarte) + 3 Trainingspuppen, siehe tools/build-wiki-content.py
+            // lumiis-2d-Gruppen + Lumiis-Steine + 3 Trainingspuppen, siehe tools/build-wiki-content.py
             Assert.Equal(catalog.Get("map1").Spawns.Count, map1Monsters.Count);
             Assert.True(map1Monsters.Count > 400);
             Assert.Equal(6, greenfieldMonsters.Count);

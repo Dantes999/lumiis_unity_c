@@ -227,11 +227,11 @@
     {
       "id": 10,
       "name": "Weißer-Eid Soldatin",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 1532,
+      "maxHp": 1824,
       "attack": 76,
       "defense": 27,
       "yangMin": 54,
@@ -242,7 +242,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 18,
-      "baseXp": 292,
+      "baseXp": 720,
       "drops": [
         {
           "itemId": 35,
@@ -268,12 +268,12 @@
     },
     {
       "id": 11,
-      "name": "W.-Eid Bogenschützin",
-      "speedWire": 450,
+      "name": "Weißer-Eid Bogenschützin",
+      "speedWire": 420,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 1265,
+      "maxHp": 1505,
       "attack": 84,
       "defense": 30,
       "yangMin": 60,
@@ -284,7 +284,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 20,
-      "baseXp": 324,
+      "baseXp": 685,
       "drops": [
         {
           "itemId": 35,
@@ -311,11 +311,11 @@
     {
       "id": 12,
       "name": "Weißer-Eid Kommandantin",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 2788,
+      "maxHp": 3317,
       "attack": 114,
       "defense": 41,
       "yangMin": 75,
@@ -326,7 +326,7 @@
       "aggroRangeWire": 500,
       "leashRangeWire": 900,
       "level": 25,
-      "baseXp": 678,
+      "baseXp": 1605,
       "drops": [
         {
           "itemId": 35,
@@ -353,11 +353,11 @@
     {
       "id": 13,
       "name": "Weißer-Eid Generälin",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 2788,
+      "maxHp": 3317,
       "attack": 114,
       "defense": 41,
       "yangMin": 75,
@@ -368,7 +368,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 25,
-      "baseXp": 678,
+      "baseXp": 1605,
       "drops": [
         {
           "itemId": 35,
@@ -395,11 +395,11 @@
     {
       "id": 14,
       "name": "Verfl. Weißer-Eid Soldatin",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 3625,
+      "maxHp": 4380,
       "attack": 84,
       "defense": 30,
       "yangMin": 54,
@@ -410,7 +410,7 @@
       "aggroRangeWire": 500,
       "leashRangeWire": 900,
       "level": 18,
-      "baseXp": 446,
+      "baseXp": 2255,
       "drops": [
         {
           "itemId": 35,
@@ -437,11 +437,11 @@
     {
       "id": 15,
       "name": "Verfl. Weißer-Eid Bogenschützin",
-      "speedWire": 450,
+      "speedWire": 420,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 4055,
+      "maxHp": 3960,
       "attack": 92,
       "defense": 33,
       "yangMin": 60,
@@ -452,7 +452,7 @@
       "aggroRangeWire": 500,
       "leashRangeWire": 900,
       "level": 20,
-      "baseXp": 485,
+      "baseXp": 2040,
       "drops": [
         {
           "itemId": 35,
@@ -494,7 +494,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 200,
       "level": 25,
-      "baseXp": 12000,
+      "baseXp": 35600,
       "drops": [
         {
           "itemId": 9,
@@ -525,14 +525,14 @@
     },
     {
       "id": 20,
-      "name": "Wildhund",
+      "name": "Wilder Hund",
       "speedWire": 420,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 117,
+      "maxHp": 94,
       "attack": 11,
-      "defense": 2,
+      "defense": 1,
       "yangMin": 3,
       "yangMax": 6,
       "meleeRangeWire": 150,
@@ -568,7 +568,7 @@
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 259,
+      "maxHp": 187,
       "attack": 18,
       "defense": 4,
       "yangMin": 9,
@@ -579,7 +579,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 3,
-      "baseXp": 31,
+      "baseXp": 32,
       "drops": [
         {
           "itemId": 8,
@@ -601,23 +601,23 @@
     },
     {
       "id": 22,
-      "name": "Alpha-Wolf",
+      "name": "Alphawolf",
       "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 336,
-      "attack": 22,
-      "defense": 6,
-      "yangMin": 12,
-      "yangMax": 24,
+      "maxHp": 323,
+      "attack": 25,
+      "defense": 7,
+      "yangMin": 15,
+      "yangMax": 30,
       "meleeRangeWire": 150,
       "attackCooldownMs": 1500,
-      "aggressive": false,
-      "aggroRangeWire": 0,
+      "aggressive": true,
+      "aggroRangeWire": 500,
       "leashRangeWire": 900,
-      "level": 4,
-      "baseXp": 41,
+      "level": 5,
+      "baseXp": 64,
       "drops": [
         {
           "itemId": 8,
@@ -639,14 +639,14 @@
     },
     {
       "id": 23,
-      "name": "Keiler",
+      "name": "Wildschwein",
       "speedWire": 420,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 589,
-      "attack": 33,
-      "defense": 10,
+      "maxHp": 459,
+      "attack": 30,
+      "defense": 11,
       "yangMin": 21,
       "yangMax": 42,
       "meleeRangeWire": 150,
@@ -655,7 +655,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 7,
-      "baseXp": 70,
+      "baseXp": 105,
       "drops": [
         {
           "itemId": 8,
@@ -731,112 +731,24 @@
       "fightsBack": false
     },
     {
-      "id": 25,
-      "name": "Hungriger Wildhund",
-      "speedWire": 420,
-      "wanderRadiusWire": 400,
-      "wanderIntervalMinMs": 3000,
-      "wanderIntervalMaxMs": 7000,
-      "maxHp": 87,
-      "attack": 11,
-      "defense": 2,
-      "yangMin": 3,
-      "yangMax": 6,
-      "meleeRangeWire": 150,
-      "attackCooldownMs": 1500,
-      "aggressive": true,
-      "aggroRangeWire": 500,
-      "leashRangeWire": 900,
-      "level": 1,
-      "baseXp": 9,
-      "drops": [
-        {
-          "itemId": 8,
-          "chancePercent": 30
-        },
-        {
-          "itemId": 6,
-          "chancePercent": 10
-        },
-        {
-          "itemId": 40,
-          "chancePercent": 20
-        },
-        {
-          "itemId": 41,
-          "chancePercent": 10
-        }
-      ]
-    },
-    {
       "id": 26,
-      "name": "Blauwolf",
+      "name": "Blauer Wolf",
       "speedWire": 462,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 501,
-      "attack": 29,
-      "defense": 9,
-      "yangMin": 18,
-      "yangMax": 36,
-      "meleeRangeWire": 150,
-      "attackCooldownMs": 1500,
-      "aggressive": false,
-      "aggroRangeWire": 0,
-      "leashRangeWire": 900,
-      "level": 6,
-      "baseXp": 60,
-      "drops": [
-        {
-          "itemId": 8,
-          "chancePercent": 25
-        },
-        {
-          "itemId": 4,
-          "chancePercent": 12
-        },
-        {
-          "itemId": 7,
-          "chancePercent": 10
-        },
-        {
-          "itemId": 25,
-          "chancePercent": 8
-        },
-        {
-          "itemId": 41,
-          "chancePercent": 15
-        },
-        {
-          "itemId": 42,
-          "chancePercent": 10
-        },
-        {
-          "itemId": 43,
-          "chancePercent": 15
-        }
-      ]
-    },
-    {
-      "id": 27,
-      "name": "Hungriger Blauwolf",
-      "speedWire": 462,
-      "wanderRadiusWire": 400,
-      "wanderIntervalMinMs": 3000,
-      "wanderIntervalMaxMs": 7000,
-      "maxHp": 376,
-      "attack": 29,
-      "defense": 9,
-      "yangMin": 18,
-      "yangMax": 36,
+      "maxHp": 561,
+      "attack": 36,
+      "defense": 13,
+      "yangMin": 27,
+      "yangMax": 54,
       "meleeRangeWire": 150,
       "attackCooldownMs": 1500,
       "aggressive": true,
       "aggroRangeWire": 500,
       "leashRangeWire": 900,
-      "level": 6,
-      "baseXp": 42,
+      "level": 9,
+      "baseXp": 150,
       "drops": [
         {
           "itemId": 8,
@@ -875,18 +787,18 @@
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 776,
-      "attack": 40,
-      "defense": 14,
-      "yangMin": 27,
-      "yangMax": 54,
+      "maxHp": 714,
+      "attack": 43,
+      "defense": 16,
+      "yangMin": 33,
+      "yangMax": 66,
       "meleeRangeWire": 150,
       "attackCooldownMs": 1500,
-      "aggressive": false,
-      "aggroRangeWire": 0,
+      "aggressive": true,
+      "aggroRangeWire": 500,
       "leashRangeWire": 900,
-      "level": 9,
-      "baseXp": 89,
+      "level": 11,
+      "baseXp": 225,
       "drops": [
         {
           "itemId": 8,
@@ -920,60 +832,14 @@
     },
     {
       "id": 29,
-      "name": "Grauwolf",
+      "name": "Grauer Wolf",
       "speedWire": 476,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 1196,
-      "attack": 56,
-      "defense": 20,
-      "yangMin": 39,
-      "yangMax": 78,
-      "meleeRangeWire": 150,
-      "attackCooldownMs": 1500,
-      "aggressive": false,
-      "aggroRangeWire": 0,
-      "leashRangeWire": 900,
-      "level": 13,
-      "baseXp": 127,
-      "drops": [
-        {
-          "itemId": 35,
-          "chancePercent": 15
-        },
-        {
-          "itemId": 21,
-          "chancePercent": 3
-        },
-        {
-          "itemId": 26,
-          "chancePercent": 3
-        },
-        {
-          "itemId": 42,
-          "chancePercent": 15
-        },
-        {
-          "itemId": 44,
-          "chancePercent": 10
-        },
-        {
-          "itemId": 9,
-          "chancePercent": 3
-        }
-      ]
-    },
-    {
-      "id": 30,
-      "name": "Hungriger Grauwolf",
-      "speedWire": 476,
-      "wanderRadiusWire": 400,
-      "wanderIntervalMinMs": 3000,
-      "wanderIntervalMaxMs": 7000,
-      "maxHp": 897,
-      "attack": 56,
-      "defense": 20,
+      "maxHp": 816,
+      "attack": 50,
+      "defense": 19,
       "yangMin": 39,
       "yangMax": 78,
       "meleeRangeWire": 150,
@@ -982,7 +848,7 @@
       "aggroRangeWire": 500,
       "leashRangeWire": 900,
       "level": 13,
-      "baseXp": 89,
+      "baseXp": 300,
       "drops": [
         {
           "itemId": 35,
@@ -1017,18 +883,18 @@
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 2092,
-      "attack": 75,
-      "defense": 26,
-      "yangMin": 48,
-      "yangMax": 96,
+      "maxHp": 952,
+      "attack": 55,
+      "defense": 21,
+      "yangMin": 42,
+      "yangMax": 84,
       "meleeRangeWire": 150,
       "attackCooldownMs": 1500,
-      "aggressive": false,
-      "aggroRangeWire": 0,
+      "aggressive": true,
+      "aggroRangeWire": 500,
       "leashRangeWire": 900,
-      "level": 16,
-      "baseXp": 187,
+      "level": 14,
+      "baseXp": 365,
       "drops": [
         {
           "itemId": 35,
@@ -1059,150 +925,46 @@
     {
       "id": 32,
       "name": "Roter Keiler",
-      "speedWire": 434,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 1182,
-      "attack": 48,
-      "defense": 16,
-      "yangMin": 30,
-      "yangMax": 60,
+      "maxHp": 1122,
+      "attack": 64,
+      "defense": 23,
+      "yangMin": 48,
+      "yangMax": 96,
       "meleeRangeWire": 150,
-      "attackCooldownMs": 1700,
-      "aggressive": false,
-      "aggroRangeWire": 0,
-      "leashRangeWire": 900,
-      "level": 10,
-      "baseXp": 118,
-      "drops": [
-        {
-          "itemId": 8,
-          "chancePercent": 25
-        },
-        {
-          "itemId": 4,
-          "chancePercent": 12
-        },
-        {
-          "itemId": 7,
-          "chancePercent": 10
-        },
-        {
-          "itemId": 25,
-          "chancePercent": 8
-        },
-        {
-          "itemId": 41,
-          "chancePercent": 15
-        },
-        {
-          "itemId": 42,
-          "chancePercent": 10
-        },
-        {
-          "itemId": 43,
-          "chancePercent": 15
-        }
-      ]
-    },
-    {
-      "id": 33,
-      "name": "Hungriger Roter Keiler",
-      "speedWire": 434,
-      "wanderRadiusWire": 400,
-      "wanderIntervalMinMs": 3000,
-      "wanderIntervalMaxMs": 7000,
-      "maxHp": 886,
-      "attack": 48,
-      "defense": 16,
-      "yangMin": 30,
-      "yangMax": 60,
-      "meleeRangeWire": 150,
-      "attackCooldownMs": 1700,
+      "attackCooldownMs": 1600,
       "aggressive": true,
       "aggroRangeWire": 500,
       "leashRangeWire": 900,
-      "level": 10,
-      "baseXp": 82,
+      "level": 16,
+      "baseXp": 480,
       "drops": [
         {
-          "itemId": 8,
-          "chancePercent": 25
-        },
-        {
-          "itemId": 4,
-          "chancePercent": 12
-        },
-        {
-          "itemId": 7,
-          "chancePercent": 10
-        },
-        {
-          "itemId": 25,
-          "chancePercent": 8
-        },
-        {
-          "itemId": 41,
+          "itemId": 35,
           "chancePercent": 15
+        },
+        {
+          "itemId": 21,
+          "chancePercent": 3
+        },
+        {
+          "itemId": 26,
+          "chancePercent": 3
         },
         {
           "itemId": 42,
-          "chancePercent": 10
-        },
-        {
-          "itemId": 43,
-          "chancePercent": 15
-        }
-      ]
-    },
-    {
-      "id": 34,
-      "name": "Bär",
-      "speedWire": 378,
-      "wanderRadiusWire": 400,
-      "wanderIntervalMinMs": 3000,
-      "wanderIntervalMaxMs": 7000,
-      "maxHp": 1085,
-      "attack": 52,
-      "defense": 18,
-      "yangMin": 36,
-      "yangMax": 72,
-      "meleeRangeWire": 150,
-      "attackCooldownMs": 1900,
-      "aggressive": false,
-      "aggroRangeWire": 0,
-      "leashRangeWire": 900,
-      "level": 12,
-      "baseXp": 118,
-      "drops": [
-        {
-          "itemId": 8,
-          "chancePercent": 25
-        },
-        {
-          "itemId": 4,
-          "chancePercent": 12
-        },
-        {
-          "itemId": 7,
-          "chancePercent": 10
-        },
-        {
-          "itemId": 25,
-          "chancePercent": 8
-        },
-        {
-          "itemId": 41,
           "chancePercent": 15
         },
         {
-          "itemId": 42,
+          "itemId": 44,
           "chancePercent": 10
         },
         {
-          "itemId": 43,
-          "chancePercent": 15
+          "itemId": 9,
+          "chancePercent": 3
         }
       ]
     },
@@ -1213,18 +975,18 @@
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 1928,
-      "attack": 70,
-      "defense": 25,
-      "yangMin": 45,
-      "yangMax": 90,
+      "maxHp": 1785,
+      "attack": 76,
+      "defense": 31,
+      "yangMin": 54,
+      "yangMax": 108,
       "meleeRangeWire": 150,
       "attackCooldownMs": 1900,
-      "aggressive": false,
-      "aggroRangeWire": 0,
+      "aggressive": true,
+      "aggroRangeWire": 500,
       "leashRangeWire": 900,
-      "level": 15,
-      "baseXp": 176,
+      "level": 18,
+      "baseXp": 650,
       "drops": [
         {
           "itemId": 35,
@@ -1259,18 +1021,18 @@
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 1937,
-      "attack": 80,
+      "maxHp": 1530,
+      "attack": 70,
       "defense": 28,
-      "yangMin": 57,
-      "yangMax": 114,
+      "yangMin": 51,
+      "yangMax": 102,
       "meleeRangeWire": 150,
       "attackCooldownMs": 1900,
-      "aggressive": false,
-      "aggroRangeWire": 0,
+      "aggressive": true,
+      "aggroRangeWire": 500,
       "leashRangeWire": 900,
-      "level": 19,
-      "baseXp": 308,
+      "level": 17,
+      "baseXp": 560,
       "drops": [
         {
           "itemId": 35,
@@ -1301,114 +1063,22 @@
     {
       "id": 37,
       "name": "Braunbär",
-      "speedWire": 378,
+      "speedWire": 364,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 2989,
-      "attack": 97,
-      "defense": 35,
-      "yangMin": 63,
-      "yangMax": 126,
+      "maxHp": 1275,
+      "attack": 62,
+      "defense": 25,
+      "yangMin": 45,
+      "yangMax": 90,
       "meleeRangeWire": 150,
       "attackCooldownMs": 1900,
       "aggressive": false,
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
-      "level": 21,
-      "baseXp": 408,
-      "drops": [
-        {
-          "itemId": 35,
-          "chancePercent": 20
-        },
-        {
-          "itemId": 23,
-          "chancePercent": 2
-        },
-        {
-          "itemId": 27,
-          "chancePercent": 2
-        },
-        {
-          "itemId": 44,
-          "chancePercent": 12
-        },
-        {
-          "itemId": 45,
-          "chancePercent": 8
-        },
-        {
-          "itemId": 9,
-          "chancePercent": 5
-        }
-      ]
-    },
-    {
-      "id": 38,
-      "name": "Hungriger Braunbär",
-      "speedWire": 378,
-      "wanderRadiusWire": 400,
-      "wanderIntervalMinMs": 3000,
-      "wanderIntervalMaxMs": 7000,
-      "maxHp": 2242,
-      "attack": 97,
-      "defense": 35,
-      "yangMin": 63,
-      "yangMax": 126,
-      "meleeRangeWire": 150,
-      "attackCooldownMs": 1900,
-      "aggressive": true,
-      "aggroRangeWire": 500,
-      "leashRangeWire": 900,
-      "level": 21,
-      "baseXp": 286,
-      "drops": [
-        {
-          "itemId": 35,
-          "chancePercent": 20
-        },
-        {
-          "itemId": 23,
-          "chancePercent": 2
-        },
-        {
-          "itemId": 27,
-          "chancePercent": 2
-        },
-        {
-          "itemId": 44,
-          "chancePercent": 12
-        },
-        {
-          "itemId": 45,
-          "chancePercent": 8
-        },
-        {
-          "itemId": 9,
-          "chancePercent": 5
-        }
-      ]
-    },
-    {
-      "id": 39,
-      "name": "Tiger",
-      "speedWire": 504,
-      "wanderRadiusWire": 400,
-      "wanderIntervalMinMs": 3000,
-      "wanderIntervalMaxMs": 7000,
-      "maxHp": 1804,
-      "attack": 76,
-      "defense": 27,
-      "yangMin": 54,
-      "yangMax": 108,
-      "meleeRangeWire": 150,
-      "attackCooldownMs": 1300,
-      "aggressive": false,
-      "aggroRangeWire": 0,
-      "leashRangeWire": 900,
-      "level": 18,
-      "baseXp": 292,
+      "level": 15,
+      "baseXp": 450,
       "drops": [
         {
           "itemId": 35,
@@ -1437,400 +1107,48 @@
       ]
     },
     {
-      "id": 40,
-      "name": "Weißer Tiger",
+      "id": 39,
+      "name": "Tiger",
       "speedWire": 504,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 3588,
-      "attack": 110,
-      "defense": 40,
-      "yangMin": 72,
-      "yangMax": 144,
-      "meleeRangeWire": 150,
-      "attackCooldownMs": 1300,
-      "aggressive": false,
-      "aggroRangeWire": 0,
-      "leashRangeWire": 900,
-      "level": 24,
-      "baseXp": 466,
-      "drops": [
-        {
-          "itemId": 35,
-          "chancePercent": 20
-        },
-        {
-          "itemId": 23,
-          "chancePercent": 2
-        },
-        {
-          "itemId": 27,
-          "chancePercent": 2
-        },
-        {
-          "itemId": 44,
-          "chancePercent": 12
-        },
-        {
-          "itemId": 45,
-          "chancePercent": 8
-        },
-        {
-          "itemId": 9,
-          "chancePercent": 5
-        }
-      ]
-    },
-    {
-      "id": 41,
-      "name": "Hungriger weißer Tiger",
-      "speedWire": 504,
-      "wanderRadiusWire": 400,
-      "wanderIntervalMinMs": 3000,
-      "wanderIntervalMaxMs": 7000,
-      "maxHp": 2691,
-      "attack": 110,
-      "defense": 40,
-      "yangMin": 72,
-      "yangMax": 144,
+      "maxHp": 1870,
+      "attack": 85,
+      "defense": 28,
+      "yangMin": 60,
+      "yangMax": 120,
       "meleeRangeWire": 150,
       "attackCooldownMs": 1300,
       "aggressive": true,
       "aggroRangeWire": 500,
       "leashRangeWire": 900,
-      "level": 24,
-      "baseXp": 326,
+      "level": 20,
+      "baseXp": 800,
       "drops": [
         {
           "itemId": 35,
-          "chancePercent": 20
+          "chancePercent": 15
         },
         {
-          "itemId": 23,
-          "chancePercent": 2
+          "itemId": 21,
+          "chancePercent": 3
         },
         {
-          "itemId": 27,
-          "chancePercent": 2
+          "itemId": 26,
+          "chancePercent": 3
+        },
+        {
+          "itemId": 42,
+          "chancePercent": 15
         },
         {
           "itemId": 44,
-          "chancePercent": 12
-        },
-        {
-          "itemId": 45,
-          "chancePercent": 8
-        },
-        {
-          "itemId": 9,
-          "chancePercent": 5
-        }
-      ]
-    },
-    {
-      "id": 42,
-      "name": "Mi-Jung",
-      "speedWire": 450,
-      "wanderRadiusWire": 400,
-      "wanderIntervalMinMs": 3000,
-      "wanderIntervalMaxMs": 7000,
-      "maxHp": 6517,
-      "attack": 125,
-      "defense": 45,
-      "yangMin": 69,
-      "yangMax": 138,
-      "meleeRangeWire": 150,
-      "attackCooldownMs": 1500,
-      "aggressive": false,
-      "aggroRangeWire": 0,
-      "leashRangeWire": 900,
-      "level": 23,
-      "baseXp": 2083,
-      "drops": [
-        {
-          "itemId": 35,
           "chancePercent": 10
         },
         {
           "itemId": 9,
           "chancePercent": 3
-        },
-        {
-          "itemId": 51,
-          "chancePercent": 15
-        },
-        {
-          "itemId": 5,
-          "chancePercent": 1
-        },
-        {
-          "itemId": 21,
-          "chancePercent": 1
-        }
-      ]
-    },
-    {
-      "id": 43,
-      "name": "Mutlose Mi-Jung",
-      "speedWire": 450,
-      "wanderRadiusWire": 400,
-      "wanderIntervalMinMs": 3000,
-      "wanderIntervalMaxMs": 7000,
-      "maxHp": 4888,
-      "attack": 125,
-      "defense": 45,
-      "yangMin": 69,
-      "yangMax": 138,
-      "meleeRangeWire": 150,
-      "attackCooldownMs": 1500,
-      "aggressive": false,
-      "aggroRangeWire": 0,
-      "leashRangeWire": 900,
-      "level": 23,
-      "baseXp": 1458,
-      "drops": [
-        {
-          "itemId": 35,
-          "chancePercent": 10
-        },
-        {
-          "itemId": 9,
-          "chancePercent": 3
-        },
-        {
-          "itemId": 51,
-          "chancePercent": 15
-        },
-        {
-          "itemId": 5,
-          "chancePercent": 1
-        },
-        {
-          "itemId": 21,
-          "chancePercent": 1
-        }
-      ]
-    },
-    {
-      "id": 44,
-      "name": "Eun-Jung",
-      "speedWire": 450,
-      "wanderRadiusWire": 400,
-      "wanderIntervalMinMs": 3000,
-      "wanderIntervalMaxMs": 7000,
-      "maxHp": 7729,
-      "attack": 140,
-      "defense": 51,
-      "yangMin": 78,
-      "yangMax": 156,
-      "meleeRangeWire": 150,
-      "attackCooldownMs": 1500,
-      "aggressive": false,
-      "aggroRangeWire": 0,
-      "leashRangeWire": 900,
-      "level": 26,
-      "baseXp": 2352,
-      "drops": [
-        {
-          "itemId": 36,
-          "chancePercent": 12
-        },
-        {
-          "itemId": 9,
-          "chancePercent": 5
-        },
-        {
-          "itemId": 51,
-          "chancePercent": 15
-        },
-        {
-          "itemId": 24,
-          "chancePercent": 1
-        },
-        {
-          "itemId": 22,
-          "chancePercent": 1
-        },
-        {
-          "itemId": 50,
-          "chancePercent": 5
-        }
-      ]
-    },
-    {
-      "id": 45,
-      "name": "Se-Rang",
-      "speedWire": 450,
-      "wanderRadiusWire": 400,
-      "wanderIntervalMinMs": 3000,
-      "wanderIntervalMaxMs": 7000,
-      "maxHp": 8585,
-      "attack": 151,
-      "defense": 55,
-      "yangMin": 84,
-      "yangMax": 168,
-      "meleeRangeWire": 150,
-      "attackCooldownMs": 1500,
-      "aggressive": false,
-      "aggroRangeWire": 0,
-      "leashRangeWire": 900,
-      "level": 28,
-      "baseXp": 2531,
-      "drops": [
-        {
-          "itemId": 36,
-          "chancePercent": 12
-        },
-        {
-          "itemId": 9,
-          "chancePercent": 5
-        },
-        {
-          "itemId": 51,
-          "chancePercent": 15
-        },
-        {
-          "itemId": 24,
-          "chancePercent": 1
-        },
-        {
-          "itemId": 22,
-          "chancePercent": 1
-        },
-        {
-          "itemId": 50,
-          "chancePercent": 5
-        }
-      ]
-    },
-    {
-      "id": 46,
-      "name": "Jin-Hee",
-      "speedWire": 450,
-      "wanderRadiusWire": 400,
-      "wanderIntervalMinMs": 3000,
-      "wanderIntervalMaxMs": 7000,
-      "maxHp": 9943,
-      "attack": 166,
-      "defense": 60,
-      "yangMin": 93,
-      "yangMax": 186,
-      "meleeRangeWire": 150,
-      "attackCooldownMs": 1500,
-      "aggressive": false,
-      "aggroRangeWire": 0,
-      "leashRangeWire": 900,
-      "level": 31,
-      "baseXp": 2800,
-      "drops": [
-        {
-          "itemId": 36,
-          "chancePercent": 12
-        },
-        {
-          "itemId": 9,
-          "chancePercent": 5
-        },
-        {
-          "itemId": 51,
-          "chancePercent": 15
-        },
-        {
-          "itemId": 24,
-          "chancePercent": 1
-        },
-        {
-          "itemId": 22,
-          "chancePercent": 1
-        },
-        {
-          "itemId": 50,
-          "chancePercent": 5
-        }
-      ]
-    },
-    {
-      "id": 47,
-      "name": "Feiger W.-Eid Schütze",
-      "speedWire": 450,
-      "wanderRadiusWire": 400,
-      "wanderIntervalMinMs": 3000,
-      "wanderIntervalMaxMs": 7000,
-      "maxHp": 2100,
-      "attack": 92,
-      "defense": 33,
-      "yangMin": 60,
-      "yangMax": 120,
-      "meleeRangeWire": 350,
-      "attackCooldownMs": 1800,
-      "aggressive": false,
-      "aggroRangeWire": 0,
-      "leashRangeWire": 900,
-      "level": 20,
-      "baseXp": 227,
-      "drops": [
-        {
-          "itemId": 35,
-          "chancePercent": 10
-        },
-        {
-          "itemId": 9,
-          "chancePercent": 3
-        },
-        {
-          "itemId": 51,
-          "chancePercent": 15
-        },
-        {
-          "itemId": 5,
-          "chancePercent": 1
-        },
-        {
-          "itemId": 21,
-          "chancePercent": 1
-        }
-      ]
-    },
-    {
-      "id": 48,
-      "name": "Feiger Weißer-Eid-Soldat",
-      "speedWire": 450,
-      "wanderRadiusWire": 400,
-      "wanderIntervalMinMs": 3000,
-      "wanderIntervalMaxMs": 7000,
-      "maxHp": 1827,
-      "attack": 84,
-      "defense": 30,
-      "yangMin": 54,
-      "yangMax": 108,
-      "meleeRangeWire": 150,
-      "attackCooldownMs": 1500,
-      "aggressive": false,
-      "aggroRangeWire": 0,
-      "leashRangeWire": 900,
-      "level": 18,
-      "baseXp": 205,
-      "drops": [
-        {
-          "itemId": 35,
-          "chancePercent": 10
-        },
-        {
-          "itemId": 9,
-          "chancePercent": 3
-        },
-        {
-          "itemId": 51,
-          "chancePercent": 15
-        },
-        {
-          "itemId": 5,
-          "chancePercent": 1
-        },
-        {
-          "itemId": 21,
-          "chancePercent": 1
         }
       ]
     },
@@ -1879,23 +1197,23 @@
     },
     {
       "id": 51,
-      "name": "Lumiis der Schlacht",
+      "name": "Schwarzer Lumiis",
       "speedWire": 1,
       "wanderRadiusWire": 1,
       "wanderIntervalMinMs": 60000,
       "wanderIntervalMaxMs": 60000,
-      "maxHp": 11900,
+      "maxHp": 17850,
       "attack": 0,
-      "defense": 17,
-      "yangMin": 600,
-      "yangMax": 1200,
+      "defense": 22,
+      "yangMin": 800,
+      "yangMax": 1600,
       "meleeRangeWire": 180,
       "attackCooldownMs": 1400,
       "aggressive": false,
       "aggroRangeWire": 0,
       "leashRangeWire": 200,
-      "level": 15,
-      "baseXp": 5000,
+      "level": 20,
+      "baseXp": 9000,
       "drops": [
         {
           "itemId": 9,
@@ -1927,18 +1245,18 @@
       "wanderRadiusWire": 1,
       "wanderIntervalMinMs": 60000,
       "wanderIntervalMaxMs": 60000,
-      "maxHp": 17850,
+      "maxHp": 11900,
       "attack": 0,
-      "defense": 22,
-      "yangMin": 800,
-      "yangMax": 1600,
+      "defense": 17,
+      "yangMin": 600,
+      "yangMax": 1200,
       "meleeRangeWire": 180,
       "attackCooldownMs": 1400,
       "aggressive": false,
       "aggroRangeWire": 0,
       "leashRangeWire": 200,
-      "level": 20,
-      "baseXp": 9000,
+      "level": 15,
+      "baseXp": 5000,
       "drops": [
         {
           "itemId": 9,
@@ -1985,7 +1303,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 200,
       "level": 30,
-      "baseXp": 16000,
+      "baseXp": 59300,
       "drops": [
         {
           "itemId": 9,
@@ -2032,7 +1350,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 200,
       "level": 35,
-      "baseXp": 20000,
+      "baseXp": 89700,
       "drops": [
         {
           "itemId": 9,
@@ -2068,11 +1386,11 @@
     {
       "id": 60,
       "name": "Verfl. Weißer-Eid Kommandantin",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 8018,
+      "maxHp": 6710,
       "attack": 125,
       "defense": 45,
       "yangMin": 75,
@@ -2083,7 +1401,7 @@
       "aggroRangeWire": 500,
       "leashRangeWire": 900,
       "level": 25,
-      "baseXp": 1162,
+      "baseXp": 3840,
       "drops": [
         {
           "itemId": 35,
@@ -2110,11 +1428,11 @@
     {
       "id": 61,
       "name": "Verfl. Weißer-Eid Generälin",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 8018,
+      "maxHp": 6710,
       "attack": 125,
       "defense": 45,
       "yangMin": 75,
@@ -2125,7 +1443,7 @@
       "aggroRangeWire": 500,
       "leashRangeWire": 900,
       "level": 25,
-      "baseXp": 1162,
+      "baseXp": 3840,
       "drops": [
         {
           "itemId": 35,
@@ -2152,11 +1470,11 @@
     {
       "id": 62,
       "name": "Böser Schw. Sturmsoldat",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 1962,
+      "maxHp": 2335,
       "attack": 108,
       "defense": 39,
       "yangMin": 78,
@@ -2167,7 +1485,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 26,
-      "baseXp": 412,
+      "baseXp": 1025,
       "drops": [
         {
           "itemId": 36,
@@ -2198,11 +1516,11 @@
     {
       "id": 63,
       "name": "Schwarzwindsoldat",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 2452,
+      "maxHp": 2918,
       "attack": 108,
       "defense": 39,
       "yangMin": 78,
@@ -2213,7 +1531,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 26,
-      "baseXp": 588,
+      "baseXp": 1285,
       "drops": [
         {
           "itemId": 36,
@@ -2244,13 +1562,13 @@
     {
       "id": 64,
       "name": "Schwarzwindbesessener",
-      "speedWire": 450,
+      "speedWire": 532,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 2568,
+      "maxHp": 3055,
       "attack": 112,
-      "defense": 40,
+      "defense": 41,
       "yangMin": 81,
       "yangMax": 162,
       "meleeRangeWire": 150,
@@ -2259,7 +1577,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 27,
-      "baseXp": 610,
+      "baseXp": 1345,
       "drops": [
         {
           "itemId": 36,
@@ -2290,11 +1608,11 @@
     {
       "id": 65,
       "name": "Böser Sturmbogenschütze",
-      "speedWire": 450,
+      "speedWire": 420,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 1638,
+      "maxHp": 1949,
       "attack": 120,
       "defense": 44,
       "yangMin": 87,
@@ -2305,7 +1623,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 29,
-      "baseXp": 458,
+      "baseXp": 985,
       "drops": [
         {
           "itemId": 36,
@@ -2336,11 +1654,11 @@
     {
       "id": 66,
       "name": "Schwarzwindbogenschütze",
-      "speedWire": 450,
+      "speedWire": 420,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 2045,
+      "maxHp": 2434,
       "attack": 120,
       "defense": 44,
       "yangMin": 87,
@@ -2351,7 +1669,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 29,
-      "baseXp": 655,
+      "baseXp": 1230,
       "drops": [
         {
           "itemId": 36,
@@ -2382,11 +1700,11 @@
     {
       "id": 67,
       "name": "Böser Sturm-Joh-Hwan",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 2822,
+      "maxHp": 3359,
       "attack": 136,
       "defense": 50,
       "yangMin": 90,
@@ -2397,7 +1715,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 30,
-      "baseXp": 569,
+      "baseXp": 1625,
       "drops": [
         {
           "itemId": 36,
@@ -2428,11 +1746,11 @@
     {
       "id": 68,
       "name": "Schwarzwind-Jak-To",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 3528,
+      "maxHp": 4198,
       "attack": 136,
       "defense": 50,
       "yangMin": 90,
@@ -2443,7 +1761,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 30,
-      "baseXp": 813,
+      "baseXp": 2030,
       "drops": [
         {
           "itemId": 36,
@@ -2474,11 +1792,11 @@
     {
       "id": 69,
       "name": "Schwarzer Sturmsoldat",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 3928,
+      "maxHp": 5650,
       "attack": 154,
       "defense": 56,
       "yangMin": 93,
@@ -2489,7 +1807,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 31,
-      "baseXp": 600,
+      "baseXp": 3230,
       "drops": [
         {
           "itemId": 36,
@@ -2520,11 +1838,11 @@
     {
       "id": 70,
       "name": "Böser Sturm-Kyuk-Jang",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 3250,
+      "maxHp": 3868,
       "attack": 150,
       "defense": 54,
       "yangMin": 99,
@@ -2535,7 +1853,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 33,
-      "baseXp": 626,
+      "baseXp": 1870,
       "drops": [
         {
           "itemId": 36,
@@ -2566,11 +1884,11 @@
     {
       "id": 71,
       "name": "Schw. Sturmbesessener",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 4332,
+      "maxHp": 6380,
       "attack": 163,
       "defense": 59,
       "yangMin": 99,
@@ -2581,7 +1899,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 33,
-      "baseXp": 638,
+      "baseXp": 3650,
       "drops": [
         {
           "itemId": 36,
@@ -2612,11 +1930,11 @@
     {
       "id": 72,
       "name": "Schwarzwind-To-Su",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 4062,
+      "maxHp": 4834,
       "attack": 150,
       "defense": 54,
       "yangMin": 99,
@@ -2627,7 +1945,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 33,
-      "baseXp": 894,
+      "baseXp": 2340,
       "drops": [
         {
           "itemId": 36,
@@ -2658,11 +1976,11 @@
     {
       "id": 73,
       "name": "Böser Sturm-Pho-Hwan",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 3472,
+      "maxHp": 4132,
       "attack": 158,
       "defense": 58,
       "yangMin": 105,
@@ -2673,7 +1991,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 35,
-      "baseXp": 663,
+      "baseXp": 2160,
       "drops": [
         {
           "itemId": 36,
@@ -2704,11 +2022,11 @@
     {
       "id": 74,
       "name": "Schwarzer Bogenschütze",
-      "speedWire": 450,
+      "speedWire": 420,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 4630,
+      "maxHp": 5770,
       "attack": 173,
       "defense": 63,
       "yangMin": 105,
@@ -2719,7 +2037,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 35,
-      "baseXp": 677,
+      "baseXp": 3565,
       "drops": [
         {
           "itemId": 36,
@@ -2750,11 +2068,11 @@
     {
       "id": 75,
       "name": "Schwarzwind-Gu-Ryung",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 4340,
+      "maxHp": 5165,
       "attack": 158,
       "defense": 58,
       "yangMin": 105,
@@ -2765,7 +2083,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 35,
-      "baseXp": 947,
+      "baseXp": 2700,
       "drops": [
         {
           "itemId": 36,
@@ -2796,11 +2114,11 @@
     {
       "id": 76,
       "name": "Schw. Sturm-Joh-Hwan",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 7525,
+      "maxHp": 9860,
       "attack": 192,
       "defense": 70,
       "yangMin": 108,
@@ -2811,7 +2129,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 36,
-      "baseXp": 1392,
+      "baseXp": 6580,
       "drops": [
         {
           "itemId": 36,
@@ -2842,11 +2160,11 @@
     {
       "id": 77,
       "name": "Schw. Sturm-Kyuk-Jan",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 8122,
+      "maxHp": 11140,
       "attack": 203,
       "defense": 74,
       "yangMin": 114,
@@ -2857,7 +2175,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 38,
-      "baseXp": 1469,
+      "baseXp": 8670,
       "drops": [
         {
           "itemId": 36,
@@ -2888,11 +2206,11 @@
     {
       "id": 78,
       "name": "Schw. Sturm-Pho-Hwan",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 8750,
+      "maxHp": 12590,
       "attack": 213,
       "defense": 78,
       "yangMin": 120,
@@ -2903,7 +2221,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 40,
-      "baseXp": 1546,
+      "baseXp": 11430,
       "drops": [
         {
           "itemId": 36,
@@ -2934,195 +2252,163 @@
     {
       "id": 79,
       "name": "Mahon",
-      "speedWire": 450,
-      "wanderRadiusWire": 400,
+      "speedWire": 448,
+      "wanderRadiusWire": 150,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 8002,
+      "maxHp": 8580,
       "attack": 172,
       "defense": 62,
       "yangMin": 96,
-      "yangMax": 192,
-      "meleeRangeWire": 150,
+      "yangMax": 1920,
+      "meleeRangeWire": 200,
       "attackCooldownMs": 1500,
       "aggressive": false,
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 32,
-      "baseXp": 2890,
+      "baseXp": 6795,
       "drops": [
         {
-          "itemId": 36,
-          "chancePercent": 12
-        },
-        {
           "itemId": 9,
-          "chancePercent": 5
+          "chancePercent": 60
         },
         {
-          "itemId": 51,
+          "itemId": 10,
           "chancePercent": 15
         },
         {
-          "itemId": 24,
-          "chancePercent": 1
-        },
-        {
-          "itemId": 22,
-          "chancePercent": 1
+          "itemId": 36,
+          "chancePercent": 60
         },
         {
           "itemId": 50,
-          "chancePercent": 5
+          "chancePercent": 20
         }
       ]
     },
     {
       "id": 80,
       "name": "Bo",
-      "speedWire": 450,
-      "wanderRadiusWire": 400,
+      "speedWire": 448,
+      "wanderRadiusWire": 150,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 9778,
+      "maxHp": 11650,
       "attack": 198,
       "defense": 72,
       "yangMin": 111,
-      "yangMax": 222,
-      "meleeRangeWire": 150,
+      "yangMax": 2220,
+      "meleeRangeWire": 200,
       "attackCooldownMs": 1500,
       "aggressive": false,
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 37,
-      "baseXp": 3338,
+      "baseXp": 11625,
       "drops": [
         {
-          "itemId": 36,
-          "chancePercent": 20
-        },
-        {
           "itemId": 9,
-          "chancePercent": 8
-        },
-        {
-          "itemId": 50,
-          "chancePercent": 10
-        },
-        {
-          "itemId": 24,
-          "chancePercent": 2
-        },
-        {
-          "itemId": 22,
-          "chancePercent": 2
+          "chancePercent": 60
         },
         {
           "itemId": 10,
-          "chancePercent": 1
+          "chancePercent": 15
+        },
+        {
+          "itemId": 36,
+          "chancePercent": 60
+        },
+        {
+          "itemId": 50,
+          "chancePercent": 20
         }
       ]
     },
     {
       "id": 81,
       "name": "Goo-Pae",
-      "speedWire": 450,
-      "wanderRadiusWire": 400,
+      "speedWire": 448,
+      "wanderRadiusWire": 150,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 10548,
+      "maxHp": 13160,
       "attack": 208,
       "defense": 76,
       "yangMin": 117,
-      "yangMax": 234,
-      "meleeRangeWire": 150,
+      "yangMax": 2340,
+      "meleeRangeWire": 200,
       "attackCooldownMs": 1500,
       "aggressive": false,
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 39,
-      "baseXp": 3517,
+      "baseXp": 15315,
       "drops": [
         {
-          "itemId": 36,
-          "chancePercent": 20
-        },
-        {
           "itemId": 9,
-          "chancePercent": 8
-        },
-        {
-          "itemId": 50,
-          "chancePercent": 10
-        },
-        {
-          "itemId": 24,
-          "chancePercent": 2
-        },
-        {
-          "itemId": 22,
-          "chancePercent": 2
+          "chancePercent": 60
         },
         {
           "itemId": 10,
-          "chancePercent": 1
+          "chancePercent": 15
+        },
+        {
+          "itemId": 36,
+          "chancePercent": 60
+        },
+        {
+          "itemId": 50,
+          "chancePercent": 20
         }
       ]
     },
     {
       "id": 82,
       "name": "Chuong",
-      "speedWire": 450,
-      "wanderRadiusWire": 400,
+      "speedWire": 448,
+      "wanderRadiusWire": 150,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 13050,
+      "maxHp": 18990,
       "attack": 239,
       "defense": 88,
       "yangMin": 135,
-      "yangMax": 270,
-      "meleeRangeWire": 150,
+      "yangMax": 2700,
+      "meleeRangeWire": 200,
       "attackCooldownMs": 1500,
       "aggressive": false,
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 45,
-      "baseXp": 4054,
+      "baseXp": 35070,
       "drops": [
         {
-          "itemId": 36,
-          "chancePercent": 20
-        },
-        {
           "itemId": 9,
-          "chancePercent": 8
-        },
-        {
-          "itemId": 50,
-          "chancePercent": 10
-        },
-        {
-          "itemId": 24,
-          "chancePercent": 2
-        },
-        {
-          "itemId": 22,
-          "chancePercent": 2
+          "chancePercent": 60
         },
         {
           "itemId": 10,
-          "chancePercent": 1
+          "chancePercent": 15
+        },
+        {
+          "itemId": 36,
+          "chancePercent": 60
+        },
+        {
+          "itemId": 50,
+          "chancePercent": 20
         }
       ]
     },
     {
       "id": 83,
       "name": "St. Wilder Infanterist",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 2808,
+      "maxHp": 3341,
       "attack": 120,
       "defense": 44,
       "yangMin": 87,
@@ -3133,7 +2419,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 29,
-      "baseXp": 655,
+      "baseXp": 1470,
       "drops": [
         {
           "itemId": 36,
@@ -3164,11 +2450,11 @@
     {
       "id": 84,
       "name": "Wilder Infanterist",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 3510,
+      "maxHp": 4177,
       "attack": 120,
       "defense": 44,
       "yangMin": 87,
@@ -3179,7 +2465,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 29,
-      "baseXp": 655,
+      "baseXp": 1840,
       "drops": [
         {
           "itemId": 36,
@@ -3210,11 +2496,11 @@
     {
       "id": 85,
       "name": "Wilder Ergebener",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 4062,
+      "maxHp": 4834,
       "attack": 132,
       "defense": 48,
       "yangMin": 96,
@@ -3225,7 +2511,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 32,
-      "baseXp": 722,
+      "baseXp": 2125,
       "drops": [
         {
           "itemId": 36,
@@ -3256,11 +2542,11 @@
     {
       "id": 86,
       "name": "St. Wilder Ergebener",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 3250,
+      "maxHp": 3868,
       "attack": 132,
       "defense": 48,
       "yangMin": 96,
@@ -3271,7 +2557,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 32,
-      "baseXp": 722,
+      "baseXp": 1700,
       "drops": [
         {
           "itemId": 36,
@@ -3302,11 +2588,11 @@
     {
       "id": 87,
       "name": "St. Wilder Bogenschütze",
-      "speedWire": 450,
+      "speedWire": 420,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 2525,
+      "maxHp": 3005,
       "attack": 158,
       "defense": 58,
       "yangMin": 105,
@@ -3317,7 +2603,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 35,
-      "baseXp": 947,
+      "baseXp": 1640,
       "drops": [
         {
           "itemId": 36,
@@ -3348,11 +2634,11 @@
     {
       "id": 88,
       "name": "Wilder Bogenschütze",
-      "speedWire": 450,
+      "speedWire": 420,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 3155,
+      "maxHp": 3754,
       "attack": 158,
       "defense": 58,
       "yangMin": 105,
@@ -3363,7 +2649,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 35,
-      "baseXp": 947,
+      "baseXp": 2050,
       "drops": [
         {
           "itemId": 36,
@@ -3394,11 +2680,11 @@
     {
       "id": 89,
       "name": "Wilder General",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 5600,
+      "maxHp": 6664,
       "attack": 178,
       "defense": 65,
       "yangMin": 108,
@@ -3409,7 +2695,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 36,
-      "baseXp": 1624,
+      "baseXp": 4105,
       "drops": [
         {
           "itemId": 36,
@@ -3440,11 +2726,11 @@
     {
       "id": 90,
       "name": "St. Wilder General",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 4480,
+      "maxHp": 5331,
       "attack": 178,
       "defense": 65,
       "yangMin": 108,
@@ -3455,7 +2741,7 @@
       "aggroRangeWire": 0,
       "leashRangeWire": 900,
       "level": 36,
-      "baseXp": 1624,
+      "baseXp": 3285,
       "drops": [
         {
           "itemId": 36,
@@ -3486,11 +2772,11 @@
     {
       "id": 91,
       "name": "Brutaler Soldat",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 4630,
+      "maxHp": 7210,
       "attack": 173,
       "defense": 63,
       "yangMin": 105,
@@ -3501,7 +2787,7 @@
       "aggroRangeWire": 500,
       "leashRangeWire": 900,
       "level": 35,
-      "baseXp": 410,
+      "baseXp": 4455,
       "drops": [
         {
           "itemId": 36,
@@ -3532,11 +2818,11 @@
     {
       "id": 92,
       "name": "Brutaler Besessener",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 5005,
+      "maxHp": 8150,
       "attack": 182,
       "defense": 67,
       "yangMin": 111,
@@ -3547,7 +2833,7 @@
       "aggroRangeWire": 500,
       "leashRangeWire": 900,
       "level": 37,
-      "baseXp": 434,
+      "baseXp": 5875,
       "drops": [
         {
           "itemId": 36,
@@ -3578,11 +2864,11 @@
     {
       "id": 93,
       "name": "Brutaler Bogenschütze",
-      "speedWire": 450,
+      "speedWire": 420,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 8750,
+      "maxHp": 10070,
       "attack": 213,
       "defense": 78,
       "yangMin": 120,
@@ -3593,7 +2879,7 @@
       "aggroRangeWire": 500,
       "leashRangeWire": 900,
       "level": 40,
-      "baseXp": 938,
+      "baseXp": 9140,
       "drops": [
         {
           "itemId": 36,
@@ -3624,11 +2910,11 @@
     {
       "id": 94,
       "name": "Brutaler Spezialist",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 400,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 9405,
+      "maxHp": 14230,
       "attack": 224,
       "defense": 82,
       "yangMin": 126,
@@ -3639,7 +2925,7 @@
       "aggroRangeWire": 500,
       "leashRangeWire": 900,
       "level": 42,
-      "baseXp": 984,
+      "baseXp": 15065,
       "drops": [
         {
           "itemId": 36,
@@ -3670,22 +2956,22 @@
     {
       "id": 95,
       "name": "Brutaler Hauptmann",
-      "speedWire": 450,
+      "speedWire": 448,
       "wanderRadiusWire": 150,
       "wanderIntervalMinMs": 3000,
       "wanderIntervalMaxMs": 7000,
-      "maxHp": 47025,
-      "attack": 335,
-      "defense": 94,
+      "maxHp": 30000,
+      "attack": 258,
+      "defense": 95,
       "yangMin": 126,
       "yangMax": 2520,
       "meleeRangeWire": 200,
-      "attackCooldownMs": 1500,
+      "attackCooldownMs": 1300,
       "aggressive": true,
       "aggroRangeWire": 500,
       "leashRangeWire": 900,
       "level": 42,
-      "baseXp": 16224,
+      "baseXp": 97730,
       "drops": [
         {
           "itemId": 9,

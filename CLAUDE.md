@@ -172,13 +172,18 @@ Seit 2026-10-25 gibt es echte, begehbare Karten statt einer einzigen Welt. Detai
     Zeile 0 = Norden; GRASS0 FLOWERS1 PATH2 WATER3 SAND4 TREE5 ROCK6 STONE7 WALL8 BRIDGE9 PORTAL10, blockiert:
     3/5/6/8), `collision.bin` und die Häuser in `props.json` (Laternen/Brunnen/Denkmäler von Hand,
     `village` = Dorfplatzmitte in Kacheln).
-  - `tools/build-wiki-content.py <wiki-ref>` erzeugt `mobs.json` (ids ≤ 6 bleiben), `metins.json`,
-    `npcs.json`, `monster-looks.json` und je Karte `map/spawns/npcs/portals.json`: Monster mit Wiki-Level,
-    -Stufe und -EXP, HP/Angriff/Verteidigung nach eigener Formel (Tiere aus Level/Stufe, Menschen TP×2,5),
-    Spawngebiete aus den Wiki-Monsterkarten, Metins aus der Wiki-Metinkarte, Händler mit Sortiment,
-    Schmied, übrige NPCs (Wächter, Alte Frau, ...) ohne Dienst grüßen nur im Chat (`NpcService.None`).
-    Yongan: 625 Spawns (24 Metins), 31 NPCs; Jayang: 501 Spawns (18 Metins), 22 NPCs; Portal Yongan-Nord ↔
-    Jayang-Ost.
+  - `tools/build-wiki-content.py` erzeugt `mobs.json` (ids ≤ 6 bleiben), `metins.json`, `npcs.json`,
+    `monster-looks.json` und je Karte `map/spawns/npcs/portals.json`. **Monster und Verteilung 1:1 aus
+    lumiis-2d** (Wunsch des Users, Stand 4376dae, Export per `tools/export-lumiis-map.mjs spawns|mobs <karte>`
+    nach `tools/lumiis2d-<karte>-{spawns,mobs}.json`): Gruppen, Steine (fest auf `count` verteilten
+    Kandidatenpunkten), Anführer/Einzelgänger, Werte (Level/HP/Angriff/Verteidigung/EXP/aggressiv/Takt,
+    Tempo ×140 Wire) und Metin-Wellen (Jayang 10 Schwellen, bis 64 Einträge je Stein,
+    `Entity.MetinWavesTriggeredMask` ist `ulong`). Versatz lumiis-2d→Wiki-Raster über den Dorfplatz, blockierte
+    Positionen rücken bis 10 Kacheln weiter, sonst entfällt das Monster. NPCs/Portale/Denkmäler nach Wiki:
+    Händler mit Sortiment, Schmied, übrige NPCs ohne Dienst grüßen nur im Chat (`NpcService.None`).
+    Yongan: 2955 Spawns, 31 NPCs; Jayang: 3278 Spawns, 22 NPCs; Portal Yongan-Nord ↔ Jayang-Ost. Für diese
+    Dichte berechnet `GameServer` Sichtbarkeit nur noch je Spieler (`World.ComputeVisibleTo`, O(n)) und die
+    Aggro-Suche läuft über die einmal pro Tick gesammelten Spieler (Tick ~0,35 ms bei ~3000 Monstern).
   - Client: `TerrainArt` (UnityEngine-frei, per `dotnet test` geprüft, Port des eigenen lumiis-2d-Kartenstils)
     zeichnet den Boden in 16×16-Kachel-Chunks (512×512 px, runde Ufer/Wege, Felswände, Wald auf Bergen,
     Brücken, Dorfplatz-Steinkreis) und die Deko (Bäume, Hanok-Häuser mit Shinsoo-Dach, Denkmäler, Portal-
@@ -1360,6 +1365,9 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   (Map1) und den 256×256-Jayang-Ausschnitt von vorher. 702 Tests grün. Annahmen: Tier-HP nach Formel (das Wiki
   nennt keine TP), Menschen-HP = TP×2,5, hungrige Varianten aggressiv, Metin-Werte eigene Wahl, Nachbarkarten
   fehlen. Noch zu prüfen im Unity-Build: Chunk-Nachladen beim Laufen, Sortierung hinter Bäumen/Häusern.
+  Danach (User: "Verteilung passt nicht, in lumiis-2d war sie perfekt"): Monster, Werte, Spawns, Steine und
+  Wellen kommen jetzt 1:1 aus lumiis-2d (siehe Abschnitt Map1), Server-Sichtbarkeit/Aggro für ~3000 Monster je
+  Karte linear statt quadratisch. 703 Tests grün.
 - Treffergefühl (2026-10-25, rein clientseitig, keine Protokolländerung): Der Hieb ist ein echter Schwertschwung
   statt Bogenlinie/Trefferring. `SwingMath` (UnityEngine-frei, per `dotnet test` geprüft) beschreibt Ausholen
   (0,07 s), Schlag (0,12 s, ease-out) und Nachschwung (0,17 s) über ±82° um die Mausrichtung, Kombo wechselt

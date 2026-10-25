@@ -642,13 +642,11 @@ public sealed class GameServer : INetEventListener
                 .Where(c => c.EntityId.HasValue && ReferenceEquals(c.World, world)).ToList();
             if (worldConnections.Count == 0) continue;
 
-            Dictionary<int, HashSet<int>> visibility = world.ComputeVisibility(GameConstants.AoiRadiusWire);
-
             foreach (ConnectionState conn in worldConnections)
             {
                 if (conn.EntityId is not int selfId) continue;
 
-                HashSet<int> nowVisible = visibility.TryGetValue(selfId, out HashSet<int>? v) ? v : new HashSet<int>();
+                HashSet<int> nowVisible = world.ComputeVisibleTo(selfId, GameConstants.AoiRadiusWire);
 
                 foreach (int otherId in nowVisible)
                 {
@@ -1358,8 +1356,7 @@ public sealed class GameServer : INetEventListener
         // alle), laufende Bewegungen zusätzlich als EntityMove ab aktueller Position. VisibleEntityIds wird
         // hier schon auf denselben Stand gebracht wie das Gesendete, damit der nächste UpdateVisibility-Tick
         // dieselben Entities nicht nochmal als "neu sichtbar" meldet.
-        HashSet<int> visibleToJoiner = world.ComputeVisibility(GameConstants.AoiRadiusWire)
-            .TryGetValue(entity.Id, out HashSet<int>? v) ? v : new HashSet<int>();
+        HashSet<int> visibleToJoiner = world.ComputeVisibleTo(entity.Id, GameConstants.AoiRadiusWire);
 
         foreach (int otherId in visibleToJoiner)
         {

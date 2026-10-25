@@ -106,6 +106,9 @@ public sealed class MetinCatalog
 
             if (waves.Count == 0)
                 throw new MetinCatalogException($"metins.json: Mob {entry.MobId} hat keine Wellen.");
+            // Entity.MetinWavesTriggeredMask merkt sich ausgelöste Wellen als 64-Bit-Maske.
+            if (waves.Count > MaxWaves)
+                throw new MetinCatalogException($"metins.json: Mob {entry.MobId} hat mehr als {MaxWaves} Wellen-Einträge.");
 
             byMobId[entry.MobId] = new MetinDefinition(entry.MobId, waves);
         }
@@ -115,6 +118,8 @@ public sealed class MetinCatalog
 
         return new MetinCatalog(byMobId);
     }
+
+    public const int MaxWaves = 64;
 
     public bool TryGet(int mobId, out MetinDefinition definition)
     {

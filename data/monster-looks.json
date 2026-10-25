@@ -69,7 +69,7 @@
     {
       "mobId": 22,
       "sheet": "alpha_wolf",
-      "scale": 1.15
+      "scale": 1.26
     },
     {
       "mobId": 23,
@@ -81,23 +81,13 @@
       "stone": true
     },
     {
-      "mobId": 25,
-      "sheet": "dog",
-      "scale": 0.85,
-      "tint": "#ffb4a0"
-    },
-    {
       "mobId": 26,
       "sheet": "blue_wolf"
     },
     {
-      "mobId": 27,
-      "sheet": "blue_wolf_c"
-    },
-    {
       "mobId": 28,
       "sheet": "alpha_blue_wolf",
-      "scale": 1.15
+      "scale": 1.26
     },
     {
       "mobId": 29,
@@ -105,14 +95,9 @@
       "scale": 1.05
     },
     {
-      "mobId": 30,
-      "sheet": "grey_wolf_c",
-      "scale": 1.05
-    },
-    {
       "mobId": 31,
       "sheet": "alpha_grey_wolf",
-      "scale": 1.15
+      "scale": 1.26
     },
     {
       "mobId": 32,
@@ -120,85 +105,24 @@
       "scale": 1.1
     },
     {
-      "mobId": 33,
-      "sheet": "red_boar_c",
-      "scale": 1.1
-    },
-    {
-      "mobId": 34,
-      "sheet": "brown_bear",
-      "scale": 1.3,
-      "tint": "#e8c8a0"
-    },
-    {
       "mobId": 35,
       "sheet": "grizzly",
-      "scale": 1.45
+      "scale": 2.03
     },
     {
       "mobId": 36,
       "sheet": "black_bear",
-      "scale": 1.3
+      "scale": 1.69
     },
     {
       "mobId": 37,
       "sheet": "brown_bear",
-      "scale": 1.3
-    },
-    {
-      "mobId": 38,
-      "sheet": "brown_bear_c",
-      "scale": 1.3
+      "scale": 1.69
     },
     {
       "mobId": 39,
       "sheet": "tiger",
-      "scale": 1.2
-    },
-    {
-      "mobId": 40,
-      "sheet": "tiger",
-      "scale": 1.2,
-      "desaturate": true
-    },
-    {
-      "mobId": 41,
-      "sheet": "tiger_c",
-      "scale": 1.2,
-      "desaturate": true
-    },
-    {
-      "mobId": 42,
-      "sheet": "woath_cmd",
-      "scale": 1.1
-    },
-    {
-      "mobId": 43,
-      "sheet": "woath_cmd_c",
-      "scale": 1.21
-    },
-    {
-      "mobId": 44,
-      "sheet": "woath_gen",
-      "scale": 1.1
-    },
-    {
-      "mobId": 45,
-      "sheet": "woath_gen_c",
-      "scale": 1.21
-    },
-    {
-      "mobId": 46,
-      "sheet": "woath_gen",
-      "scale": 1.1
-    },
-    {
-      "mobId": 47,
-      "sheet": "woath_archer"
-    },
-    {
-      "mobId": 48,
-      "sheet": "woath"
+      "scale": 1.44
     },
     {
       "mobId": 50,
@@ -228,12 +152,12 @@
     {
       "mobId": 60,
       "sheet": "woath_cmd_c",
-      "scale": 1.1
+      "scale": 1.21
     },
     {
       "mobId": 61,
       "sheet": "woath_gen_c",
-      "scale": 1.1
+      "scale": 1.21
     },
     {
       "mobId": 62,
@@ -266,7 +190,7 @@
     {
       "mobId": 69,
       "sheet": "black_storm",
-      "scale": 1.2
+      "scale": 1.32
     },
     {
       "mobId": 70,
@@ -275,7 +199,7 @@
     {
       "mobId": 71,
       "sheet": "black_storm",
-      "scale": 1.2
+      "scale": 1.32
     },
     {
       "mobId": 72,
@@ -288,7 +212,7 @@
     {
       "mobId": 74,
       "sheet": "black_storm_archer",
-      "scale": 1.1
+      "scale": 1.21
     },
     {
       "mobId": 75,
@@ -297,17 +221,17 @@
     {
       "mobId": 76,
       "sheet": "black_storm",
-      "scale": 1.2
+      "scale": 1.44
     },
     {
       "mobId": 77,
       "sheet": "black_storm",
-      "scale": 1.2
+      "scale": 1.44
     },
     {
       "mobId": 78,
       "sheet": "black_storm",
-      "scale": 1.2
+      "scale": 1.44
     },
     {
       "mobId": 79,
@@ -327,7 +251,7 @@
     {
       "mobId": 82,
       "sheet": "bw_chief",
-      "scale": 1.2
+      "scale": 1.3
     },
     {
       "mobId": 83,
@@ -356,37 +280,37 @@
     {
       "mobId": 89,
       "sheet": "wild_general",
-      "scale": 1.1
+      "scale": 1.21
     },
     {
       "mobId": 90,
       "sheet": "st_wild_general",
-      "scale": 1.1
+      "scale": 1.21
     },
     {
       "mobId": 91,
       "sheet": "brutal",
-      "scale": 1.1
+      "scale": 1.21
     },
     {
       "mobId": 92,
       "sheet": "brutal",
-      "scale": 1.1
+      "scale": 1.21
     },
     {
       "mobId": 93,
       "sheet": "brutal_archer",
-      "scale": 1.2
+      "scale": 1.44
     },
     {
       "mobId": 94,
       "sheet": "brutal",
-      "scale": 1.1
+      "scale": 1.32
     },
     {
       "mobId": 95,
       "sheet": "brutal_captain",
-      "scale": 1.5
+      "scale": 2.25
     }
   ]
 }

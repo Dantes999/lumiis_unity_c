@@ -112,6 +112,8 @@ public sealed class World
         get { return _mapDefinition?.Portals ?? (IReadOnlyList<PortalDefinition>)Array.Empty<PortalDefinition>(); }
     }
 
+    private readonly List<Entity> _tickPlayers = new();
+
     public IReadOnlyCollection<Entity> Entities => _entities.Values;
 
     /// <summary>Prüft, ob dieser Charakter schon online ist, und das Spielerlimit; spawnt bei Erfolg an der
@@ -732,7 +734,7 @@ public sealed class World
 
         for (int waveIndex = 0; waveIndex < metin.Waves.Count; waveIndex++)
         {
-            int bit = 1 << waveIndex;
+            ulong bit = 1UL << waveIndex;
             if ((target.MetinWavesTriggeredMask & bit) != 0) continue;
 
             MetinWave wave = metin.Waves[waveIndex];
@@ -1409,6 +1411,25 @@ public sealed class World
     /// der Grenze ist bei quadrierter Ganzzahl-Distanz selten, inklusiv vermeidet zumindest in diesem
     /// seltenen Fall ein Flackern zwischen zwei Ticks mit identischer Distanz. Sichtbarkeit ist symmetrisch
     /// (A sieht B genau dann, wenn B sieht A) - jedes Paar wird deshalb nur einmal verglichen.</summary>
+    /// <summary>Wie ComputeVisibility, aber nur für eine einzelne Entity (O(n) statt O(n²)) - GameServer braucht
+    /// die Sichtbarkeit nur für Spieler mit Verbindung, nicht für jedes Monster-Paar. Gleiche Regeln: quadrierte
+    /// Distanz, Grenzfall inklusiv, die Entity selbst ist nie enthalten.</summary>
+    public HashSet<int> ComputeVisibleTo(int entityId, int radiusWire)
+    {
+        var visible = new HashSet<int>();
+        if (!_entities.TryGetValue(entityId, out Entity? self)) return visible;
+
+        long radiusSq = (long)radiusWire * radiusWire;
+        foreach (Entity other in _entities.Values)
+        {
+            if (other.Id == entityId) continue;
+            long dx = self.IntX - other.IntX;
+            long dy = self.IntY - other.IntY;
+            if (dx * dx + dy * dy <= radiusSq) visible.Add(other.Id);
+        }
+        return visible;
+    }
+
     public Dictionary<int, HashSet<int>> ComputeVisibility(int radiusWire)
     {
         var visible = new Dictionary<int, HashSet<int>>();
@@ -1471,6 +1492,13 @@ public sealed class World
 
         List<Entity> startedWandering = new();
         List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> monsterAttacks = new();
+        // Spieler einmal pro Tick sammeln: die Aggro-Suche läuft für jedes Monster, mit tausenden Monstern je
+        // Karte wäre ein Durchlauf über alle Entities pro Monster quadratisch.
+        _tickPlayers.Clear();
+        foreach (Entity entity in _entities.Values)
+        {
+            if (entity.Kind == EntityKind.Player) _tickPlayers.Add(entity);
+        }
         foreach (Entity entity in _entities.Values)
         {
             if (entity.Kind != EntityKind.Monster) continue;
@@ -1633,9 +1661,9 @@ public sealed class World
         Entity? nearest = null;
         long nearestDistSq = long.MaxValue;
 
-        foreach (Entity candidate in _entities.Values)
+        foreach (Entity candidate in _tickPlayers)
         {
-            if (candidate.Kind != EntityKind.Player || candidate.IsDead) continue;
+            if (candidate.IsDead || !_entities.ContainsKey(candidate.Id)) continue;
 
             long dx = monster.IntX - candidate.IntX;
             long dy = monster.IntY - candidate.IntY;
