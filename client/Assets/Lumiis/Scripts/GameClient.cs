@@ -27,6 +27,7 @@ namespace Lumiis.Client
 
         /// <summary>M7-Party: voller Gruppenstand (Resync) für das HUD.</summary>
         public event System.Action<PartyChangedPacket> PartyChangedReceived;
+        public event System.Action<string> PartyInviteReceived;
         private Sprite _squareSprite;
         private Sprite _localMarkerSprite;
         private Sprite _monsterCircleSprite;
@@ -2057,6 +2058,11 @@ namespace Lumiis.Client
         {
             _netClient?.SendChat(channel, targetName, text);
         }
+
+        public void PartyInvite(string targetName) => _netClient?.SendPartyInvite(targetName);
+        public void PartyRespond(bool accept) => _netClient?.SendPartyRespond(accept);
+        public void PartyLeave() => _netClient?.SendPartyLeave();
+        public void RequestPartySnapshot() => _netClient?.RequestPartySnapshot();
 
         public Vector3 LocalPlayerWorldPosition
         {

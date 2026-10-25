@@ -1031,6 +1031,18 @@ public sealed class GameServer : INetEventListener
             case PickupItemRequestPacket pickup:
                 HandlePickupItemRequest(conn, pickup);
                 break;
+            case PartyInviteRequestPacket partyInvite:
+                HandlePartyInviteRequest(conn, partyInvite);
+                break;
+            case PartyRespondRequestPacket partyRespond:
+                HandlePartyRespondRequest(conn, partyRespond);
+                break;
+            case PartyLeaveRequestPacket:
+                HandlePartyLeaveRequest(conn);
+                break;
+            case PartySnapshotRequestPacket:
+                HandlePartySnapshotRequest(conn);
+                break;
             case AttackRequestPacket attack:
                 HandleAttackRequest(conn, attack);
                 break;
@@ -1748,6 +1760,37 @@ public sealed class GameServer : INetEventListener
         return null;
     }
 
+    private void HandlePartyInviteRequest(ConnectionState conn, PartyInviteRequestPacket request)
+    {
+        if (!TryGetOwnPlayer(conn, out Entity? sender)) return;
+        InviteToParty(conn, sender!, request.TargetName);
+    }
+
+    private void HandlePartyRespondRequest(ConnectionState conn, PartyRespondRequestPacket request)
+    {
+        if (!TryGetOwnPlayer(conn, out Entity? sender)) return;
+        if (request.Accept) AcceptPartyInvite(conn, sender!);
+        else DeclinePartyInvite(conn, sender!);
+    }
+
+    private void HandlePartyLeaveRequest(ConnectionState conn)
+    {
+        if (conn.EntityId is not int entityId) return;
+        LeaveParty(conn, entityId);
+    }
+
+    private void HandlePartySnapshotRequest(ConnectionState conn)
+    {
+        if (conn.EntityId is not int entityId) return;
+        SendPartySnapshot(conn, entityId);
+    }
+
+    private bool TryGetOwnPlayer(ConnectionState conn, out Entity? entity)
+    {
+        entity = null;
+        return conn.EntityId is int entityId && TryGetEntity(entityId, out entity) && entity != null && entity.Kind == EntityKind.Player;
+    }
+
     /// <summary>M7-Party-MVP über Chat-Befehle: /invite Name, /accept, /decline, /leave, /party.
     /// Kein DB-Save, keine Rollen; max. 8 Mitglieder, Leiter ist der Einladende. Gibt true zurück, wenn der
     /// Text ein bekannter Befehl war (dann nicht als Chat gebroadcastet wird).</summary>
@@ -1835,7 +1878,10 @@ public sealed class GameServer : INetEventListener
         SendSystemChat(conn, "Einladung an " + target.Name + " gesendet.");
         ConnectionState? targetConn = FindConnectionByEntityId(target.Id);
         if (targetConn != null)
+        {
+            targetConn.Peer.SendPacket(new PartyInviteReceivedPacket { InviterName = sender.Name });
             SendSystemChat(targetConn, sender.Name + " lädt dich in eine Gruppe ein. /accept oder /decline");
+        }
     }
 
     private void AcceptPartyInvite(ConnectionState conn, Entity sender)
@@ -2440,7 +2486,7 @@ public sealed class GameServer : INetEventListener
         _logger.Info($"Dev-Tools: Entity {entityId} auf Level {request.Level} gesetzt");
     }
 
-    /// <summary>Dev-Tool (Multi-Map, Protocol.Version 18): versetzt den eigenen Charakter auf die Startposition
+    /// <summary>Dev-Tool (Multi-Map, Protocol.Version 19): versetzt den eigenen Charakter auf die Startposition
     /// der angegebenen Karte - nur mit --allow-debug-commands, sonst still verworfen (wie die anderen
     /// Debug-Befehle, siehe HandleDebugSpawnMonster-Kommentar). Debug-API zum Testen des Kartenwechsels ohne
     /// Portal (der Client nutzt sie aus dem Debug-Panel).</summary>

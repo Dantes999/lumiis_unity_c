@@ -3,7 +3,7 @@ namespace Lumiis.Shared
     public static class Protocol
     {
         /// <summary>Wird bei jeder inkompatiblen Protokolländerung erhöht.</summary>
-        public const int Version = 18;
+        public const int Version = 19;
 
         /// <summary>Server-Ticks pro Sekunde.</summary>
         public const int TickRate = 25;

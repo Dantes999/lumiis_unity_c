@@ -67,6 +67,30 @@ namespace Lumiis.Client
             Send(new PickupItemRequestPacket { GroundItemEntityId = groundItemEntityId });
         }
 
+        public void SendPartyInvite(string targetName)
+        {
+            if (_peer == null || !IsConnected) return;
+            Send(new PartyInviteRequestPacket { TargetName = targetName ?? "" });
+        }
+
+        public void SendPartyRespond(bool accept)
+        {
+            if (_peer == null || !IsConnected) return;
+            Send(new PartyRespondRequestPacket { Accept = accept });
+        }
+
+        public void SendPartyLeave()
+        {
+            if (_peer == null || !IsConnected) return;
+            Send(new PartyLeaveRequestPacket());
+        }
+
+        public void RequestPartySnapshot()
+        {
+            if (_peer == null || !IsConnected) return;
+            Send(new PartySnapshotRequestPacket());
+        }
+
         /// <summary>M4a: Rechtsklick auf ein sichtbares Monster (siehe GameClient.HandleClickInput) - der
         /// Server prüft alles erneut serverautoritativ (Existenz, Leben, PvP, Cooldown, Reichweite).</summary>
         public void SendAttack(int targetEntityId)

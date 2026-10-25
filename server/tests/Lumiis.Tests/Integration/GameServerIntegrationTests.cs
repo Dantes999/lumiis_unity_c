@@ -221,7 +221,7 @@ namespace Lumiis.Tests.Integration
             List<Entity> greenfieldMonsters = fixture.Server.WorldForMap("greenfield").Entities
                 .Where(e => e.Kind == EntityKind.Monster).ToList();
 
-            Assert.Equal(6, map1Monsters.Count);
+            Assert.Equal(8, map1Monsters.Count);
             Assert.Equal(6, greenfieldMonsters.Count);
             Assert.Empty(map1Monsters.Select(m => m.Id).Intersect(greenfieldMonsters.Select(m => m.Id)));
             Assert.NotEmpty(fixture.Server.WorldForMap("map1").Entities.Where(e => e.Kind == EntityKind.Npc));
@@ -3247,7 +3247,8 @@ namespace Lumiis.Tests.Integration
                 client.Send(new UpgradeItemRequestPacket { EquipmentSlot = EquipmentSlot.Weapon, UseProtectionScroll = false });
                 Assert.True(Pump(() => client.Received.OfType<UpgradeItemResultPacket>().Any()
                     && client.Received.OfType<InventorySyncPacket>().Any(s => s.EquippedWeaponItemId == 0)
-                    && client.Received.OfType<CharacterStatsPacket>().Any(s => s.Attack == attackBefore - (5 + 2 * 2)), server, client));
+                    && client.Received.OfType<CharacterStatsPacket>().Any(s => s.Attack == attackBefore - (5 + 2 * 2))
+                    && client.Received.OfType<ChatMessagePacket>().Any(m => m.Text.Contains("zerstört")), server, client));
 
                 UpgradeItemResultPacket result = client.Received.OfType<UpgradeItemResultPacket>().Single();
                 Assert.False(result.Success);

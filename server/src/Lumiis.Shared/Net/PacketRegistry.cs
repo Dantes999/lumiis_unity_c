@@ -42,7 +42,7 @@ namespace Lumiis.Shared.Net
         /// <summary>M7-Chat: Chat-Nachricht senden (Karte/Global/Flüstern).</summary>
         ChatRequest = 16,
 
-        /// <summary>Multi-Map (Protocol.Version 18): nur wirksam mit --allow-debug-commands, sonst still
+        /// <summary>Multi-Map (Protocol.Version 19): nur wirksam mit --allow-debug-commands, sonst still
         /// verworfen (siehe DebugSpawnMonsterRequest-Kommentar). Versetzt den eigenen Charakter auf die
         /// Startposition der angegebenen Karte - Debug-API zum Testen des Kartenwechsels ohne Portal.</summary>
         DebugChangeMapRequest = 17,
@@ -50,11 +50,16 @@ namespace Lumiis.Shared.Net
         /// <summary>M6c: angelegte Ausrüstung aufwerten (Schleifstein, optional Bewahrungsrolle).</summary>
         UpgradeItemRequest = 18,
 
-        /// <summary>Taste losgelassen: laufende Bewegung sofort beenden (Protocol.Version 18).</summary>
+        /// <summary>Taste losgelassen: laufende Bewegung sofort beenden (Protocol.Version 19).</summary>
         StopMove = 19,
 
-        /// <summary>Boden-Drop aufheben (Protocol.Version 18).</summary>
+        /// <summary>Boden-Drop aufheben (Protocol.Version 19).</summary>
         PickupItemRequest = 20,
+
+        PartyInviteRequest = 21,
+        PartyRespondRequest = 22,
+        PartyLeaveRequest = 23,
+        PartySnapshotRequest = 24,
 
         // Server -> Client: ab 1000
         JoinAccepted = 1000,
@@ -109,7 +114,10 @@ namespace Lumiis.Shared.Net
         /// <summary>M7-Party: voller Gruppenstand (Resync).</summary>
         PartyChanged = 1021,
 
-        /// <summary>Multi-Map (Protocol.Version 18): der eigene Charakter hat die Karte gewechselt (Portal
+        /// <summary>Gruppen-UI: Einladung erhalten (nur an den Eingeladenen).</summary>
+        PartyInviteReceived = 1025,
+
+        /// <summary>Multi-Map (Protocol.Version 19): der eigene Charakter hat die Karte gewechselt (Portal
         /// oder Dev-Tool). Der Client leert seine Entities/Umgebung und baut Boden/Portale der neuen Karte
         /// neu auf; die Zielposition ist bereits enthalten (kein separates EntityStop nötig).</summary>
         MapChanged = 1022,
@@ -134,6 +142,10 @@ namespace Lumiis.Shared.Net
                 case PacketId.MoveTo: return new MoveToPacket();
                 case PacketId.StopMove: return new StopMovePacket();
                 case PacketId.PickupItemRequest: return new PickupItemRequestPacket();
+                case PacketId.PartyInviteRequest: return new PartyInviteRequestPacket();
+                case PacketId.PartyRespondRequest: return new PartyRespondRequestPacket();
+                case PacketId.PartyLeaveRequest: return new PartyLeaveRequestPacket();
+                case PacketId.PartySnapshotRequest: return new PartySnapshotRequestPacket();
                 case PacketId.JoinAccepted: return new JoinAcceptedPacket();
                 case PacketId.JoinRejected: return new JoinRejectedPacket();
                 case PacketId.EntitySpawn: return new EntitySpawnPacket();
@@ -170,6 +182,7 @@ namespace Lumiis.Shared.Net
                 case PacketId.ChatRequest: return new ChatRequestPacket();
                 case PacketId.ChatMessage: return new ChatMessagePacket();
                 case PacketId.PartyChanged: return new PartyChangedPacket();
+                case PacketId.PartyInviteReceived: return new PartyInviteReceivedPacket();
                 case PacketId.DebugChangeMapRequest: return new DebugChangeMapRequestPacket();
                 case PacketId.MapChanged: return new MapChangedPacket();
                 case PacketId.UpgradeItemRequest: return new UpgradeItemRequestPacket();

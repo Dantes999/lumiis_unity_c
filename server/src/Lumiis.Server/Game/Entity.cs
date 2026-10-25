@@ -31,7 +31,7 @@ public sealed class Entity
 
     public EntityKind Kind { get; }
 
-    /// <summary>Id der Karte, auf der diese Entity aktuell steht (Multi-Map, Protocol.Version 18). Wird von
+    /// <summary>Id der Karte, auf der diese Entity aktuell steht (Multi-Map, Protocol.Version 19). Wird von
     /// World beim Anlegen/Transfer gesetzt und von GameServer für Persistenz (Position/CharacterSave) genutzt -
     /// Mobs/NPCs bleiben zeitlebens auf ihrer Karte, Spieler wechseln per Portal/Dev-Tool.</summary>
     public string MapId { get; set; } = "village";

@@ -32,7 +32,7 @@ namespace Lumiis.Shared.Net
     }
 
     /// <summary>Der Client wurde aufgenommen und an der genannten Position gespawnt. Appearance ist die eigene
-    /// Figur - der Client berechnet sie nie selbst, siehe CLAUDE.md-Konvention. Seit Protocol.Version 18
+    /// Figur - der Client berechnet sie nie selbst, siehe CLAUDE.md-Konvention. Seit Protocol.Version 19
     /// zusätzlich die Karte (Id/Name/Maße), damit der Client Boden/Portale/Kartenname korrekt aufbaut.</summary>
     public sealed class JoinAcceptedPacket : IPacket
     {
@@ -923,7 +923,29 @@ namespace Lumiis.Shared.Net
         }
     }
 
-    /// <summary>Multi-Map (Protocol.Version 18): eigener Kartenwechsel. Enthält die neue Karte, ihre Maße und
+    /// <summary>Gruppen-UI: der eigene Spieler wurde eingeladen. Die UI kann darauf ein Annehmen/-
+    /// Ablehnen-Dialog zeigen; `PartyRespondRequestPacket` beantwortet sie.</summary>
+    public sealed class PartyInviteReceivedPacket : IPacket
+    {
+        public string InviterName = "";
+
+        public PacketId Id
+        {
+            get { return PacketId.PartyInviteReceived; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteString(InviterName);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            InviterName = reader.ReadString();
+        }
+    }
+
+    /// <summary>Multi-Map (Protocol.Version 19): eigener Kartenwechsel. Enthält die neue Karte, ihre Maße und
     /// die bereits gesetzte Zielposition. Der Client verwirft alle Entities/Views, baut Boden/Portale neu und
     /// legt seine eigene Figur an der Zielposition an; fremde Entities der neuen Karte folgen über den
     /// normalen AOI-Diff (EntitySpawn).</summary>
