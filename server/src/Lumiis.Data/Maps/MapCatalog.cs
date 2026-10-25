@@ -158,7 +158,81 @@ public sealed class MapCatalog
         if (File.Exists(portalsPath))
             portals = LoadPortals(portalsPath);
 
-        return new MapDefinition(entry.Id, name, collision, startX, startY, portals, spawns, npcs);
+        IReadOnlyList<MapEventDefinition> events = Array.Empty<MapEventDefinition>();
+        string eventsPath = Path.Combine(mapDirectory, "events.json");
+        if (File.Exists(eventsPath))
+            events = LoadEvents(entry.Id, eventsPath, mobCatalog, collision);
+
+        return new MapDefinition(entry.Id, name, collision, startX, startY, portals, spawns, npcs, events);
+    }
+
+    /// <summary>Lädt events.json fail-fast: Boss/Eskorte müssen in der MobCatalog existieren, jeder Punkt begehbar,
+    /// Intervall &gt; 0, mindestens ein Punkt, Ids eindeutig.</summary>
+    public static IReadOnlyList<MapEventDefinition> LoadEvents(string mapId, string path, MobCatalog mobCatalog,
+        CollisionMap collision)
+    {
+        EventsFileDto data = TryReadOptionalJson<EventsFileDto>(path)
+            ?? throw new MapCatalogException($"events.json ist leer ({path}).");
+        var events = new List<MapEventDefinition>();
+        var ids = new HashSet<int>();
+        foreach (EventEntryDto e in data.Events ?? new List<EventEntryDto>())
+        {
+            string where = $"Karte '{mapId}', Event {e.Id}";
+            if (!ids.Add(e.Id))
+                throw new MapCatalogException($"{where}: doppelte Event-Id.");
+            if (!mobCatalog.TryGet(e.BossMobId, out _))
+                throw new MapCatalogException($"{where}: unbekannte Boss-MobId {e.BossMobId}.");
+            if (e.IntervalSeconds <= 0)
+                throw new MapCatalogException($"{where}: intervalSeconds muss > 0 sein.");
+            var escort = new List<(int, int)>();
+            foreach (EscortDto esc in e.Escort ?? new List<EscortDto>())
+            {
+                if (!mobCatalog.TryGet(esc.MobId, out _))
+                    throw new MapCatalogException($"{where}: unbekannte Eskorte-MobId {esc.MobId}.");
+                if (esc.Count < 0 || esc.Count > 20)
+                    throw new MapCatalogException($"{where}: Eskorte-Anzahl {esc.Count} außerhalb 0..20.");
+                escort.Add((esc.MobId, esc.Count));
+            }
+            var points = new List<(int, int)>();
+            foreach (PointDto pt in e.Points ?? new List<PointDto>())
+            {
+                if (pt.X < 0 || pt.Y < 0 || pt.X >= collision.Width * 100 || pt.Y >= collision.Height * 100
+                    || collision.IsBlockedAtWire(pt.X, pt.Y))
+                    throw new MapCatalogException($"{where}: Punkt ({pt.X},{pt.Y}) ist nicht begehbar.");
+                points.Add((pt.X, pt.Y));
+            }
+            if (points.Count == 0)
+                throw new MapCatalogException($"{where}: keine Erscheinungsorte.");
+            events.Add(new MapEventDefinition(e.Id, e.BossMobId, escort, e.IntervalSeconds, e.AreaName ?? "", points));
+        }
+        return events;
+    }
+
+    private sealed class EventsFileDto
+    {
+        public List<EventEntryDto>? Events { get; set; }
+    }
+
+    private sealed class EventEntryDto
+    {
+        public int Id { get; set; }
+        public int BossMobId { get; set; }
+        public List<EscortDto>? Escort { get; set; }
+        public int IntervalSeconds { get; set; }
+        public string? AreaName { get; set; }
+        public List<PointDto>? Points { get; set; }
+    }
+
+    private sealed class EscortDto
+    {
+        public int MobId { get; set; }
+        public int Count { get; set; }
+    }
+
+    private sealed class PointDto
+    {
+        public int X { get; set; }
+        public int Y { get; set; }
     }
 
     private static IReadOnlyList<PortalDefinition> LoadPortals(string path)

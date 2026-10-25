@@ -1023,4 +1023,55 @@ namespace Lumiis.Shared.Net
             MapHeight = reader.ReadInt32();
         }
     }
+
+    /// <summary>Ein lebender Mini-Boss auf der eigenen Karte (siehe MapEventsPacket).</summary>
+    public struct MapEventInfo
+    {
+        public int EventId;
+        public int MobId;
+        public string Name;
+        public int PositionX;
+        public int PositionY;
+    }
+
+    /// <summary>Karten-Events: voller Stand aller gerade lebenden Mini-Bosse der eigenen Karte (leere Liste = keiner).
+    /// Position = Erscheinungsort (Anker), der Boss wandert nur wenig darum herum.</summary>
+    public sealed class MapEventsPacket : IPacket
+    {
+        public List<MapEventInfo> Events = new List<MapEventInfo>();
+
+        public PacketId Id
+        {
+            get { return PacketId.MapEvents; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteByte((byte)Events.Count);
+            foreach (MapEventInfo e in Events)
+            {
+                writer.WriteInt32(e.EventId);
+                writer.WriteInt32(e.MobId);
+                writer.WriteString(e.Name ?? "");
+                writer.WriteInt32(e.PositionX);
+                writer.WriteInt32(e.PositionY);
+            }
+        }
+
+        public void Read(PacketReader reader)
+        {
+            int count = reader.ReadByte();
+            Events = new List<MapEventInfo>(count);
+            for (int i = 0; i < count; i++)
+            {
+                MapEventInfo e;
+                e.EventId = reader.ReadInt32();
+                e.MobId = reader.ReadInt32();
+                e.Name = reader.ReadString();
+                e.PositionX = reader.ReadInt32();
+                e.PositionY = reader.ReadInt32();
+                Events.Add(e);
+            }
+        }
+    }
 }

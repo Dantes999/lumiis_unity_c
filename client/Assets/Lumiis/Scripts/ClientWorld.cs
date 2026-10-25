@@ -123,6 +123,16 @@ namespace Lumiis.Client
             if (mapHeight > 0) MapHeight = mapHeight;
         }
 
+        /// <summary>Karten-Events (Protocol.Version 22): gerade lebende Mini-Bosse der eigenen Karte mit
+        /// Erscheinungsort, voller Resync aus MapEventsPacket - für Minimap-Markierungen, unabhängig von AOI.</summary>
+        public List<MapEventInfo> MapEvents { get; } = new List<MapEventInfo>();
+
+        public void HandleMapEvents(List<MapEventInfo> events)
+        {
+            MapEvents.Clear();
+            if (events != null) MapEvents.AddRange(events);
+        }
+
         public event Action<ClientEntity> EntitySpawned;
         public event Action<int> EntityDespawned;
         public event Action<string> Warning;
@@ -130,6 +140,7 @@ namespace Lumiis.Client
         public void Reset()
         {
             ClearEntities();
+            MapEvents.Clear();
             MapId = "village";
             MapName = "Dorf";
             MapWidth = GameConstants.MapWidth;
@@ -182,6 +193,7 @@ namespace Lumiis.Client
             Appearance appearance = local?.Appearance ?? default;
 
             ClearEntities();
+            MapEvents.Clear(); // der Server schickt direkt danach den Stand der neuen Karte
             ApplyMapInfo(mapId, mapName, mapWidth, mapHeight);
             LocalEntityId = entityId;
             ApplyAppearance(entityId, name, EntityKind.Player, typeId: 0, x, y, appearance);

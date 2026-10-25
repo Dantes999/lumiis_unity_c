@@ -746,15 +746,105 @@ public sealed class World
             for (int i = 0; i < wave.Count; i++)
             {
                 (int x, int y) = FindNearbyWalkablePoint(target.IntX, target.IntY, 150, 350);
-                Entity waveMob = SpawnMonster(wave.MobId, mobDef.Name, x, y, mobDef.SpeedWire,
-                    mobDef.WanderRadiusWire, mobDef.WanderIntervalMinMs, mobDef.WanderIntervalMaxMs, nowMs,
-                    mobDef.MaxHp, mobDef.Attack, mobDef.Defense, mobDef.YangMin, mobDef.YangMax,
-                    meleeRangeWire: mobDef.MeleeRangeWire, attackCooldownMs: mobDef.AttackCooldownMs,
-                    aggressive: mobDef.Aggressive, aggroRangeWire: mobDef.AggroRangeWire, leashRangeWire: mobDef.LeashRangeWire,
-                    drops: mobDef.Drops.Select(d => (d.ItemId, d.ChancePercent)).ToList(),
-                    level: mobDef.Level, baseXp: mobDef.BaseXp);
-                waveMob.FightsBack = mobDef.FightsBack;
+                SpawnFromDefinition(mobDef, x, y, nowMs);
             }
+        }
+    }
+
+    /// <summary>Monster ohne SpawnPoint (kein Respawn) mit allen Werten aus der MobCatalog - für Metin-Wellen und
+    /// Karten-Events.</summary>
+    private Entity SpawnFromDefinition(MobDefinition mobDef, int x, int y, long nowMs)
+    {
+        Entity mob = SpawnMonster(mobDef.Id, mobDef.Name, x, y, mobDef.SpeedWire,
+            mobDef.WanderRadiusWire, mobDef.WanderIntervalMinMs, mobDef.WanderIntervalMaxMs, nowMs,
+            mobDef.MaxHp, mobDef.Attack, mobDef.Defense, mobDef.YangMin, mobDef.YangMax,
+            meleeRangeWire: mobDef.MeleeRangeWire, attackCooldownMs: mobDef.AttackCooldownMs,
+            aggressive: mobDef.Aggressive, aggroRangeWire: mobDef.AggroRangeWire, leashRangeWire: mobDef.LeashRangeWire,
+            drops: mobDef.Drops.Select(d => (d.ItemId, d.ChancePercent)).ToList(),
+            level: mobDef.Level, baseXp: mobDef.BaseXp);
+        mob.FightsBack = mobDef.FightsBack;
+        return mob;
+    }
+
+    /// <summary>Laufzeitstand eines Karten-Events: lebender Boss (EntityId) oder Zeitpunkt des nächsten Erscheinens.</summary>
+    private sealed class MapEventState
+    {
+        public required MapEventDefinition Definition { get; init; }
+        public int? BossEntityId { get; set; }
+        public long NextSpawnAtMs { get; set; } = -1;
+        public int X { get; set; }
+        public int Y { get; set; }
+    }
+
+    private List<MapEventState>? _mapEvents;
+
+    /// <summary>Ein Event hat sich geändert: Boss erschienen (Spawned) oder besiegt.</summary>
+    public readonly record struct MapEventChange(int EventId, int BossEntityId, string BossName, bool Spawned, int X, int Y,
+        string AreaName);
+
+    /// <summary>Karten-Events (events.json): einmal pro Tick nach Tick() aufrufen. Beim ersten Aufruf wird jedes
+    /// Event zufällig zwischen 30 s und der Hälfte seines Intervalls eingeplant (nach Serverstart lohnt sich das
+    /// Suchen bald); stirbt ein Boss, kommt er IntervalSeconds später an einem zufälligen seiner Punkte wieder.
+    /// Ohne MapDefinition/MobCatalog ein No-op.</summary>
+    public List<MapEventChange> RunMapEvents(long nowMs)
+    {
+        var changes = new List<MapEventChange>();
+        if (_mapDefinition == null || _mobCatalog == null || _mapDefinition.Events.Count == 0) return changes;
+        if (_mapEvents == null)
+        {
+            _mapEvents = new List<MapEventState>();
+            foreach (MapEventDefinition def in _mapDefinition.Events)
+            {
+                long half = Math.Max(30_000L, def.IntervalSeconds * 1000L / 2);
+                _mapEvents.Add(new MapEventState
+                {
+                    Definition = def,
+                    NextSpawnAtMs = nowMs + 30_000 + (long)(_random.NextDouble() * (half - 30_000)),
+                });
+            }
+        }
+
+        foreach (MapEventState ev in _mapEvents)
+        {
+            MapEventDefinition def = ev.Definition;
+            if (ev.BossEntityId is int bossId)
+            {
+                if (_entities.TryGetValue(bossId, out Entity? alive) && !alive.IsDead) continue;
+                ev.BossEntityId = null;
+                ev.NextSpawnAtMs = nowMs + def.IntervalSeconds * 1000L;
+                string deadName = _mobCatalog.TryGet(def.BossMobId, out MobDefinition deadDef) ? deadDef.Name : "";
+                changes.Add(new MapEventChange(def.Id, bossId, deadName, false, ev.X, ev.Y, def.AreaName));
+                continue;
+            }
+            if (nowMs < ev.NextSpawnAtMs || !_mobCatalog.TryGet(def.BossMobId, out MobDefinition bossDef)) continue;
+
+            (int px, int py) = def.Points[_random.Next(def.Points.Count)];
+            Entity boss = SpawnFromDefinition(bossDef, px, py, nowMs);
+            foreach ((int mobId, int count) in def.Escort)
+            {
+                if (!_mobCatalog.TryGet(mobId, out MobDefinition escDef)) continue;
+                for (int i = 0; i < count; i++)
+                {
+                    (int ex, int ey) = FindNearbyWalkablePoint(px, py, 100, 300);
+                    SpawnFromDefinition(escDef, ex, ey, nowMs);
+                }
+            }
+            ev.BossEntityId = boss.Id;
+            ev.X = px;
+            ev.Y = py;
+            changes.Add(new MapEventChange(def.Id, boss.Id, bossDef.Name, true, px, py, def.AreaName));
+        }
+        return changes;
+    }
+
+    /// <summary>Alle gerade lebenden Event-Bosse dieser Karte (für MapEventsPacket).</summary>
+    public IEnumerable<(int EventId, int MobId, string Name, int X, int Y)> ActiveMapEvents()
+    {
+        if (_mapEvents == null) yield break;
+        foreach (MapEventState ev in _mapEvents)
+        {
+            if (ev.BossEntityId is int id && _entities.TryGetValue(id, out Entity? boss))
+                yield return (ev.Definition.Id, boss.TypeId, boss.Name, ev.X, ev.Y);
         }
     }
 

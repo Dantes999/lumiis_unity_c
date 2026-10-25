@@ -103,6 +103,24 @@ namespace Lumiis.Tests
         }
 
         [Fact]
+        public void MapEvents_RoundTrip()
+        {
+            var original = new MapEventsPacket();
+            original.Events.Add(new MapEventInfo { EventId = 3, MobId = 41, Name = "Hauerkönig", PositionX = 51234, PositionY = 47000 });
+            original.Events.Add(new MapEventInfo { EventId = 5, MobId = 44, Name = "Schneetiger", PositionX = 1, PositionY = 99999 });
+            var decoded = Assert.IsType<MapEventsPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(2, decoded.Events.Count);
+            Assert.Equal(original.Events[0].EventId, decoded.Events[0].EventId);
+            Assert.Equal(original.Events[0].MobId, decoded.Events[0].MobId);
+            Assert.Equal(original.Events[0].Name, decoded.Events[0].Name);
+            Assert.Equal(original.Events[1].PositionX, decoded.Events[1].PositionX);
+            Assert.Equal(original.Events[1].PositionY, decoded.Events[1].PositionY);
+
+            var empty = Assert.IsType<MapEventsPacket>(PacketCodec.Decode(PacketCodec.Encode(new MapEventsPacket())));
+            Assert.Empty(empty.Events);
+        }
+
+        [Fact]
         public void DebugChangeMapRequest_RoundTrip()
         {
             var original = new DebugChangeMapRequestPacket { MapId = "village" };

@@ -731,6 +731,44 @@
       "fightsBack": false
     },
     {
+      "id": 25,
+      "name": "Hungriger Wildhund",
+      "speedWire": 420,
+      "wanderRadiusWire": 400,
+      "wanderIntervalMinMs": 3000,
+      "wanderIntervalMaxMs": 7000,
+      "maxHp": 140,
+      "attack": 14,
+      "defense": 2,
+      "yangMin": 6,
+      "yangMax": 12,
+      "meleeRangeWire": 150,
+      "attackCooldownMs": 1500,
+      "aggressive": true,
+      "aggroRangeWire": 500,
+      "leashRangeWire": 900,
+      "level": 2,
+      "baseXp": 20,
+      "drops": [
+        {
+          "itemId": 8,
+          "chancePercent": 30
+        },
+        {
+          "itemId": 6,
+          "chancePercent": 10
+        },
+        {
+          "itemId": 40,
+          "chancePercent": 20
+        },
+        {
+          "itemId": 41,
+          "chancePercent": 10
+        }
+      ]
+    },
+    {
       "id": 26,
       "name": "Blauer Wolf",
       "speedWire": 462,
@@ -1149,6 +1187,264 @@
         {
           "itemId": 9,
           "chancePercent": 3
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "name": "Rudelführer Aschpelz",
+      "speedWire": 448,
+      "wanderRadiusWire": 150,
+      "wanderIntervalMinMs": 3000,
+      "wanderIntervalMaxMs": 7000,
+      "maxHp": 2584,
+      "attack": 34,
+      "defense": 8,
+      "yangMin": 18,
+      "yangMax": 360,
+      "meleeRangeWire": 200,
+      "attackCooldownMs": 1300,
+      "aggressive": true,
+      "aggroRangeWire": 500,
+      "leashRangeWire": 900,
+      "level": 6,
+      "baseXp": 640,
+      "drops": [
+        {
+          "itemId": 9,
+          "chancePercent": 100
+        },
+        {
+          "itemId": 8,
+          "chancePercent": 75
+        },
+        {
+          "itemId": 4,
+          "chancePercent": 36
+        },
+        {
+          "itemId": 7,
+          "chancePercent": 30
+        },
+        {
+          "itemId": 25,
+          "chancePercent": 24
+        },
+        {
+          "itemId": 41,
+          "chancePercent": 45
+        },
+        {
+          "itemId": 42,
+          "chancePercent": 30
+        },
+        {
+          "itemId": 43,
+          "chancePercent": 45
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "name": "Hauerkönig",
+      "speedWire": 420,
+      "wanderRadiusWire": 150,
+      "wanderIntervalMinMs": 3000,
+      "wanderIntervalMaxMs": 7000,
+      "maxHp": 3672,
+      "attack": 40,
+      "defense": 13,
+      "yangMin": 30,
+      "yangMax": 600,
+      "meleeRangeWire": 200,
+      "attackCooldownMs": 1500,
+      "aggressive": true,
+      "aggroRangeWire": 500,
+      "leashRangeWire": 900,
+      "level": 10,
+      "baseXp": 1050,
+      "drops": [
+        {
+          "itemId": 9,
+          "chancePercent": 100
+        },
+        {
+          "itemId": 8,
+          "chancePercent": 75
+        },
+        {
+          "itemId": 4,
+          "chancePercent": 36
+        },
+        {
+          "itemId": 7,
+          "chancePercent": 30
+        },
+        {
+          "itemId": 25,
+          "chancePercent": 24
+        },
+        {
+          "itemId": 41,
+          "chancePercent": 45
+        },
+        {
+          "itemId": 42,
+          "chancePercent": 30
+        },
+        {
+          "itemId": 43,
+          "chancePercent": 45
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "name": "Frostmähne",
+      "speedWire": 476,
+      "wanderRadiusWire": 150,
+      "wanderIntervalMinMs": 3000,
+      "wanderIntervalMaxMs": 7000,
+      "maxHp": 7616,
+      "attack": 74,
+      "defense": 25,
+      "yangMin": 45,
+      "yangMax": 900,
+      "meleeRangeWire": 200,
+      "attackCooldownMs": 1300,
+      "aggressive": true,
+      "aggroRangeWire": 500,
+      "leashRangeWire": 900,
+      "level": 15,
+      "baseXp": 3650,
+      "drops": [
+        {
+          "itemId": 9,
+          "chancePercent": 100
+        },
+        {
+          "itemId": 35,
+          "chancePercent": 45
+        },
+        {
+          "itemId": 21,
+          "chancePercent": 9
+        },
+        {
+          "itemId": 26,
+          "chancePercent": 9
+        },
+        {
+          "itemId": 42,
+          "chancePercent": 45
+        },
+        {
+          "itemId": 44,
+          "chancePercent": 30
+        },
+        {
+          "itemId": 9,
+          "chancePercent": 9
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "name": "Altbär Grimmtatze",
+      "speedWire": 392,
+      "wanderRadiusWire": 150,
+      "wanderIntervalMinMs": 3000,
+      "wanderIntervalMaxMs": 7000,
+      "maxHp": 14280,
+      "attack": 103,
+      "defense": 37,
+      "yangMin": 60,
+      "yangMax": 1200,
+      "meleeRangeWire": 200,
+      "attackCooldownMs": 1700,
+      "aggressive": true,
+      "aggroRangeWire": 500,
+      "leashRangeWire": 900,
+      "level": 20,
+      "baseXp": 6500,
+      "drops": [
+        {
+          "itemId": 9,
+          "chancePercent": 100
+        },
+        {
+          "itemId": 35,
+          "chancePercent": 45
+        },
+        {
+          "itemId": 21,
+          "chancePercent": 9
+        },
+        {
+          "itemId": 26,
+          "chancePercent": 9
+        },
+        {
+          "itemId": 42,
+          "chancePercent": 45
+        },
+        {
+          "itemId": 44,
+          "chancePercent": 30
+        },
+        {
+          "itemId": 9,
+          "chancePercent": 9
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "name": "Schneetiger",
+      "speedWire": 504,
+      "wanderRadiusWire": 150,
+      "wanderIntervalMinMs": 3000,
+      "wanderIntervalMaxMs": 7000,
+      "maxHp": 14960,
+      "attack": 115,
+      "defense": 34,
+      "yangMin": 66,
+      "yangMax": 1320,
+      "meleeRangeWire": 200,
+      "attackCooldownMs": 1200,
+      "aggressive": true,
+      "aggroRangeWire": 500,
+      "leashRangeWire": 900,
+      "level": 22,
+      "baseXp": 8000,
+      "drops": [
+        {
+          "itemId": 9,
+          "chancePercent": 100
+        },
+        {
+          "itemId": 35,
+          "chancePercent": 60
+        },
+        {
+          "itemId": 23,
+          "chancePercent": 6
+        },
+        {
+          "itemId": 27,
+          "chancePercent": 6
+        },
+        {
+          "itemId": 44,
+          "chancePercent": 36
+        },
+        {
+          "itemId": 45,
+          "chancePercent": 24
+        },
+        {
+          "itemId": 9,
+          "chancePercent": 15
         }
       ]
     },

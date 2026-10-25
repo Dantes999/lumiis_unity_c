@@ -288,6 +288,25 @@ namespace Lumiis.Tests.Client
         }
 
         [Fact]
+        public void HandleMapEvents_IsFullResync_AndClearedOnMapChange()
+        {
+            var world = new ClientWorld();
+            world.HandleJoinAccepted(1, 50000, 50000, "Me", SomeAppearance, mapId: "map1", mapName: "Yongan");
+            world.HandleMapEvents(new List<MapEventInfo>
+            {
+                new MapEventInfo { EventId = 1, MobId = 40, Name = "Boss A", PositionX = 1000, PositionY = 2000 },
+                new MapEventInfo { EventId = 2, MobId = 41, Name = "Boss B", PositionX = 3000, PositionY = 4000 },
+            });
+            Assert.Equal(2, world.MapEvents.Count);
+
+            world.HandleMapEvents(new List<MapEventInfo> { new MapEventInfo { EventId = 2, MobId = 41, Name = "Boss B" } });
+            Assert.Equal(2, Assert.Single(world.MapEvents).EventId);
+
+            world.HandleMapChanged(1, 50000, 65000, "map2", "Jayang", 100000, 100000);
+            Assert.Empty(world.MapEvents);
+        }
+
+        [Fact]
         public void HandleMapChanged_ClearsOtherEntitiesKeepsLocalIdentityAndStats()
         {
             var world = new ClientWorld();

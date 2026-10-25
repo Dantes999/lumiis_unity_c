@@ -173,15 +173,26 @@ Seit 2026-10-25 gibt es echte, begehbare Karten statt einer einzigen Welt. Detai
     3/5/6/8), `collision.bin` und die Häuser in `props.json` (Laternen/Brunnen/Denkmäler von Hand,
     `village` = Dorfplatzmitte in Kacheln).
   - `tools/build-wiki-content.py` erzeugt `mobs.json` (ids ≤ 6 bleiben), `metins.json`, `npcs.json`,
-    `monster-looks.json` und je Karte `map/spawns/npcs/portals.json`. **Monster und Verteilung 1:1 aus
-    lumiis-2d** (Wunsch des Users, Stand 4376dae, Export per `tools/export-lumiis-map.mjs spawns|mobs <karte>`
-    nach `tools/lumiis2d-<karte>-{spawns,mobs}.json`): Gruppen, Steine (fest auf `count` verteilten
-    Kandidatenpunkten), Anführer/Einzelgänger, Werte (Level/HP/Angriff/Verteidigung/EXP/aggressiv/Takt,
-    Tempo ×140 Wire) und Metin-Wellen (Jayang 10 Schwellen, bis 64 Einträge je Stein,
-    `Entity.MetinWavesTriggeredMask` ist `ulong`). Versatz lumiis-2d→Wiki-Raster über den Dorfplatz, blockierte
-    Positionen rücken bis 10 Kacheln weiter, sonst entfällt das Monster. NPCs/Portale/Denkmäler nach Wiki:
+    `monster-looks.json` und je Karte `map/spawns/npcs/portals/events.json`. **Monsterwerte/-aussehen aus
+    lumiis-2d** (Stand 4376dae, `tools/lumiis2d-<karte>-mobs.json`: Level/HP/Angriff/Verteidigung/EXP/aggressiv/
+    Takt, Tempo ×140 Wire, Metin-Wellen bis 64 Einträge je Stein, `Entity.MetinWavesTriggeredMask` ist `ulong`).
+    **Verteilung nach Level und Geografie** (Wunsch des Users 2026-10-25, ersetzt die 1:1-lumiis-2d-Verteilung):
+    Level steigt mit der begehbaren (geodätischen) Entfernung vom Dorfplatz, auf Jayang zusätzlich vom
+    Ankunftsportal aus - man kommt am Rand an und trifft nicht sofort die harten Gegner. Yongan: innerster Ring
+    nur Wildhunde + "Hungriger Wildhund" (neu, Lv 2), dann Wölfe, Wildschweine/Blauwölfe, Grau-/Blauwolf-Rudel,
+    Bären/Rote Keiler, außen Grizzlys/Tiger; Themen je Gebiet nach Gelände (Fels/Wasser/Ebene), "Weißer Eid" als
+    zusammenhängende Ebene nahe dem Jayang-Portal, Tiger an der Küste. Jayang: Fraktionsgebiete Lv 18-42.
+    Lumiis-Steine stehen dort, wo das Gebietslevel zur Steinstufe passt (5/10/15/20/25/...). Vorschau:
+    `<karte>-spawns.png`/`-zones.png` (nicht im Repo).
+  - Mini-Boss-Events (Protocol.Version 22): `data/maps/<karte>/events.json` (Boss-MobId, Eskorte, Intervall,
+    Ortsname, mögliche Erscheinungsorte im passenden Levelgebiet; geladen/validiert von `MapCatalog.LoadEvents`).
+    `World.RunMapEvents`: erster Boss 30 s bis halbes Intervall nach Start, danach `intervalSeconds` nach dem
+    Tod, höchstens einer je Event. Yongan 5 Bosse (Mob 40-44, Lv 6-22, 10-30 min), Jayang 5 (Kapitäne, 25-40
+    min). Ankündigung als System-Chat an die Karte, `MapEventsPacket` (1026, voller Resync der lebenden Bosse
+    mit Position) bei Join/Kartenwechsel/jeder Änderung -> `ClientWorld.MapEvents` für Minimap-Markierungen.
+    NPCs/Portale/Denkmäler nach Wiki:
     Händler mit Sortiment, Schmied, übrige NPCs ohne Dienst grüßen nur im Chat (`NpcService.None`).
-    Yongan: 2955 Spawns, 31 NPCs; Jayang: 3278 Spawns, 22 NPCs; Portal Yongan-Nord ↔ Jayang-Ost. Für diese
+    Yongan: 3105 Spawns, 31 NPCs; Jayang: 2824 Spawns, 22 NPCs; Portal Yongan-Nord ↔ Jayang-Ost. Für diese
     Dichte berechnet `GameServer` Sichtbarkeit nur noch je Spieler (`World.ComputeVisibleTo`, O(n)) und die
     Aggro-Suche läuft über die einmal pro Tick gesammelten Spieler (Tick ~0,35 ms bei ~3000 Monstern).
   - Client: `TerrainArt` (UnityEngine-frei, per `dotnet test` geprüft, Port des eigenen lumiis-2d-Kartenstils)
@@ -1386,6 +1397,10 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   `dotnet test` geprüft): gleichmäßige Phase (9 Bilder/s, mit Tempo skaliert), Schritt links/Mitte/Schritt
   rechts/Mitte (Sheet-Spalten 1/0/2/0), Wippen synchron, Losgehen startet mit einem Schritt, 0,12 s Nachlauf;
   Totzone für die Mausrichtung, siehe Abschnitt "Map1, Steuerung und Spiel-UI".
+- Monster-Gebiete nach Level/Geografie + Mini-Boss-Events (2026-10-25, Protocol.Version 22): Verteilung nicht
+  mehr 1:1 lumiis-2d, sondern Level-Ringe um die Stadt (Jayang ab Portal), Gebietsthemen nach Gelände, Steine
+  nach Gebietslevel, `events.json` + `World.RunMapEvents` + `MapEventsPacket`, `ClientWorld.MapEvents`
+  (Minimap-Marker macht der UI-Thread). Siehe Abschnitt Map1. 733 Tests grün.
 - Offen: Monster-Sheets für die Jayang-Mobs, weitere Zonen/Dungeons, Reittiere; siehe
   `docs/feature-gap-lumiis.md`.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client

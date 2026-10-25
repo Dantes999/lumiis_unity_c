@@ -134,6 +134,11 @@ namespace Lumiis.Shared.Net
         /// <summary>M6c: Aufwertung gar nicht erst versucht (leerer Slot, Maximalstufe, fehlendes Material/
         /// fehlende Schutzrolle) - nur an den Anfragenden, Verbindung bleibt bestehen.</summary>
         UpgradeActionFailed = 1024,
+
+        /// <summary>Karten-Events (Protocol.Version 22): alle gerade lebenden Mini-Bosse der eigenen Karte mit
+        /// Position (voller Resync) - bei Join/Kartenwechsel und bei jedem Erscheinen/Tod an alle Spieler der
+        /// Karte. Für Minimap-Markierungen, unabhängig vom Sichtbereich (AOI).</summary>
+        MapEvents = 1026,
     }
 
     /// <summary>Jede neue PacketId braucht hier eine Zeile (ein Test prüft das).</summary>
@@ -196,6 +201,7 @@ namespace Lumiis.Shared.Net
                 case PacketId.UpgradeItemRequest: return new UpgradeItemRequestPacket();
                 case PacketId.UpgradeItemResult: return new UpgradeItemResultPacket();
                 case PacketId.UpgradeActionFailed: return new UpgradeActionFailedPacket();
+                case PacketId.MapEvents: return new MapEventsPacket();
                 default: return null;
             }
         }

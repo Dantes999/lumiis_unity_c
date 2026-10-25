@@ -1,0 +1,183 @@
+{
+  "_hinweis": "Mini-Boss-Events: erscheinen zeitgesteuert an einem der Punkte, Ankündigung im Kartenchat. Erzeugt von tools/build-wiki-content.py.",
+  "events": [
+    {
+      "id": 1,
+      "bossMobId": 79,
+      "escort": [
+        {
+          "mobId": 66,
+          "count": 2
+        },
+        {
+          "mobId": 75,
+          "count": 2
+        }
+      ],
+      "intervalSeconds": 1500,
+      "areaName": "im Westen",
+      "points": [
+        {
+          "x": 30950,
+          "y": 49850
+        },
+        {
+          "x": 27350,
+          "y": 51850
+        },
+        {
+          "x": 28350,
+          "y": 48250
+        },
+        {
+          "x": 30250,
+          "y": 52450
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "bossMobId": 80,
+      "escort": [
+        {
+          "mobId": 66,
+          "count": 2
+        },
+        {
+          "mobId": 75,
+          "count": 2
+        }
+      ],
+      "intervalSeconds": 1500,
+      "areaName": "im Westen",
+      "points": [
+        {
+          "x": 28850,
+          "y": 46750
+        },
+        {
+          "x": 32150,
+          "y": 42150
+        },
+        {
+          "x": 32350,
+          "y": 45750
+        },
+        {
+          "x": 28650,
+          "y": 41750
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "bossMobId": 81,
+      "escort": [
+        {
+          "mobId": 66,
+          "count": 2
+        },
+        {
+          "mobId": 75,
+          "count": 2
+        }
+      ],
+      "intervalSeconds": 1800,
+      "areaName": "im Nordosten",
+      "points": [
+        {
+          "x": 67350,
+          "y": 56650
+        },
+        {
+          "x": 64050,
+          "y": 60650
+        },
+        {
+          "x": 68050,
+          "y": 60950
+        },
+        {
+          "x": 63350,
+          "y": 56650
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "bossMobId": 82,
+      "escort": [
+        {
+          "mobId": 75,
+          "count": 1
+        },
+        {
+          "mobId": 68,
+          "count": 1
+        },
+        {
+          "mobId": 72,
+          "count": 1
+        },
+        {
+          "mobId": 66,
+          "count": 2
+        }
+      ],
+      "intervalSeconds": 2400,
+      "areaName": "im Nordwesten",
+      "points": [
+        {
+          "x": 31250,
+          "y": 69450
+        },
+        {
+          "x": 28250,
+          "y": 66750
+        },
+        {
+          "x": 28650,
+          "y": 69750
+        },
+        {
+          "x": 30350,
+          "y": 67450
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "bossMobId": 95,
+      "escort": [
+        {
+          "mobId": 88,
+          "count": 2
+        },
+        {
+          "mobId": 89,
+          "count": 2
+        }
+      ],
+      "intervalSeconds": 2400,
+      "areaName": "im Nordosten",
+      "points": [
+        {
+          "x": 62050,
+          "y": 71650
+        },
+        {
+          "x": 58650,
+          "y": 73650
+        },
+        {
+          "x": 59750,
+          "y": 70850
+        },
+        {
+          "x": 60550,
+          "y": 73050
+        }
+      ]
+    }
+  ]
+}

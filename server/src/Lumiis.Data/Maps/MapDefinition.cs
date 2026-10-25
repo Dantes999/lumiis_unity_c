@@ -53,9 +53,12 @@ public sealed class MapDefinition
     public IReadOnlyList<SpawnPoint> Spawns { get; }
     public IReadOnlyList<NpcPlacement> NpcPlacements { get; }
 
+    /// <summary>Mini-Boss-Events (optional, events.json) - siehe MapEventDefinition.</summary>
+    public IReadOnlyList<MapEventDefinition> Events { get; }
+
     public MapDefinition(string id, string name, CollisionMap collision, int startX, int startY,
         IReadOnlyList<PortalDefinition>? portals = null, IReadOnlyList<SpawnPoint>? spawns = null,
-        IReadOnlyList<NpcPlacement>? npcPlacements = null)
+        IReadOnlyList<NpcPlacement>? npcPlacements = null, IReadOnlyList<MapEventDefinition>? events = null)
     {
         if (string.IsNullOrWhiteSpace(id))
             throw new MapCatalogException("Karte ohne Id.");
@@ -72,6 +75,7 @@ public sealed class MapDefinition
         Portals = portals ?? Array.Empty<PortalDefinition>();
         Spawns = spawns ?? Array.Empty<SpawnPoint>();
         NpcPlacements = npcPlacements ?? Array.Empty<NpcPlacement>();
+        Events = events ?? Array.Empty<MapEventDefinition>();
 
         ValidateCoordinates(id, "Startposition", startX, startY, collision);
         if (collision.IsBlockedAtWire(startX, startY))

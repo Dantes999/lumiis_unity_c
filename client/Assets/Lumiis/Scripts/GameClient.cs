@@ -1765,6 +1765,13 @@ namespace Lumiis.Client
                 return;
             }
 
+            MapEventsPacket mapEvents = packet as MapEventsPacket;
+            if (mapEvents != null)
+            {
+                _world.HandleMapEvents(mapEvents.Events);
+                return;
+            }
+
             // JoinRejected: keine eigene Behandlung hier nötig - LoginController zeigt die Fehlermeldung im
             // UI, GameClient war zu diesem Zeitpunkt ohnehin nie InGame.
 

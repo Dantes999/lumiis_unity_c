@@ -164,6 +164,49 @@ namespace Lumiis.Tests.Data.Maps
             Assert.False(portal.Contains(301, 400));
         }
 
+        private const string EventMobsJson = @"{ ""mobs"": [
+    { ""id"": 1, ""name"": ""Boss"", ""speedWire"": 100, ""wanderRadiusWire"": 100, ""wanderIntervalMinMs"": 1000, ""wanderIntervalMaxMs"": 2000, ""maxHp"": 10, ""attack"": 1, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 0, ""meleeRangeWire"": 100, ""attackCooldownMs"": 1000, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 300, ""level"": 1, ""baseXp"": 1 } ] }";
+
+        private static IReadOnlyList<MapEventDefinition> LoadEventsJson(string json, CollisionMap collision)
+        {
+            string path = Path.Combine(Path.GetTempPath(), "lumiis-events-" + Guid.NewGuid().ToString("N") + ".json");
+            File.WriteAllText(path, json);
+            try
+            {
+                return MapCatalog.LoadEvents("t", path, MobCatalog.LoadFromJson(EventMobsJson), collision);
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        [Fact]
+        public void Events_ValidFile_Loads()
+        {
+            var events = LoadEventsJson(@"{ ""events"": [ { ""id"": 1, ""bossMobId"": 1, ""escort"": [ { ""mobId"": 1, ""count"": 2 } ],
+                ""intervalSeconds"": 600, ""areaName"": ""im Norden"", ""points"": [ { ""x"": 550, ""y"": 550 } ] } ] }", BuildMap());
+            MapEventDefinition ev = Assert.Single(events);
+            Assert.Equal(600, ev.IntervalSeconds);
+            Assert.Equal("im Norden", ev.AreaName);
+            Assert.Equal((1, 2), Assert.Single(ev.Escort));
+            Assert.Equal((550, 550), Assert.Single(ev.Points));
+        }
+
+        [Theory]
+        [InlineData(@"{ ""events"": [ { ""id"": 1, ""bossMobId"": 99, ""intervalSeconds"": 600, ""points"": [ { ""x"": 550, ""y"": 550 } ] } ] }", "unbekannte Boss-MobId")]
+        [InlineData(@"{ ""events"": [ { ""id"": 1, ""bossMobId"": 1, ""intervalSeconds"": 0, ""points"": [ { ""x"": 550, ""y"": 550 } ] } ] }", "intervalSeconds")]
+        [InlineData(@"{ ""events"": [ { ""id"": 1, ""bossMobId"": 1, ""intervalSeconds"": 600, ""points"": [] } ] }", "keine Erscheinungsorte")]
+        [InlineData(@"{ ""events"": [ { ""id"": 1, ""bossMobId"": 1, ""intervalSeconds"": 600, ""points"": [ { ""x"": 150, ""y"": 150 } ] } ] }", "nicht begehbar")]
+        [InlineData(@"{ ""events"": [ { ""id"": 1, ""bossMobId"": 1, ""intervalSeconds"": 600, ""escort"": [ { ""mobId"": 1, ""count"": 21 } ], ""points"": [ { ""x"": 550, ""y"": 550 } ] } ] }", "Eskorte-Anzahl")]
+        [InlineData(@"{ ""events"": [ { ""id"": 1, ""bossMobId"": 1, ""intervalSeconds"": 600, ""points"": [ { ""x"": 550, ""y"": 550 } ] },
+                                     { ""id"": 1, ""bossMobId"": 1, ""intervalSeconds"": 600, ""points"": [ { ""x"": 550, ""y"": 550 } ] } ] }", "doppelte Event-Id")]
+        public void Events_InvalidFile_Throws(string json, string expected)
+        {
+            var ex = Assert.Throws<MapCatalogException>(() => LoadEventsJson(json, BuildMap((1, 1))));
+            Assert.Contains(expected, ex.Message);
+        }
+
         [Fact]
         public void RealMapData_VillageAndGreenfield_LoadAndValidate()
         {
@@ -215,6 +258,8 @@ namespace Lumiis.Tests.Data.Maps
             Assert.False(map1.Collision.IsBlockedAtWire(toMap1.TargetX, toMap1.TargetY));
             Assert.True(map2.Spawns.Count > 100);
             Assert.True(map2.NpcPlacements.Count >= 20); // Wiki-NPCs von Jayang
+            Assert.NotEmpty(map1.Events); // Mini-Boss-Events aus events.json
+            Assert.NotEmpty(map2.Events);
 
             MapDefinition village = catalog.Get("village");
             Assert.EndsWith("Dorf", village.Name);

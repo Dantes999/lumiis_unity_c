@@ -81,6 +81,12 @@
       "stone": true
     },
     {
+      "mobId": 25,
+      "sheet": "dog",
+      "tint": "#ffb4a0",
+      "scale": 0.85
+    },
+    {
       "mobId": 26,
       "sheet": "blue_wolf"
     },
@@ -123,6 +129,34 @@
       "mobId": 39,
       "sheet": "tiger",
       "scale": 1.44
+    },
+    {
+      "mobId": 40,
+      "sheet": "alpha_wolf",
+      "tint": "#d8d0c8",
+      "scale": 1.55
+    },
+    {
+      "mobId": 41,
+      "sheet": "boar",
+      "scale": 1.6
+    },
+    {
+      "mobId": 42,
+      "sheet": "alpha_grey_wolf",
+      "tint": "#c8e0ff",
+      "scale": 1.6
+    },
+    {
+      "mobId": 43,
+      "sheet": "grizzly",
+      "scale": 1.8
+    },
+    {
+      "mobId": 44,
+      "sheet": "tiger",
+      "tint": "#f0f4ff",
+      "scale": 1.6
     },
     {
       "mobId": 50,

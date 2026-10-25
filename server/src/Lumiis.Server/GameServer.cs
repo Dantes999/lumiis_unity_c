@@ -445,6 +445,22 @@ public sealed class GameServer : INetEventListener
 
             foreach (int expiredGroundItemId in world.RemoveExpiredGroundItems(tickNowMs))
                 BroadcastDespawn(expiredGroundItemId);
+
+            // Karten-Events: Mini-Bosse erscheinen zeitgesteuert - Ankündigung im Chat der Karte, Minimap-Stand an alle
+            List<World.MapEventChange> eventChanges = world.RunMapEvents(tickNowMs);
+            if (eventChanges.Count > 0)
+            {
+                foreach (World.MapEventChange change in eventChanges)
+                {
+                    string text = change.Spawned
+                        ? $"{change.BossName} ist {change.AreaName} erschienen!"
+                        : $"{change.BossName} wurde besiegt.";
+                    BroadcastToWorld(new ChatMessagePacket { Channel = ChatChannel.System, SenderName = "System", Text = text },
+                        world);
+                    _logger.Info($"Karte {world.MapId}: Event {change.EventId} - {text}");
+                }
+                BroadcastToWorld(BuildMapEventsPacket(world), world);
+            }
         }
 
         // Gruppe: Offline-Mitglieder nach Ablauf der Frist (data/party.json) entfernen.
@@ -586,6 +602,7 @@ public sealed class GameServer : INetEventListener
                 MapWidth = GameConstants.MapWidth,
                 MapHeight = GameConstants.MapHeight
             });
+            conn.Peer.SendPacket(BuildMapEventsPacket(toWorld));
         }
 
         if (entity.CharacterId is int characterId)
@@ -1333,6 +1350,7 @@ public sealed class GameServer : INetEventListener
             MapHeight = GameConstants.MapHeight
         });
         conn.Peer.SendPacket(BuildInventorySyncPacket(entity));
+        conn.Peer.SendPacket(BuildMapEventsPacket(world));
 
         // Bugfix (Yang-Anzeige zeigte 0 bis zum ersten Kauf/Verkauf/Kill): Yang und eigenes Leben hatten sonst
         // keinen Anfangswert beim Client - beide werden nur durch Änderungs-Pakete aktualisiert
@@ -1768,6 +1786,25 @@ public sealed class GameServer : INetEventListener
                 continue;
             conn.Peer.Send(data, DeliveryMethod.ReliableOrdered);
         }
+    }
+
+    /// <summary>Paket an alle eingeloggten Spieler einer Karte.</summary>
+    private void BroadcastToWorld(IPacket packet, World world)
+    {
+        byte[] data = PacketCodec.Encode(packet);
+        foreach (ConnectionState conn in _connections.Values)
+        {
+            if (conn.EntityId != null && ReferenceEquals(conn.World, world))
+                conn.Peer.Send(data, DeliveryMethod.ReliableOrdered);
+        }
+    }
+
+    private static MapEventsPacket BuildMapEventsPacket(World world)
+    {
+        var packet = new MapEventsPacket();
+        foreach ((int eventId, int mobId, string name, int x, int y) in world.ActiveMapEvents())
+            packet.Events.Add(new MapEventInfo { EventId = eventId, MobId = mobId, Name = name, PositionX = x, PositionY = y });
+        return packet;
     }
 
     private void SendSystemChat(ConnectionState conn, string text)
