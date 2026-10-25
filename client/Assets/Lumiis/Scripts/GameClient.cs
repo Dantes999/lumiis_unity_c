@@ -103,6 +103,8 @@ namespace Lumiis.Client
         private float _nextAutoAttackAt;
         private int _comboIndex;
         private float _nextMoveSendAt;
+        private bool _keyboardMoveSent;
+        private Vector2 _aimDirection = Vector2.down;
         private long _yangTotal;
         private bool _isDead;
 
@@ -187,6 +189,11 @@ namespace Lumiis.Client
         public void SetGameplayInputLocked(bool locked)
         {
             _gameplayInputLocked = locked;
+            if (locked && _keyboardMoveSent)
+            {
+                _netClient?.SendStopMove();
+                _keyboardMoveSent = false;
+            }
         }
 
         /// <summary>Multi-Map: aktueller Kartenname/-Id für HUD/Debug-Anzeige (nur Anzeige, Server bleibt
@@ -244,7 +251,7 @@ namespace Lumiis.Client
                     + "Wurde 'cd server && dotnet build' vor dem Öffnen von Unity ausgeführt? " + ex);
                 throw;
             }
-            _spriteProvider = new CachingSpriteProvider(new PlaceholderSpriteProvider(_lookCatalog.CanvasPx, _lookCatalog.Ppu));
+            _spriteProvider = new CachingSpriteProvider(new LumiisSpriteProvider(_lookCatalog.CanvasPx, _lookCatalog.Ppu));
             _audio = gameObject.AddComponent<AudioService>();
             _audio.Initialize();
 
@@ -356,6 +363,7 @@ namespace Lumiis.Client
 
             if (_inGame && !_gameplayInputLocked && !_assetLabActive && !_chatInputFocused)
             {
+                UpdateMouseFacing();
                 HandleKeyboardMovement();
                 HandleKeyboardCombat();
                 HandleClickInput();
@@ -447,11 +455,7 @@ namespace Lumiis.Client
 
             // Kampf-Visualisierung Abschnitt 5: Wuchtschlag ist der einzige zielgerichtete Skill (siehe
             // SkillHotkeys) - sofort lokal zum Ziel drehen, analog zu HandleRightClickAttack.
-            if (skillId == SingleStrikeSkillId && targetEntityId != 0 && _world.LocalEntityId >= 0
-                && _world.Entities.TryGetValue(targetEntityId, out ClientEntity skillTarget))
-            {
-                _world.SetFacingOverride(_world.LocalEntityId, skillTarget.IntX, skillTarget.IntY);
-            }
+            // Blickrichtung bleibt am Mauszeiger (siehe UpdateMouseFacing); kein Ziel-Override hier.
         }
 
         /// <summary>Kampf-Visualisierung Abschnitt 3: kurzzeitiger Radius-Ring beim Ausloesen von Kreisschlag -
@@ -1183,6 +1187,25 @@ namespace Lumiis.Client
             }
         }
 
+        /// <summary>Blickrichtung folgt dem Mauszeiger, nicht der Laufrichtung. So kann man weglaufen und
+        /// gleichzeitig nach hinten schlagen; der Server braucht dafür keine Änderung, weil Angriffe über
+        /// Ziel-EntityIds laufen und nur die lokale Darstellung/der Schlagbogen die Richtung nutzt.</summary>
+        private void UpdateMouseFacing()
+        {
+            if (Mouse.current == null || _world.LocalEntityId < 0) return;
+            if (IsPointerOverDebugPanel()) return;
+
+            Vector3 mouseWorld = ScreenToWorldPoint(Mouse.current.position.ReadValue());
+            Vector3 localWorld = LocalPlayerWorldPosition;
+            Vector2 direction = new Vector2(mouseWorld.x - localWorld.x, mouseWorld.y - localWorld.y);
+            if (direction.sqrMagnitude < 0.0001f) return;
+
+            _aimDirection = direction.normalized;
+            _world.SetFacingOverride(_world.LocalEntityId,
+                Mathf.RoundToInt(mouseWorld.x * 100f),
+                Mathf.RoundToInt(mouseWorld.y * 100f));
+        }
+
         /// <summary>WASD/Pfeiltasten: hält die Figur in die gewünschte Richtung. Der Client sendet in
         /// kurzen Abständen ein neues MoveTo-Ziel; die eigentliche Bewegung/Kollision bleibt serverautoritativ
         /// (ClientWorld interpoliert die eingehenden EntityMove-Pakete).</summary>
@@ -1196,7 +1219,17 @@ namespace Lumiis.Client
             if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed) direction.x -= 1f;
             if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed) direction.x += 1f;
 
-            if (direction.sqrMagnitude <= 0f) return;
+            if (direction.sqrMagnitude <= 0f)
+            {
+                if (_keyboardMoveSent)
+                {
+                    _keyboardMoveSent = false;
+                    _netClient.SendStopMove();
+                }
+                return;
+            }
+
+            _keyboardMoveSent = true;
             if (Time.time < _nextMoveSendAt) return;
             _nextMoveSendAt = Time.time + 0.10f;
             direction.Normalize();
@@ -1208,7 +1241,6 @@ namespace Lumiis.Client
             int wireX = Mathf.RoundToInt(target.x * 100f);
             int wireY = Mathf.RoundToInt(target.y * 100f);
             _netClient.SendMoveTo(wireX, wireY);
-            _world.SetFacingOverride(_world.LocalEntityId, wireX, wireY);
         }
 
         /// <summary>Leertaste: ein Schlag; gedrückt halten schlägt automatisch im Takt weiter. Der lokale
@@ -1257,18 +1289,37 @@ namespace Lumiis.Client
                 && selected.CurrentHp != 0
                 && Distance(local, selected) <= maxDistance)
             {
-                return _targetEntityId;
+                Vector2 toSelected = new Vector2(
+                    (float)((selected.X - local.X) / 100.0),
+                    (float)((selected.Y - local.Y) / 100.0));
+                if (toSelected.sqrMagnitude < 0.0001f
+                    || Vector2.Dot(_aimDirection, toSelected.normalized) >= 0.15f)
+                    return _targetEntityId;
             }
 
+            // Auto-Target bevorzugt Ziele in Blickrichtung (Mauszeiger), damit der sichtbare Schlagbogen
+            // und der tatsächlich getroffene Gegner zusammenpassen. Bei Maus nach hinten werden auch Ziele
+            // hinter dem Charakter gefunden.
             int bestId = -1;
-            float bestDistance = maxDistance;
+            float bestScore = float.MinValue;
             foreach (KeyValuePair<int, ClientEntity> kvp in _world.Entities)
             {
                 ClientEntity entity = kvp.Value;
                 if (entity.Kind != EntityKind.Monster || entity.CurrentHp == 0) continue;
                 float distance = Distance(local, entity);
-                if (distance > bestDistance) continue;
-                bestDistance = distance;
+                if (distance > maxDistance) continue;
+
+                Vector2 toTarget = new Vector2(
+                    (float)((entity.X - local.X) / 100.0),
+                    (float)((entity.Y - local.Y) / 100.0));
+                float facing = toTarget.sqrMagnitude > 0.0001f
+                    ? Vector2.Dot(_aimDirection, toTarget.normalized)
+                    : 0f;
+                if (facing < 0.15f) continue; // nicht in Blickrichtung
+
+                float score = facing * 2f - distance * 0.15f;
+                if (score <= bestScore) continue;
+                bestScore = score;
                 bestId = kvp.Key;
             }
             return bestId;
@@ -1285,7 +1336,32 @@ namespace Lumiis.Client
         {
             PlayAttackAnimation(_world.LocalEntityId, _comboIndex);
             _audio?.PlaySwing();
+            SpawnMeleeArc();
             _comboIndex = (_comboIndex + 1) % 3;
+        }
+
+        private void SpawnMeleeArc()
+        {
+            if (_world.LocalEntityId < 0 || !_world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity local))
+                return;
+
+            float radius = _classCatalog != null ? _classCatalog.MeleeRangeWire / 100f : 1.5f;
+            Vector3 origin = new Vector3((float)(local.X / 100.0), (float)(local.Y / 100.0), 0f);
+            var arcGo = new GameObject("MeleeArc");
+            var arc = arcGo.AddComponent<MeleeArcView>();
+            arc.Initialize(origin, _aimDirection, radius, new Color(1f, 0.88f, 0.35f, 0.65f), 0.2f);
+        }
+
+        private void SpawnTargetHitbox(int targetId)
+        {
+            if (_unitRingSprite == null || !_world.Entities.TryGetValue(targetId, out ClientEntity target))
+                return;
+
+            var go = new GameObject("TargetHitbox");
+            var ring = go.AddComponent<RadiusFlashView>();
+            ring.Initialize(_unitRingSprite,
+                new Vector3((float)(target.X / 100.0), (float)(target.Y / 100.0), 0f),
+                1.15f, new Color(1f, 0.25f, 0.2f, 0.55f), 0.22f);
         }
 
         private void PerformAttack(int targetId)
@@ -1295,9 +1371,9 @@ namespace Lumiis.Client
             _netClient.SendAttack(targetId);
             PlayAttackAnimation(_world.LocalEntityId, _comboIndex);
             _audio?.PlaySwing();
+            SpawnMeleeArc();
+            SpawnTargetHitbox(targetId);
             _comboIndex = (_comboIndex + 1) % 3;
-            if (_world.LocalEntityId >= 0 && _world.Entities.TryGetValue(targetId, out ClientEntity target))
-                _world.SetFacingOverride(_world.LocalEntityId, target.IntX, target.IntY);
         }
 
         private void HandleClickInput()

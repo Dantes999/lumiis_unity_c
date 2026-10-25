@@ -27,6 +27,14 @@ namespace Lumiis.Tests
         }
 
         [Fact]
+        public void StopMove_RoundTrip()
+        {
+            var original = new StopMovePacket();
+            var decoded = Assert.IsType<StopMovePacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(PacketId.StopMove, decoded.Id);
+        }
+
+        [Fact]
         public void JoinAccepted_RoundTrip()
         {
             var appearance = new Appearance { BodyId = 1, HairStyleId = 2, HairColorId = 3, ArmorId = 4, HelmetId = 0, WeaponId = 1, ShieldId = 0 };

@@ -63,7 +63,9 @@ namespace Lumiis.Client
                 if (sprite == null) continue;
                 Texture2D texture = sprite.texture;
                 Object.Destroy(sprite);
-                if (texture != null) Object.Destroy(texture);
+                // Nur die vom Placeholder-Provider erzeugten Texturen gehören uns. Lumiis-Charakter-Sheets
+                // sind Resources-Assets und werden von Unity verwaltet.
+                if (texture != null && texture.name == "__runtime") Object.Destroy(texture);
             }
             _cache.Clear();
 

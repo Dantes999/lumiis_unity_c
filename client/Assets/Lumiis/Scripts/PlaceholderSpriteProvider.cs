@@ -36,6 +36,7 @@ namespace Lumiis.Client
             }
 
             var texture = new Texture2D(_canvasPx, _canvasPx, TextureFormat.RGBA32, false);
+            texture.name = "__runtime";
             texture.filterMode = FilterMode.Point;
             texture.SetPixels32(pixels);
             texture.Apply();

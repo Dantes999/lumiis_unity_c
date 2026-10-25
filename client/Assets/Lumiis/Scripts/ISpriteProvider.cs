@@ -8,14 +8,15 @@ namespace Lumiis.Client
     {
         Body,
         Armor,
+        Head,
         Shield,
         Weapon,
         Hair,
         Helmet
     }
 
-    /// <summary>Liefert das Sprite für eine Ebene. PlaceholderSpriteProvider erzeugt Formen zur Laufzeit; später
-    /// kommt ein AtlasSpriteProvider, der echte PNGs lädt und bei fehlender Datei auf den Platzhalter zurückfällt.</summary>
+    /// <summary>Liefert das Sprite für eine Ebene. LumiisSpriteProvider lädt die echten Lumiis-Charakter-Sheets;
+    /// PlaceholderSpriteProvider bleibt der Fallback für Ebenen ohne Sheet.</summary>
     public interface ISpriteProvider
     {
         /// <summary>pivotNormalized: 0..1 im Canvas, Standard (0.5, 0) = Fußpunkt unten Mitte. Die Waffe nutzt

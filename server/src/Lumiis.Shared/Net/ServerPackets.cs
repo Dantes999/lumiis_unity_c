@@ -22,7 +22,7 @@ namespace Lumiis.Shared.Net
     }
 
     /// <summary>Der Client wurde aufgenommen und an der genannten Position gespawnt. Appearance ist die eigene
-    /// Figur - der Client berechnet sie nie selbst, siehe CLAUDE.md-Konvention. Seit Protocol.Version 16
+    /// Figur - der Client berechnet sie nie selbst, siehe CLAUDE.md-Konvention. Seit Protocol.Version 17
     /// zusätzlich die Karte (Id/Name/Maße), damit der Client Boden/Portale/Kartenname korrekt aufbaut.</summary>
     public sealed class JoinAcceptedPacket : IPacket
     {
@@ -899,7 +899,7 @@ namespace Lumiis.Shared.Net
         }
     }
 
-    /// <summary>Multi-Map (Protocol.Version 16): eigener Kartenwechsel. Enthält die neue Karte, ihre Maße und
+    /// <summary>Multi-Map (Protocol.Version 17): eigener Kartenwechsel. Enthält die neue Karte, ihre Maße und
     /// die bereits gesetzte Zielposition. Der Client verwirft alle Entities/Views, baut Boden/Portale neu und
     /// legt seine eigene Figur an der Zielposition an; fremde Entities der neuen Karte folgen über den
     /// normalen AOI-Diff (EntitySpawn).</summary>

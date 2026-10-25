@@ -1,7 +1,7 @@
 # Karten-Import aus den Lumiis-Referenzprojekten
 
 Stand: 2026-10-25  
-Status: **Server-/Client-Multi-Map umgesetzt** (Protocol.Version 16). Die Lumiis-Referenzkarten
+Status: **Server-/Client-Multi-Map umgesetzt** (Protocol.Version 17). Die Lumiis-Referenzkarten
 wurden bewusst noch nicht 1:1 skaliert importiert; `greenfield` ist eine eigene, deterministisch
 generierte Testkarte. Die frühere reine Bildvorschau im Asset-Testlabor bleibt zusätzlich bestehen.
 

@@ -664,3 +664,152 @@ Button:disabled {
 .hud-skill-slot {
     height: 96px;
 }
+
+/* ---- Login / Charakterauswahl: Release-Optik ---- */
+
+.login-screen,
+.character-select-screen {
+    background-color: rgb(7, 12, 9);
+}
+
+.login-backdrop {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    opacity: 0.32;
+    -unity-background-scale-mode: scale-and-crop;
+}
+
+.login-layout {
+    position: relative;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 24px;
+}
+
+.login-brand {
+    width: 330px;
+    margin-right: 40px;
+}
+
+.login-logo {
+    color: rgb(236, 205, 128);
+    font-size: 52px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-left;
+    margin-bottom: 2px;
+}
+
+.login-tagline {
+    color: rgb(240, 240, 230);
+    font-size: 20px;
+    margin-bottom: 14px;
+}
+
+.login-copy {
+    color: rgba(225, 230, 220, 0.78);
+    font-size: 13px;
+    white-space: normal;
+}
+
+.login-feature-row {
+    margin-top: 24px;
+}
+
+.login-feature {
+    color: rgba(220, 198, 145, 0.9);
+    font-size: 12px;
+    margin: 5px 0;
+}
+
+.login-card {
+    width: 370px;
+    padding: 28px;
+    background-color: rgba(12, 17, 13, 0.94);
+    border-width: 1px;
+    border-color: rgba(166, 139, 82, 0.6);
+    border-radius: 6px;
+}
+
+.character-card {
+    width: 430px;
+}
+
+.login-title {
+    color: rgb(242, 236, 218);
+    font-size: 24px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-left;
+    margin-bottom: 2px;
+}
+
+.login-subtitle {
+    color: rgba(200, 208, 196, 0.72);
+    font-size: 12px;
+    margin-bottom: 18px;
+}
+
+.login-input {
+    margin-bottom: 6px;
+}
+
+.login-actions {
+    margin-top: 18px;
+    justify-content: flex-start;
+}
+
+.primary-button {
+    background-color: rgb(150, 103, 43);
+    color: rgb(255, 244, 219);
+    min-width: 145px;
+}
+
+.primary-button:hover {
+    background-color: rgb(181, 126, 54);
+}
+
+.secondary-button {
+    background-color: rgba(48, 58, 48, 0.9);
+    color: rgb(225, 230, 220);
+    border-width: 1px;
+    border-color: rgba(126, 142, 118, 0.55);
+}
+
+.secondary-button:hover {
+    background-color: rgba(64, 78, 64, 0.95);
+}
+
+.login-version {
+    color: rgba(170, 178, 165, 0.55);
+    font-size: 10px;
+    margin-top: 14px;
+    -unity-text-align: middle-left;
+}
+
+.character-card .character-list {
+    height: 210px;
+    background-color: rgba(5, 8, 6, 0.6);
+    border-color: rgba(100, 116, 94, 0.45);
+    padding: 4px;
+}
+
+.character-card .character-button {
+    min-height: 38px;
+    margin: 3px 0;
+    background-color: rgba(32, 45, 34, 0.95);
+    color: rgb(235, 238, 228);
+    border-width: 1px;
+    border-color: rgba(100, 116, 94, 0.35);
+    -unity-text-align: middle-left;
+    padding-left: 12px;
+}
+
+.character-card .character-button:hover {
+    background-color: rgba(54, 72, 53, 0.95);
+    border-color: rgba(190, 158, 86, 0.65);
+}

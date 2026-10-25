@@ -53,6 +53,24 @@ namespace Lumiis.Shared.Net
         }
     }
 
+    /// <summary>Beendet eine laufende Bewegung sofort (Taste losgelassen). Ohne dieses Paket würde der Server
+    /// noch bis zum zuletzt gesendeten MoveTo-Ziel weiterlaufen. Kein Payload.</summary>
+    public sealed class StopMovePacket : IPacket
+    {
+        public PacketId Id
+        {
+            get { return PacketId.StopMove; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+        }
+
+        public void Read(PacketReader reader)
+        {
+        }
+    }
+
     /// <summary>Der Client greift eine sichtbare Entity an (M4a). Der Server prüft alles serverautoritativ
     /// erneut (Existenz, Leben, PvP, Cooldown, Reichweite) - siehe World.TryAttack.</summary>
     public sealed class AttackRequestPacket : IPacket
@@ -447,7 +465,7 @@ namespace Lumiis.Shared.Net
         }
     }
 
-    /// <summary>Multi-Map (Protocol.Version 16): nur wirksam mit --allow-debug-commands (sonst still
+    /// <summary>Multi-Map (Protocol.Version 17): nur wirksam mit --allow-debug-commands (sonst still
     /// verworfen, siehe DebugSpawnMonsterRequestPacket). Versetzt den eigenen Charakter auf die
     /// Startposition der Zielkarte - Debug-API zum Testen des Kartenwechsels ohne Portal.</summary>
     public sealed class DebugChangeMapRequestPacket : IPacket

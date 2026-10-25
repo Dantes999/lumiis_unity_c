@@ -1,17 +1,26 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements">
     <Style src="lumiis.uss" />
-    <ui:VisualElement name="character-select-root" class="screen">
-        <ui:VisualElement class="panel">
-            <ui:Label text="Charakter wählen" class="title" />
-            <ui:ScrollView name="character-list" class="character-list" />
-            <ui:VisualElement class="new-character-row">
-                <ui:TextField name="new-character-name-field" label="Neu" />
-                <ui:Button text="Erstellen" name="create-character-button" />
+    <ui:VisualElement name="character-select-root" class="screen character-select-screen">
+        <ui:VisualElement name="character-select-backdrop" class="login-backdrop" />
+        <ui:VisualElement class="login-layout">
+            <ui:VisualElement class="login-brand">
+                <ui:Label text="LUMIIS" class="login-logo" />
+                <ui:Label text="Deine Geschichte." class="login-tagline" />
+                <ui:Label text="Wähle einen bestehenden Charakter oder erschaffe einen neuen Helden für Yongan." class="login-copy" />
             </ui:VisualElement>
-            <ui:Label name="character-select-status" class="status-text" />
-            <ui:Label name="character-select-error" class="error-text" />
-            <ui:VisualElement class="button-row">
-                <ui:Button text="Abmelden" name="logout-button" />
+
+            <ui:VisualElement class="panel login-card character-card">
+                <ui:Label text="Charakter wählen" class="login-title" />
+                <ui:ScrollView name="character-list" class="character-list" />
+                <ui:VisualElement class="new-character-row">
+                    <ui:TextField name="new-character-name-field" label="Neuer Charakter" />
+                    <ui:Button text="Erstellen" name="create-character-button" class="primary-button" />
+                </ui:VisualElement>
+                <ui:Label name="character-select-status" class="status-text" />
+                <ui:Label name="character-select-error" class="error-text" />
+                <ui:VisualElement class="button-row login-actions">
+                    <ui:Button text="Abmelden" name="logout-button" class="secondary-button" />
+                </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>

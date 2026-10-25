@@ -21,7 +21,7 @@ Quests/Trade, echte Vollkarten und mehr Content.
 ## P0 – spielbarer Alpha-Test / M7
 
 **Stand 2026-10-25:** HUD, Chat-MVP, Gruppen-MVP, Multi-Map/Portale und Ausrüstungs-Aufwertung
-+0…+9 (M6c) sind umgesetzt; Protocol.Version 16. Offen: Party-Rollen/Persistenz und weitere
++0…+9 (M6c) sind umgesetzt; Protocol.Version 17. Offen: Party-Rollen/Persistenz und weitere
 soziale Integrationstests. YangChanged beim Join ist bereits im Code.
 
 | Feature | Warum | Beleg | Aufwand |

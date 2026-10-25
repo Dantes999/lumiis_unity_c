@@ -85,7 +85,7 @@ namespace Lumiis.Client
         /// (kein Neuanlegen), damit gehaltene Referenzen (z. B. im Debug-Panel) gültig bleiben.</summary>
         public CharacterState CharacterStats { get; } = new CharacterState();
 
-        /// <summary>Multi-Map (Protocol.Version 16): aktuelle Karte aus JoinAccepted/MapChanged. Maße kommen
+        /// <summary>Multi-Map (Protocol.Version 17): aktuelle Karte aus JoinAccepted/MapChanged. Maße kommen
         /// vom Server (heute immer GameConstants, später ggf. kleinere Karten); der Client skaliert Boden und
         /// Portale danach.</summary>
         public string MapId { get; private set; } = "village";

@@ -99,6 +99,7 @@ namespace Lumiis.Client
                 _view.VisualRoot.localRotation = Quaternion.identity;
             }
 
+            _view.SetAnimationFrame(state, frame);
             ApplyFrame(state, frame);
 
             bool trailActive = attacking && frame >= AttackTrailFirstFrame && frame <= AttackTrailLastFrame;

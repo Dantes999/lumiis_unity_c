@@ -21,9 +21,9 @@ namespace Lumiis.Client
     /// selbst bleibt ein einzelnes Sprite und muss nicht bildweise animiert werden.</summary>
     public sealed class CharacterView : MonoBehaviour
     {
-        private static readonly CharacterSlot[] OrderDown = { CharacterSlot.Body, CharacterSlot.Armor, CharacterSlot.Shield, CharacterSlot.Weapon, CharacterSlot.Hair, CharacterSlot.Helmet };
-        private static readonly CharacterSlot[] OrderUp = { CharacterSlot.Weapon, CharacterSlot.Shield, CharacterSlot.Body, CharacterSlot.Armor, CharacterSlot.Hair, CharacterSlot.Helmet };
-        private static readonly CharacterSlot[] OrderSide = { CharacterSlot.Shield, CharacterSlot.Body, CharacterSlot.Armor, CharacterSlot.Weapon, CharacterSlot.Hair, CharacterSlot.Helmet };
+        private static readonly CharacterSlot[] OrderDown = { CharacterSlot.Body, CharacterSlot.Armor, CharacterSlot.Head, CharacterSlot.Shield, CharacterSlot.Weapon, CharacterSlot.Hair, CharacterSlot.Helmet };
+        private static readonly CharacterSlot[] OrderUp = { CharacterSlot.Weapon, CharacterSlot.Shield, CharacterSlot.Body, CharacterSlot.Armor, CharacterSlot.Head, CharacterSlot.Hair, CharacterSlot.Helmet };
+        private static readonly CharacterSlot[] OrderSide = { CharacterSlot.Shield, CharacterSlot.Body, CharacterSlot.Armor, CharacterSlot.Head, CharacterSlot.Weapon, CharacterSlot.Hair, CharacterSlot.Helmet };
 
         private static readonly Vector2 DefaultPivot = new Vector2(0.5f, 0f);
 
@@ -61,6 +61,8 @@ namespace Lumiis.Client
         private readonly Dictionary<CharacterSlot, SpriteRenderer> _renderers = new Dictionary<CharacterSlot, SpriteRenderer>();
         private Appearance _appearance;
         private Facing _facing = new Facing(FacingDirection.Down, false);
+        private string _animationState = "idle";
+        private int _animationFrame;
 
         private SpriteRenderer _bodyRenderer;
         private Transform _weaponSocket;
@@ -123,7 +125,8 @@ namespace Lumiis.Client
 
             _armorMaterial = Resources.Load<Material>(ArmorMaterialResourcePath);
             _armorPropertyBlock = new MaterialPropertyBlock();
-            if (_armorMaterial != null && _renderers.TryGetValue(CharacterSlot.Armor, out SpriteRenderer armorRenderer))
+            if (_armorMaterial != null && !(_spriteProvider is LumiisSpriteProvider)
+                && _renderers.TryGetValue(CharacterSlot.Armor, out SpriteRenderer armorRenderer))
                 armorRenderer.sharedMaterial = _armorMaterial;
 
             CreateWeaponVfx();
@@ -170,6 +173,17 @@ namespace Lumiis.Client
             RefreshWeaponSocketPose();
         }
 
+        /// <summary>Setzt den Animationszustand der Körper-/Kopf-/Haar-/Rüstungs-Sheets (idle/walk/attack).
+        /// Die echten Lumiis-Sheets haben neun Spalten (0 Stand, 1-2 Schritte, 4-6 Angriff); der
+        /// Placeholder-Provider ignoriert den Zustand weiterhin.</summary>
+        public void SetAnimationFrame(string state, int frame)
+        {
+            if (_animationState == state && _animationFrame == frame) return;
+            _animationState = string.IsNullOrEmpty(state) ? "idle" : state;
+            _animationFrame = Mathf.Max(0, frame);
+            RefreshAllSlots();
+        }
+
         /// <summary>Waffe aus Item-Daten setzen (GameClient beim Ausrüsten oder Testboard). sprite darf null
         /// sein, wenn kein PNG unter Resources/Sprites/Items/ existiert - dann bleibt der generierte
         /// Platzhalter aus der aktuellen Appearance sichtbar. pivotOffset ist die Pixel-Korrektur relativ zum
@@ -185,6 +199,9 @@ namespace Lumiis.Client
             {
                 _weaponRenderer.enabled = true;
                 _weaponRenderer.sprite = weaponSprite;
+                _weaponRenderer.transform.localScale = _spriteProvider is LumiisSpriteProvider
+                    ? new Vector3(0.85f, 0.85f, 1f)
+                    : Vector3.one;
                 SetWeaponPixelOffset();
                 UpdateTrailAnchor();
             }
@@ -207,6 +224,7 @@ namespace Lumiis.Client
             _weaponPivotOffsetPixels = Vector2.zero;
             _weaponUpgradeLevel = 0;
             _weaponRenderer.transform.localPosition = Vector3.zero;
+            _weaponRenderer.transform.localScale = Vector3.one;
             RefreshSlot(CharacterSlot.Weapon, _appearance.WeaponId, null);
             UpdateUpgradeEffects();
             RefreshWeaponSocketPose();
@@ -252,6 +270,9 @@ namespace Lumiis.Client
         /// Höhe zurück, wenn kein Anker im Katalog hinterlegt ist.</summary>
         public Vector3 GetHeadWorldOffset()
         {
+            if (_spriteProvider is LumiisSpriteProvider)
+                return new Vector3(0f, 1.55f, 0f);
+
             LookAnchorJson anchor = GetBodyAnchor(_facing.Direction);
             int ppu = _lookCatalog?.Ppu ?? 0;
             if (anchor?.head != null && anchor.head.Length >= 2 && ppu > 0)
@@ -267,6 +288,7 @@ namespace Lumiis.Client
         private void RefreshAllSlots()
         {
             RefreshSlot(CharacterSlot.Body, _appearance.BodyId, null);
+            RefreshSlot(CharacterSlot.Head, _appearance.BodyId, null);
             RefreshSlot(CharacterSlot.Armor, _appearance.ArmorId, null);
             ApplyArmorColors(_appearance.ArmorId);
 
@@ -304,7 +326,7 @@ namespace Lumiis.Client
 
             Vector2 pivot = slot == CharacterSlot.Weapon ? ComputeWeaponPivot(_facing.Direction) : DefaultPivot;
             renderer.enabled = true;
-            renderer.sprite = _spriteProvider.GetSprite(slot, lookId, _facing.Direction, "idle", 0, pivot);
+            renderer.sprite = _spriteProvider.GetSprite(slot, lookId, _facing.Direction, _animationState, _animationFrame, pivot);
             renderer.color = tint ?? Color.white;
             if (slot == CharacterSlot.Weapon) UpdateTrailAnchor();
         }
@@ -351,6 +373,15 @@ namespace Lumiis.Client
 
         private Vector2 GetHandAnchorLocal()
         {
+            if (_spriteProvider is LumiisSpriteProvider)
+            {
+                Vector2 native = _facing.Direction == FacingDirection.Side
+                    ? new Vector2(0.20f, 0.48f)
+                    : new Vector2(0.28f, 0.48f);
+                if (_facing.FlipX) native.x = -native.x;
+                return native;
+            }
+
             LookAnchorJson anchor = GetBodyAnchor(_facing.Direction);
             int ppu = _lookCatalog?.Ppu ?? 0;
             if (anchor?.hand != null && anchor.hand.Length >= 2 && ppu > 0)
@@ -447,6 +478,15 @@ namespace Lumiis.Client
         /// SpriteRenderer-Farbton (nur für die Rüstung, nicht für den Körper).</summary>
         private void ApplyArmorColors(int armorId)
         {
+            // Die echten Lumiis-Rüstungs-Sheets bringen ihre Farben mit; der Palette-Shader würde sie
+            // multiplikativ verfälschen. Nur der Platzhalter-Pfad nutzt die Farbpalette.
+            if (_spriteProvider is LumiisSpriteProvider)
+            {
+                if (_renderers.TryGetValue(CharacterSlot.Armor, out SpriteRenderer nativeArmor))
+                    nativeArmor.color = Color.white;
+                return;
+            }
+
             Color primary = Color.white;
             Color secondary = Color.white;
             Color accent = Color.white;

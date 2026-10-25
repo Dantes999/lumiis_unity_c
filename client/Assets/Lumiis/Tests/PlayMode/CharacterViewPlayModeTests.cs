@@ -123,6 +123,41 @@ namespace Lumiis.Client.Tests.PlayMode
             Assert.AreEqual(1.25f, wolf[0].rect.width / wolf[0].pixelsPerUnit, 0.01f);
             Assert.IsNotNull(MonsterArt.LoadFrames("boar"));
             Assert.IsNotNull(ItemIconCatalog.LoadFromResources().GetTexture("book_bash"), "book_bash-Icon fehlt.");
+
+            var lumiis = new LumiisSpriteProvider(128, 64);
+            Sprite body = lumiis.GetSprite(CharacterSlot.Body, 1, FacingDirection.Down, "idle", 0, new Vector2(0.5f, 0f));
+            Sprite head = lumiis.GetSprite(CharacterSlot.Head, 1, FacingDirection.Down, "idle", 0, new Vector2(0.5f, 0f));
+            Assert.IsNotNull(body, "Lumiis-Body-Sheet wurde nicht geladen.");
+            Assert.IsNotNull(head, "Lumiis-Head-Sheet wurde nicht geladen.");
+            Assert.AreEqual(48f, body.rect.width, 0.01f);
+        }
+
+        [Test]
+        public void LumiisSpriteProvider_ShowsRealBodyAndHeadLayers()
+        {
+            var go = new GameObject("LumiisViewTest");
+            var provider = new CachingSpriteProvider(new LumiisSpriteProvider(128, 64));
+            var view = go.AddComponent<CharacterView>();
+            view.Initialize(99, "Lumiis", provider, _lookCatalog);
+            view.SetAppearance(new Appearance
+            {
+                BodyId = 1,
+                HairStyleId = 1,
+                HairColorId = 1,
+                ArmorId = 0,
+                HelmetId = 0,
+                WeaponId = 2,
+                ShieldId = 0
+            });
+
+            Assert.IsNotNull(view.BodyRenderer.sprite, "Body-Sprite fehlt.");
+            var head = view.GetSlotTransform(CharacterSlot.Head).GetComponent<SpriteRenderer>();
+            Assert.IsNotNull(head.sprite, "Head-Ebene fehlt.");
+            Assert.AreEqual(48f, view.BodyRenderer.sprite.rect.width, 0.01f);
+            Assert.AreEqual(48f, head.sprite.rect.width, 0.01f);
+
+            provider.DestroyAll();
+            Object.Destroy(go);
         }
 
         [Test]

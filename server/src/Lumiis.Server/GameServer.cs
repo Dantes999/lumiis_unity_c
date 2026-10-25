@@ -1010,6 +1010,9 @@ public sealed class GameServer : INetEventListener
             case MoveToPacket moveTo:
                 HandleMoveTo(conn, moveTo);
                 break;
+            case StopMovePacket:
+                HandleStopMove(conn);
+                break;
             case AttackRequestPacket attack:
                 HandleAttackRequest(conn, attack);
                 break;
@@ -1399,6 +1402,19 @@ public sealed class GameServer : INetEventListener
             Speed = entity.Speed,
             ServerTick = _tick
         });
+    }
+
+    /// <summary>Beendet eine laufende Spielerbewegung sofort. Der Client sendet das beim Loslassen der
+    /// WASD-Taste; der Server bleibt autoritativ und schickt die Endposition als EntityStop an alle
+    /// Beobachter.</summary>
+    private void HandleStopMove(ConnectionState conn)
+    {
+        if (conn.EntityId is not int entityId) return;
+        World world = conn.World ?? _world;
+        if (!world.TryGet(entityId, out Entity? entity) || entity == null || entity.Kind != EntityKind.Player) return;
+
+        entity.StopMoving();
+        SendToVisible(entityId, new EntityStopPacket { EntityId = entityId, X = entity.IntX, Y = entity.IntY });
     }
 
     /// <summary>Netzwerk-Seite eines erfolgreichen Angriffs (M4a Spieler->Monster, seit M4c auch
@@ -2375,7 +2391,7 @@ public sealed class GameServer : INetEventListener
         _logger.Info($"Dev-Tools: Entity {entityId} auf Level {request.Level} gesetzt");
     }
 
-    /// <summary>Dev-Tool (Multi-Map, Protocol.Version 16): versetzt den eigenen Charakter auf die Startposition
+    /// <summary>Dev-Tool (Multi-Map, Protocol.Version 17): versetzt den eigenen Charakter auf die Startposition
     /// der angegebenen Karte - nur mit --allow-debug-commands, sonst still verworfen (wie die anderen
     /// Debug-Befehle, siehe HandleDebugSpawnMonster-Kommentar). Debug-API zum Testen des Kartenwechsels ohne
     /// Portal (der Client nutzt sie aus dem Debug-Panel).</summary>

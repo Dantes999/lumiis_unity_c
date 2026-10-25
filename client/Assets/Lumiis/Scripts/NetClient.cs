@@ -53,6 +53,14 @@ namespace Lumiis.Client
             Send(new MoveToPacket { X = x, Y = y });
         }
 
+        /// <summary>Taste losgelassen: der Server stoppt die Bewegung sofort, statt noch bis zum letzten
+        /// MoveTo-Ziel weiterzulaufen.</summary>
+        public void SendStopMove()
+        {
+            if (_peer == null || !IsConnected) return;
+            Send(new StopMovePacket());
+        }
+
         /// <summary>M4a: Rechtsklick auf ein sichtbares Monster (siehe GameClient.HandleClickInput) - der
         /// Server prüft alles erneut serverautoritativ (Existenz, Leben, PvP, Cooldown, Reichweite).</summary>
         public void SendAttack(int targetEntityId)

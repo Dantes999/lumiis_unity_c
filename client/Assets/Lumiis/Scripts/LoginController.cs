@@ -106,6 +106,8 @@ namespace Lumiis.Client
             _escapeMenuRoot = escapeMenuAsset.CloneTree();
             _uiDocument.rootVisualElement.Add(_loginRoot);
             _uiDocument.rootVisualElement.Add(_characterSelectRoot);
+            ApplyBackdrop(_loginRoot, "login-backdrop");
+            ApplyBackdrop(_characterSelectRoot, "character-select-backdrop");
             // escape-menu ABSICHTLICH als dritter Eintrag NACH Login/CharacterSelect angehängt - die
             // bestehenden LoginControllerPlayModeTests greifen per root[0]/root[1] auf genau diese beiden
             // zu, eine andere Reihenfolge würde sie brechen.
@@ -143,6 +145,18 @@ namespace Lumiis.Client
             _escapeMenuRoot.Q<Button>("escape-switch-character-button").clicked += SwitchCharacter;
             _escapeMenuRoot.Q<Button>("escape-logout-button").clicked += Logout;
             _escapeMenuRoot.Q<Button>("escape-quit-button").clicked += QuitGame;
+        }
+
+        /// <summary>Setzt das Map1-Stimmungsbild dezent hinter Login/Charakterauswahl. Fehlt das Asset,
+        /// bleibt der dunkle Hintergrund aus dem USS erhalten.</summary>
+        private static void ApplyBackdrop(VisualElement root, string elementName)
+        {
+            VisualElement backdrop = root.Q<VisualElement>(elementName);
+            if (backdrop == null) return;
+
+            Sprite map = Resources.Load<Sprite>("Maps/map1");
+            if (map != null && map.texture != null)
+                backdrop.style.backgroundImage = new StyleBackground(map.texture);
         }
 
         private void Update()
