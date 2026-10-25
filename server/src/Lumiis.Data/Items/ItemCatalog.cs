@@ -173,6 +173,9 @@ public sealed class ItemCatalog
     {
         return _byId.TryGetValue(itemId, out definition!);
     }
+
+    /// <summary>Alle Definitionen (u. a. für Katalog-/Icon-Coverage-Tests).</summary>
+    public IReadOnlyCollection<ItemDefinition> All => _byId.Values;
 }
 
 public sealed class ItemCatalogException : Exception
