@@ -233,8 +233,10 @@
 
 .error-text {
     color: rgb(255, 110, 90);
-    font-size: 14px;
-    white-space: normal;
+    font-size: 13px;
+    white-space: nowrap; /* lange Namen nie mitten im Wort umbrechen */
+    overflow: hidden;
+    text-overflow: ellipsis;
     -unity-text-align: middle-center;
     margin-top: 2px;
     min-height: 16px;
@@ -409,7 +411,7 @@
     width: 92px;
     height: 56px;
     margin: 3px;
-    padding: 4px;
+    padding: 4px 2px;
     min-width: 0;
     background-image: resource("UI/Skin/charslot");
     -unity-slice-left: 10;
@@ -476,7 +478,7 @@
     width: 40px;
     height: 16px;
     border-width: 1px;
-    border-color: rgb(10, 6, 4);
+    border-color: rgb(214, 180, 110); /* heller Rahmen, damit auch Schwarz sichtbar bleibt */
 }
 
 .charselect-actions {
@@ -1334,7 +1336,7 @@
 .hud-context-menu {
     position: absolute;
     display: none;
-    width: 170px;
+    width: 200px;
     padding: 6px;
 }
 
@@ -1367,6 +1369,8 @@
 }
 
 .hud-party-role {
+    flex-shrink: 0;
+    margin-left: 4px;
     font-size: 11px;
     color: rgb(214, 196, 160);
     text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
@@ -1386,6 +1390,11 @@
 }
 
 .hud-party-name {
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
     color: rgb(240, 232, 214);
     font-size: 13px;
 }

@@ -27,6 +27,7 @@ namespace Lumiis.Client
         private const int InventoryColumns = 5;
         private const float TaskbarHeight = 68f;
         private const float WindowMargin = 4f;
+        private const float ContextMenuWidth = 200f; // siehe .hud-context-menu
         private const float TaskbarSideReserve = 116f; // Breite einer Kugel plus Abstand, siehe .hud-taskbar padding.
 
         private static readonly ChatChannel[] ChatChannelCycle = { ChatChannel.Map, ChatChannel.Global, ChatChannel.Whisper };
@@ -413,10 +414,12 @@ namespace Lumiis.Client
             ShowButton(_contextRoleAttacker, role != PartyRole.Attacker);
             ShowButton(_contextRoleDefender, role != PartyRole.Defender);
             ShowButton(_contextRoleNone, role != PartyRole.None);
-            OpenContextMenu(memberName);
+            OpenContextMenu(memberName, _partyRoot);
         }
 
-        private void OpenContextMenu(string playerName)
+        /// <summary>besideElement: Menü links neben dieses Element setzen (Gruppenpanel), damit es die
+        /// übrigen Zeilen nicht verdeckt.</summary>
+        private void OpenContextMenu(string playerName, VisualElement besideElement = null)
         {
             if (Mouse.current == null) return;
             _contextPlayerName = playerName ?? "";
@@ -425,9 +428,12 @@ namespace Lumiis.Client
             Vector2 screen = Mouse.current.position.ReadValue();
             Vector2 panelPos = RuntimePanelUtils.ScreenToPanel(_root.panel, new Vector2(screen.x, Screen.height - screen.y));
             Vector2 local = _root.WorldToLocal(panelPos);
-            float maxX = Mathf.Max(0f, _root.layout.width - 180f);
+            float maxX = Mathf.Max(0f, _root.layout.width - ContextMenuWidth);
             float maxY = Mathf.Max(0f, _root.layout.height - TaskbarHeight - 230f);
-            _contextMenu.style.left = Mathf.Clamp(local.x + 4f, 0f, maxX);
+            float left = local.x + 4f;
+            if (besideElement != null)
+                left = _root.WorldToLocal(besideElement.worldBound.position).x - ContextMenuWidth - 4f;
+            _contextMenu.style.left = Mathf.Clamp(left, 0f, maxX);
             _contextMenu.style.top = Mathf.Clamp(local.y + 4f, 0f, maxY);
             _contextMenu.style.display = DisplayStyle.Flex;
             _contextMenu.BringToFront();
@@ -1584,7 +1590,7 @@ namespace Lumiis.Client
                 row.EnableInClassList("hud-party-row-offline", !online);
                 var header = new VisualElement();
                 header.AddToClassList("hud-party-header");
-                var label = new Label((leader ? "★ " : "") + name + "   Lv " + level + (online ? "" : "  (offline)"));
+                var label = new Label((leader ? "★ " : "") + name + "  Lv " + level + (online ? "" : " (offline)"));
                 label.AddToClassList("hud-party-name");
                 label.EnableInClassList("hud-party-name-leader", leader);
                 header.Add(label);
