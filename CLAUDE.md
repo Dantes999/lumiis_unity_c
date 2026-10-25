@@ -168,9 +168,14 @@ Seit 2026-10-25 gibt es echte, begehbare Karten statt einer einzigen Welt. Detai
   (`tiles.json`) werden mit `tools/import-map1.py` zu `Resources/Maps/map1.png` (4096×4096, 32 px/Tile)
   und einer 1000×1000-`collision.bin` gebacken. Dorfplatz, Häuser, Wege, Wasser und Baumrand stammen aus
   dem Referenzlayout; der Start liegt außerhalb des Dorfes auf einer offenen Wiese.
-- Spawns: drei Wildhunde (Mob 1), drei Hungrige Wildhunde (Mob 5), ein Lumiis-Stein (Mob 3) und der
-  Waldboss (Mob 4) - die normalen Mobs mindestens 20 Weltenheiten vom Start entfernt, im Startbereich
-  steht kein Monster. Dorfhändler und **Schmied** sitzen im Dorfplatz.
+- Spawns (seit 2026-10-25 Originaldaten): `tools/import-map1-spawns.py` setzt aus `tools/map1-yongan-spawns.json`
+  (lumiis-2d@4376dae, nur der Map1-Ausschnitt) alle 47 Originalgruppen außerhalb der Dorf-Sicherheitszone:
+  Wilder Hund (Mob 20, Lv 1), Wolf (21, Lv 3), Alphawolf (22, Lv 5, aggressiv), Wildschwein (23, Lv 7) und
+  5 feste Lumiis des Kummers (24, Lv 5, wehrt sich nicht, Wellen aus Wölfen/Hund wie im Original). Level/HP/
+  Angriff/Verteidigung/EXP/Angriffstempo/aggressiv 1:1 aus dem Original, Laufgeschwindigkeit (×140 Wire),
+  Reichweiten, Yang und Beute an unser System angepasst. Kein Boss (gibt es im Original auf Yongan nicht).
+  Start und Respawn liegen jetzt auf dem Dorfplatz. Dorfhändler und **Schmied** sitzen im Dorfplatz.
+  Sheets: `dog`/`wolf`/`metin_sorrow` aus dem Lumiis-Asset-Archiv (`MonsterArt`, Steine als Einzelbild).
 - Drops: Produktionsserver nutzt echte **Boden-Drops** (`EntityKind.GroundItem`): Monster lassen Items mit
   Icon/Name auf dem Boden fallen, Aufheben per Klick (`PickupItemRequestPacket` 20) prüft Distanz
   (`GameConstants.PickupRangeWire`), Besitz und Inventarplatz. Besitz: 10 s nur Killer oder dessen Gruppe

@@ -2018,8 +2018,11 @@ namespace Lumiis.Client
                 var monsterView = monsterGo.AddComponent<MonsterView>();
                 string artKey = MonsterArt.ResourceForMob(entity.TypeId);
                 Sprite[] frames = artKey != null ? MonsterArt.LoadFrames(artKey) : null;
+                Sprite stone = frames == null ? MonsterArt.LoadStone(MonsterArt.StoneResourceForMob(entity.TypeId)) : null;
                 if (frames != null)
                     monsterView.Initialize(frames, MonsterColorFor(entity.TypeId), MonsterScaleFor(entity.TypeId));
+                else if (stone != null)
+                    monsterView.Initialize(stone, MonsterColorFor(entity.TypeId), MonsterScaleFor(entity.TypeId));
                 else
                     monsterView.Initialize(MonsterShapeFor(entity.TypeId), MonsterColorFor(entity.TypeId), MonsterScaleFor(entity.TypeId));
                 monsterView.SetWorldPosition(entity.X / 100.0, entity.Y / 100.0);
@@ -2385,7 +2388,8 @@ namespace Lumiis.Client
             {
                 1 => Color.white,                    // Wildhund: Original-Sheet
                 2 => new Color(0.9f, 1f, 0.85f),     // Waldschrat/Boar: leicht grünlicher Stich
-                3 => new Color(0.35f, 0.45f, 0.8f), // Lumiis-Stein: blau
+                3 => Color.white,                    // Lumiis des Kummers: Original-Bild
+                18 => new Color(0.45f, 0.4f, 0.55f), // Lumiis der Schwärze: dunkel getöntes Kummer-Bild
                 4 => new Color(0.6f, 0.15f, 0.15f), // Boss: dunkelrot
                 5 => new Color(0.95f, 0.62f, 0.55f), // Hungriger Wildhund: rötlich
                 _ => Color.white
@@ -2400,6 +2404,10 @@ namespace Lumiis.Client
                 case 3: return 1.15f;
                 case 4: return 1.8f;
                 case 5: return 1.05f;
+                case 18: return 1.3f;
+                case 20: return 0.85f; // Größen aus monster.json des Lumiis-Asset-Archivs
+                case 22: return 1.15f;
+                case 24: return 1.15f;
                 default: return 1f;
             }
         }

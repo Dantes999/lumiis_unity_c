@@ -184,8 +184,10 @@ namespace Lumiis.Tests.Data.Maps
             Assert.NotEmpty(map1.NpcPlacements);
             Assert.False(map1.Collision.IsBlockedAtWire(map1.StartX, map1.StartY));
             // Startbereich bleibt monsterfrei: kein Spawn innerhalb von 20 Weltenheiten (2000 Wire).
+            // Ausnahme: die Trainingspuppen (Mob 6) stehen absichtlich am Dorfplatz.
             foreach (SpawnPoint spawn in map1.Spawns)
             {
+                if (spawn.MobId == 6) continue;
                 long dx = spawn.PositionX - map1.StartX;
                 long dy = spawn.PositionY - map1.StartY;
                 Assert.True(dx * dx + dy * dy > 2000L * 2000L);

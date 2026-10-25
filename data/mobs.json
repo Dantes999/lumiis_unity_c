@@ -517,6 +517,205 @@
           "chancePercent": 5
         }
       ]
+    },
+    {
+      "id": 20,
+      "name": "Wilder Hund",
+      "speedWire": 420,
+      "wanderRadiusWire": 400,
+      "wanderIntervalMinMs": 3000,
+      "wanderIntervalMaxMs": 7000,
+      "maxHp": 94,
+      "attack": 11,
+      "defense": 1,
+      "yangMin": 3,
+      "yangMax": 6,
+      "meleeRangeWire": 150,
+      "attackCooldownMs": 1500,
+      "aggressive": false,
+      "aggroRangeWire": 0,
+      "leashRangeWire": 900,
+      "level": 1,
+      "baseXp": 12,
+      "drops": [
+        {
+          "itemId": 8,
+          "chancePercent": 30
+        },
+        {
+          "itemId": 6,
+          "chancePercent": 10
+        },
+        {
+          "itemId": 40,
+          "chancePercent": 20
+        },
+        {
+          "itemId": 41,
+          "chancePercent": 10
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "name": "Wolf",
+      "speedWire": 448,
+      "wanderRadiusWire": 400,
+      "wanderIntervalMinMs": 3000,
+      "wanderIntervalMaxMs": 7000,
+      "maxHp": 187,
+      "attack": 18,
+      "defense": 4,
+      "yangMin": 9,
+      "yangMax": 18,
+      "meleeRangeWire": 150,
+      "attackCooldownMs": 1500,
+      "aggressive": false,
+      "aggroRangeWire": 0,
+      "leashRangeWire": 900,
+      "level": 3,
+      "baseXp": 32,
+      "drops": [
+        {
+          "itemId": 8,
+          "chancePercent": 30
+        },
+        {
+          "itemId": 6,
+          "chancePercent": 10
+        },
+        {
+          "itemId": 40,
+          "chancePercent": 20
+        },
+        {
+          "itemId": 41,
+          "chancePercent": 10
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "name": "Alphawolf",
+      "speedWire": 448,
+      "wanderRadiusWire": 400,
+      "wanderIntervalMinMs": 3000,
+      "wanderIntervalMaxMs": 7000,
+      "maxHp": 323,
+      "attack": 25,
+      "defense": 7,
+      "yangMin": 15,
+      "yangMax": 30,
+      "meleeRangeWire": 150,
+      "attackCooldownMs": 1500,
+      "aggressive": true,
+      "aggroRangeWire": 500,
+      "leashRangeWire": 900,
+      "level": 5,
+      "baseXp": 64,
+      "drops": [
+        {
+          "itemId": 8,
+          "chancePercent": 30
+        },
+        {
+          "itemId": 6,
+          "chancePercent": 10
+        },
+        {
+          "itemId": 40,
+          "chancePercent": 20
+        },
+        {
+          "itemId": 41,
+          "chancePercent": 10
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "name": "Wildschwein",
+      "speedWire": 420,
+      "wanderRadiusWire": 400,
+      "wanderIntervalMinMs": 3000,
+      "wanderIntervalMaxMs": 7000,
+      "maxHp": 459,
+      "attack": 30,
+      "defense": 11,
+      "yangMin": 21,
+      "yangMax": 42,
+      "meleeRangeWire": 150,
+      "attackCooldownMs": 1700,
+      "aggressive": false,
+      "aggroRangeWire": 0,
+      "leashRangeWire": 900,
+      "level": 7,
+      "baseXp": 105,
+      "drops": [
+        {
+          "itemId": 4,
+          "chancePercent": 20
+        },
+        {
+          "itemId": 7,
+          "chancePercent": 15
+        },
+        {
+          "itemId": 42,
+          "chancePercent": 15
+        },
+        {
+          "itemId": 43,
+          "chancePercent": 20
+        },
+        {
+          "itemId": 44,
+          "chancePercent": 8
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "name": "Lumiis des Kummers",
+      "speedWire": 1,
+      "wanderRadiusWire": 1,
+      "wanderIntervalMinMs": 60000,
+      "wanderIntervalMaxMs": 60000,
+      "maxHp": 3825,
+      "attack": 0,
+      "defense": 6,
+      "yangMin": 200,
+      "yangMax": 400,
+      "meleeRangeWire": 180,
+      "attackCooldownMs": 1400,
+      "aggressive": false,
+      "aggroRangeWire": 0,
+      "leashRangeWire": 200,
+      "level": 5,
+      "baseXp": 900,
+      "drops": [
+        {
+          "itemId": 2,
+          "chancePercent": 100
+        },
+        {
+          "itemId": 5,
+          "chancePercent": 25
+        },
+        {
+          "itemId": 45,
+          "chancePercent": 25
+        },
+        {
+          "itemId": 49,
+          "chancePercent": 20
+        },
+        {
+          "itemId": 50,
+          "chancePercent": 15
+        }
+      ],
+      "fightsBack": false
     }
   ]
 }
