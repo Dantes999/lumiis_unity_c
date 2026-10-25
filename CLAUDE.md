@@ -941,7 +941,7 @@ Das ist bewusst so gebaut, damit ein künftiges Monster-Respawn-pro-SpawnPoint (
 einen Respawn an einem (evtl. schon belegten) SpawnPoint aus.
 
 ## Alpha-Umfang (Ziel)
-Zwei Karten (Startdorf + Feld) mit Portalwechsel, Krieger, Level 1-25, Monster/Bosse/Lumiis-Steine, Items/Drops/Shop, Chat, Gruppe. NICHT: Quests/Lua, Reittiere, Kostüme, Drachenseelen, Gildenkrieg, weitere Reiche.
+Zwei Karten (Map1 Yongan + Map2 Jayang) mit Portalwechsel, Krieger, Level 1-25, Monster/Bosse/Lumiis-Steine, Items/Drops/Shop, Chat, Gruppe. NICHT: Quests/Lua, Reittiere, Kostüme, Drachenseelen, Gildenkrieg, weitere Reiche.
 
 ## Meilensteine
 M0 Fundament (fertig) | M1 Walking Skeleton (fertig, inkl. M1b Unity-Client, M1c Sichtbarkeit/Testing, M1c-layered-characters Paper-Doll-Charaktere) | M2 Account & Charakter (komplett fertig): M2a Datenbank & Auth-Dienst, M2b Server-Join über Account/Token/Charakter, M2c Unity-Login-UI (UI Toolkit) | M3 Welt (Grid, AOI, Mobs) komplett fertig: M3a Kartenkollision, M3b Sichtbarkeitsbereich (kein Grid - siehe Abschnitt "Sichtbarkeitsbereich (AOI)"), M3c Monster (Spawns, Wander-KI, AOI-Integration - siehe Abschnitt "Monster") | M4 Kampf komplett fertig (inkl. Gegenwehr): M4a Kampf-Grundlagen, M4b Monster-Respawn, M4c Monster-Aggro/Verfolgung/Leine (siehe Abschnitt "Kampf") | M5 Items komplett fertig: M5a Items/Inventar/Ausrüstung/Drops (siehe Abschnitt "Items und Inventar"), M5b Shop/NPCs (siehe Abschnitt "Shop und NPCs") | M6 Metin-Kern abgeschlossen: M6a Level/XP/Werte/SP/Ausweichen/Regeneration (siehe Abschnitt "Fortschritt: Level, XP, Werte"), M6b Skills (siehe Abschnitt "Skills"), M6c Ausruestungs-Aufwertung +0..+9 (siehe Abschnitt "Ausruestungs-Aufwertung"); M6d Lumiis-Stein/Boss inkl. Wellen umgesetzt | M7 Sozial inkl. Multi-Map/Portale | M8 Alpha-Betrieb.
@@ -1249,8 +1249,19 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   Holzschwert: `CharacterView` erkannte den Lumiis-Provider hinter `CachingSpriteProvider` nicht (Hand-
   Anker/Skalierung/Namensschild-Höhe der Platzhalter griffen) - in Unity per Screenshot bestätigt. 687 Tests
   grün (PartyManager 12, PartyCatalog 10, Rollen-Bonus 1, 2 neue Integrationstests).
-- Offen: Map2 (Jayang, Quelldaten in `tools/map2-jayang-source.json`/`-mobs.json`, Exporter
-  `tools/export-lumiis-map.mjs`), Gruppen-UI für Kick/Promote/Rollen (UI-Thread); siehe
+- Map2 = Jayang (2026-10-25): Quelldaten aus `lumiis-2d` (`buildMap("jayang")`, Stand 4376dae) per
+  `tools/export-lumiis-map.mjs` nach `tools/map2-jayang-source.json`/`-mobs.json` exportiert,
+  `tools/import-map2-jayang.py` schneidet 256×256 Tiles (Original x 136-391, y 200-455: Dorf + erstes
+  Jagdgebiet "Lager des Weißen Eids", Lv 18-25) mittig in die 1000×1000-Zellenkarte (Origin 372) und
+  schreibt `Resources/Maps/map2.png` (16 px/Tile, 4096²), `collision.bin`, `map.json`, `portals.json`,
+  `npcs.json` (Schmied + Händler an den Originalplätzen), `spawns.json` (alle Zone-1-Gruppen 1:1 = 340
+  Monster außerhalb der Dorf-Sicherheitszone, dazu 3 feste "Lumiis der Schwärze"). Neue Mobs 10-15, 18 in
+  `mobs.json` (Werte bewusst nach unserer Formel skaliert, Originalwerte bleiben in `-mobs.json`), Wellen
+  für Mob 18 in `metins.json`. Map1 bekam ein Nordportal am oberen Wegende (das Original-Portal liegt
+  außerhalb des Map1-Ausschnitts), Jayang führt am Osttor zurück. Nicht übernommen: Zonen 2-5 (Lv 25-45,
+  über dem Alpha-Levelcap), Hasun-Dong-Portal, Lager des Alten Mannes, eigene Monstergrafik für die neuen
+  Mobs (Platzhalterform). 684 Tests grün.
+- Offen: Monster-Sheets für die Jayang-Mobs, weitere Zonen/Dungeons, Reittiere; siehe
   `docs/feature-gap-lumiis.md`.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client
 War kein Codefehler. User hat den Test mit fokussiertem Unity-Fenster wiederholt (Server, Unity Play, dann Bots

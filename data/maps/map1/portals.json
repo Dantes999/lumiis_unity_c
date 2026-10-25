@@ -1,3 +1,14 @@
 {
-  "portals": []
+  "portals": [
+    {
+      "id": 1,
+      "x1": 44200,
+      "y1": 52300,
+      "x2": 44399,
+      "y2": 52599,
+      "targetMapId": "map2",
+      "targetX": 50650,
+      "targetY": 51850
+    }
+  ]
 }

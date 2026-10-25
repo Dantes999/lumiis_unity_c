@@ -8,6 +8,14 @@
         { "hpPercent": 50, "mobId": 1, "count": 3 },
         { "hpPercent": 25, "mobId": 2, "count": 2 }
       ]
+    },
+    {
+      "mobId": 18,
+      "waves": [
+        { "hpPercent": 75, "mobId": 10, "count": 4 },
+        { "hpPercent": 50, "mobId": 11, "count": 3 },
+        { "hpPercent": 25, "mobId": 12, "count": 2 }
+      ]
     }
   ]
 }

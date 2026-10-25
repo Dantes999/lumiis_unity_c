@@ -201,6 +201,300 @@
           "chancePercent": 8
         }
       ]
+    },
+    {
+      "id": 10,
+      "name": "Weißer-Eid Soldatin",
+      "speedWire": 450,
+      "wanderRadiusWire": 400,
+      "wanderIntervalMinMs": 3000,
+      "wanderIntervalMaxMs": 7000,
+      "maxHp": 504,
+      "attack": 46,
+      "defense": 9,
+      "yangMin": 54,
+      "yangMax": 108,
+      "meleeRangeWire": 150,
+      "attackCooldownMs": 1500,
+      "aggressive": false,
+      "aggroRangeWire": 0,
+      "leashRangeWire": 900,
+      "level": 18,
+      "baseXp": 180,
+      "drops": [
+        {
+          "itemId": 35,
+          "chancePercent": 10
+        },
+        {
+          "itemId": 9,
+          "chancePercent": 3
+        },
+        {
+          "itemId": 51,
+          "chancePercent": 15
+        },
+        {
+          "itemId": 5,
+          "chancePercent": 1
+        },
+        {
+          "itemId": 21,
+          "chancePercent": 1
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "name": "Weißer-Eid Bogenschützin",
+      "speedWire": 450,
+      "wanderRadiusWire": 400,
+      "wanderIntervalMinMs": 3000,
+      "wanderIntervalMaxMs": 7000,
+      "maxHp": 448,
+      "attack": 50,
+      "defense": 10,
+      "yangMin": 60,
+      "yangMax": 120,
+      "meleeRangeWire": 350,
+      "attackCooldownMs": 1800,
+      "aggressive": false,
+      "aggroRangeWire": 0,
+      "leashRangeWire": 900,
+      "level": 20,
+      "baseXp": 200,
+      "drops": [
+        {
+          "itemId": 35,
+          "chancePercent": 10
+        },
+        {
+          "itemId": 9,
+          "chancePercent": 3
+        },
+        {
+          "itemId": 51,
+          "chancePercent": 15
+        },
+        {
+          "itemId": 5,
+          "chancePercent": 1
+        },
+        {
+          "itemId": 21,
+          "chancePercent": 1
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "name": "Weißer-Eid Kommandantin",
+      "speedWire": 450,
+      "wanderRadiusWire": 400,
+      "wanderIntervalMinMs": 3000,
+      "wanderIntervalMaxMs": 7000,
+      "maxHp": 1400,
+      "attack": 65,
+      "defense": 15,
+      "yangMin": 75,
+      "yangMax": 150,
+      "meleeRangeWire": 150,
+      "attackCooldownMs": 1500,
+      "aggressive": true,
+      "aggroRangeWire": 500,
+      "leashRangeWire": 900,
+      "level": 25,
+      "baseXp": 500,
+      "drops": [
+        {
+          "itemId": 35,
+          "chancePercent": 25
+        },
+        {
+          "itemId": 9,
+          "chancePercent": 8
+        },
+        {
+          "itemId": 51,
+          "chancePercent": 15
+        },
+        {
+          "itemId": 5,
+          "chancePercent": 3
+        },
+        {
+          "itemId": 21,
+          "chancePercent": 3
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "name": "Weißer-Eid Generälin",
+      "speedWire": 450,
+      "wanderRadiusWire": 400,
+      "wanderIntervalMinMs": 3000,
+      "wanderIntervalMaxMs": 7000,
+      "maxHp": 1400,
+      "attack": 65,
+      "defense": 15,
+      "yangMin": 75,
+      "yangMax": 150,
+      "meleeRangeWire": 150,
+      "attackCooldownMs": 1500,
+      "aggressive": false,
+      "aggroRangeWire": 0,
+      "leashRangeWire": 900,
+      "level": 25,
+      "baseXp": 500,
+      "drops": [
+        {
+          "itemId": 35,
+          "chancePercent": 25
+        },
+        {
+          "itemId": 9,
+          "chancePercent": 8
+        },
+        {
+          "itemId": 51,
+          "chancePercent": 15
+        },
+        {
+          "itemId": 5,
+          "chancePercent": 3
+        },
+        {
+          "itemId": 21,
+          "chancePercent": 3
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "name": "Verfl. Weißer-Eid Soldatin",
+      "speedWire": 450,
+      "wanderRadiusWire": 400,
+      "wanderIntervalMinMs": 3000,
+      "wanderIntervalMaxMs": 7000,
+      "maxHp": 1008,
+      "attack": 51,
+      "defense": 12,
+      "yangMin": 54,
+      "yangMax": 108,
+      "meleeRangeWire": 150,
+      "attackCooldownMs": 1500,
+      "aggressive": true,
+      "aggroRangeWire": 500,
+      "leashRangeWire": 900,
+      "level": 18,
+      "baseXp": 360,
+      "drops": [
+        {
+          "itemId": 35,
+          "chancePercent": 25
+        },
+        {
+          "itemId": 9,
+          "chancePercent": 8
+        },
+        {
+          "itemId": 51,
+          "chancePercent": 15
+        },
+        {
+          "itemId": 5,
+          "chancePercent": 3
+        },
+        {
+          "itemId": 21,
+          "chancePercent": 3
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "name": "Verfl. Weißer-Eid Bogenschützin",
+      "speedWire": 450,
+      "wanderRadiusWire": 400,
+      "wanderIntervalMinMs": 3000,
+      "wanderIntervalMaxMs": 7000,
+      "maxHp": 896,
+      "attack": 55,
+      "defense": 13,
+      "yangMin": 60,
+      "yangMax": 120,
+      "meleeRangeWire": 350,
+      "attackCooldownMs": 1800,
+      "aggressive": true,
+      "aggroRangeWire": 500,
+      "leashRangeWire": 900,
+      "level": 20,
+      "baseXp": 400,
+      "drops": [
+        {
+          "itemId": 35,
+          "chancePercent": 25
+        },
+        {
+          "itemId": 9,
+          "chancePercent": 8
+        },
+        {
+          "itemId": 51,
+          "chancePercent": 15
+        },
+        {
+          "itemId": 5,
+          "chancePercent": 3
+        },
+        {
+          "itemId": 21,
+          "chancePercent": 3
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "name": "Lumiis der Schwärze",
+      "speedWire": 1,
+      "wanderRadiusWire": 1,
+      "wanderIntervalMinMs": 60000,
+      "wanderIntervalMaxMs": 60000,
+      "maxHp": 3000,
+      "attack": 30,
+      "defense": 25,
+      "yangMin": 400,
+      "yangMax": 800,
+      "meleeRangeWire": 180,
+      "attackCooldownMs": 1400,
+      "aggressive": false,
+      "aggroRangeWire": 0,
+      "leashRangeWire": 200,
+      "level": 25,
+      "baseXp": 1250,
+      "drops": [
+        {
+          "itemId": 9,
+          "chancePercent": 100
+        },
+        {
+          "itemId": 36,
+          "chancePercent": 30
+        },
+        {
+          "itemId": 24,
+          "chancePercent": 5
+        },
+        {
+          "itemId": 22,
+          "chancePercent": 5
+        },
+        {
+          "itemId": 10,
+          "chancePercent": 5
+        }
+      ]
     }
   ]
 }
