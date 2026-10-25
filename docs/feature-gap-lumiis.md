@@ -13,15 +13,13 @@ Aufwand: S = wenige Tage, M = 1–2 Wochen, L = mehrere Wochen (inkl. Tests/Doku
 
 Der Serverkern ist solide: autoritativer 25-Hz-Loop, LiteNetLib, PostgreSQL/EF Core, Token-Auth,
 AOI, Kollision, Monster-KI, Kampf, Items/Inventar/Shop, Level/XP/Stats, vier Skills, Paper-Doll
-und breite Tests. Es fehlt aber ein **spielbares Alpha-HUD** und das **soziale Spiel**:
-eine Klasse, eine Karte, zwei Monster, ein Händler, acht Items, vier Skills, kein Chat, keine
-Gruppe, keine Quests, keine Lumiis-Steine, keine Bosse, kein Audio, keine echten Item-Icons
-(seit 2026-10-24 importiert), keine echten Health-Bars. Die nächste Aufgabe laut
-`CLAUDE.md` ist **M7 Sozial**.
+und breite Tests. HUD, Chat, Gruppe inkl. EXP-Teilen, Audio-Platzhalter, 546 Item-Icons,
+18 Items sowie ein Lumiis-Stein/Boss-MVP sind umgesetzt. Offen sind vor allem **Multi-Map**,
+**Aufwertung +0…+9**, echte Stein-Wellen, Quests/Trade und mehr Content.
 
 ## P0 – spielbarer Alpha-Test / M7
 
-**Stand 2026-10-24:** HUD, Chat-MVP und Gruppen-MVP (Chat-Befehle, PartyChanged, HUD-Panel) sind umgesetzt; Protocol.Version 14. Offen: Party-Rollen/Persistenz und weitere soziale Integrationstests. YangChanged beim Join ist bereits im Code.
+**Stand 2026-10-25:** HUD, Chat-MVP und Gruppen-MVP (Chat-Befehle, PartyChanged, HUD-Panel) sind umgesetzt; Protocol.Version 14. Offen: Party-Rollen/Persistenz und weitere soziale Integrationstests. YangChanged beim Join ist bereits im Code.
 
 | Feature | Warum | Beleg | Aufwand |
 |---|---|---|---|
