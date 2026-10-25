@@ -957,6 +957,10 @@ Zwei Clients gleichzeitig testen: Editor plus Build. Der Play-Modus im Editor dr
 baut einen Development-Standalone-Build (Unity-Editor muss dafür geschlossen sein, Projekt-Lock). Danach einen
 Client per Editor-Play und einen zweiten per `client/Builds/<plattform>/Lumiis` starten - der Build läuft ohne
 Fokus-Drosselung, beide können gleichzeitig gegen denselben Server verbunden sein.
+`tools/build-client.sh` zeigt währenddessen eine Statuszeile (Phase 1-4, vergangene Zeit, letzter Unity-
+Fortschrittsschritt über `LUMIIS-BUILD:`-Marker aus `BuildScript`), bricht sofort ab, wenn schon ein Unity-Prozess
+das Projekt offen hat, entfernt eine verwaiste Lockfile und schreibt das Log je Checkout nach
+`/tmp/lumiis-build-client-<ordner>.log`. Am Ende steht der Startbefehl; `-logFile -` gibt das Player-Log auf stdout aus.
 
 ## Dev-Tools
 `--allow-debug-commands` (Default aus, `ServerConfig.AllowDebugCommands`) schaltet Dev-Only-Befehle frei, die
