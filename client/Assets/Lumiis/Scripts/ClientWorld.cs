@@ -16,6 +16,8 @@ namespace Lumiis.Client
         public int ItemUpgradeLevel;
         /// <summary>Nur Kind=Npc: Dienst (Shop/Schmied), für die UI.</summary>
         public NpcService NpcService;
+        /// <summary>Level beim Erscheinen (EntitySpawn, Protocol 21) - 0 = unbekannt/NPC/Boden-Item.</summary>
+        public int Level;
         public double X;
         public double Y;
         public Appearance Appearance;
@@ -179,9 +181,10 @@ namespace Lumiis.Client
         }
 
         public void HandleEntitySpawn(int entityId, string name, EntityKind kind, int typeId, int x, int y, Appearance appearance,
-            int itemUpgradeLevel = 0, NpcService npcService = NpcService.None)
+            int itemUpgradeLevel = 0, NpcService npcService = NpcService.None, int level = 0)
         {
             ApplyAppearance(entityId, name, kind, typeId, x, y, appearance, itemUpgradeLevel, npcService);
+            _entities[entityId].Level = level;
         }
 
         /// <summary>Gemeinsamer Erzeugungs-/Aktualisierungspfad für die eigene Figur (aus JoinAccepted, immer

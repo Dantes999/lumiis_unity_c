@@ -119,6 +119,10 @@ namespace Lumiis.Shared.Net
         /// <summary>Nur Kind=Npc: Dienst des NPCs (Shop/Schmied).</summary>
         public NpcService NpcService;
 
+        /// <summary>Protocol 21: Level beim Erscheinen (Monster aus mobs.json, Spieler ihr aktuelles Level;
+        /// 0 bei NPC/Boden-Item) - nur für Namensschild/Zielanzeige.</summary>
+        public int Level;
+
         public PacketId Id
         {
             get { return PacketId.EntitySpawn; }
@@ -135,6 +139,7 @@ namespace Lumiis.Shared.Net
             writer.WriteInt32(TypeId);
             writer.WriteByte(ItemUpgradeLevel);
             writer.WriteByte((byte)NpcService);
+            writer.WriteInt32(Level);
         }
 
         public void Read(PacketReader reader)
@@ -148,6 +153,7 @@ namespace Lumiis.Shared.Net
             TypeId = reader.ReadInt32();
             ItemUpgradeLevel = reader.ReadByte();
             NpcService = (NpcService)reader.ReadByte();
+            Level = reader.ReadInt32();
         }
     }
 

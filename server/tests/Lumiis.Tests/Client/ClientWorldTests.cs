@@ -369,5 +369,13 @@ namespace Lumiis.Tests.Client
             world.Tick(1.0);
             Assert.Equal(50040, world.Entities[1].IntX);
         }
+    
+        [Fact]
+        public void HandleEntitySpawn_StoresLevel()
+        {
+            var world = new ClientWorld();
+            world.HandleEntitySpawn(5, "Wildhund", EntityKind.Monster, 1, 100, 100, SomeAppearance, level: 3);
+            Assert.Equal(3, world.Entities[5].Level);
+        }
     }
 }

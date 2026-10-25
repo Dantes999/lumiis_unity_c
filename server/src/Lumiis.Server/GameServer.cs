@@ -665,7 +665,8 @@ public sealed class GameServer : INetEventListener
                         Kind = other.Kind,
                         TypeId = other.TypeId,
                         ItemUpgradeLevel = (byte)Math.Clamp(other.ItemUpgradeLevel, 0, 9),
-                        NpcService = other.Service
+                        NpcService = other.Service,
+                        Level = other.Kind == EntityKind.Monster || other.Kind == EntityKind.Player ? other.Level : 0
                     });
                     SendHpIfDamaged(conn.Peer, other);
                     if (other.IsMoving)
@@ -1374,7 +1375,8 @@ public sealed class GameServer : INetEventListener
                 Kind = other.Kind,
                 TypeId = other.TypeId,
                 ItemUpgradeLevel = (byte)Math.Clamp(other.ItemUpgradeLevel, 0, 9),
-                NpcService = other.Service
+                NpcService = other.Service,
+                        Level = other.Kind == EntityKind.Monster || other.Kind == EntityKind.Player ? other.Level : 0
             });
             SendHpIfDamaged(conn.Peer, other);
             if (other.IsMoving)

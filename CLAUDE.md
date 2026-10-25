@@ -1320,6 +1320,8 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   Trainingspuppen: Mob 6 "Trainingspuppe" (`dummy`-Sheet, 2000 HP, steht still, 5 s Respawn, keine
   Beute) dreimal am Westrand des Map1-Dorfplatzes; neues optionales Mob-Feld `fightsBack` (Default true,
   `MobDefinition.FightsBack`/`Entity.FightsBack`) - bei false erfasst der Mob auch nach einem Treffer kein Ziel.
+  `EntitySpawnPacket.Level` (Protocol 21): Level von Monster/Spieler beim Erscheinen, `ClientEntity.Level` -
+  für Namensschild/Zielanzeige (Spieler-Levelaufstiege danach aktualisieren es bisher nicht).
 - Offen: Monster-Sheets für die Jayang-Mobs, weitere Zonen/Dungeons, Reittiere; siehe
   `docs/feature-gap-lumiis.md`.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client

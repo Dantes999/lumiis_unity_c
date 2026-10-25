@@ -1592,7 +1592,7 @@ namespace Lumiis.Client
             {
                 Debug.Log("EntitySpawn: Id=" + spawn.EntityId + " Kind=" + spawn.Kind + " Name=" + spawn.Name + " Pos=(" + (spawn.X / 100.0) + "," + (spawn.Y / 100.0) + ")");
                 _world.HandleEntitySpawn(spawn.EntityId, spawn.Name, spawn.Kind, spawn.TypeId, spawn.X, spawn.Y, spawn.Appearance,
-                    spawn.ItemUpgradeLevel, spawn.NpcService);
+                    spawn.ItemUpgradeLevel, spawn.NpcService, spawn.Level);
                 return;
             }
 
