@@ -256,6 +256,68 @@ namespace Lumiis.Tests.Client
         }
 
         [Fact]
+        public void HandleJoinAccepted_AppliesMapInfo()
+        {
+            var world = new ClientWorld();
+            world.HandleJoinAccepted(1, 50000, 65000, "Me", SomeAppearance,
+                mapId: "greenfield", mapName: "Gruenes Feld", mapWidth: 100000, mapHeight: 80000);
+
+            Assert.Equal("greenfield", world.MapId);
+            Assert.Equal("Gruenes Feld", world.MapName);
+            Assert.Equal(100000, world.MapWidth);
+            Assert.Equal(80000, world.MapHeight);
+        }
+
+        [Fact]
+        public void HandleMapChanged_ClearsOtherEntitiesKeepsLocalIdentityAndStats()
+        {
+            var world = new ClientWorld();
+            var despawned = new List<int>();
+            var spawned = new List<int>();
+            world.EntityDespawned += id => despawned.Add(id);
+            world.EntitySpawned += e => spawned.Add(e.Id);
+
+            world.HandleJoinAccepted(1, 50000, 50000, "Me", SomeAppearance, mapId: "village", mapName: "Dorf");
+            world.HandleEntitySpawn(2, "Bot", EntityKind.Player, 0, 50000, 50000, SomeAppearance);
+            world.ApplyCharacterStats(new CharacterStatsPacket { Level = 7, Xp = 42, MaxHp = 100, CurrentHp = 90 });
+            despawned.Clear();
+            spawned.Clear();
+
+            world.HandleMapChanged(1, 50000, 65000, "greenfield", "Gruenes Feld", 100000, 100000);
+
+            Assert.Equal("greenfield", world.MapId);
+            Assert.Equal("Gruenes Feld", world.MapName);
+            Assert.Equal(1, world.LocalEntityId);
+            Assert.Single(world.Entities);
+            Assert.True(world.Entities.ContainsKey(1));
+            Assert.False(world.Entities.ContainsKey(2));
+            Assert.Equal(65000, world.Entities[1].IntY);
+            Assert.Equal("Me", world.Entities[1].Name);
+            Assert.Equal(SomeAppearance, world.Entities[1].Appearance);
+            Assert.Contains(2, despawned);
+            Assert.Contains(1, spawned); // eigene Figur wird an der Zielposition neu angelegt
+            Assert.Equal(7, world.CharacterStats.Level); // Fortschritt bleibt (kein Reset wie bei Disconnect)
+            Assert.Equal(42, world.CharacterStats.Xp);
+        }
+
+        [Fact]
+        public void ClearEntities_KeepsMapInfoAndProgress()
+        {
+            var world = new ClientWorld();
+            world.HandleJoinAccepted(1, 50000, 50000, "Me", SomeAppearance, mapId: "greenfield", mapName: "Feld");
+            world.ApplyCharacterStats(new CharacterStatsPacket { Level = 3, Xp = 5 });
+            world.HandleEntitySpawn(2, "Bot", EntityKind.Player, 0, 1, 1, SomeAppearance);
+
+            world.ClearEntities();
+
+            Assert.Empty(world.Entities);
+            Assert.Equal(-1, world.LocalEntityId);
+            Assert.Equal("greenfield", world.MapId);
+            Assert.Equal("Feld", world.MapName);
+            Assert.Equal(3, world.CharacterStats.Level);
+        }
+
+        [Fact]
         public void SetFacingOverride_UnknownEntity_DoesNotThrow()
         {
             var world = new ClientWorld();

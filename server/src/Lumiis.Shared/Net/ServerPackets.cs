@@ -22,13 +22,18 @@ namespace Lumiis.Shared.Net
     }
 
     /// <summary>Der Client wurde aufgenommen und an der genannten Position gespawnt. Appearance ist die eigene
-    /// Figur - der Client berechnet sie nie selbst, siehe CLAUDE.md-Konvention.</summary>
+    /// Figur - der Client berechnet sie nie selbst, siehe CLAUDE.md-Konvention. Seit Protocol.Version 15
+    /// zusätzlich die Karte (Id/Name/Maße), damit der Client Boden/Portale/Kartenname korrekt aufbaut.</summary>
     public sealed class JoinAcceptedPacket : IPacket
     {
         public int EntityId;
         public int X;
         public int Y;
         public Appearance Appearance;
+        public string MapId = "village";
+        public string MapName = "Dorf";
+        public int MapWidth = 100000;
+        public int MapHeight = 100000;
 
         public PacketId Id
         {
@@ -41,6 +46,10 @@ namespace Lumiis.Shared.Net
             writer.WriteInt32(X);
             writer.WriteInt32(Y);
             Appearance.Write(writer);
+            writer.WriteString(MapId);
+            writer.WriteString(MapName);
+            writer.WriteInt32(MapWidth);
+            writer.WriteInt32(MapHeight);
         }
 
         public void Read(PacketReader reader)
@@ -49,6 +58,10 @@ namespace Lumiis.Shared.Net
             X = reader.ReadInt32();
             Y = reader.ReadInt32();
             Appearance.Read(reader);
+            MapId = reader.ReadString();
+            MapName = reader.ReadString();
+            MapWidth = reader.ReadInt32();
+            MapHeight = reader.ReadInt32();
         }
     }
 
@@ -803,6 +816,48 @@ namespace Lumiis.Shared.Net
                 int maxHp = reader.ReadInt32();
                 Members.Add((entityId, name, level, hp, maxHp));
             }
+        }
+    }
+
+    /// <summary>Multi-Map (Protocol.Version 15): eigener Kartenwechsel. Enthält die neue Karte, ihre Maße und
+    /// die bereits gesetzte Zielposition. Der Client verwirft alle Entities/Views, baut Boden/Portale neu und
+    /// legt seine eigene Figur an der Zielposition an; fremde Entities der neuen Karte folgen über den
+    /// normalen AOI-Diff (EntitySpawn).</summary>
+    public sealed class MapChangedPacket : IPacket
+    {
+        public int EntityId;
+        public int X;
+        public int Y;
+        public string MapId = "";
+        public string MapName = "";
+        public int MapWidth = 100000;
+        public int MapHeight = 100000;
+
+        public PacketId Id
+        {
+            get { return PacketId.MapChanged; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteInt32(EntityId);
+            writer.WriteInt32(X);
+            writer.WriteInt32(Y);
+            writer.WriteString(MapId);
+            writer.WriteString(MapName);
+            writer.WriteInt32(MapWidth);
+            writer.WriteInt32(MapHeight);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            EntityId = reader.ReadInt32();
+            X = reader.ReadInt32();
+            Y = reader.ReadInt32();
+            MapId = reader.ReadString();
+            MapName = reader.ReadString();
+            MapWidth = reader.ReadInt32();
+            MapHeight = reader.ReadInt32();
         }
     }
 }

@@ -34,6 +34,11 @@ public sealed class Character
     public int? PositionX { get; set; }
     public int? PositionY { get; set; }
 
+    /// <summary>Multi-Map (Protocol.Version 15): Id der Karte aus data/maps/index.json. Bestehende Zeilen
+    /// bekommen per DB-Default "village" (siehe Migration AddCharacterMapId) - ein unbekannter Wert beim Join
+    /// fällt ebenfalls auf die Startkarte zurück (Legacy-Fallback, siehe GameServer.CompleteJoin).</summary>
+    public string MapId { get; set; } = "village";
+
     /// <summary>Kampf-Ertrag (M4a) - Default 0 bei Erstellung, siehe AuthEndpoints.CreateCharacter.</summary>
     public long Yang { get; set; }
 

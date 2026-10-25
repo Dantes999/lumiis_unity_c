@@ -40,6 +40,10 @@ public sealed class LumiisDbContext : DbContext
             // die Migration bestehende Zeilen (und jede Zeile, die EF ohne explizit gesetztes Level einfügt)
             // auf 0 setzen, ein ungültiges Level (siehe ProgressionCatalog.MaxLevel-Bereich 1..25).
             entity.Property(c => c.Level).HasDefaultValue(1);
+
+            // Multi-Map: DB-Default "village" - bestehende Zeilen (und von Auth ohne MapId eingefügte)
+            // landen damit automatisch auf der Default-Karte, ohne dass die Migration Daten raten muss.
+            entity.Property(c => c.MapId).HasMaxLength(64).HasDefaultValue("village");
         });
 
         modelBuilder.Entity<CharacterInventoryItem>(entity =>

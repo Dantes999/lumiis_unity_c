@@ -1,0 +1,10 @@
+{
+  "spawns": [
+    { "id": 1, "mobId": 1, "positionX": 20000, "positionY": 20000, "respawnSeconds": 30 },
+    { "id": 2, "mobId": 1, "positionX": 70000, "positionY": 25000, "respawnSeconds": 30 },
+    { "id": 3, "mobId": 2, "positionX": 25000, "positionY": 70000, "respawnSeconds": 60 },
+    { "id": 4, "mobId": 2, "positionX": 75000, "positionY": 70000, "respawnSeconds": 60 },
+    { "id": 5, "mobId": 3, "positionX": 60000, "positionY": 50000, "respawnSeconds": 120 },
+    { "id": 6, "mobId": 4, "positionX": 65000, "positionY": 70000, "respawnSeconds": 180 }
+  ]
+}

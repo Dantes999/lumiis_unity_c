@@ -102,6 +102,13 @@ namespace Lumiis.Data.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(1);
 
+                    b.Property<string>("MapId")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasDefaultValue("village");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");

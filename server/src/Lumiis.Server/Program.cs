@@ -43,33 +43,17 @@ for (int i = 0; i < args.Length; i++)
 
 config.DataDir = explicitDataDir ?? ResolveDefaultDataDir();
 
-// Nur eine Karte "village" in M3a (siehe docs/tasks/M3a-collision.md) - Mehrkarten-Unterstützung ist
-// bewusst kein Ziel hier, der Pfad ist deshalb noch hartkodiert. GameConstants.MapWidth/Height sind in
-// 1/100-Einheiten, collision.bin zählt in Zellen (1 Zelle = 1 Weltenheit) - daher /100.
-string collisionMapPath = Path.Combine(config.DataDir, "maps", "village", "collision.bin");
-CollisionMap collisionMap;
-try
-{
-    collisionMap = CollisionMap.LoadFromFile(collisionMapPath, GameConstants.MapWidth / 100, GameConstants.MapHeight / 100);
-}
-catch (Exception ex)
-{
-    logger.Error($"Serverstart fehlgeschlagen (Kollisionskarte): {ex.Message}");
-    return 1;
-}
-
-// Ebenfalls nur "village" hartkodiert (siehe Kommentar oben). SpawnCatalog braucht MobCatalog+CollisionMap
-// zur Validierung (jede MobId muss existieren, jede Position begehbar sein).
+// Multi-Map (docs/map-import-plan.md): mobs.json zuerst (jede Karten-Spawn-Position verweist auf eine
+// MobId), die Karten selbst lädt gleich MapCatalog aus data/maps/index.json - inklusive collision.bin,
+// spawns.json, npcs.json, portals.json und optional map.json je Kartenordner.
 MobCatalog mobCatalog;
-SpawnCatalog spawnCatalog;
 try
 {
     mobCatalog = MobCatalog.LoadFromFile(Path.Combine(config.DataDir, "mobs.json"));
-    spawnCatalog = SpawnCatalog.LoadFromFile(Path.Combine(config.DataDir, "maps", "village", "spawns.json"), mobCatalog, collisionMap);
 }
 catch (Exception ex)
 {
-    logger.Error($"Serverstart fehlgeschlagen (Mob-/Spawn-Daten): {ex.Message}");
+    logger.Error($"Serverstart fehlgeschlagen (Mob-Daten): {ex.Message}");
     return 1;
 }
 
@@ -125,21 +109,31 @@ catch (Exception ex)
     return 1;
 }
 
-// Ebenfalls nur "village" hartkodiert (siehe Kommentar oben). NpcSpawnCatalog braucht NpcCatalog+
-// CollisionMap zur Validierung (analog zu SpawnCatalog für Monster). looks.json wird hier erneut geladen
-// (bewusst eine eigene, kleine Instanz statt Wiederverwendung der obigen - günstig, hält die Datenblöcke
-// unabhängig voneinander, siehe Item-Daten-Block).
+// NPC-Typen (Sortimente) global; die Platzierungen je Karte kommen aus MapCatalog (maps/<id>/npcs.json).
+// looks.json wird hier erneut geladen (bewusst eine eigene, kleine Instanz statt Wiederverwendung der obigen -
+// günstig, hält die Datenblöcke unabhängig voneinander, siehe Item-Daten-Block).
 NpcCatalog npcCatalog;
-NpcSpawnCatalog npcSpawnCatalog;
 try
 {
     LookCatalog npcLookCatalog = LookCatalog.LoadFromFile(Path.Combine(config.DataDir, "looks.json"));
     npcCatalog = NpcCatalog.LoadFromFile(Path.Combine(config.DataDir, "npcs.json"), itemCatalog, npcLookCatalog);
-    npcSpawnCatalog = NpcSpawnCatalog.LoadFromFile(Path.Combine(config.DataDir, "maps", "village", "npcs.json"), npcCatalog, collisionMap);
 }
 catch (Exception ex)
 {
     logger.Error($"Serverstart fehlgeschlagen (NPC-Daten): {ex.Message}");
+    return 1;
+}
+
+// Multi-Map: index.json + alle Kartenordner, fail-fast validiert (duplizierte IDs, blockierte Start-/
+// Portal-/Spawn-Positionen, unbekannte Portalziele, Ankunft in einem Portal der Zielkarte).
+MapCatalog mapCatalog;
+try
+{
+    mapCatalog = MapCatalog.LoadFromDirectory(Path.Combine(config.DataDir, "maps"), mobCatalog, npcCatalog);
+}
+catch (Exception ex)
+{
+    logger.Error($"Serverstart fehlgeschlagen (Karten-Daten): {ex.Message}");
     return 1;
 }
 
@@ -171,7 +165,7 @@ Console.CancelKeyPress += (_, eventArgs) =>
     cts.Cancel();
 };
 
-GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, collisionMap: collisionMap, mobCatalog: mobCatalog, spawnCatalog: spawnCatalog, classCatalog: classCatalog, itemCatalog: itemCatalog, npcCatalog: npcCatalog, npcSpawnCatalog: npcSpawnCatalog, progressionCatalog: progressionCatalog, skillCatalog: skillCatalog);
+GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, mobCatalog: mobCatalog, classCatalog: classCatalog, itemCatalog: itemCatalog, npcCatalog: npcCatalog, progressionCatalog: progressionCatalog, skillCatalog: skillCatalog, mapCatalog: mapCatalog);
 
 try
 {
@@ -205,10 +199,10 @@ return 0;
 // nur den Repo-Root-Fall stillschweigend anzunehmen.
 static string ResolveDefaultDataDir()
 {
-    if (File.Exists(Path.Combine("data", "maps", "village", "collision.bin"))) return "data";
+    if (File.Exists(Path.Combine("data", "maps", "index.json"))) return "data";
 
     string fromServerDir = Path.Combine("..", "data");
-    if (File.Exists(Path.Combine(fromServerDir, "maps", "village", "collision.bin"))) return fromServerDir;
+    if (File.Exists(Path.Combine(fromServerDir, "maps", "index.json"))) return fromServerDir;
 
-    return "data"; // Existiert keins von beiden, soll die Fehlermeldung von CollisionMap.LoadFromFile den erwarteten Pfad nennen.
+    return "data"; // Existiert keins von beiden, soll die Fehlermeldung von MapCatalog den erwarteten Pfad nennen.
 }

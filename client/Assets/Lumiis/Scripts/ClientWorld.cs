@@ -85,15 +85,33 @@ namespace Lumiis.Client
         /// (kein Neuanlegen), damit gehaltene Referenzen (z. B. im Debug-Panel) gültig bleiben.</summary>
         public CharacterState CharacterStats { get; } = new CharacterState();
 
+        /// <summary>Multi-Map (Protocol.Version 15): aktuelle Karte aus JoinAccepted/MapChanged. Maße kommen
+        /// vom Server (heute immer GameConstants, später ggf. kleinere Karten); der Client skaliert Boden und
+        /// Portale danach.</summary>
+        public string MapId { get; private set; } = "village";
+        public string MapName { get; private set; } = "Dorf";
+        public int MapWidth { get; private set; } = GameConstants.MapWidth;
+        public int MapHeight { get; private set; } = GameConstants.MapHeight;
+
+        public void ApplyMapInfo(string mapId, string mapName, int mapWidth, int mapHeight)
+        {
+            if (!string.IsNullOrEmpty(mapId)) MapId = mapId;
+            if (!string.IsNullOrEmpty(mapName)) MapName = mapName;
+            if (mapWidth > 0) MapWidth = mapWidth;
+            if (mapHeight > 0) MapHeight = mapHeight;
+        }
+
         public event Action<ClientEntity> EntitySpawned;
         public event Action<int> EntityDespawned;
         public event Action<string> Warning;
 
         public void Reset()
         {
-            List<int> ids = new List<int>(_entities.Keys);
-            _entities.Clear();
-            LocalEntityId = -1;
+            ClearEntities();
+            MapId = "village";
+            MapName = "Dorf";
+            MapWidth = GameConstants.MapWidth;
+            MapHeight = GameConstants.MapHeight;
             CharacterStats.Level = 0; // 0 = noch kein CharacterStatsPacket erhalten (frisch nach Reset/vor Join).
             CharacterStats.Xp = 0;
             CharacterStats.XpToNext = 0;
@@ -109,13 +127,42 @@ namespace Lumiis.Client
             CharacterStats.Defense = 0;
             CharacterStats.DodgeBp = 0;
             CharacterStats.Skills.Clear();
+        }
+
+        /// <summary>Entfernt alle Entities (mit EntityDespawned-Events, damit die Views aufgeräumt werden),
+        /// behält aber MapId/Maße und (optional) den Fortschrittsstand. Für den Kartenwechsel: der Client
+        /// verwirft alle Entities der alten Karte, ohne Level/XP/Inventar-Anzeige zu verlieren.</summary>
+        public void ClearEntities()
+        {
+            List<int> ids = new List<int>(_entities.Keys);
+            _entities.Clear();
+            LocalEntityId = -1;
             foreach (int id in ids) EntityDespawned?.Invoke(id);
         }
 
-        public void HandleJoinAccepted(int entityId, int x, int y, string localName, Appearance appearance)
+        public void HandleJoinAccepted(int entityId, int x, int y, string localName, Appearance appearance,
+            string mapId = "village", string mapName = "Dorf", int mapWidth = GameConstants.MapWidth,
+            int mapHeight = GameConstants.MapHeight)
         {
+            ApplyMapInfo(mapId, mapName, mapWidth, mapHeight);
             LocalEntityId = entityId;
             ApplyAppearance(entityId, localName, EntityKind.Player, typeId: 0, x, y, appearance);
+        }
+
+        /// <summary>Multi-Map: Kartenwechsel. Behält Name/Aussehen der eigenen Figur (MapChangedPacket trägt
+        /// beides nicht), leert alle Entities und legt die eigene Figur an der vom Server gesetzten
+        /// Zielposition neu an. Fremde Entities der neuen Karte kommen danach über EntitySpawn (AOI-Diff).</summary>
+        public void HandleMapChanged(int entityId, int x, int y, string mapId, string mapName, int mapWidth, int mapHeight)
+        {
+            ClientEntity? local = LocalEntityId >= 0 && _entities.TryGetValue(LocalEntityId, out ClientEntity? existing)
+                ? existing : null;
+            string name = local?.Name ?? "";
+            Appearance appearance = local?.Appearance ?? default;
+
+            ClearEntities();
+            ApplyMapInfo(mapId, mapName, mapWidth, mapHeight);
+            LocalEntityId = entityId;
+            ApplyAppearance(entityId, name, EntityKind.Player, typeId: 0, x, y, appearance);
         }
 
         public void HandleEntitySpawn(int entityId, string name, EntityKind kind, int typeId, int x, int y, Appearance appearance)

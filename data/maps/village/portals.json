@@ -1,0 +1,14 @@
+{
+  "portals": [
+    {
+      "id": 1,
+      "x1": 52000,
+      "y1": 49500,
+      "x2": 52800,
+      "y2": 50500,
+      "targetMapId": "greenfield",
+      "targetX": 50000,
+      "targetY": 65000
+    }
+  ]
+}

@@ -265,6 +265,12 @@ Button:disabled {
     margin-bottom: 4px;
 }
 
+.hud-map-name {
+    color: rgb(180, 205, 225);
+    font-size: 12px;
+    margin-bottom: 6px;
+}
+
 .hud-bar-row {
     flex-direction: row;
     align-items: center;

@@ -31,7 +31,7 @@ client/ (Unity-Projekt), server/ (Solution mit Shared, Server, Bot, Data, Auth, 
 
 ## Befehle
 - Build/Test: cd server && dotnet build && dotnet test (läuft ohne laufendes Postgres - die Lumiis.Auth-Tests nutzen EF-Core-InMemory, siehe Status M2a)
-- Server: dotnet run --project server/src/Lumiis.Server (--data-dir überschreibt den Basispfad für Spieldaten, Default "data" relativ zum Arbeitsverzeichnis - lädt data/maps/village/collision.bin, siehe Abschnitt "Kartenkollision"; --allow-debug-commands NUR für lokale Entwicklung, siehe Abschnitt "Dev-Tools")
+- Server: dotnet run --project server/src/Lumiis.Server (--data-dir überschreibt den Basispfad für Spieldaten, Default "data" relativ zum Arbeitsverzeichnis - lädt data/maps/index.json inkl. aller Karten, siehe Abschnitte "Kartenkollision"/"Multi-Map und Portale"; --allow-debug-commands NUR für lokale Entwicklung, siehe Abschnitt "Dev-Tools")
 - Bot: dotnet run --project server/src/Lumiis.Bot -- --count 3
 - Umgebungsvariablen laden: source tools/dev-env.sh (mit "source", NICHT ./ - sonst gelten die Variablen nur im Subprozess des Skripts). Davor nötig für docker compose, dotnet ef, dotnet run --project server/src/Lumiis.Auth UND (seit M2b) server/src/Lumiis.Server.
 - Postgres starten: docker compose up -d (Repo-Root, nach source tools/dev-env.sh)
@@ -89,8 +89,9 @@ fest als "botpass-<name>-2026" (nur Test-Tool). Option --auth-url (Default http:
 
 ## Kartenkollision
 Bewegung wird seit M3a serverseitig gegen eine pro Karte hinterlegte Blockierkarte geprüft (nicht mehr nur an
-die Kartengrenzen geklemmt). Aktuell nur eine Karte, "village" - Mehrkarten-Unterstützung ist bewusst kein
-Ziel, der Pfad `data/maps/village/collision.bin` ist in `Lumiis.Server/Program.cs` noch hartkodiert.
+die Kartengrenzen geklemmt). Seit dem Multi-Map-Umbau (2026-10-25, Protocol.Version 15) gibt es mehrere
+Karten; `Lumiis.Server/Program.cs` lädt sie über `MapCatalog` aus `data/maps/index.json` (nicht mehr
+hartkodiert nur `village`). Jede `World` hält ihre eigene `CollisionMap`.
 
 Pipeline-Ablauf (1 Pixel im Quellbild = 1 Weltenheit = 1 Zelle):
 1. `data/maps/village/collision-source.png` bemalen - rote Flächen (R > 200, G/B < 100, siehe
@@ -108,10 +109,50 @@ kein Absturz). `World.SetDestination` klemmt ein Bewegungsziel wie bisher auf di
 danach die gerade Linie zum geklemmten Ziel zellenweise ab (Bresenham), stoppt an der letzten begehbaren
 Zelle vor einer blockierten - `CollisionMap` wird injiziert, `World` lädt selbst keine Dateien.
 
+Für die zweite Karte `greenfield` erzeugt `tools/generate-greenfield-map.py` Quellbild und
+`collision.bin` deterministisch (Rand, See, Felsgruppen; Start/Portale/Spawns bleiben frei).
+
 **`data/maps/village/collision-source.png` ist aktuell ein Platzhalter** (einfacher Rand + ein Rechteck +
 eine Ellipse, per Pillow-Skript erzeugt, keine echte Kartengrafik) - der User ersetzt es später durch eine
 echte, handbemalte Version, sobald Kartengrafik existiert. Danach `tools/bake-collision.py` erneut ausführen
 und beide Dateien neu committen.
+
+## Multi-Map und Portale (Protocol.Version 15)
+Seit 2026-10-25 gibt es echte, begehbare Karten statt einer einzigen Welt. Details/Plan:
+`docs/map-import-plan.md`.
+
+- Daten: `data/maps/index.json` (`startMapId` + Kartenliste), je Kartenordner `collision.bin`,
+  optional `spawns.json`, `npcs.json`, `portals.json`, `map.json` (Name/Startposition). `village`
+  bleibt Default und Legacy-Fallback. Zweite Karte: `greenfield` (generierte Kollision, eigene
+  Spawns/Portale, leere NPC-Liste). Geladen/validiert von `MapCatalog` (`Lumiis.Data.Maps`) fail-fast
+  (doppelte IDs, blockierter Start, unbekanntes Portalziel, blockierte Ankunft, Ankunft im Zielportal,
+  invertierte/außerhalb liegende Rechtecke). Karten haben weiterhin global
+  `GameConstants.MapWidth/Height` (1000×1000 Zellen).
+- Server: `GameServer` hält `Dictionary<string, World>` (eine World je Karte) und einen gemeinsamen
+  EntityId-Zähler; `ConnectionState.World` bestimmt AOI/Sichtbarkeit. Bewegung/Kollision, Monster-KI,
+  Spawns/Respawns und NPCs laufen pro Karte; `SendToVisible`/`UpdateVisibility` liefern nur an
+  Verbindungen derselben Karte. Chat-Kanal „Karte“ ist kartenlokal, Global/Whisper kartenübergreifend.
+- Portale: `World.CheckPortal` prüft das Wire-Rechteck pro Tick (1 s Sperre, tote Spieler lösen nicht
+  aus); `GameServer.TransitionEntityToMap` entfernt die Entity aus der alten World, schickt Despawn an
+  alte Beobachter, setzt sie in die neue World, leert `VisibleEntityIds`, sendet `MapChangedPacket` und
+  persistiert Position+MapId sofort. Neue Entities der Zielkarte kommen über den normalen AOI-Diff.
+- Persistenz: `Character.MapId` (DB, Default `village`, Migration `AddCharacterMapId`);
+  `PositionSaveRequest`/`CharacterSaveRequest` tragen die MapId. Unbekannte gespeicherte MapIds fallen
+  beim Join auf die Startkarte zurück (Warnung, kein Join-Abbruch). Respawn/„im Tod ausgeloggt“ nutzt
+  die Startposition der Karte; eine beim Join blockierte gespeicherte Position fällt auf den Kartenstart
+  zurück.
+- Pakete: `JoinAccepted` trägt zusätzlich `MapId`/`MapName`/`MapWidth`/`MapHeight`; neu
+  `MapChangedPacket` (1022, Server→Client, EntityId/Position/Karte/Maße) und
+  `DebugChangeMapRequestPacket` (17, Client→Server, nur mit `--allow-debug-commands`).
+- Client: `ClientWorld` hält MapId/Name/Maße; `HandleMapChanged` leert alle Entities, behält
+  Fortschritt/Buffs und legt die eigene Figur an der Zielposition neu an. `GameClient.RebuildMapVisuals`
+  baut Boden/Ränder/Portalrechtecke neu; Kartenname/Portale kommen aus `MapCatalogClient`
+  (StreamingAssets/`lumiis-data/maps`, vom Shared-Build mitkopiert, rein für die Anzeige). HUD zeigt den
+  Kartenamen, das Debug-Panel hat „Karte wechseln“ (Dev-Tool). Eine clientseitige Kollisionsprüfung gibt
+  es weiterhin nicht.
+- Bewusste Limitations: keine Referenzkarten importiert (kein Terrain/`tiles.bin`), keine kleineren
+  Kartenmaße pro Map, kein Client-Kollisionsrendering, Gruppe bleibt kartenübergreifend, testmap/grove/
+  sohan fehlen (Portale dorthin würden den Start abbrechen).
 
 ## Sichtbarkeitsbereich (AOI)
 Seit M3b bekommt eine Verbindung nur noch Spawns, Bewegungen und Despawns von Entities innerhalb von
@@ -725,6 +766,7 @@ Domain-Reload-Verhalten):
 - `ClientWorld.cs`: reine Weltsicht ohne UnityEngine-Bezug und ohne `Time.*`; Bewegung wird über `MovementMath` (Shared) anhand einer von außen übergebenen Zeit interpoliert (Client-Empfangszeit, keine Uhrensynchronisation in M1b), Blickrichtung über `FacingMath` (Shared) aus dem Bewegungsvektor. JoinAccepted (eigene Figur) und EntitySpawn (andere) laufen beide durch denselben `ApplyAppearance`-Pfad.
 - `GameClient.cs`: Orchestrierung - Views, Klick-Eingabe (New Input System, `Mouse.current`), Mausrad-Zoom, Kamera-Folgen, IMGUI-Debug-Overlay (Statuszeile, Entity-Liste, F1-Umschaltung; Default aus) und F2-Testboard/F3-F8-Look-Hotkeys/F10-Asset-Testlabor (nur Editor/Development-Build) - alles erst sichtbar nach erfolgreichem Join (`_inGame`-Flag, von LoginController unabhängig gepflegt). Login/Charakterauswahl selbst sind seit M2c LoginControllers Sache, nicht mehr Teil von GameClient.
 - `LookCatalogClient.cs`: lädt `looks.json` aus StreamingAssets (JsonUtility).
+- `MapCatalogClient.cs`: lädt `lumiis-data/maps/index.json` plus `map.json`/`portals.json` je Karte aus StreamingAssets - nur für Kartenname/Portalmarkierungen (Multi-Map), keine Spielwahrheit.
 - `ISpriteProvider.cs`/`PlaceholderSpriteProvider.cs`: liefert Sprites je Ebene/Richtung; aktuell zur Laufzeit erzeugte Formen, später ein `AtlasSpriteProvider` mit echten PNGs.
 - `CharacterView.cs`/`CharacterAnimator.cs`/`CharacterTestboard.cs`: Paper-Doll-Zusammensetzung (Sortierung, Spiegeln, Anker, Tönung), prozedurale Idle-/Lauf-Animation, F2-Debug-Raster.
 - `AssetTestLab.cs` (+ `Resources/UI/AssetTestLab.uxml`): F10-Testlabor (nur Editor/Development) mit echter UI-Toolkit-Oberfläche, lokaler Vorschaufigur und Trainingspuppen; blendet Server-Figuren/Monster/altes Debug-Overlay während des Testens aus.
@@ -778,13 +820,12 @@ Das ist bewusst so gebaut, damit ein künftiges Monster-Respawn-pro-SpawnPoint (
 einen Respawn an einem (evtl. schon belegten) SpawnPoint aus.
 
 ## Alpha-Umfang (Ziel)
-Map 1 (Startdorf + Feld), Krieger, Level 1-25, Monster/Bosse/Lumiis-Steine, Items/Drops/Shop, Chat, Gruppe. NICHT: Quests/Lua, Reittiere, Kostüme, Drachenseelen, Gildenkrieg, weitere Reiche.
+Zwei Karten (Startdorf + Feld) mit Portalwechsel, Krieger, Level 1-25, Monster/Bosse/Lumiis-Steine, Items/Drops/Shop, Chat, Gruppe. NICHT: Quests/Lua, Reittiere, Kostüme, Drachenseelen, Gildenkrieg, weitere Reiche.
 
 ## Meilensteine
 M0 Fundament (fertig) | M1 Walking Skeleton (fertig, inkl. M1b Unity-Client, M1c Sichtbarkeit/Testing, M1c-layered-characters Paper-Doll-Charaktere) | M2 Account & Charakter (komplett fertig): M2a Datenbank & Auth-Dienst, M2b Server-Join über Account/Token/Charakter, M2c Unity-Login-UI (UI Toolkit) | M3 Welt (Grid, AOI, Mobs) komplett fertig: M3a Kartenkollision, M3b Sichtbarkeitsbereich (kein Grid - siehe Abschnitt "Sichtbarkeitsbereich (AOI)"), M3c Monster (Spawns, Wander-KI, AOI-Integration - siehe Abschnitt "Monster") | M4 Kampf komplett fertig (inkl. Gegenwehr): M4a Kampf-Grundlagen, M4b Monster-Respawn, M4c Monster-Aggro/Verfolgung/Leine (siehe Abschnitt "Kampf") | M5 Items komplett fertig: M5a Items/Inventar/Ausrüstung/Drops (siehe Abschnitt "Items und Inventar"), M5b Shop/NPCs (siehe Abschnitt "Shop und NPCs") | M6 Metin-Kern abgeschlossen: M6a Level/XP/Werte/SP/Ausweichen/Regeneration (siehe Abschnitt "Fortschritt: Level, XP, Werte"), M6b Skills (siehe Abschnitt "Skills") - die ursprünglich mitgeplanten M6c Upgrade/M6d Lumiis-Steine sind zurückgestellt (siehe "Aktuelle Aufgabe") | M7 Sozial | M8 Alpha-Betrieb.
-Aktuelle Aufgabe: keine - der Paper-Doll-Rendering-Umbau (Socketing, Waffen-Sprites, Rüstungs-Palette,
-+7/+9-VFX) ist umgesetzt (siehe Abschnitt "Paper-Doll-Socketing, Waffen-VFX und Rüstungs-Palette" und
-Status). M6c Upgrade/M6d Lumiis-Steine bleiben weiterhin zurückgestellt.
+Aktuelle Aufgabe: keine - Multi-Map/Portale sind umgesetzt (siehe Abschnitt "Multi-Map und Portale" und
+`docs/map-import-plan.md`). M6c Upgrade/M6d Lumiis-Steine bleiben weiterhin zurückgestellt.
 
 ## Arbeitsweise
 - Kleine Schritte. Jeder endet mit grünem `dotnet test` und einem Commit (Präfix "M1: ...").
@@ -811,9 +852,19 @@ Status). M6c Upgrade/M6d Lumiis-Steine bleiben weiterhin zurückgestellt.
 - Kein Token-Refresh: die Session (LoginController, Lumiis.Data.TokenService) endet nach 30 Minuten fix, danach muss sich der Client neu anmelden (JoinRejectReason.TokenExpired bzw. 401 auf GET/POST /characters schicken automatisch zurück zu LoggedOut).
 - ResolveDefaultDataDir() existiert unabhängig in Lumiis.Server und Lumiis.Auth (Pfad-Kandidaten je nach typischem CWD beim Start). Bei künftigen data-dir-bezogenen Bugs beide Stellen prüfen, nicht nur eine. Eine gemeinsame Stelle (z. B. in Lumiis.Data) ist eine spätere Aufräumarbeit, kein aktueller Blocker.
 - Verfolgungs-EntityMove-Pakete (M4c): ein aktiv ein Ziel verfolgendes Monster erzeugt jeden Tick (25x/s) ein neues EntityMovePacket an alle AOI-Beobachter (siehe Abschnitt "Kampf") - kein Throttling/Diffing, ähnlich der Rate-Limit-Lücke oben. Für die aktuelle Spielergröße unkritisch, bei mehr gleichzeitig verfolgenden Monstern eine spätere Optimierung.
+- Multi-Map-Limitations: Kartenmaße sind global fix (kein `tiles.bin`/Terrain), die Lumiis-Referenzkarten
+  wurden nicht importiert (`greenfield` ist generiert), der Client rendert keine Kollision und Gruppe/Party
+  ist weiterhin kartenübergreifend (siehe Abschnitt "Multi-Map und Portale").
 - Kein YangChangedPacket bei Join: `GameServer.CompleteJoin` lädt `Character.Yang` in die Entity, verschickt dafür aber kein Paket (YangChangedPacket wird nur bei Monster-Kill/Kauf/Verkauf/Debug-Give-Yang ausgelöst) - die Debug-Overlay-Anzeige zeigt bis zum ersten Yang-Ereignis nach dem Login 0 statt des echten Standes. Bislang kein Auftrag, das zu beheben (analog zur inzwischen behobenen HP-Sync-Lücke, siehe Status-Eintrag "Bugfix HP-Anzeige").
 
 ## Status
+- Multi-Map + Portale (2026-10-25, Protocol.Version 15) fertig: `MapCatalog`/`MapDefinition`/
+  `PortalDefinition` + `data/maps/index.json` (village Default + generiertes greenfield), `Character.MapId`
+  (Migration `AddCharacterMapId`), eine `World` pro Karte im `GameServer`, `MapChangedPacket`/
+  `DebugChangeMapRequestPacket`, AOI-/Chat-Trennung pro Karte, Portal-Sofortsave, Client-Kartenwechsel
+  (Boden/Portale/HUD/Debug-API), Tests (`MapCatalogTests`, `WorldPortalTests`, Roundtrips, 5
+  Integrationstests). Siehe `docs/map-import-plan.md` (Limitations: kein echter Referenzkarten-Import,
+  globale Kartenmaße, kein Client-Kollisionsrendering).
 - M0 fertig. Shared: PacketWriter/PacketReader/PacketCodec, PacketId (JoinRequest, MoveTo), 23 Tests grün.
 - M1 (Server, Bot, Bewegung) fertig, in 5 Commits: Shared (Server->Client-Pakete 1000-1005, GameConstants, NameRules), Game-Logik (World/Entity, reine Bewegung pro Tick), Transport/GameServer (LiteNetLib-Adapter, fester 25-Hz-Loop, Join/Move/Disconnect-Handling), Bot (Lumiis.Bot joint und läuft zufällig), Integrationstests (echtes LiteNetLib auf Loopback). 62 Tests grün, manuell mit Server + `Lumiis.Bot -- --count 3` getestet. M1b (Unity-Client) ist eine eigene, noch offene Aufgabe.
 - M1-Fixes (Architektur-Review-Ergebnis) fertig, in 3 Commits: (1) Exceptions dürfen den Server nie beenden - jeder Netzwerk-Callback fängt Fehler ab, nur die betroffene Verbindung wird getrennt, 50 fehlerhafte Ticks in Folge lösen einen sauberen Shutdown mit Exit-Code 1 aus; (2) Fristen laufen in Wandzeit (ms) mit injizierbarer Uhr statt in Ticks; (3) Paketgrößenlimit (1200 Bytes, vor dem Decode geprüft) und NameRules nur noch ASCII (Homoglyph-Schutz). 67 Tests grün, 5x hintereinander stabil.
