@@ -38,7 +38,7 @@ Gruppe, keine Quests, keine Lumiis-Steine, keine Bosse, kein Audio, keine echten
 | Lumiis-Steine + ein Boss (Wellen 75/50/25 %, Loot, Respawn, Client-View) | **MVP umgesetzt**: `Lumiis des Kummers` (stationär, 800 HP, garantiertes Material) und `Waldboss` (1200 HP, aggressiv) als Mobs inkl. Client-Form/Farbe/Skalierung; echte Wellen-Phasen fehlen | `lumiis-2d/shared/metins.js`, `server/metin.js`, `server/stages/` | M |
 | Aufwertung +0…+9 (DB-Stufen, Material/Schutzrolle, Pakete, UI) | Design liegt fertig vor; günstiger Alpha-Gewinn | `docs/tasks/M6c-upgrade.md` | M |
 | Audio + konsistente Kampf-/Loot-VFX | **Audio-Platzhalter umgesetzt** (`AudioService`, prozedurale Clips); VFX weiterhin nur Ringe/Linien/Trail | `lumiis/packages/client/src/audio.ts` | –/M |
-| Item-Icons/Tooltips + kleines Content-Paket | Icons sind jetzt importiert; Item-Katalog noch 8 Einträge | `Resources/Icons`, `ItemIconCatalog`, `data/items.json` | S–M |
+| Item-Icons/Tooltips + kleines Content-Paket | **Icons + Content-Paket umgesetzt**: 546 Icons, 18 Items mit iconKey, 13 fehlende Archivdateien nachgeladen; Tooltips weiterhin knapp | `Resources/Icons`, `ItemIconCatalog`, `data/items.json` | –/S |
 | Lesbare Kartenoptik / Feldkarte | Boden ist Platzhalter-Checker; Alpha nennt Startdorf + Feld | `PlaceholderSprites.cs`, `data/maps/village/collision-source.png` | M–L |
 | Rate-Limits (Verbindung/Chat), Auth-Brute-Force-Schutz, Backups | M8 Alpha-Betrieb | `ServerConfig`, `AuthEndpoints`; Referenz `lumiis/packages/server/src/net/gateway.ts`, `lumiis-2d/docs/SECURITY.md` | S–M |
 | Last-/Flow-Tests mit Bots | Bot kann nur bewegen | `lumiis-2d/tests/perf.test.js`, `lumiis-2d/tools/flow/` | M |
@@ -55,7 +55,7 @@ Gruppe, keine Quests, keine Lumiis-Steine, keine Bosse, kein Audio, keine echten
 | Sockets/Geiststeine/Refine-Materialien/Lager | `lumiis-2d/shared/sockets.js`, `spirit.js`, `refine.js`, `warehouse.js` | L |
 | PvP/Duell/Gilde | `lumiis-2d/shared/pvp.js`, `server/pvp.js`, `duel.js` | L |
 | Mobile/Touch, Minimap, Settings, UI-Art | `lumiis/packages/client/src/mobile.ts`, `lumiis-2d/client/mobileui.js`, `minimap.js` | M–L |
-| Größerer Item-/Monster-Katalog (L2D: 545 Items/344 Mobs) | `lumiis-2d/shared/items.js`, `mobs.js` | M–L |
+| Größerer Item-/Monster-Katalog (L2D: 545 Items/344 Mobs) | 18 Items, 4 Mobs, 4 Skills; Ausbau offen | `lumiis-2d/shared/items.js`, `mobs.js` | M–L |
 
 ## Architektur-Risiken
 
