@@ -1,3 +1,4 @@
+using Lumiis.Shared.Net;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -66,17 +67,30 @@ namespace Lumiis.Client
         /// einfach übersprungen.</summary>
         public static void BuildCharacterPortrait(VisualElement parent, float size)
         {
-            parent.Clear();
-            AddPortraitLayer(parent, "Characters/body/warrior_m", 0, size);
-            AddPortraitLayer(parent, "Characters/armor/01_moenchsplattenpanzer", 0, size);
-            AddPortraitLayer(parent, "Characters/head/warrior_m", 0, size);
-            AddPortraitLayer(parent, "Characters/hair/warrior_m_1", 0, size);
-            // Waffen-Sheet: Zeilen 3-5 sind die Vorderseite, Zeile 3 = Blick nach unten.
-            AddPortraitLayer(parent, "Characters/weapon/schwert_02", 3, size);
+            var appearance = new Appearance { BodyId = 1, HairStyleId = 1, HairColorId = 0, ArmorId = 4, WeaponId = 1 };
+            BuildCharacterPortrait(parent, size, appearance, Color.white);
         }
 
-        private static void AddPortraitLayer(VisualElement parent, string resource, int row, float size)
+        /// <summary>Vorschau aus dem echten Aussehen (Charakterauswahl/Erstellung) - dieselben Sheets wie
+        /// LumiisSpriteProvider im Spiel, Blick nach unten, Stand-Frame.</summary>
+        public static void BuildCharacterPortrait(VisualElement parent, float size, Appearance appearance, Color hairTint)
         {
+            parent.Clear();
+            AddPortraitLayer(parent, LumiisSpriteProvider.SheetResourceFor(CharacterSlot.Body, appearance.BodyId), 0, size, Color.white);
+            if (appearance.ArmorId > 0)
+                AddPortraitLayer(parent, LumiisSpriteProvider.SheetResourceFor(CharacterSlot.Armor, appearance.ArmorId), 0, size, Color.white);
+            AddPortraitLayer(parent, LumiisSpriteProvider.SheetResourceFor(CharacterSlot.Head, appearance.BodyId), 0, size, Color.white);
+            if (appearance.HairStyleId > 0)
+                AddPortraitLayer(parent, LumiisSpriteProvider.SheetResourceFor(CharacterSlot.Hair, appearance.HairStyleId), 0, size, hairTint);
+            // Waffen-Sheet: Zeilen 3-5 sind die Vorderseite, Zeile 3 = Blick nach unten. Bis eigene Sheets
+            // je Waffe importiert sind, steht ein Schwert-Sheet für jede Waffe.
+            if (appearance.WeaponId > 0)
+                AddPortraitLayer(parent, "Characters/weapon/schwert_02", 3, size, Color.white);
+        }
+
+        private static void AddPortraitLayer(VisualElement parent, string resource, int row, float size, Color tint)
+        {
+            if (string.IsNullOrEmpty(resource)) return;
             const float cell = 48f;
             Texture2D texture = Resources.Load<Texture2D>(resource);
             if (texture == null) return;
@@ -85,6 +99,7 @@ namespace Lumiis.Client
             {
                 image = texture,
                 scaleMode = ScaleMode.StretchToFill,
+                tintColor = tint,
                 pickingMode = PickingMode.Ignore,
                 // uv: normiert, Ursprung unten links - Zeile 0 ist die oberste Zeile des Sheets.
                 uv = new Rect(0f, (texture.height - (row + 1) * cell) / texture.height, cell / texture.width, cell / texture.height)

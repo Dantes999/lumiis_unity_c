@@ -440,6 +440,45 @@
     flex-grow: 1;
 }
 
+.charselect-look-row {
+    flex-direction: row;
+    align-items: center;
+    margin-top: 3px;
+}
+
+.charselect-look-label {
+    width: 84px;
+    color: rgb(214, 196, 160);
+    font-size: 14px;
+}
+
+.charselect-look-arrow {
+    min-width: 26px;
+    width: 26px;
+    min-height: 24px;
+    padding: 0;
+    margin: 0 2px;
+}
+
+.charselect-look-value {
+    flex-grow: 1;
+    color: rgb(240, 232, 214);
+    font-size: 14px;
+    -unity-text-align: middle-center;
+}
+
+.charselect-look-color-cell {
+    align-items: center;
+    justify-content: center;
+}
+
+.charselect-look-swatch {
+    width: 40px;
+    height: 16px;
+    border-width: 1px;
+    border-color: rgb(10, 6, 4);
+}
+
 .charselect-actions {
     flex-direction: row;
     justify-content: space-between;

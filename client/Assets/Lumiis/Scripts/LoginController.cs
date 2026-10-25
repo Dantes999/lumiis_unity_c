@@ -47,6 +47,15 @@ namespace Lumiis.Client
         private VisualElement _previewFigure;
         private Label _selectedNameLabel;
         private CharacterInfo? _selectedCharacter;
+        private Label _selectedInfoLabel;
+        private LookCatalogClient _lookCatalog;
+        private Label _lookBodyValue;
+        private Label _lookHairValue;
+        private VisualElement _lookColorSwatch;
+        private int _lookBodyIndex;
+        private int _lookHairIndex;
+        private int _lookColorIndex; // 0-basiert in hairColors, auf der Leitung +1
+        private bool _previewingNewLook;
         private HudController _hud;
 
         // ---- escape-menu (siehe docs/tasks/escape-menu.md) - eigene, dritte UI-Wurzel im selben UIDocument
@@ -150,6 +159,8 @@ namespace Lumiis.Client
             _startGameButton = _characterSelectRoot.Q<Button>("start-game-button");
             _previewFigure = _characterSelectRoot.Q<VisualElement>("charselect-preview-figure");
             _selectedNameLabel = _characterSelectRoot.Q<Label>("charselect-selected-name");
+            _selectedInfoLabel = _characterSelectRoot.Q<Label>("charselect-selected-info");
+            BindLookChoice();
             UiSkin.BuildCharacterPortrait(_previewFigure, 144f);
 
             _usernameField.value = PlayerPrefs.GetString(UsernamePrefsKey, "");
@@ -355,7 +366,126 @@ namespace Lumiis.Client
         private void SelectCharacterCard(CharacterInfo character)
         {
             _selectedCharacter = character;
+            _previewingNewLook = false;
             RefreshCharacterSelection();
+        }
+
+        // ---- Aussehen bei der Erstellung ----
+
+        private void BindLookChoice()
+        {
+            try
+            {
+                _lookCatalog = LookCatalogClient.LoadFromStreamingAssets();
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning("LoginController: looks.json nicht geladen, Aussehenswahl aus: " + ex.Message);
+            }
+
+            _lookBodyValue = _characterSelectRoot.Q<Label>("look-body-value");
+            _lookHairValue = _characterSelectRoot.Q<Label>("look-hair-value");
+            _lookColorSwatch = _characterSelectRoot.Q<VisualElement>("look-color-swatch");
+            _characterSelectRoot.Q<Button>("look-body-prev").clicked += () => StepLook(ref _lookBodyIndex, LookIds("Body").Count, -1);
+            _characterSelectRoot.Q<Button>("look-body-next").clicked += () => StepLook(ref _lookBodyIndex, LookIds("Body").Count, 1);
+            _characterSelectRoot.Q<Button>("look-hair-prev").clicked += () => StepLook(ref _lookHairIndex, LookIds("Hair").Count, -1);
+            _characterSelectRoot.Q<Button>("look-hair-next").clicked += () => StepLook(ref _lookHairIndex, LookIds("Hair").Count, 1);
+            _characterSelectRoot.Q<Button>("look-color-prev").clicked += () => StepLook(ref _lookColorIndex, HairColorCount(), -1);
+            _characterSelectRoot.Q<Button>("look-color-next").clicked += () => StepLook(ref _lookColorIndex, HairColorCount(), 1);
+            // Nur ein Körper im Katalog: Zeile ausblenden statt eines toten Cyclers.
+            _characterSelectRoot.Q<VisualElement>("look-body-row").style.display =
+                LookIds("Body").Count > 1 ? DisplayStyle.Flex : DisplayStyle.None;
+            _newCharacterNameField.RegisterCallback<FocusInEvent>(_ => ShowNewLookPreview());
+            _newCharacterNameField.RegisterValueChangedCallback(evt =>
+            {
+                if (!_previewingNewLook) return;
+                string typed = evt.newValue != null ? evt.newValue.Trim() : "";
+                _selectedNameLabel.text = typed.Length > 0 ? typed : "Neuer Charakter";
+            });
+            RefreshLookLabels();
+        }
+
+        private System.Collections.Generic.IReadOnlyList<int> LookIds(string slot)
+        {
+            return _lookCatalog != null ? _lookCatalog.GetIdsForSlot(slot) : System.Array.Empty<int>();
+        }
+
+        private int HairColorCount() => _lookCatalog != null ? _lookCatalog.HairColors.Count : 0;
+
+        private void StepLook(ref int index, int count, int delta)
+        {
+            if (count <= 0) return;
+            index = ((index + delta) % count + count) % count;
+            RefreshLookLabels();
+            ShowNewLookPreview();
+        }
+
+        private void RefreshLookLabels()
+        {
+            _lookBodyValue.text = LookName("Body", _lookBodyIndex);
+            _lookHairValue.text = LookName("Hair", _lookHairIndex);
+            _lookColorSwatch.style.backgroundColor = HairColor(_lookColorIndex + 1);
+        }
+
+        private string LookName(string slot, int index)
+        {
+            System.Collections.Generic.IReadOnlyList<int> ids = LookIds(slot);
+            if (index < 0 || index >= ids.Count) return "-";
+            return _lookCatalog.TryGetEntry(slot, ids[index], out LookEntryJson entry) && entry.name.Length > 0
+                ? entry.name
+                : "#" + ids[index];
+        }
+
+        private Color HairColor(int hairColorId)
+        {
+            int index = hairColorId - 1; // 1-basiert wie Appearance.HairColorId
+            if (_lookCatalog == null || index < 0 || index >= _lookCatalog.HairColors.Count) return Color.white;
+            return ColorUtility.TryParseHtmlString(_lookCatalog.HairColors[index], out Color color) ? color : Color.white;
+        }
+
+        /// <summary>Gewähltes Aussehen für POST /characters; ohne Katalog bleibt es leer (Server-Default).</summary>
+        private CharacterLookChoice CurrentLookChoice()
+        {
+            if (_lookCatalog == null) return default;
+            System.Collections.Generic.IReadOnlyList<int> bodies = LookIds("Body");
+            System.Collections.Generic.IReadOnlyList<int> hairs = LookIds("Hair");
+            int? body = _lookBodyIndex < bodies.Count ? bodies[_lookBodyIndex] : (int?)null;
+            int? hair = _lookHairIndex < hairs.Count ? hairs[_lookHairIndex] : (int?)null;
+            int? color = _lookColorIndex < HairColorCount() ? _lookColorIndex + 1 : (int?)null;
+            return new CharacterLookChoice(body, hair, color);
+        }
+
+        private void ShowNewLookPreview()
+        {
+            _previewingNewLook = true;
+            RefreshCharacterSelection();
+        }
+
+        private void RefreshPreviewFigure()
+        {
+            Appearance appearance;
+            if (_previewingNewLook)
+            {
+                CharacterLookChoice look = CurrentLookChoice();
+                // Neue Charaktere bekommen serverseitig nur die Startwaffe (siehe Lumiis.Auth), keine Rüstung.
+                appearance = new Appearance
+                {
+                    BodyId = look.BodyId ?? 1,
+                    HairStyleId = look.HairStyleId ?? 1,
+                    HairColorId = look.HairColorId ?? 0,
+                    WeaponId = 1
+                };
+            }
+            else if (_selectedCharacter.HasValue)
+            {
+                appearance = _selectedCharacter.Value.Appearance;
+                if (appearance.BodyId <= 0) appearance.BodyId = 1; // alter Auth-Dienst ohne Aussehen in der Liste
+            }
+            else
+            {
+                return;
+            }
+            UiSkin.BuildCharacterPortrait(_previewFigure, 144f, appearance, HairColor(appearance.HairColorId));
         }
 
         private void RefreshCharacterSelection()
@@ -367,8 +497,19 @@ namespace Lumiis.Client
             }
 
             bool hasSelection = _selectedCharacter.HasValue;
-            _selectedNameLabel.text = hasSelection ? _selectedCharacter.Value.Name : "Kein Charakter";
-            _previewFigure.style.visibility = hasSelection ? Visibility.Visible : Visibility.Hidden;
+            if (_previewingNewLook)
+            {
+                string typed = _newCharacterNameField.value != null ? _newCharacterNameField.value.Trim() : "";
+                _selectedNameLabel.text = typed.Length > 0 ? typed : "Neuer Charakter";
+                _selectedInfoLabel.text = "Krieger · Stufe 1";
+            }
+            else
+            {
+                _selectedNameLabel.text = hasSelection ? _selectedCharacter.Value.Name : "Kein Charakter";
+                _selectedInfoLabel.text = hasSelection ? "Krieger · Stufe " + Mathf.Max(1, _selectedCharacter.Value.Level) : "";
+            }
+            _previewFigure.style.visibility = hasSelection || _previewingNewLook ? Visibility.Visible : Visibility.Hidden;
+            RefreshPreviewFigure();
             _startGameButton.SetEnabled(hasSelection && _characterListView.enabledSelf);
         }
 
@@ -390,7 +531,8 @@ namespace Lumiis.Client
             SetCharacterSelectInteractable(false);
             SetCharacterSelectError("");
             _characterSelectStatusLabel.text = "Erstelle Charakter ...";
-            await _loginFlow.CreateCharacterAsync(NormalizedAuthUrl(), _newCharacterNameField.value);
+            await _loginFlow.CreateCharacterAsync(NormalizedAuthUrl(), _newCharacterNameField.value, CurrentLookChoice());
+            _previewingNewLook = false;
             if (_loginFlow.State == LoginFlowState.Connecting) _newCharacterNameField.value = "";
             ApplyLoginFlowState();
         }

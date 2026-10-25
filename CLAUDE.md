@@ -244,6 +244,11 @@ Seit 2026-10-25 sind Login, Charakterauswahl, Systemmenü und HUD im Stil klassi
   `GameClient.PlayerContextRequested`), `PartyInviteReceived` zeigt ein Annehmen/Ablehnen-Popup, das
   Gruppenpanel zeigt HP-Balken je Mitglied, "Verlassen" nutzt `PartyLeave`, beim Betreten des Spiels
   `RequestPartySnapshot`.
+- Gruppe (Protocol 20): Offline-Mitglieder ausgegraut "(offline)", Rollenname je Zeile; der Leiter öffnet
+  per Rechtsklick auf eine Zeile Entfernen/Zum Leiter machen/Rolle (PartyKick/-Promote/-SetRoleRequest).
+- Charakterauswahl-Vorschau aus dem echten `CharacterInfo.Appearance` (`UiSkin.BuildCharacterPortrait`, Sheets
+  über `LumiisSpriteProvider.SheetResourceFor`); beim Erstellen Frisur/Haarfarbe (Körper nur bei >1 Eintrag)
+  wählbar, geht als `CharacterLookChoice` an POST /characters.
 - Boden-Items: Namensschild mit "+N" und Farbe je Stufe (blau ab +1, gold ab +7, orange +9), Hervorhebung
   unter dem Mauszeiger, Linksklick hebt auf.
 - Screenshot-Hilfen: `GameClient.DebugShowSmithPreview()` / `DebugShowPartyInvite(name)`.

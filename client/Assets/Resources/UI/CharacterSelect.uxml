@@ -26,6 +26,26 @@
                             <ui:TextField name="new-character-name-field" class="m2-input" />
                             <ui:Button text="Erstellen" name="create-character-button" class="m2-button" />
                         </ui:VisualElement>
+                        <ui:VisualElement name="look-body-row" class="charselect-look-row">
+                            <ui:Label text="Körper" class="charselect-look-label" />
+                            <ui:Button name="look-body-prev" text="&lt;" class="m2-button charselect-look-arrow" />
+                            <ui:Label name="look-body-value" text="-" class="charselect-look-value" />
+                            <ui:Button name="look-body-next" text="&gt;" class="m2-button charselect-look-arrow" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="charselect-look-row">
+                            <ui:Label text="Frisur" class="charselect-look-label" />
+                            <ui:Button name="look-hair-prev" text="&lt;" class="m2-button charselect-look-arrow" />
+                            <ui:Label name="look-hair-value" text="-" class="charselect-look-value" />
+                            <ui:Button name="look-hair-next" text="&gt;" class="m2-button charselect-look-arrow" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="charselect-look-row">
+                            <ui:Label text="Haarfarbe" class="charselect-look-label" />
+                            <ui:Button name="look-color-prev" text="&lt;" class="m2-button charselect-look-arrow" />
+                            <ui:VisualElement class="charselect-look-value charselect-look-color-cell">
+                                <ui:VisualElement name="look-color-swatch" class="charselect-look-swatch" />
+                            </ui:VisualElement>
+                            <ui:Button name="look-color-next" text="&gt;" class="m2-button charselect-look-arrow" />
+                        </ui:VisualElement>
                         <ui:Label name="character-select-status" class="status-text" />
                         <ui:Label name="character-select-error" class="error-text" />
                     </ui:VisualElement>
