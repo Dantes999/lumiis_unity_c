@@ -782,6 +782,7 @@
 
 .hud-taskbar-center {
     flex-direction: row;
+    flex-shrink: 0; /* natürliche Breite messen, HudController.FitTaskbarCenter skaliert bei Platzmangel */
     align-items: center;
     margin-top: 4px;
 }

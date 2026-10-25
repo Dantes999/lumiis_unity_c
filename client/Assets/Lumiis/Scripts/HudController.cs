@@ -27,6 +27,7 @@ namespace Lumiis.Client
         private const int InventoryColumns = 5;
         private const float TaskbarHeight = 68f;
         private const float WindowMargin = 4f;
+        private const float TaskbarSideReserve = 116f; // Breite einer Kugel plus Abstand, siehe .hud-taskbar padding.
 
         private static readonly ChatChannel[] ChatChannelCycle = { ChatChannel.Map, ChatChannel.Global, ChatChannel.Whisper };
 
@@ -95,6 +96,7 @@ namespace Lumiis.Client
         private VisualElement _characterWindow;
         private VisualElement _shopWindow;
         private VisualElement _smithWindow;
+        private VisualElement _taskbarCenter;
         private readonly List<VisualElement> _openWindows = new List<VisualElement>();
 
         private sealed class ItemSlotView
@@ -497,6 +499,20 @@ namespace Lumiis.Client
                 if (titlebar.HasPointerCapture(evt.pointerId)) titlebar.ReleasePointer(evt.pointerId);
                 _dragWindow = null;
             });
+        }
+
+        // Schrumpft Schnellleiste/EXP/Menüknöpfe, wenn sie zwischen den beiden Kugeln keinen Platz haben
+        // (z. B. 1024x576) - sonst ragt Slot 1 unter die HP-Kugel.
+        private void FitTaskbarCenter()
+        {
+            if (_taskbarCenter == null) _taskbarCenter = _root.Q<VisualElement>(className: "hud-taskbar-center");
+            if (_taskbarCenter == null) return;
+            float available = _root.layout.width - 2f * TaskbarSideReserve;
+            float width = _taskbarCenter.layout.width;
+            if (float.IsNaN(available) || float.IsNaN(width) || width <= 0f) return;
+            float factor = Mathf.Clamp(available / width, 0.5f, 1f);
+            if (Mathf.Abs(_taskbarCenter.resolvedStyle.scale.value.x - factor) > 0.001f)
+                _taskbarCenter.style.scale = new Scale(new Vector2(factor, factor));
         }
 
         // Hält offene Fenster oberhalb der Taskleiste (wichtig bei kleinen Auflösungen wie 1024x576).
@@ -1225,6 +1241,7 @@ namespace Lumiis.Client
             HandleHotkeys();
             UpdateContextMenu();
             KeepWindowsInView();
+            FitTaskbarCenter();
             RefreshPlayer();
             RefreshTarget();
             RefreshQuickslots();
