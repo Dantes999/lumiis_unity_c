@@ -18,7 +18,8 @@ public enum ItemType
     Shield,
     Consumable,
     UpgradeMaterial,
-    ProtectionScroll
+    ProtectionScroll,
+    Material
 }
 
 /// <summary>Ein Item aus data/items.json. LookId/AttackBonus/DefenseBonus nur bei Ausrüstungs-ItemTypes
@@ -142,7 +143,7 @@ public sealed class ItemCatalog
             {
                 throw new ItemCatalogException(
                     $"items.json: Item {entry.Id} ({entry.Name}) hat einen ungültigen itemType '{entry.ItemType}' " +
-                    "(erwartet: Armor/Helmet/Weapon/Shield/Consumable/UpgradeMaterial/ProtectionScroll).");
+                    "(erwartet: Armor/Helmet/Weapon/Shield/Consumable/UpgradeMaterial/ProtectionScroll/Material).");
             }
 
             if (itemType == ItemType.Consumable)
@@ -150,7 +151,7 @@ public sealed class ItemCatalog
                 if (entry.HealAmount <= 0)
                     throw new ItemCatalogException($"items.json: Item {entry.Id} ({entry.Name}) ist Consumable, hat aber healAmount <= 0.");
             }
-            else if (itemType is ItemType.UpgradeMaterial or ItemType.ProtectionScroll)
+            else if (itemType is ItemType.UpgradeMaterial or ItemType.ProtectionScroll or ItemType.Material)
             {
                 // M6c: reine Verbrauchsgüter ohne Aussehen/Boni - eine LookId wäre hier ein Datenfehler.
                 if (entry.LookId != 0 || entry.AttackBonus != 0 || entry.DefenseBonus != 0 || entry.HealAmount != 0)

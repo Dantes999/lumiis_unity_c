@@ -27,6 +27,14 @@
         {
           "itemId": 6,
           "chancePercent": 10
+        },
+        {
+          "itemId": 40,
+          "chancePercent": 20
+        },
+        {
+          "itemId": 41,
+          "chancePercent": 10
         }
       ]
     },
@@ -57,6 +65,18 @@
         {
           "itemId": 7,
           "chancePercent": 15
+        },
+        {
+          "itemId": 42,
+          "chancePercent": 15
+        },
+        {
+          "itemId": 43,
+          "chancePercent": 20
+        },
+        {
+          "itemId": 44,
+          "chancePercent": 8
         }
       ]
     },
@@ -87,6 +107,18 @@
         {
           "itemId": 5,
           "chancePercent": 25
+        },
+        {
+          "itemId": 45,
+          "chancePercent": 25
+        },
+        {
+          "itemId": 49,
+          "chancePercent": 20
+        },
+        {
+          "itemId": 50,
+          "chancePercent": 15
         }
       ]
     },
@@ -117,6 +149,22 @@
         {
           "itemId": 5,
           "chancePercent": 50
+        },
+        {
+          "itemId": 46,
+          "chancePercent": 35
+        },
+        {
+          "itemId": 47,
+          "chancePercent": 35
+        },
+        {
+          "itemId": 48,
+          "chancePercent": 30
+        },
+        {
+          "itemId": 51,
+          "chancePercent": 25
         }
       ]
     }

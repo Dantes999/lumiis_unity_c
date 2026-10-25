@@ -79,8 +79,8 @@ stehen jetzt für frühe Item-Tiers zur Verfügung.
 
 ## Offene Punkte
 
-- Weitere Item-Typen mit `iconKey` versorgen (Material, Buch, Geiststein, Truhe,
-  Schlüssel, Karte, Teleport, Schmuck, Schuhe, Kostüm, Pferd); erste Ausrüstungs- und
-  Trank-Erweiterung ist umgesetzt.
+- Weitere Item-Typen mit `iconKey` versorgen (Buch, Geiststein, Truhe, Schlüssel, Karte,
+  Teleport, Schmuck, Schuhe, Kostüm, Pferd); Ausrüstung, Tränke, Aufwertungsmaterial und
+  12 Materialien sind umgesetzt.
 - Optional: Sprite-Atlas, sobald Profiling es rechtfertigt.
 - Windows-Check nach dem Import (keine `:`-Dateien mehr).

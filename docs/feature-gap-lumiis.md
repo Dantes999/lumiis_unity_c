@@ -14,7 +14,7 @@ Aufwand: S = wenige Tage, M = 1–2 Wochen, L = mehrere Wochen (inkl. Tests/Doku
 Der Serverkern ist solide: autoritativer 25-Hz-Loop, LiteNetLib, PostgreSQL/EF Core, Token-Auth,
 AOI, Kollision, Monster-KI, Kampf, Items/Inventar/Shop, Level/XP/Stats, vier Skills, Paper-Doll
 und breite Tests. HUD, Chat, Gruppe inkl. EXP-Teilen, Audio-Platzhalter, 546 Item-Icons,
-18 Items, Multi-Map mit zwei Karten/Portalen, Aufwertung +0…+9 sowie ein Lumiis-Stein/Boss-MVP
+32 Items, Multi-Map mit zwei Karten/Portalen, Aufwertung +0…+9 sowie ein Lumiis-Stein/Boss-MVP
 sind umgesetzt. Offen sind vor allem echte Stein-Wellen, Quests/Trade, echter Kartenimport und
 mehr Content.
 
@@ -39,7 +39,7 @@ soziale Integrationstests. YangChanged beim Join ist bereits im Code.
 | Lumiis-Steine + ein Boss (Wellen 75/50/25 %, Loot, Respawn, Client-View) | **umgesetzt**: `Lumiis des Kummers` (800 HP) und `Waldboss` (1200 HP) inkl. Client-Look; `data/metins.json` + `World.TryTriggerMetinWaves` spawnen 75/50/25-%-Wellen | `lumiis-2d/shared/metins.js`, `server/metin.js`, `server/stages/` | – |
 | Aufwertung +0…+9 (DB-Stufen, Material/Schutzrolle, Pakete, UI) | **umgesetzt** (M6c: `data/upgrade.json`, `UpgradeCatalog`, Migration `AddUpgradeLevels`, `UpgradeItem*`-Pakete, Debug-Panel-UI; Zerstoerung ohne Bewahrungsrolle) | `docs/tasks/M6c-upgrade.md` | – |
 | Audio + konsistente Kampf-/Loot-VFX | **Audio-Platzhalter umgesetzt** (`AudioService`, prozedurale Clips); VFX weiterhin nur Ringe/Linien/Trail | `lumiis/packages/client/src/audio.ts` | –/M |
-| Item-Icons/Tooltips + kleines Content-Paket | **Icons + Content-Paket umgesetzt**: 546 Icons, 18 Items mit iconKey, 13 fehlende Archivdateien nachgeladen; Tooltips weiterhin knapp | `Resources/Icons`, `ItemIconCatalog`, `data/items.json` | –/S |
+| Item-Icons/Tooltips + kleines Content-Paket | **Icons + Content-Paket umgesetzt**: 546 Icons, 32 Items mit iconKey, 13 fehlende Archivdateien nachgeladen; Tooltips weiterhin knapp | `Resources/Icons`, `ItemIconCatalog`, `data/items.json` | –/S |
 | Lesbare Kartenoptik / Feldkarte | **Multi-Map umgesetzt** (Dorf + generiertes Grünes Feld, Portale, HUD-Kartenname); Boden weiterhin Platzhalter-Checker, kein echtes Terrain | `docs/map-import-plan.md`, `data/maps/`, `MapCatalog.cs`, `GameClient.RebuildMapVisuals` | M–L |
 | Rate-Limits (Verbindung/Chat), Auth-Brute-Force-Schutz, Backups | M8 Alpha-Betrieb | `ServerConfig`, `AuthEndpoints`; Referenz `lumiis/packages/server/src/net/gateway.ts`, `lumiis-2d/docs/SECURITY.md` | S–M |
 | Last-/Flow-Tests mit Bots | Bot kann nur bewegen | `lumiis-2d/tests/perf.test.js`, `lumiis-2d/tools/flow/` | M |
@@ -56,7 +56,7 @@ soziale Integrationstests. YangChanged beim Join ist bereits im Code.
 | Sockets/Geiststeine/Refine-Materialien/Lager | `lumiis-2d/shared/sockets.js`, `spirit.js`, `refine.js`, `warehouse.js` | L |
 | PvP/Duell/Gilde | `lumiis-2d/shared/pvp.js`, `server/pvp.js`, `duel.js` | L |
 | Mobile/Touch, Minimap, Settings, UI-Art | `lumiis/packages/client/src/mobile.ts`, `lumiis-2d/client/mobileui.js`, `minimap.js` | M–L |
-| Größerer Item-/Monster-Katalog (L2D: 545 Items/344 Mobs) | 18 Items, 4 Mobs, 4 Skills; Ausbau offen | `lumiis-2d/shared/items.js`, `mobs.js` | M–L |
+| Größerer Item-/Monster-Katalog (L2D: 545 Items/344 Mobs) | 32 Items, 4 Mobs, 4 Skills; Ausbau offen | `lumiis-2d/shared/items.js`, `mobs.js` | M–L |
 
 ## Architektur-Risiken
 

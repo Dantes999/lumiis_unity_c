@@ -965,11 +965,23 @@ namespace Lumiis.Client
         private void HandleInventorySlotClick(int slotIndex, int itemId)
         {
             if (itemId == 0) return;
+            if (!_itemCatalog.TryGet(itemId, out ItemEntryJson entry)) return;
 
-            if (_itemCatalog.TryGet(itemId, out ItemEntryJson entry) && entry.itemType == "Consumable")
+            if (entry.itemType == "Consumable")
+            {
                 _netClient.SendUseConsumable(slotIndex);
-            else
+                return;
+            }
+
+            if (entry.itemType == "Armor" || entry.itemType == "Helmet" || entry.itemType == "Weapon" || entry.itemType == "Shield")
+            {
                 _netClient.SendEquipItem(slotIndex);
+                return;
+            }
+
+            // Material/Aufwertungsverbrauch: kein Anlegen/Benutzen ueber den Inventar-Klick; der Server
+            // wuerde es ohnehin ablehnen. Kurze Rueckmeldung im Debug-Overlay.
+            _lastInventoryActionFailedMessage = entry.name + " ist ein Material.";
         }
 
         /// <summary>M5b: nur sichtbar, solange ein Shop offen ist (Rechtsklick auf einen NPC, siehe
