@@ -2059,6 +2059,7 @@ namespace Lumiis.Client
             _netClient?.SendChat(channel, targetName, text);
         }
 
+        public void PickupItem(int groundItemEntityId) => _netClient?.SendPickupItem(groundItemEntityId);
         public void PartyInvite(string targetName) => _netClient?.SendPartyInvite(targetName);
         public void PartyRespond(bool accept) => _netClient?.SendPartyRespond(accept);
         public void PartyLeave() => _netClient?.SendPartyLeave();
