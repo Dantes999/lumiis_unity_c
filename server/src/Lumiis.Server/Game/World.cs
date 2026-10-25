@@ -27,7 +27,7 @@ public sealed class World
         int WanderRadiusWire, int WanderIntervalMinMs, int WanderIntervalMaxMs,
         int MaxHp, int Attack, int Defense, int YangMin, int YangMax, int RespawnSeconds,
         int MeleeRangeWire, int AttackCooldownMs, bool Aggressive, int AggroRangeWire, int LeashRangeWire,
-        IReadOnlyList<(int ItemId, int ChancePercent)> Drops, int Level, int BaseXp, long DueAtMs);
+        IReadOnlyList<(int ItemId, int ChancePercent)> Drops, int Level, int BaseXp, long DueAtMs, bool FightsBack);
 
     private readonly Dictionary<int, Entity> _entities = new();
     private readonly Dictionary<int, int> _entityIdByCharacterId = new();
@@ -562,7 +562,7 @@ public sealed class World
         // wird von einem Monster getroffen) hier automatisch aus, kein Sonderfall nötig. Läuft bewusst VOR
         // dem Ausweichwurf (M6a) - ein ausgewichener Treffer ist immer noch ein Angriff, der den Verteidiger
         // aufmerksam macht (siehe docs/tasks/M6a-progression.md Abschnitt 0e).
-        if (target.Kind == EntityKind.Monster && target.TargetEntityId == null)
+        if (target.Kind == EntityKind.Monster && target.FightsBack && target.TargetEntityId == null)
             target.TargetEntityId = attacker.Id;
 
         // M6a: Ausweichwurf NACH reaktiver Zielerfassung (bleibt unverändert, siehe Kommentar oben) - Monster
@@ -701,7 +701,7 @@ public sealed class World
             diedMonster.MaxHp, diedMonster.Attack, diedMonster.Defense, diedMonster.YangMin, diedMonster.YangMax,
             diedMonster.RespawnSeconds, diedMonster.MeleeRangeWire, diedMonster.AttackCooldownMs,
             diedMonster.Aggressive, diedMonster.AggroRangeWire, diedMonster.LeashRangeWire, diedMonster.Drops,
-            diedMonster.Level, diedMonster.BaseXp, nowMs + diedMonster.RespawnSeconds * 1000L);
+            diedMonster.Level, diedMonster.BaseXp, nowMs + diedMonster.RespawnSeconds * 1000L, diedMonster.FightsBack);
     }
 
     // ---- M6a: Fortschritt (Level/XP/Werte/SP/Regeneration, kein Netzwerkbezug, siehe GameServer für die
@@ -739,13 +739,14 @@ public sealed class World
             for (int i = 0; i < wave.Count; i++)
             {
                 (int x, int y) = FindNearbyWalkablePoint(target.IntX, target.IntY, 150, 350);
-                SpawnMonster(wave.MobId, mobDef.Name, x, y, mobDef.SpeedWire,
+                Entity waveMob = SpawnMonster(wave.MobId, mobDef.Name, x, y, mobDef.SpeedWire,
                     mobDef.WanderRadiusWire, mobDef.WanderIntervalMinMs, mobDef.WanderIntervalMaxMs, nowMs,
                     mobDef.MaxHp, mobDef.Attack, mobDef.Defense, mobDef.YangMin, mobDef.YangMax,
                     meleeRangeWire: mobDef.MeleeRangeWire, attackCooldownMs: mobDef.AttackCooldownMs,
                     aggressive: mobDef.Aggressive, aggroRangeWire: mobDef.AggroRangeWire, leashRangeWire: mobDef.LeashRangeWire,
                     drops: mobDef.Drops.Select(d => (d.ItemId, d.ChancePercent)).ToList(),
                     level: mobDef.Level, baseXp: mobDef.BaseXp);
+                waveMob.FightsBack = mobDef.FightsBack;
             }
         }
     }
@@ -1505,6 +1506,7 @@ public sealed class World
                     meleeRangeWire: pending.MeleeRangeWire, attackCooldownMs: pending.AttackCooldownMs,
                     aggressive: pending.Aggressive, aggroRangeWire: pending.AggroRangeWire, leashRangeWire: pending.LeashRangeWire,
                     drops: pending.Drops, level: pending.Level, baseXp: pending.BaseXp);
+                monster.FightsBack = pending.FightsBack;
                 respawnedMonsters.Add(monster);
             }
         }

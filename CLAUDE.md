@@ -1317,6 +1317,9 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   Beobachter. Ruckeln beim Laufen behoben: `ClientWorld` setzte bei jedem EntityMove die Anzeige hart auf
   die Server-Startposition zurück (WASD schickt alle 100 ms ein neues Ziel); jetzt wird die Abweichung als
   Offset mit 0,1 s Zeitkonstante ausgeblendet, ab 300 Wire (Teleport/Respawn) hart gesetzt.
+  Trainingspuppen: Mob 6 "Trainingspuppe" (`dummy`-Sheet, 2000 HP, steht still, 5 s Respawn, keine
+  Beute) dreimal am Westrand des Map1-Dorfplatzes; neues optionales Mob-Feld `fightsBack` (Default true,
+  `MobDefinition.FightsBack`/`Entity.FightsBack`) - bei false erfasst der Mob auch nach einem Treffer kein Ziel.
 - Offen: Monster-Sheets für die Jayang-Mobs, weitere Zonen/Dungeons, Reittiere; siehe
   `docs/feature-gap-lumiis.md`.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client

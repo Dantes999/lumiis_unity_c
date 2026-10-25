@@ -203,6 +203,28 @@
       ]
     },
     {
+      "id": 6,
+      "name": "Trainingspuppe",
+      "speedWire": 1,
+      "wanderRadiusWire": 1,
+      "wanderIntervalMinMs": 60000,
+      "wanderIntervalMaxMs": 60000,
+      "maxHp": 2000,
+      "attack": 0,
+      "defense": 0,
+      "yangMin": 0,
+      "yangMax": 0,
+      "meleeRangeWire": 100,
+      "attackCooldownMs": 1000,
+      "aggressive": false,
+      "aggroRangeWire": 0,
+      "leashRangeWire": 100,
+      "fightsBack": false,
+      "level": 1,
+      "baseXp": 0,
+      "drops": []
+    },
+    {
       "id": 10,
       "name": "Weißer-Eid Soldatin",
       "speedWire": 450,

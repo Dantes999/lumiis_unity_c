@@ -4,8 +4,9 @@ using Xunit;
 
 namespace Lumiis.Tests.Game
 {
-    /// <summary>Tote Spieler duerfen bis zum Respawn weder angreifen, Skills nutzen noch laufen.</summary>
-    public class WorldDeadPlayerTests
+    /// <summary>Spielbarkeit: tote Spieler duerfen bis zum Respawn weder angreifen, Skills nutzen noch laufen;
+    /// Trainingspuppen (FightsBack=false) wehren sich nie.</summary>
+    public class WorldPlayabilityTests
     {
         private static Entity JoinPlayer(World world)
         {
@@ -58,6 +59,20 @@ namespace Lumiis.Tests.Game
 
             Assert.False(world.SetDestination(player.Id, 51000, 50000));
             Assert.False(player.IsMoving);
+        }
+    
+        [Fact]
+        public void TryAttack_TrainingDummy_NeverAcquiresTarget()
+        {
+            var world = new World(maxPlayers: 10);
+            Entity player = JoinPlayer(world);
+            Entity dummy = SpawnMonster(world);
+            dummy.FightsBack = false;
+
+            AttackResult result = world.TryAttack(player.Id, dummy.Id, nowMs: 0);
+
+            Assert.True(result.Success);
+            Assert.Null(dummy.TargetEntityId);
         }
     }
 }

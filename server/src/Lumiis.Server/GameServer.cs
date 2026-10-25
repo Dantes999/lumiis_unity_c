@@ -319,7 +319,7 @@ public sealed class GameServer : INetEventListener
             foreach (SpawnPoint spawn in spawns)
             {
                 _mobCatalog.TryGet(spawn.MobId, out MobDefinition mobDef);
-                world.SpawnMonster(spawn.MobId, mobDef.Name, spawn.PositionX, spawn.PositionY, mobDef.SpeedWire,
+                Entity monster = world.SpawnMonster(spawn.MobId, mobDef.Name, spawn.PositionX, spawn.PositionY, mobDef.SpeedWire,
                     mobDef.WanderRadiusWire, mobDef.WanderIntervalMinMs, mobDef.WanderIntervalMaxMs, _nowMs(),
                     mobDef.MaxHp, mobDef.Attack, mobDef.Defense, mobDef.YangMin, mobDef.YangMax,
                     spawnPointId: spawn.Id, respawnSeconds: spawn.RespawnSeconds,
@@ -327,6 +327,7 @@ public sealed class GameServer : INetEventListener
                     aggressive: mobDef.Aggressive, aggroRangeWire: mobDef.AggroRangeWire, leashRangeWire: mobDef.LeashRangeWire,
                     drops: mobDef.Drops.Select(d => (d.ItemId, d.ChancePercent)).ToList(),
                     level: mobDef.Level, baseXp: mobDef.BaseXp);
+                monster.FightsBack = mobDef.FightsBack;
             }
         }
 

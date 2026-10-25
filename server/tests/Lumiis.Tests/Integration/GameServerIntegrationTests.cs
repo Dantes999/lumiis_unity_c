@@ -229,7 +229,7 @@ namespace Lumiis.Tests.Integration
             List<Entity> greenfieldMonsters = fixture.Server.WorldForMap("greenfield").Entities
                 .Where(e => e.Kind == EntityKind.Monster).ToList();
 
-            Assert.Equal(8, map1Monsters.Count);
+            Assert.Equal(11, map1Monsters.Count); // 8 Monster + 3 Trainingspuppen
             Assert.Equal(6, greenfieldMonsters.Count);
             Assert.Empty(map1Monsters.Select(m => m.Id).Intersect(greenfieldMonsters.Select(m => m.Id)));
             Assert.NotEmpty(fixture.Server.WorldForMap("map1").Entities.Where(e => e.Kind == EntityKind.Npc));

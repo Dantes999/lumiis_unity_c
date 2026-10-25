@@ -55,6 +55,27 @@
       "positionX": 51000,
       "positionY": 42700,
       "respawnSeconds": 240
+    },
+    {
+      "id": 9,
+      "mobId": 6,
+      "positionX": 45400,
+      "positionY": 45500,
+      "respawnSeconds": 5
+    },
+    {
+      "id": 10,
+      "mobId": 6,
+      "positionX": 45700,
+      "positionY": 45500,
+      "respawnSeconds": 5
+    },
+    {
+      "id": 11,
+      "mobId": 6,
+      "positionX": 46000,
+      "positionY": 45500,
+      "respawnSeconds": 5
     }
   ]
 }
