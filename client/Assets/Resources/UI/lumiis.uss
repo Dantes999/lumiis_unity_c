@@ -695,10 +695,6 @@
     background-image: resource("UI/Skin/boss_marker");
 }
 
-.hud-minimap-boss-edge {
-    opacity: 0.85;
-}
-
 .hud-minimap-ring {
     position: absolute;
     left: 0;

@@ -1465,7 +1465,7 @@ namespace Lumiis.Client
 
         /// <summary>Mini-Boss-Events (ClientWorld.MapEvents, unabhängig von der Sichtweite) als Totenkopf auf
         /// der Minimap. Liegt der Boss außerhalb des Ausschnitts, sitzt das Symbol am Rand in seiner Richtung
-        /// (etwas kleiner), damit man weiß, wohin man laufen muss.</summary>
+        /// (etwas blasser), damit man weiß, wohin man laufen muss.</summary>
         private void RefreshMinimapMarkers(MapVisual visual, float mapLeft, float mapTop, float mapSize)
         {
             List<MapEventInfo> events = _gameClient.World.MapEvents;
@@ -1479,7 +1479,8 @@ namespace Lumiis.Client
 
             const float center = MinimapSize / 2f;
             const float edgeRadius = MinimapSize / 2f - 11f;
-            float pulse = 1f + 0.12f * Mathf.Sin(Time.unscaledTime * 5f);
+            // Pulsieren über die Deckkraft statt Skalierung - krumme Skalierung verwischt die 16-px-Pixelart.
+            float pulse = 0.8f + 0.2f * Mathf.Sin(Time.unscaledTime * 5f);
             for (int i = 0; i < _minimapMarkers.Count; i++)
             {
                 VisualElement marker = _minimapMarkers[i];
@@ -1503,12 +1504,10 @@ namespace Lumiis.Client
                     py = center + dy / distance * edgeRadius;
                 }
 
-                float scale = outside ? 0.8f : pulse;
                 marker.style.display = DisplayStyle.Flex;
-                marker.style.left = px;
-                marker.style.top = py;
-                marker.style.scale = new Scale(new Vector3(scale, scale, 1f));
-                marker.EnableInClassList("hud-minimap-boss-edge", outside);
+                marker.style.left = Mathf.Round(px);
+                marker.style.top = Mathf.Round(py);
+                marker.style.opacity = outside ? 0.75f : pulse;
             }
         }
 
