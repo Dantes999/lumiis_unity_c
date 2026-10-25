@@ -44,11 +44,20 @@ public sealed class LumiisDbContext : DbContext
             // Multi-Map: DB-Default "village" - bestehende Zeilen (und von Auth ohne MapId eingefügte)
             // landen damit automatisch auf der Default-Karte, ohne dass die Migration Daten raten muss.
             entity.Property(c => c.MapId).HasMaxLength(64).HasDefaultValue("village");
+
+            // M6c: Aufwertungsstufen der Ausrüstung - DB-Default 0, bestehende Zeilen bleiben +0.
+            entity.Property(c => c.EquippedArmorUpgradeLevel).HasDefaultValue(0);
+            entity.Property(c => c.EquippedHelmetUpgradeLevel).HasDefaultValue(0);
+            entity.Property(c => c.EquippedWeaponUpgradeLevel).HasDefaultValue(0);
+            entity.Property(c => c.EquippedShieldUpgradeLevel).HasDefaultValue(0);
         });
 
         modelBuilder.Entity<CharacterInventoryItem>(entity =>
         {
             entity.HasIndex(i => new { i.CharacterId, i.SlotIndex }).IsUnique();
+
+            // M6c: Item-Instanz-Aufwertungsstufe, Default 0 (bestehende Inventarzeilen bleiben +0).
+            entity.Property(i => i.UpgradeLevel).HasDefaultValue(0);
 
             entity.HasOne(i => i.Character)
                 .WithMany(c => c.InventoryItems)

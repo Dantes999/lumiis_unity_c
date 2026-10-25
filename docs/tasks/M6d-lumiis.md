@@ -2,7 +2,7 @@
 
 Stand: 2026-10-25
 
-Status: Daten-/Katalog-MVP umgesetzt. Die folgende Wellen-Integration ist der naechste Schritt.
+Status: Daten, Katalog, Wellen-Integration und Tests umgesetzt (2026-10-25).
 
 ## Bereits umgesetzt
 
@@ -13,10 +13,10 @@ Status: Daten-/Katalog-MVP umgesetzt. Die folgende Wellen-Integration ist der na
   (Stein = blaues Quadrat, Boss = grosses dunkelrotes Dreieck).
 - `data/metins.json` + `MetinCatalog`: Wellen bei 75/50/25 % Rest-HP, Validierung gegen `mobs.json`
   inklusive Tests.
-- Noch NICHT verdrahtet: `World`/`GameServer` lesen `metins.json` noch nicht; es erscheinen daher
-  noch keine Wellen.
+- Verdrahtet: `Program.cs` laedt/validiert `metins.json`, `GameServer` reicht `MetinCatalog` und
+  `MobCatalog` an jede `World` weiter, `World.ResolveHit` ruft `TryTriggerMetinWaves` auf.
 
-## Integration (naechster Schritt)
+## Integration (umgesetzt)
 
 1. `Program.cs`: `MetinCatalog.LoadFromFile(data/metins.json)`, `ValidateAgainst(mobCatalog)`.
 2. `GameServer`/`World`: optionalen `MetinCatalog` und `MobCatalog` an `World` durchreichen.

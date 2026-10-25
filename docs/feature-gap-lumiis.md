@@ -14,14 +14,15 @@ Aufwand: S = wenige Tage, M = 1–2 Wochen, L = mehrere Wochen (inkl. Tests/Doku
 Der Serverkern ist solide: autoritativer 25-Hz-Loop, LiteNetLib, PostgreSQL/EF Core, Token-Auth,
 AOI, Kollision, Monster-KI, Kampf, Items/Inventar/Shop, Level/XP/Stats, vier Skills, Paper-Doll
 und breite Tests. HUD, Chat, Gruppe inkl. EXP-Teilen, Audio-Platzhalter, 546 Item-Icons,
-18 Items, Multi-Map mit zwei Karten/Portalen sowie ein Lumiis-Stein/Boss-MVP sind umgesetzt.
-Offen sind vor allem **Aufwertung +0…+9**, echte Stein-Wellen, Quests/Trade und mehr Content.
+18 Items, Multi-Map mit zwei Karten/Portalen, Aufwertung +0…+9 sowie ein Lumiis-Stein/Boss-MVP
+sind umgesetzt. Offen sind vor allem echte Stein-Wellen, Quests/Trade, echter Kartenimport und
+mehr Content.
 
 ## P0 – spielbarer Alpha-Test / M7
 
-**Stand 2026-10-25:** HUD, Chat-MVP, Gruppen-MVP und Multi-Map/Portale sind umgesetzt;
-Protocol.Version 15. Offen: Party-Rollen/Persistenz und weitere soziale Integrationstests.
-YangChanged beim Join ist bereits im Code.
+**Stand 2026-10-25:** HUD, Chat-MVP, Gruppen-MVP, Multi-Map/Portale und Ausrüstungs-Aufwertung
++0…+9 (M6c) sind umgesetzt; Protocol.Version 16. Offen: Party-Rollen/Persistenz und weitere
+soziale Integrationstests. YangChanged beim Join ist bereits im Code.
 
 | Feature | Warum | Beleg | Aufwand |
 |---|---|---|---|
@@ -35,8 +36,8 @@ YangChanged beim Join ist bereits im Code.
 
 | Feature | Warum | Beleg | Aufwand |
 |---|---|---|---|
-| Lumiis-Steine + ein Boss (Wellen 75/50/25 %, Loot, Respawn, Client-View) | **MVP umgesetzt**: `Lumiis des Kummers` (stationär, 800 HP, garantiertes Material) und `Waldboss` (1200 HP, aggressiv) als Mobs inkl. Client-Form/Farbe/Skalierung; echte Wellen-Phasen fehlen | `lumiis-2d/shared/metins.js`, `server/metin.js`, `server/stages/` | M |
-| Aufwertung +0…+9 (DB-Stufen, Material/Schutzrolle, Pakete, UI) | Design liegt fertig vor; günstiger Alpha-Gewinn | `docs/tasks/M6c-upgrade.md` | M |
+| Lumiis-Steine + ein Boss (Wellen 75/50/25 %, Loot, Respawn, Client-View) | **umgesetzt**: `Lumiis des Kummers` (800 HP) und `Waldboss` (1200 HP) inkl. Client-Look; `data/metins.json` + `World.TryTriggerMetinWaves` spawnen 75/50/25-%-Wellen | `lumiis-2d/shared/metins.js`, `server/metin.js`, `server/stages/` | – |
+| Aufwertung +0…+9 (DB-Stufen, Material/Schutzrolle, Pakete, UI) | **umgesetzt** (M6c: `data/upgrade.json`, `UpgradeCatalog`, Migration `AddUpgradeLevels`, `UpgradeItem*`-Pakete, Debug-Panel-UI; Zerstoerung ohne Bewahrungsrolle) | `docs/tasks/M6c-upgrade.md` | – |
 | Audio + konsistente Kampf-/Loot-VFX | **Audio-Platzhalter umgesetzt** (`AudioService`, prozedurale Clips); VFX weiterhin nur Ringe/Linien/Trail | `lumiis/packages/client/src/audio.ts` | –/M |
 | Item-Icons/Tooltips + kleines Content-Paket | **Icons + Content-Paket umgesetzt**: 546 Icons, 18 Items mit iconKey, 13 fehlende Archivdateien nachgeladen; Tooltips weiterhin knapp | `Resources/Icons`, `ItemIconCatalog`, `data/items.json` | –/S |
 | Lesbare Kartenoptik / Feldkarte | **Multi-Map umgesetzt** (Dorf + generiertes Grünes Feld, Portale, HUD-Kartenname); Boden weiterhin Platzhalter-Checker, kein echtes Terrain | `docs/map-import-plan.md`, `data/maps/`, `MapCatalog.cs`, `GameClient.RebuildMapVisuals` | M–L |
@@ -64,7 +65,8 @@ YangChanged beim Join ist bereits im Code.
 3. **Keine Item-Instanz-IDs**: Inventar ist nur `(SlotIndex, ItemId)`; Handel/Anti-Dupe erst nach Instanz-ID-Schicht.
 4. **UI ist Debug-IMGUI**: für Alpha durch UI Toolkit ersetzen; Login/Escape/Labor sind gute Muster.
 5. **Kein Audio-Service** und **keine Rate-Limits**.
-6. **Neue Pakete** brauchen `PacketId` + `PacketFactory` + Roundtrip-Test; `Protocol.Version` derzeit 15.
+6. **Neue Pakete** brauchen `PacketId` + `PacketFactory` + Roundtrip-Test; `Protocol.Version` derzeit 16.
+7. **Aufwertung ist an Slot+ItemId gebunden** (noch keine Item-Instanz-IDs): Stufen leben in `CharacterInventoryItem.UpgradeLevel` und den vier `Equipped...UpgradeLevel`-Spalten, nicht an einer global eindeutigen Instanz. Für Handel/Anti-Dupe reicht das nicht.
 
 ## Nicht in M7 / Alpha
 
@@ -75,6 +77,6 @@ sind umgesetzt); zusätzlich Map-Editor, vier Klassen, Handel, Dungeons, PvP, To
 ## Nächste konkrete Schritte
 
 1. Echte Lumiis-Karten importieren (Skalierung/Konverter aus `docs/map-import-plan.md`), terraintauglicher Boden.
-2. M6c-Aufwertung (+0…+9) und weitere Item-/Monster-Inhalte.
+2. Weitere Item-/Monster-Inhalte und echte Referenzkarten importieren.
 3. Party-Rollen/Persistenz und weitere soziale Integrationstests.
 4. Rate-Limits/Alpha-Betrieb, Lasttests mit Bots.

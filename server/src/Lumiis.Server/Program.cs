@@ -8,6 +8,7 @@ using Lumiis.Data.Mobs;
 using Lumiis.Data.Npcs;
 using Lumiis.Data.Progression;
 using Lumiis.Data.Skills;
+using Lumiis.Data.Upgrade;
 using Lumiis.Server;
 using Lumiis.Server.Logging;
 using Lumiis.Server.Net;
@@ -109,6 +110,20 @@ catch (Exception ex)
     return 1;
 }
 
+// M6c: Erfolgstabelle + Verbrauchsgüter-IDs für die Ausrüstungs-Aufwertung - referenziert items.json
+// (Schleifstein/Bewahrungsrolle müssen existieren und den richtigen ItemType haben), deshalb erst nach
+// dem ItemCatalog.
+UpgradeCatalog upgradeCatalog;
+try
+{
+    upgradeCatalog = UpgradeCatalog.LoadFromFile(Path.Combine(config.DataDir, "upgrade.json"), itemCatalog);
+}
+catch (Exception ex)
+{
+    logger.Error($"Serverstart fehlgeschlagen (Aufwertungs-Daten): {ex.Message}");
+    return 1;
+}
+
 // NPC-Typen (Sortimente) global; die Platzierungen je Karte kommen aus MapCatalog (maps/<id>/npcs.json).
 // looks.json wird hier erneut geladen (bewusst eine eigene, kleine Instanz statt Wiederverwendung der obigen -
 // günstig, hält die Datenblöcke unabhängig voneinander, siehe Item-Daten-Block).
@@ -134,6 +149,20 @@ try
 catch (Exception ex)
 {
     logger.Error($"Serverstart fehlgeschlagen (Karten-Daten): {ex.Message}");
+    return 1;
+}
+
+// M6d: Lumiis-Stein-Wellen. Die MobIds werden gegen mobCatalog geprueft, damit ein Tippfehler in
+// metins.json den Serverstart abbricht statt still keine Wellen zu erzeugen.
+MetinCatalog metinCatalog;
+try
+{
+    metinCatalog = MetinCatalog.LoadFromFile(Path.Combine(config.DataDir, "metins.json"));
+    metinCatalog.ValidateAgainst(mobCatalog);
+}
+catch (Exception ex)
+{
+    logger.Error($"Serverstart fehlgeschlagen (Lumiis-Stein-Daten): {ex.Message}");
     return 1;
 }
 
@@ -165,7 +194,7 @@ Console.CancelKeyPress += (_, eventArgs) =>
     cts.Cancel();
 };
 
-GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, mobCatalog: mobCatalog, classCatalog: classCatalog, itemCatalog: itemCatalog, npcCatalog: npcCatalog, progressionCatalog: progressionCatalog, skillCatalog: skillCatalog, mapCatalog: mapCatalog);
+GameServer server = new GameServer(config, logger, tokenService, dbContextFactory, mobCatalog: mobCatalog, classCatalog: classCatalog, itemCatalog: itemCatalog, npcCatalog: npcCatalog, progressionCatalog: progressionCatalog, skillCatalog: skillCatalog, mapCatalog: mapCatalog, upgradeCatalog: upgradeCatalog, metinCatalog: metinCatalog);
 
 try
 {

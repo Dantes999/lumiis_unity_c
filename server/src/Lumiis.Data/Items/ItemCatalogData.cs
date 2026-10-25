@@ -16,6 +16,10 @@ internal sealed class ItemEntryDto
     public int DefenseBonus { get; set; }
     public int HealAmount { get; set; }
 
+    /// <summary>M6c: Bonus auf Attack/Defense je Aufwertungsstufe (nur bei Ausrüstung sinnvoll, 0 = kein
+    /// Aufwertungsbonus). Wird je nach Itemtyp auf AttackBonus (Waffe) bzw. DefenseBonus (Rest) addiert.</summary>
+    public int UpgradeBonusPerLevel { get; set; }
+
     /// <summary>M5b: Kaufpreis im Shop (0 = nicht im Sortiment kaufbar, siehe NpcCatalog).</summary>
     public long BuyPrice { get; set; }
 

@@ -230,11 +230,15 @@ namespace Lumiis.Tests
         {
             var original = new InventorySyncPacket
             {
-                Slots = new System.Collections.Generic.List<(int SlotIndex, int ItemId)> { (0, 1), (5, 8), (19, 3) },
+                Slots = new System.Collections.Generic.List<(int SlotIndex, int ItemId, int UpgradeLevel)> { (0, 1, 3), (5, 8, 0), (19, 3, 9) },
                 EquippedArmorItemId = 4,
                 EquippedHelmetItemId = 0,
                 EquippedWeaponItemId = 1,
-                EquippedShieldItemId = 7
+                EquippedShieldItemId = 7,
+                EquippedArmorUpgradeLevel = 2,
+                EquippedHelmetUpgradeLevel = 0,
+                EquippedWeaponUpgradeLevel = 9,
+                EquippedShieldUpgradeLevel = 1
             };
             var decoded = Assert.IsType<InventorySyncPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
             Assert.Equal(original.Slots, decoded.Slots);
@@ -242,6 +246,10 @@ namespace Lumiis.Tests
             Assert.Equal(original.EquippedHelmetItemId, decoded.EquippedHelmetItemId);
             Assert.Equal(original.EquippedWeaponItemId, decoded.EquippedWeaponItemId);
             Assert.Equal(original.EquippedShieldItemId, decoded.EquippedShieldItemId);
+            Assert.Equal(original.EquippedArmorUpgradeLevel, decoded.EquippedArmorUpgradeLevel);
+            Assert.Equal(original.EquippedHelmetUpgradeLevel, decoded.EquippedHelmetUpgradeLevel);
+            Assert.Equal(original.EquippedWeaponUpgradeLevel, decoded.EquippedWeaponUpgradeLevel);
+            Assert.Equal(original.EquippedShieldUpgradeLevel, decoded.EquippedShieldUpgradeLevel);
         }
 
         [Fact]
@@ -563,6 +571,50 @@ namespace Lumiis.Tests
             Assert.Equal(2, decoded.Members.Count);
             Assert.Equal((1, "Alice", 12, 200, 240), decoded.Members[0]);
             Assert.Equal((2, "Bob", 10, 150, 200), decoded.Members[1]);
+        }
+
+        [Theory]
+        [InlineData(EquipmentSlot.Armor, false)]
+        [InlineData(EquipmentSlot.Weapon, true)]
+        [InlineData(EquipmentSlot.Shield, true)]
+        public void UpgradeItemRequest_RoundTrip(EquipmentSlot slot, bool useProtectionScroll)
+        {
+            var original = new UpgradeItemRequestPacket { EquipmentSlot = slot, UseProtectionScroll = useProtectionScroll };
+            var decoded = Assert.IsType<UpgradeItemRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(slot, decoded.EquipmentSlot);
+            Assert.Equal(useProtectionScroll, decoded.UseProtectionScroll);
+        }
+
+        [Theory]
+        [InlineData(true, false, 3)]
+        [InlineData(false, true, 0)]
+        [InlineData(false, false, 5)]
+        public void UpgradeItemResult_RoundTrip(bool success, bool destroyed, int newUpgradeLevel)
+        {
+            var original = new UpgradeItemResultPacket
+            {
+                EquipmentSlot = EquipmentSlot.Weapon,
+                Success = success,
+                Destroyed = destroyed,
+                NewUpgradeLevel = newUpgradeLevel
+            };
+            var decoded = Assert.IsType<UpgradeItemResultPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(EquipmentSlot.Weapon, decoded.EquipmentSlot);
+            Assert.Equal(success, decoded.Success);
+            Assert.Equal(destroyed, decoded.Destroyed);
+            Assert.Equal(newUpgradeLevel, decoded.NewUpgradeLevel);
+        }
+
+        [Theory]
+        [InlineData(UpgradeActionFailedReason.SlotEmpty)]
+        [InlineData(UpgradeActionFailedReason.AlreadyMaxLevel)]
+        [InlineData(UpgradeActionFailedReason.NoMaterial)]
+        [InlineData(UpgradeActionFailedReason.NoProtectionScroll)]
+        public void UpgradeActionFailed_RoundTrip(UpgradeActionFailedReason reason)
+        {
+            var original = new UpgradeActionFailedPacket { Reason = reason };
+            var decoded = Assert.IsType<UpgradeActionFailedPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(reason, decoded.Reason);
         }
     }
 }

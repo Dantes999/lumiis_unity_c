@@ -42,10 +42,13 @@ namespace Lumiis.Shared.Net
         /// <summary>M7-Chat: Chat-Nachricht senden (Karte/Global/Flüstern).</summary>
         ChatRequest = 16,
 
-        /// <summary>Multi-Map (Protocol.Version 15): nur wirksam mit --allow-debug-commands, sonst still
+        /// <summary>Multi-Map (Protocol.Version 16): nur wirksam mit --allow-debug-commands, sonst still
         /// verworfen (siehe DebugSpawnMonsterRequest-Kommentar). Versetzt den eigenen Charakter auf die
         /// Startposition der angegebenen Karte - Debug-API zum Testen des Kartenwechsels ohne Portal.</summary>
         DebugChangeMapRequest = 17,
+
+        /// <summary>M6c: angelegte Ausrüstung aufwerten (Schleifstein, optional Bewahrungsrolle).</summary>
+        UpgradeItemRequest = 18,
 
         // Server -> Client: ab 1000
         JoinAccepted = 1000,
@@ -100,10 +103,18 @@ namespace Lumiis.Shared.Net
         /// <summary>M7-Party: voller Gruppenstand (Resync).</summary>
         PartyChanged = 1021,
 
-        /// <summary>Multi-Map (Protocol.Version 15): der eigene Charakter hat die Karte gewechselt (Portal
+        /// <summary>Multi-Map (Protocol.Version 16): der eigene Charakter hat die Karte gewechselt (Portal
         /// oder Dev-Tool). Der Client leert seine Entities/Umgebung und baut Boden/Portale der neuen Karte
         /// neu auf; die Zielposition ist bereits enthalten (kein separates EntityStop nötig).</summary>
         MapChanged = 1022,
+
+        /// <summary>M6c: Ergebnis eines abgeschlossenen Aufwertungsversuchs (auch Fehlschlag/Zerstörung) -
+        /// nur an den Anfragenden, siehe UpgradeItemResultPacket.</summary>
+        UpgradeItemResult = 1023,
+
+        /// <summary>M6c: Aufwertung gar nicht erst versucht (leerer Slot, Maximalstufe, fehlendes Material/
+        /// fehlende Schutzrolle) - nur an den Anfragenden, Verbindung bleibt bestehen.</summary>
+        UpgradeActionFailed = 1024,
     }
 
     /// <summary>Jede neue PacketId braucht hier eine Zeile (ein Test prüft das).</summary>
@@ -153,6 +164,9 @@ namespace Lumiis.Shared.Net
                 case PacketId.PartyChanged: return new PartyChangedPacket();
                 case PacketId.DebugChangeMapRequest: return new DebugChangeMapRequestPacket();
                 case PacketId.MapChanged: return new MapChangedPacket();
+                case PacketId.UpgradeItemRequest: return new UpgradeItemRequestPacket();
+                case PacketId.UpgradeItemResult: return new UpgradeItemResultPacket();
+                case PacketId.UpgradeActionFailed: return new UpgradeActionFailedPacket();
                 default: return null;
             }
         }

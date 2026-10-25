@@ -172,6 +172,32 @@ namespace Lumiis.Shared.Net
         }
     }
 
+    /// <summary>M6c: Der Client will die angelegte Ausrüstung im genannten Slot aufwerten. Der Server prüft
+    /// alles erneut (Slot belegt, Maximalstufe, Schleifstein vorhanden, ggf. Bewahrungsrolle vorhanden) und
+    /// verbraucht erst nach erfolgreicher Vorprüfung Material - siehe World.TryUpgrade.</summary>
+    public sealed class UpgradeItemRequestPacket : IPacket
+    {
+        public EquipmentSlot EquipmentSlot;
+        public bool UseProtectionScroll;
+
+        public PacketId Id
+        {
+            get { return PacketId.UpgradeItemRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteByte((byte)EquipmentSlot);
+            writer.WriteByte((byte)(UseProtectionScroll ? 1 : 0));
+        }
+
+        public void Read(PacketReader reader)
+        {
+            EquipmentSlot = (EquipmentSlot)reader.ReadByte();
+            UseProtectionScroll = reader.ReadByte() != 0;
+        }
+    }
+
     /// <summary>Rechtsklick auf einen sichtbaren NPC (M5b) - der Server prüft Existenz/Kind/Reichweite
     /// erneut, siehe World.TryOpenShop.</summary>
     public sealed class OpenShopRequestPacket : IPacket
@@ -421,7 +447,7 @@ namespace Lumiis.Shared.Net
         }
     }
 
-    /// <summary>Multi-Map (Protocol.Version 15): nur wirksam mit --allow-debug-commands (sonst still
+    /// <summary>Multi-Map (Protocol.Version 16): nur wirksam mit --allow-debug-commands (sonst still
     /// verworfen, siehe DebugSpawnMonsterRequestPacket). Versetzt den eigenen Charakter auf die
     /// Startposition der Zielkarte - Debug-API zum Testen des Kartenwechsels ohne Portal.</summary>
     public sealed class DebugChangeMapRequestPacket : IPacket

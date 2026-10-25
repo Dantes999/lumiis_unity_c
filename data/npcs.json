@@ -4,7 +4,7 @@
       "id": 1,
       "name": "Dorfhaendler",
       "appearance": { "bodyId": 1, "hairStyleId": 1, "hairColorId": 1, "armorId": 3, "helmetId": 0, "weaponId": 0, "shieldId": 0 },
-      "shopItemIds": [8, 2, 3, 4, 6, 7, 20, 21, 22, 23, 24, 25, 26, 27, 35, 36]
+      "shopItemIds": [8, 2, 3, 4, 6, 7, 9, 10, 20, 21, 22, 23, 24, 25, 26, 27, 35, 36]
     }
   ]
 }

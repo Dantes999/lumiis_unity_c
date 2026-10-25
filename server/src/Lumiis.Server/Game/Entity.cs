@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Lumiis.Data.Classes;
+using Lumiis.Data.Items;
 using Lumiis.Shared;
 using Lumiis.Shared.Net;
 
@@ -30,7 +31,7 @@ public sealed class Entity
 
     public EntityKind Kind { get; }
 
-    /// <summary>Id der Karte, auf der diese Entity aktuell steht (Multi-Map, Protocol.Version 15). Wird von
+    /// <summary>Id der Karte, auf der diese Entity aktuell steht (Multi-Map, Protocol.Version 16). Wird von
     /// World beim Anlegen/Transfer gesetzt und von GameServer für Persistenz (Position/CharacterSave) genutzt -
     /// Mobs/NPCs bleiben zeitlebens auf ihrer Karte, Spieler wechseln per Portal/Dev-Tool.</summary>
     public string MapId { get; set; } = "village";
@@ -38,6 +39,11 @@ public sealed class Entity
     /// <summary>Wandzeit, ab wann dieses Portal-Ereignis erneut auslösen darf (Multi-Map: Sperre gegen
     /// Mehrfachauslösung, siehe World.CheckPortal) - 0 = sofort. Nur bei Kind=Player relevant.</summary>
     public long PortalReadyAtMs { get; set; }
+
+    /// <summary>M6d: Bitmaske der bereits ausgeloesten Lumiis-Wellen (Bit i = Welle i aus data/metins.json).
+    /// Nur bei Kind=Monster mit einem Stein-Eintrag relevant; ein Respawn erzeugt eine neue Entity und damit
+    /// wieder 0.</summary>
+    public int MetinWavesTriggeredMask { get; set; }
 
     /// <summary>Bei Kind=Monster ein Index in data/mobs.json, bei Kind=Npc (M5b) ein Index in data/npcs.json,
     /// bei Kind=Player ungenutzt/0 - bis M5a "MobId" genannt, seit M5b umbenannt (reiner Rename, siehe
@@ -166,6 +172,11 @@ public sealed class Entity
     /// sinnvoll befüllt (siehe GameServer.CompleteJoin) - Monster haben ein leeres, ungenutztes Array.</summary>
     public int[] Inventory { get; } = new int[GameConstants.InventorySize];
 
+    /// <summary>M6c: Aufwertungsstufe 0-9 je Inventarplatz, parallel zu Inventory indexiert (0 = nicht
+    /// aufgewertet). Wird zusammen mit Inventory beim Anlegen/Ablegen verschoben (siehe World.TryEquip/
+    /// TryUnequip), damit eine Item-Instanz ihre Stufe behält.</summary>
+    public int[] InventoryUpgradeLevels { get; } = new int[GameConstants.InventorySize];
+
     /// <summary>Ausgerüstete Items (M5a, Item-IDs aus data/items.json, 0 = Slot leer) - nur bei Kind=Player
     /// relevant. Werden von World.TryEquip/TryUnequip gepflegt, beim Join zusätzlich aus der Character-Zeile
     /// übernommen (siehe GameServer.CompleteJoin).</summary>
@@ -173,6 +184,64 @@ public sealed class Entity
     public int EquippedHelmetItemId { get; set; }
     public int EquippedWeaponItemId { get; set; }
     public int EquippedShieldItemId { get; set; }
+
+    /// <summary>M6c: Aufwertungsstufe 0-9 der jeweiligen ausgerüsteten Item-Instanz (nur sinnvoll, solange
+    /// die zugehörige Equipped...ItemId != 0). Wird von World.TryUpgrade erhöht, von TryEquip/TryUnequip
+    /// mit dem Item verschoben und bei einer Zerstörung auf 0 zurückgesetzt.</summary>
+    public int EquippedArmorUpgradeLevel { get; set; }
+    public int EquippedHelmetUpgradeLevel { get; set; }
+    public int EquippedWeaponUpgradeLevel { get; set; }
+    public int EquippedShieldUpgradeLevel { get; set; }
+
+    /// <summary>Liest ItemId + Stufe eines Ausrüstungs-Slots (0/0 bei leerem Slot).</summary>
+    public (int ItemId, int UpgradeLevel) GetEquipped(EquipmentSlot slot)
+    {
+        return slot switch
+        {
+            EquipmentSlot.Armor => (EquippedArmorItemId, EquippedArmorUpgradeLevel),
+            EquipmentSlot.Helmet => (EquippedHelmetItemId, EquippedHelmetUpgradeLevel),
+            EquipmentSlot.Weapon => (EquippedWeaponItemId, EquippedWeaponUpgradeLevel),
+            EquipmentSlot.Shield => (EquippedShieldItemId, EquippedShieldUpgradeLevel),
+            _ => (0, 0)
+        };
+    }
+
+    /// <summary>Setzt ItemId + Stufe eines Ausrüstungs-Slots gemeinsam (0/0 = leeren).</summary>
+    public void SetEquipped(EquipmentSlot slot, int itemId, int upgradeLevel)
+    {
+        switch (slot)
+        {
+            case EquipmentSlot.Armor:
+                EquippedArmorItemId = itemId;
+                EquippedArmorUpgradeLevel = itemId == 0 ? 0 : upgradeLevel;
+                break;
+            case EquipmentSlot.Helmet:
+                EquippedHelmetItemId = itemId;
+                EquippedHelmetUpgradeLevel = itemId == 0 ? 0 : upgradeLevel;
+                break;
+            case EquipmentSlot.Weapon:
+                EquippedWeaponItemId = itemId;
+                EquippedWeaponUpgradeLevel = itemId == 0 ? 0 : upgradeLevel;
+                break;
+            case EquipmentSlot.Shield:
+                EquippedShieldItemId = itemId;
+                EquippedShieldUpgradeLevel = itemId == 0 ? 0 : upgradeLevel;
+                break;
+        }
+    }
+
+    /// <summary>Mappt einen Ausrüstungs-ItemType auf den passenden EquipmentSlot (null für Nicht-Ausrüstung).</summary>
+    public static EquipmentSlot? SlotForItemType(ItemType itemType)
+    {
+        return itemType switch
+        {
+            ItemType.Armor => EquipmentSlot.Armor,
+            ItemType.Helmet => EquipmentSlot.Helmet,
+            ItemType.Weapon => EquipmentSlot.Weapon,
+            ItemType.Shield => EquipmentSlot.Shield,
+            _ => null
+        };
+    }
 
     /// <summary>M5b: Sortiment eines NPC-Händlers (ItemIds aus data/npcs.json, über NpcDefinition.ShopItemIds
     /// von World.SpawnNpc gesetzt - analog zu Appearance dort, nicht über den Konstruktor, da nur bei

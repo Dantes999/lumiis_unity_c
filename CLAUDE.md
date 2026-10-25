@@ -89,7 +89,7 @@ fest als "botpass-<name>-2026" (nur Test-Tool). Option --auth-url (Default http:
 
 ## Kartenkollision
 Bewegung wird seit M3a serverseitig gegen eine pro Karte hinterlegte Blockierkarte geprüft (nicht mehr nur an
-die Kartengrenzen geklemmt). Seit dem Multi-Map-Umbau (2026-10-25, Protocol.Version 15) gibt es mehrere
+die Kartengrenzen geklemmt). Seit dem Multi-Map-Umbau (2026-10-25, Protocol.Version 16) gibt es mehrere
 Karten; `Lumiis.Server/Program.cs` lädt sie über `MapCatalog` aus `data/maps/index.json` (nicht mehr
 hartkodiert nur `village`). Jede `World` hält ihre eigene `CollisionMap`.
 
@@ -117,7 +117,7 @@ eine Ellipse, per Pillow-Skript erzeugt, keine echte Kartengrafik) - der User er
 echte, handbemalte Version, sobald Kartengrafik existiert. Danach `tools/bake-collision.py` erneut ausführen
 und beide Dateien neu committen.
 
-## Multi-Map und Portale (Protocol.Version 15)
+## Multi-Map und Portale (Protocol.Version 16)
 Seit 2026-10-25 gibt es echte, begehbare Karten statt einer einzigen Welt. Details/Plan:
 `docs/map-import-plan.md`.
 
@@ -566,6 +566,60 @@ zum Statuspunkte-Bereich aus M6a).
 Bewusst NICHT in M6b: Skillbücher, Meister-System nach Stufe 17 (später), Partikeleffekte/Animationen,
 Skill-Icons (Text/Name reicht, wie bei Health-Bars/Items/Shop).
 
+## Ausruestungs-Aufwertung
+Seit M6c lässt sich **angelegte** Ausrüstung (Waffe/Rüstung/Helm/Schild) mit einem Schleifstein von +0 bis
++9 aufwerten. Inventar-Items werden bewusst NICHT direkt aufgewertet, es gibt keinen neuen NPC. Jede
+Ausrüstungs-Item-Instanz trägt ihre eigene Stufe (0-9), die beim Anlegen/Ablegen mitwandert.
+
+Daten (`data/upgrade.json`, neu): `maxUpgradeLevel` 9, `successChancePercent` mit genau 9 Einträgen für die
+Übergänge +0->+1 bis +8->+9 (Platzhalter, absteigend 90/80/70/60/50/40/30/20/10), `whetstoneItemId` (9,
+Schleifstein) und `protectionScrollItemId` (10, Bewahrungsrolle). `UpgradeCatalog` validiert Länge/Bereich
+der Tabelle und dass beide IDs in items.json existieren und den ItemType `UpgradeMaterial` bzw.
+`ProtectionScroll` haben - sonst Startabbruch. `data/items.json` hat die beiden neuen Verbrauchsgüter
+(iconKey `magic_stone`/`blessing_scroll`, SellPrice 0, BuyPrice 50/500) und je Ausrüstungs-Item
+`upgradeBonusPerLevel` (Waffe -> Attack, Armor/Helmet/Shield -> Defense; stärkere Items haben höhere
+Werte). Der Dorfhändler verkauft beide neuen Items.
+
+Ablauf (`World.TryUpgrade`, kein Netzwerkbezug, `Random` injizierbar): ALLE Vorprüfungen laufen VOR jedem
+Verbrauch - Slot belegt, Stufe &lt; 9, Schleifstein vorhanden, bei angefordertem Schutz zusätzlich
+Bewahrungsrolle vorhanden. Fehlt etwas, kommt nur ein `UpgradeActionFailedPacket` (SlotEmpty/
+AlreadyMaxLevel/NoMaterial/NoProtectionScroll), es wird nichts verbraucht. Danach wird gegen
+`successChancePercent[aktuelle Stufe]` gewürfelt. Der Schleifstein wird IMMER verbraucht, die
+Bewahrungsrolle bei Verwendung ebenfalls IMMER (auch bei Erfolg). **Zerstoerungsregel:** Fehlschlag MIT
+Bewahrungsrolle lässt Item und Stufe unverändert; Fehlschlag OHNE Bewahrungsrolle zerstört die komplette
+Item-Instanz (Ausrüstungs-Slot wird geleert, Stufe 0, Attack/Defense fallen zurück). Erfolg erhöht die
+Stufe um 1; die Boni werden in `World.RecomputeDerivedStats` als `UpgradeBonusPerLevel * Stufe` addiert.
+
+Persistenz: `CharacterInventoryItem.UpgradeLevel` (Default 0) und die vier Spalten
+`Character.EquippedArmor/Helmet/Weapon/ShieldUpgradeLevel` (Default 0), Migration `AddUpgradeLevels`.
+`TryEquip`/`TryUnequip` verschieben ItemId UND Stufe gemeinsam zwischen Inventar und Ausrüstung. Der
+kombinierte Save-Kanal (`CharacterSaveRequest`, voller Snapshot wie Inventar/Yang/Fortschritt/Skills)
+enthält jetzt auch die Stufen und wird SOFORT nach jedem abgeschlossenen Aufwertungsversuch ausgelöst.
+`CompleteJoin` lädt die Stufen beim Join wieder in die Entity.
+
+Netzwerk (Protocol.Version 16): `UpgradeItemRequestPacket` (Client->Server: EquipmentSlot,
+UseProtectionScroll), `UpgradeItemResultPacket` (Server->Client: EquipmentSlot, Success, Destroyed,
+NewUpgradeLevel) und `UpgradeActionFailedPacket` (Reason-Enum). Ein abgeschlossener Versuch (auch
+Fehlschlag/Zerstörung) liefert zusätzlich `InventorySyncPacket` und `CharacterStatsPacket` an den
+Anfragenden, bei Zerstörung außerdem `AppearanceChangedPacket` an alle AOI-Beobachter (die sichtbare
+Ausrüstung verschwindet); der Server schickt eine deutsche System-Chat-Zeile. `InventorySyncPacket`
+enthält seit M6c pro Inventarplatz `(SlotIndex, ItemId, UpgradeLevel)` sowie vier
+`Equipped...UpgradeLevel`-Felder. `EntitySpawnPacket`/Appearance bleiben unverändert - eine Aufwertung
+ändert nur Zahlenwerte, nie das Aussehen.
+
+Client: Debug-Panel-Bereich "Ausrüstung" zeigt pro Slot "+N", einen "Aufwerten"-Knopf (nur bei belegtem
+Slot und Stufe &lt; 9) und eine Checkbox "Bewahrungsrolle" (clientseitig nur aktiv, wenn laut lokalem
+Inventar-Cache eine Rolle vorhanden ist - der Server validiert final). Inventar-Slots zeigen ebenfalls
+"+N". Overlay-/Systemmeldungen: Erfolg ("Schwert ist jetzt +3!"), Fehlschlag mit Rolle ("... durch die
+Bewahrungsrolle gerettet."), Fehlschlag ohne Rolle ("... wurde zerstört!"), plus deutsche Texte je
+`UpgradeActionFailedReason`. `ItemCatalogClient` kennt `upgradeBonusPerLevel` und die neuen ItemTypes als
+Strings.
+
+Bewusst NICHT in M6c: Aufwertung von Inventar-Items, Stapeln mehrerer Schleifsteine (jeder Inventarplatz
+trägt genau ein Item), Sockel/Lumiis-Steine (M6d), Item-Instanz-IDs (weiterhin nur Slot+ItemId),
+grafisches Aufwertungsmenü (Debug-Panel-Stil), automatische Migration bestehender Postgres-Datenbanken
+(mit `dotnet ef database update` anzuwenden).
+
 ## Kampf-Visualisierung
 Seit der Aufgabe `combat-visuals.md` wird Kampf sichtbar gemacht - REIN CLIENTSEITIG UND KOSMETISCH,
 keine Protokolländerung, keine neue Serverwahrheit (der Server bleibt für jede Kampfaktion die
@@ -617,9 +671,10 @@ Der Client rendert Waffen und Rüstungen seit dem Rendering-Umbau modular (weite
 Protokolländerung, keine Serverwahrheit):
 - `data/items.json`: Waffen tragen zusätzlich `spriteKey` (PNG-Name unter
   `client/Assets/Resources/Sprites/Items/`, ohne Endung), `pivotOffset` (`x`/`y` in Canvas-Pixeln relativ
-  zum Griff) und `upgradeLevel` (0-9, Vorlagen-/Fallback-Wert; die echte Instanzstufe kommt mit M6c aus
-  dem Inventar). `ItemCatalog` (Server, nur Validierung der Stufe) und `ItemCatalogClient` (Client,
-  inkl. `FirstOfType` fürs Testfeld) lesen die Felder.
+  zum Griff) und `upgradeLevel` (0-9, Vorlagen-/Fallback-Wert fürs Testfeld; die echte
+  Instanzstufe kommt seit M6c aus dem Inventar-Sync und wird in `GameClient` für die eigene Waffe
+  genutzt, siehe Abschnitt "Ausruestungs-Aufwertung"). `ItemCatalog` (Server, nur Validierung der Stufe)
+  und `ItemCatalogClient` (Client, inkl. `FirstOfType` fürs Testfeld) lesen die Felder.
 - `data/looks.json`: Rüstungs-Looks tragen `colors` (`primaryColor`/`secondaryColor`/`accentColor` als
   Hex). `LookCatalogClient.TryGetArmorColors` liefert sie; `CharacterView.ApplyArmorColors` schreibt sie
   per `MaterialPropertyBlock` auf `_Color_ArmorPrimary`, `_Color_ArmorSecondary`, `_Color_ArmorTrim`
@@ -823,9 +878,9 @@ einen Respawn an einem (evtl. schon belegten) SpawnPoint aus.
 Zwei Karten (Startdorf + Feld) mit Portalwechsel, Krieger, Level 1-25, Monster/Bosse/Lumiis-Steine, Items/Drops/Shop, Chat, Gruppe. NICHT: Quests/Lua, Reittiere, Kostüme, Drachenseelen, Gildenkrieg, weitere Reiche.
 
 ## Meilensteine
-M0 Fundament (fertig) | M1 Walking Skeleton (fertig, inkl. M1b Unity-Client, M1c Sichtbarkeit/Testing, M1c-layered-characters Paper-Doll-Charaktere) | M2 Account & Charakter (komplett fertig): M2a Datenbank & Auth-Dienst, M2b Server-Join über Account/Token/Charakter, M2c Unity-Login-UI (UI Toolkit) | M3 Welt (Grid, AOI, Mobs) komplett fertig: M3a Kartenkollision, M3b Sichtbarkeitsbereich (kein Grid - siehe Abschnitt "Sichtbarkeitsbereich (AOI)"), M3c Monster (Spawns, Wander-KI, AOI-Integration - siehe Abschnitt "Monster") | M4 Kampf komplett fertig (inkl. Gegenwehr): M4a Kampf-Grundlagen, M4b Monster-Respawn, M4c Monster-Aggro/Verfolgung/Leine (siehe Abschnitt "Kampf") | M5 Items komplett fertig: M5a Items/Inventar/Ausrüstung/Drops (siehe Abschnitt "Items und Inventar"), M5b Shop/NPCs (siehe Abschnitt "Shop und NPCs") | M6 Metin-Kern abgeschlossen: M6a Level/XP/Werte/SP/Ausweichen/Regeneration (siehe Abschnitt "Fortschritt: Level, XP, Werte"), M6b Skills (siehe Abschnitt "Skills") - die ursprünglich mitgeplanten M6c Upgrade/M6d Lumiis-Steine sind zurückgestellt (siehe "Aktuelle Aufgabe") | M7 Sozial | M8 Alpha-Betrieb.
-Aktuelle Aufgabe: keine - Multi-Map/Portale sind umgesetzt (siehe Abschnitt "Multi-Map und Portale" und
-`docs/map-import-plan.md`). M6c Upgrade/M6d Lumiis-Steine bleiben weiterhin zurückgestellt.
+M0 Fundament (fertig) | M1 Walking Skeleton (fertig, inkl. M1b Unity-Client, M1c Sichtbarkeit/Testing, M1c-layered-characters Paper-Doll-Charaktere) | M2 Account & Charakter (komplett fertig): M2a Datenbank & Auth-Dienst, M2b Server-Join über Account/Token/Charakter, M2c Unity-Login-UI (UI Toolkit) | M3 Welt (Grid, AOI, Mobs) komplett fertig: M3a Kartenkollision, M3b Sichtbarkeitsbereich (kein Grid - siehe Abschnitt "Sichtbarkeitsbereich (AOI)"), M3c Monster (Spawns, Wander-KI, AOI-Integration - siehe Abschnitt "Monster") | M4 Kampf komplett fertig (inkl. Gegenwehr): M4a Kampf-Grundlagen, M4b Monster-Respawn, M4c Monster-Aggro/Verfolgung/Leine (siehe Abschnitt "Kampf") | M5 Items komplett fertig: M5a Items/Inventar/Ausrüstung/Drops (siehe Abschnitt "Items und Inventar"), M5b Shop/NPCs (siehe Abschnitt "Shop und NPCs") | M6 Metin-Kern abgeschlossen: M6a Level/XP/Werte/SP/Ausweichen/Regeneration (siehe Abschnitt "Fortschritt: Level, XP, Werte"), M6b Skills (siehe Abschnitt "Skills"), M6c Ausruestungs-Aufwertung +0..+9 (siehe Abschnitt "Ausruestungs-Aufwertung"); M6d Lumiis-Stein/Boss inkl. Wellen umgesetzt | M7 Sozial inkl. Multi-Map/Portale | M8 Alpha-Betrieb.
+Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein/Boss inklusive
+75/50/25-%-Wellen sind umgesetzt. Der Import echter Referenzkarten und weitere Inhalte bleiben offen.
 
 ## Arbeitsweise
 - Kleine Schritte. Jeder endet mit grünem `dotnet test` und einem Commit (Präfix "M1: ...").
@@ -858,13 +913,18 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale sind umgesetzt (siehe Abschnitt "Mul
 - Kein YangChangedPacket bei Join: `GameServer.CompleteJoin` lädt `Character.Yang` in die Entity, verschickt dafür aber kein Paket (YangChangedPacket wird nur bei Monster-Kill/Kauf/Verkauf/Debug-Give-Yang ausgelöst) - die Debug-Overlay-Anzeige zeigt bis zum ersten Yang-Ereignis nach dem Login 0 statt des echten Standes. Bislang kein Auftrag, das zu beheben (analog zur inzwischen behobenen HP-Sync-Lücke, siehe Status-Eintrag "Bugfix HP-Anzeige").
 
 ## Status
-- Multi-Map + Portale (2026-10-25, Protocol.Version 15) fertig: `MapCatalog`/`MapDefinition`/
+- Multi-Map + Portale (2026-10-25, Protocol.Version 16) fertig: `MapCatalog`/`MapDefinition`/
   `PortalDefinition` + `data/maps/index.json` (village Default + generiertes greenfield), `Character.MapId`
   (Migration `AddCharacterMapId`), eine `World` pro Karte im `GameServer`, `MapChangedPacket`/
   `DebugChangeMapRequestPacket`, AOI-/Chat-Trennung pro Karte, Portal-Sofortsave, Client-Kartenwechsel
   (Boden/Portale/HUD/Debug-API), Tests (`MapCatalogTests`, `WorldPortalTests`, Roundtrips, 5
   Integrationstests). Siehe `docs/map-import-plan.md` (Limitations: kein echter Referenzkarten-Import,
   globale Kartenmaße, kein Client-Kollisionsrendering).
+- M6d (Lumiis-Stein/Boss inkl. Wellen) fertig: `data/metins.json` + `MetinCatalog` (Validierung gegen
+  `mobs.json`), `World.TryTriggerMetinWaves` in `ResolveHit`, Spawn der Wellen-Mobs über `SpawnMonster`
+  (kein SpawnPoint/Respawn), `Entity.MetinWavesTriggeredMask` gegen Mehrfachauslösung, `Program`/`GameServer`
+  reichen `MobCatalog`+`MetinCatalog` an jede Karten-World durch. Unit-Test deckt 75/50/25 % und
+  "Tod löst keine Nachwelle aus" ab. Siehe `docs/tasks/M6d-lumiis.md`.
 - M0 fertig. Shared: PacketWriter/PacketReader/PacketCodec, PacketId (JoinRequest, MoveTo), 23 Tests grün.
 - M1 (Server, Bot, Bewegung) fertig, in 5 Commits: Shared (Server->Client-Pakete 1000-1005, GameConstants, NameRules), Game-Logik (World/Entity, reine Bewegung pro Tick), Transport/GameServer (LiteNetLib-Adapter, fester 25-Hz-Loop, Join/Move/Disconnect-Handling), Bot (Lumiis.Bot joint und läuft zufällig), Integrationstests (echtes LiteNetLib auf Loopback). 62 Tests grün, manuell mit Server + `Lumiis.Bot -- --count 3` getestet. M1b (Unity-Client) ist eine eigene, noch offene Aufgabe.
 - M1-Fixes (Architektur-Review-Ergebnis) fertig, in 3 Commits: (1) Exceptions dürfen den Server nie beenden - jeder Netzwerk-Callback fängt Fehler ab, nur die betroffene Verbindung wird getrennt, 50 fehlerhafte Ticks in Folge lösen einen sauberen Shutdown mit Exit-Code 1 aus; (2) Fristen laufen in Wandzeit (ms) mit injizierbarer Uhr statt in Ticks; (3) Paketgrößenlimit (1200 Bytes, vor dem Decode geprüft) und NameRules nur noch ASCII (Homoglyph-Schutz). 67 Tests grün, 5x hintereinander stabil.
@@ -1076,7 +1136,7 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale sind umgesetzt (siehe Abschnitt "Mul
   `-icons.png`, `-map.png`, `-characters.png`, `-hud.png`) zeigen Labor-UI, Vorschaufigur,
   Trainingspuppen, Waffe, +9-Glitzern, Trail, Icon-Galerie, Greenfield-Kartenvorschau, die acht echten
   Lumiis-Charaktere und das HUD mit Demo-Gruppe.
-- Lumiis-Referenz-Assets: (1) `tools/import-lumiis-assets.py` importiert 533 Icons (34 Kategorien)
+- Lumiis-Referenz-Assets: (1) `tools/import-lumiis-assets.py` importiert 546 Icons (34 Kategorien)
   aus dem Asset-Archiv nach `Resources/Icons`, inkl. Windows-sauberer Dateinamen, Manifest,
   deterministischer `.meta`-Dateien und Provenance-Einträgen. (2) `ItemIconCatalog` + `iconKey`
   zeigen Icons in Inventar/Ausrüstung/Shop; die Labor-UI hat eine paginierte Icon-Galerie
@@ -1084,7 +1144,7 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale sind umgesetzt (siehe Abschnitt "Mul
   unter `Resources/Characters`; `CharacterSheetGallery` zeigt Krieger/Ninja/Sura/Schamane (m/w) im
   Labor und der Screenshot-Lauf legt `/tmp/lumiis-asset-lab-characters.png` ab. (4) Feature-Gap-,
   Icon- und Kartenplanung als `docs/feature-gap-lumiis.md`, `docs/icon-integration-plan.md`,
-  `docs/map-import-plan.md`. 568 Server-/Unit-Tests und 13 PlayMode-Tests grün.
+  `docs/map-import-plan.md`. 636 Server-/Unit-Tests und 13 PlayMode-Tests grün.
 - M7-HUD + Chat-MVP: (1) `Hud.uxml`/`HudController` zeigen Name/Level, HP/SP/EXP/Yang, Ziel + HP,
   Meldungen, vier Skill-Slots mit Cooldowns, aktive Buffs und einen Chat mit Karte/Global/Flüstern.
   Das alte IMGUI-Overlay bleibt F1-Debug. (2) Chat-Protokoll: `ChatRequestPacket` (16),
@@ -1095,10 +1155,22 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale sind umgesetzt (siehe Abschnitt "Mul
 - M7-Gruppen-MVP: Chat-Befehle `/invite Name`, `/accept`, `/decline`, `/leave`, `/party`; max. 8,
   Leader = Einladender, Leaderwechsel beim Verlassen. `PartyChangedPacket` (1021) ist ein voller
   Resync; das HUD zeigt Leader/Name/Level/HP und einen Verlassen-Knopf, HP wird bei Treffer/Heilung/
-  Respawn nachgezogen. Kein DB-Save, keine Rollen, keine EXP-Teilung. Integrationstest mit zwei Clients
+  Respawn nachgezogen. EXP-Teilen: andere Mitglieder erhalten 50 % des Kill-XP (mind. 1). Kein DB-Save, keine Rollen. Integrationstest mit zwei Clients
   (Invite → Accept → Leave) ist grün.
-- Offen als nächster M7-Block: EXP-Teilen in der Gruppe, Party-Persistenz/Rollen und weitere soziale
-  Integrationstests; siehe `docs/feature-gap-lumiis.md`.
+- M6c (Ausruestungs-Aufwertung +0..+9, docs/tasks/M6c-upgrade.md) fertig: `data/upgrade.json`
+  (Max 9, Platzhalter-Erfolgstabelle 90..10, Schleifstein/Bewahrungsrolle), `UpgradeCatalog` mit
+  Startabbruch-Validierung, `ItemType.UpgradeMaterial/ProtectionScroll` und `upgradeBonusPerLevel` je
+  Ausrüstungs-Item, Shop-Erweiterung. Migration `AddUpgradeLevels` (`CharacterInventoryItem.UpgradeLevel`
+  + vier `Character.Equipped...UpgradeLevel`), Save/Load über den kombinierten Kanal, Stufen wandern bei
+  Equip/Unequip mit. `World.TryUpgrade` prüft alles vor jedem Verbrauch, würfelt mit injizierbarem
+  `Random`, verbraucht Schleifstein (und Rolle) immer, zerstört bei Fehlschlag ohne Rolle das Item.
+  Protocol.Version 16 mit `UpgradeItemRequest/Result/ActionFailed`; `InventorySyncPacket` trägt Stufen
+  pro Slot und je Equipped-Slot. Client: +N-Anzeige, Aufwerten-Knopf + Bewahrungsrollen-Checkbox im
+  Debug-Panel, deutsche Overlay-/Systemmeldungen. 636 Server-Tests grün (inkl. 20 neue Aufwertungs-/
+  Katalog-/Packet-Tests und 3 LiteNetLib-Integrationstests inkl. Disconnect/Rejoin), Unity-PlayMode
+  grün.
+- Offen als nächster M7-Block: Party-Persistenz/Rollen und weitere soziale Integrationstests; siehe
+  `docs/feature-gap-lumiis.md`.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client
 War kein Codefehler. User hat den Test mit fokussiertem Unity-Fenster wiederholt (Server, Unity Play, dann Bots
 gestartet, ins Unity-Fenster geklickt): alle Spawns kamen an, auch mit 99 Bots. Wahrscheinliche Ursache war die
