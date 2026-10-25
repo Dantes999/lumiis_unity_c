@@ -207,8 +207,9 @@ Seit 2026-10-25 gibt es echte, begehbare Karten statt einer einzigen Welt. Detai
 - Bewegung: WASD oder Pfeiltasten senden alle 100 ms ein neues MoveTo-Ziel; beim Loslassen geht sofort
   `StopMovePacket` (19) an den Server, der die Bewegung mit `EntityStop` beendet. Linksklick auf den
   Boden bleibt als Komfort erhalten.
-- Blickrichtung: beim Laufen ohne Kampf die Laufrichtung, im Stand und beim Schlagen (Leertaste gehalten,
-  Hieb läuft, 0,45 s danach) der Mauszeiger - weglaufen und nach hinten schlagen funktioniert weiterhin. `MeleeArcView` zeigt bei jedem Schlag einen sichtbaren Bogen in Zielrichtung und
+- Blickrichtung: folgt immer dem Mauszeiger (nicht der Laufrichtung, ausdrücklicher Wunsch des Users) -
+  weglaufen und nach hinten schlagen funktioniert. Liegt der Mauszeiger näher als 0,45 Einheiten an der
+  Figur, bleibt die letzte Blickrichtung stehen (sonst kippte sie bei jeder kleinen Bewegung). `MeleeArcView` zeigt bei jedem Schlag einen sichtbaren Bogen in Zielrichtung und
   Reichweite; ein roter Ring markiert das getroffene Ziel.
 - Kampf: Leertaste schlägt, gedrückt halten wiederholt den Schlag im Server-Cooldown-Takt. Der lokale
   Kombo-Zähler wechselt links/rechts/links und neigt die Figur sichtbar; Auto-Target wählt das nächste
@@ -1380,11 +1381,11 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   Die eigene Figur schwingt bei EntityDamaged nicht mehr ein zweites Mal; Trefferlinien und Schlagbogen entfallen.
 - Laufanimation (2026-10-25, rein clientseitig): Die Figur zuckelte beim Laufen. Ursachen: der Lauf-Frame kam
   aus |sin(t)| (ungleich lange Schrittbilder, zufälliger Einstieg), die Figur flackerte bei kurzen "angekommen"-
-  Momenten (Wand, spätes MoveTo) zwischen Stand und Lauf, und die Blickrichtung folgte auch beim Laufen der Maus
-  (Seitwärts-/Rückwärtslaufen, Umspringen mitten im Schritt). Jetzt `WalkCycle` (UnityEngine-frei, per
+  Momenten (Wand, spätes MoveTo) zwischen Stand und Lauf, und die Blickrichtung kippte, wenn der Mauszeiger nah an der
+  Figur lag (bleibt aber bewusst immer an der Maus). Jetzt `WalkCycle` (UnityEngine-frei, per
   `dotnet test` geprüft): gleichmäßige Phase (9 Bilder/s, mit Tempo skaliert), Schritt links/Mitte/Schritt
-  rechts/Mitte (Sheet-Spalten 1/0/2/0), Wippen synchron, Losgehen startet mit einem Schritt, 0,12 s Nachlauf.
-  Blickrichtung siehe Abschnitt "Map1, Steuerung und Spiel-UI".
+  rechts/Mitte (Sheet-Spalten 1/0/2/0), Wippen synchron, Losgehen startet mit einem Schritt, 0,12 s Nachlauf;
+  Totzone für die Mausrichtung, siehe Abschnitt "Map1, Steuerung und Spiel-UI".
 - Offen: Monster-Sheets für die Jayang-Mobs, weitere Zonen/Dungeons, Reittiere; siehe
   `docs/feature-gap-lumiis.md`.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client
