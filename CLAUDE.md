@@ -252,6 +252,13 @@ Seit 2026-10-25 sind Login, Charakterauswahl, Systemmenü und HUD im Stil klassi
 - Boden-Items: Namensschild mit "+N" und Farbe je Stufe (blau ab +1, gold ab +7, orange +9), Hervorhebung
   unter dem Mauszeiger, Linksklick hebt auf.
 - Screenshot-Hilfen: `GameClient.DebugShowSmithPreview()` / `DebugShowPartyInvite(name)`.
+- Spielgefühl statt Debug (`HudWorldOverlay`, UI Toolkit im HUD-Dokument): Namensschilder über Spielern
+  (eigener gelb), NPCs (grün) und Monstern (rötlich, Ziel hervorgehoben) auch ohne F1 - das IMGUI-Namens-
+  Overlay ist entfernt. Schwebende Schadenszahlen (gelb = eigener Treffer, rot = erlittener Schaden,
+  "Verfehlt"/"Ausgewichen") aus `GameClient.DamageShown`/`DodgeShown`. Todesbildschirm mit Countdown
+  (`RespawnRemainingSeconds`, fix 3 s wie der Server); im Tod sperrt der Client Laufen, Angriff, Skills,
+  Heiltrank und Aufheben (rein kosmetisch, der Server muss trotzdem selbst ablehnen). Screenshot-Hilfen
+  `DebugShowCombatPreview()`/`DebugSimulateDeath()`.
 - Klick-Abschirmung: Elemente mit Klasse `ui-block` fangen Mausklicks ab
   (`HudController.IsPointerOverUi` -> `GameClient.UiPointerHitTest`), ein Klick auf HUD/Fenster bewegt
   oder greift also nicht an.

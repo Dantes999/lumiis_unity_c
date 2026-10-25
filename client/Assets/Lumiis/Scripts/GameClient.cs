@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Lumiis.Shared;
 using Lumiis.Shared.Net;
@@ -116,6 +117,9 @@ namespace Lumiis.Client
         private Vector2 _aimDirection = Vector2.down;
         private long _yangTotal;
         private bool _isDead;
+        private float _diedAtTime;
+        /// <summary>Feste Wiederbelebungsfrist des Servers (World.Tick: nowMs + 3000) - nur für den Countdown.</summary>
+        private const float RespawnDelaySeconds = 3f;
 
         // ---- Inventar/Ausrüstung (M5a, Debug-Panel-Stil - siehe DrawInventoryPanel/DrawEquipmentPanel) ----
         // Voller Resync bei Join und nach jeder Änderung (siehe InventorySyncPacket) - rein lokaler Cache für
@@ -382,7 +386,8 @@ namespace Lumiis.Client
                     buffRing.SetWorldPosition(localForRing.X / 100.0, localForRing.Y / 100.0);
             }
 
-            if (_inGame && !_gameplayInputLocked && !_assetLabActive && !_chatInputFocused)
+            if (_inGame && _isDead) StopKeyboardMovementIfActive();
+            if (_inGame && !_gameplayInputLocked && !_assetLabActive && !_chatInputFocused && !_isDead)
             {
                 UpdateMouseFacing();
                 HandleKeyboardMovement();
@@ -728,6 +733,26 @@ namespace Lumiis.Client
             packet.MemberStatus.Add((false, PartyRole.None));
             PartyChangedReceived?.Invoke(packet);
         }
+
+        /// <summary>Screenshot-Hilfe: schwebende Schadenszahlen über der eigenen Figur (ohne Server).</summary>
+        public void DebugShowCombatPreview()
+        {
+            int local = _world.LocalEntityId;
+            if (local < 0) return;
+            DamageShown?.Invoke(local, 12, local + 1);
+            DodgeShown?.Invoke(local, local + 1);
+            DamageShown?.Invoke(local, 48, local);
+        }
+
+        /// <summary>Screenshot-Hilfe: Todesbildschirm wie nach EntityDied der eigenen Figur; der nächste
+        /// EntityStop (bzw. DebugEndSimulatedDeath) beendet ihn.</summary>
+        public void DebugSimulateDeath()
+        {
+            _isDead = true;
+            _diedAtTime = Time.time;
+        }
+
+        public void DebugEndSimulatedDeath() => _isDead = false;
 
         public void DebugHideAssetLabMapPreview()
         {
@@ -1257,6 +1282,14 @@ namespace Lumiis.Client
         /// <summary>WASD/Pfeiltasten: hält die Figur in die gewünschte Richtung. Der Client sendet in
         /// kurzen Abständen ein neues MoveTo-Ziel; die eigentliche Bewegung/Kollision bleibt serverautoritativ
         /// (ClientWorld interpoliert die eingehenden EntityMove-Pakete).</summary>
+        /// <summary>Im Tod: eine noch laufende Tastaturbewegung einmal stoppen, danach keine Eingaben mehr.</summary>
+        private void StopKeyboardMovementIfActive()
+        {
+            if (!_keyboardMoveSent) return;
+            _keyboardMoveSent = false;
+            _netClient?.SendStopMove();
+        }
+
         private void HandleKeyboardMovement()
         {
             if (Keyboard.current == null || _world.LocalEntityId < 0) return;
@@ -1630,6 +1663,7 @@ namespace Lumiis.Client
             if (damaged != null)
             {
                 _world.HandleEntityDamaged(damaged.TargetEntityId, damaged.TargetHpAfter, damaged.TargetMaxHp);
+                DamageShown?.Invoke(damaged.TargetEntityId, damaged.Damage, damaged.AttackerEntityId);
                 SpawnHitLine(damaged.AttackerEntityId, damaged.TargetEntityId, hit: true);
                 PlayAttackAnimation(damaged.AttackerEntityId);
                 if (damaged.TargetEntityId == _world.LocalEntityId) _audio?.PlayHurt();
@@ -1648,7 +1682,12 @@ namespace Lumiis.Client
             if (died != null)
             {
                 _world.HandleEntityDied(died.EntityId);
-                if (died.EntityId == _world.LocalEntityId) _isDead = true;
+                if (died.EntityId == _world.LocalEntityId)
+                {
+                    _isDead = true;
+                    _diedAtTime = Time.time;
+                    _targetEntityId = -1;
+                }
                 _audio?.PlayKill();
                 return;
             }
@@ -1763,6 +1802,7 @@ namespace Lumiis.Client
                 if (dodged.TargetEntityId == _world.LocalEntityId) _lastDodgeMessage = "Ausgewichen!";
                 else if (dodged.AttackerEntityId == _world.LocalEntityId) _lastDodgeMessage = "Verfehlt!";
                 SpawnHitLine(dodged.AttackerEntityId, dodged.TargetEntityId, hit: false);
+                DodgeShown?.Invoke(dodged.TargetEntityId, dodged.AttackerEntityId);
                 PlayAttackAnimation(dodged.AttackerEntityId);
                 return;
             }
@@ -2101,11 +2141,53 @@ namespace Lumiis.Client
         public long YangTotal => _yangTotal;
         public bool IsDead => _isDead;
 
+        /// <summary>Restzeit bis zur Wiederbelebung (Sekunden, nie negativ) - rein kosmetischer Countdown, der
+        /// eigentliche Respawn kommt wie bisher als EntityStop vom Server.</summary>
+        public float RespawnRemainingSeconds => _isDead ? Mathf.Max(0f, RespawnDelaySeconds - (Time.time - _diedAtTime)) : 0f;
+
+        /// <summary>Treffer mit Schaden (Ziel, Schaden, Angreifer) - für schwebende Schadenszahlen im HUD.</summary>
+        public event Action<int, int, int> DamageShown;
+
+        /// <summary>Ausgewichener Treffer (Ziel, Angreifer).</summary>
+        public event Action<int, int> DodgeShown;
+
+        public Camera WorldCamera => _camera;
+
+        /// <summary>Weltposition über dem Kopf einer sichtbaren Figur (Namensschild/Schadenszahl). false, wenn
+        /// die Entity keine eigene View hat (z. B. Boden-Drops, die ihr Namensschild selbst zeichnen).</summary>
+        public bool TryGetOverheadWorldPosition(int entityId, out Vector3 world)
+        {
+            world = Vector3.zero;
+            if (!_world.Entities.TryGetValue(entityId, out ClientEntity entity)) return false;
+            var basePos = new Vector3((float)(entity.X / 100.0), (float)(entity.Y / 100.0), 0f);
+            if (_views.TryGetValue(entityId, out CharacterView view) && view != null && view.gameObject.activeInHierarchy)
+            {
+                world = basePos + view.GetHeadWorldOffset() + new Vector3(0f, 0.25f, 0f);
+                return true;
+            }
+            if (_monsterViews.TryGetValue(entityId, out MonsterView monster) && monster != null && monster.gameObject.activeInHierarchy)
+            {
+                world = new Vector3(basePos.x, monster.TopWorldY + 0.1f, 0f);
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>Alle Entities mit eigener Figur (Spieler, NPCs, Monster) - fürs Namensschild-Overlay.</summary>
+        public IEnumerable<int> OverheadEntityIds
+        {
+            get
+            {
+                foreach (int id in _views.Keys) yield return id;
+                foreach (int id in _monsterViews.Keys) yield return id;
+            }
+        }
+
         public string CurrentHudMessage
         {
             get
             {
-                if (_isDead) return "Du bist gestorben, Respawn in Kürze ...";
+                if (_isDead) return ""; // Der Todesbildschirm (HudWorldOverlay) zeigt das bereits groß an.
                 if (!string.IsNullOrEmpty(_lastLevelUpMessage)) return _lastLevelUpMessage;
                 if (!string.IsNullOrEmpty(_lastDodgeMessage)) return _lastDodgeMessage;
                 if (!string.IsNullOrEmpty(_lastAttackFailedMessage)) return _lastAttackFailedMessage;
@@ -2213,6 +2295,7 @@ namespace Lumiis.Client
         /// <summary>Benutzt den ersten Verbrauchsgegenstand (Heiltrank) im Inventar - Schnellleisten-Taste 5.</summary>
         public void UseFirstConsumable()
         {
+            if (_isDead) return;
             int slotIndex = FindFirstConsumableSlot(out _);
             if (slotIndex >= 0) _netClient?.SendUseConsumable(slotIndex);
         }
@@ -2288,7 +2371,7 @@ namespace Lumiis.Client
         /// <summary>Klick auf einen Skill der Schnellleiste - wie Taste 1-4.</summary>
         public void UseSkillSlot(int hotkeyIndex)
         {
-            if (!_inGame || _gameplayInputLocked || _world.LocalEntityId < 0) return;
+            if (!_inGame || _gameplayInputLocked || _isDead || _world.LocalEntityId < 0) return;
             if (hotkeyIndex < 0 || hotkeyIndex >= SkillHotkeys.Length) return;
             UseSkillHotkey(hotkeyIndex);
         }
@@ -2298,7 +2381,10 @@ namespace Lumiis.Client
             _netClient?.SendChat(channel, targetName, text);
         }
 
-        public void PickupItem(int groundItemEntityId) => _netClient?.SendPickupItem(groundItemEntityId);
+        public void PickupItem(int groundItemEntityId)
+        {
+            if (!_isDead) _netClient?.SendPickupItem(groundItemEntityId);
+        }
         public void PartyInvite(string targetName) => _netClient?.SendPartyInvite(targetName);
         public void PartyRespond(bool accept) => _netClient?.SendPartyRespond(accept);
         public void PartyLeave() => _netClient?.SendPartyLeave();
@@ -2561,7 +2647,6 @@ namespace Lumiis.Client
                 DrawCombatLine();
                 DrawSkillsLine();
                 DrawEntityList();
-                DrawEntityLabels();
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 DrawDebugTestPanel();
 #endif
@@ -2666,31 +2751,6 @@ namespace Lumiis.Client
             double dx = entity.X - local.X;
             double dy = entity.Y - local.Y;
             return System.Math.Sqrt(dx * dx + dy * dy) / 100.0;
-        }
-
-        private void DrawEntityLabels()
-        {
-            foreach (KeyValuePair<int, CharacterView> kvp in _views)
-            {
-                ClientEntity entity;
-                if (!_world.Entities.TryGetValue(kvp.Key, out entity)) continue;
-
-                Vector3 basePos = new Vector3((float)(entity.X / 100.0), (float)(entity.Y / 100.0), 0f);
-                Vector3 worldPos = basePos + kvp.Value.GetHeadWorldOffset();
-                Vector3 screenPos = _camera.WorldToScreenPoint(worldPos);
-                if (screenPos.z < 0) continue; // hinter der Kamera
-
-                float guiY = Screen.height - screenPos.y; // GUI-Koordinaten sind Y-invertiert gegenüber Screen-Koordinaten
-
-                // Eigener Name in Gelb statt Ebenen-Tönung - unterscheidet den lokalen Spieler zusätzlich zum
-                // Ring am Fuß. NPCs (M5b) in Grün, um sie auf einen Blick von anderen Spielern zu unterscheiden.
-                Color previousColor = GUI.color;
-                if (entity.Id == _world.LocalEntityId) GUI.color = Color.yellow;
-                else if (entity.Kind == EntityKind.Npc) GUI.color = Color.green;
-                else GUI.color = Color.white;
-                GUI.Label(new Rect(screenPos.x - 40, guiY - 10, 80, 20), entity.Name);
-                GUI.color = previousColor;
-            }
         }
     }
 }

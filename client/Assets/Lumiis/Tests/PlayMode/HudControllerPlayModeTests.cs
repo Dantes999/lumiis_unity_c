@@ -49,6 +49,52 @@ namespace Lumiis.Client.Tests.PlayMode
             Assert.IsNotNull(document.rootVisualElement.Q<VisualElement>("hud-party"), "Party-Panel fehlt.");
         }
 
+        [UnityTest]
+        public IEnumerator Hud_ShowsOwnNameplateAndDeathScreen()
+        {
+            _cameraGo = new GameObject("HudTestCamera");
+            Camera camera = _cameraGo.AddComponent<Camera>();
+            camera.orthographic = true;
+            camera.orthographicSize = 8f;
+            camera.transform.position = new Vector3(437f, 498f, -10f);
+
+            _root = new GameObject("HudTestRoot");
+            var netClient = _root.AddComponent<NetClient>();
+            var gameClient = _root.AddComponent<GameClient>();
+            gameClient.Initialize(netClient, camera);
+            var hud = _root.AddComponent<HudController>();
+            hud.Initialize(gameClient);
+            gameClient.DebugPrepareAssetLabLocalPlayer();
+
+            UIDocument document = null;
+            for (int i = 0; i < 20; i++)
+            {
+                yield return null;
+                GameObject hudGo = GameObject.Find("HudUI");
+                if (hudGo != null) document = hudGo.GetComponent<UIDocument>();
+            }
+
+            Assert.IsNotNull(document, "HudUI wurde nicht erzeugt.");
+            VisualElement root = document.rootVisualElement;
+            Label ownPlate = root.Q<Label>(className: "hud-nameplate-self");
+            Assert.IsNotNull(ownPlate, "Namensschild der eigenen Figur fehlt im normalen Spiel.");
+            Assert.AreEqual("Abenteurer", ownPlate.text);
+
+            VisualElement death = root.Q<VisualElement>("hud-death-screen");
+            Assert.IsNotNull(death, "Todesbildschirm fehlt.");
+            Assert.AreEqual(DisplayStyle.None, death.resolvedStyle.display);
+
+            gameClient.DebugSimulateDeath();
+            yield return null;
+            yield return null;
+            Assert.AreEqual(DisplayStyle.Flex, death.resolvedStyle.display, "Todesbildschirm erscheint nicht.");
+
+            gameClient.DebugEndSimulatedDeath();
+            yield return null;
+            yield return null;
+            Assert.AreEqual(DisplayStyle.None, death.resolvedStyle.display, "Todesbildschirm bleibt nach dem Respawn.");
+        }
+
         [UnityTearDown]
         public IEnumerator TearDown()
         {

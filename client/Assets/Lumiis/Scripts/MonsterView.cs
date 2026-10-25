@@ -96,6 +96,9 @@ namespace Lumiis.Client
 
         /// <summary>Bounds-Check statt echtem Collider-System (M4a, Rechtsklick-Angriff - siehe
         /// GameClient.HandleClickInput) - reicht für Sprite-Figuren.</summary>
+        /// <summary>Oberkante der Monstergrafik in Weltkoordinaten (für Namensschild/Schadenszahlen).</summary>
+        public float TopWorldY => _renderer != null ? Mathf.Max(_renderer.bounds.max.y, transform.position.y + HpBarY + 0.1f) : transform.position.y + HpBarY + 0.1f;
+
         public bool ContainsWorldPoint(Vector3 worldPos)
         {
             return _renderer != null && _renderer.bounds.Contains(worldPos);

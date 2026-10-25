@@ -1547,3 +1547,116 @@
     height: 32px;
 }
 
+
+/* ---- Weltbezogene HUD-Ebene: Namensschilder, Schadenszahlen, Todesbildschirm (HudWorldOverlay) ---- */
+
+.hud-world-layer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    overflow: hidden;
+}
+
+.hud-nameplate {
+    position: absolute;
+    font-size: 13px;
+    -unity-font-style: bold;
+    white-space: nowrap;
+    -unity-text-align: middle-center;
+    color: rgb(245, 240, 225);
+    -unity-text-outline-width: 0;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
+}
+
+.hud-nameplate-self {
+    color: rgb(255, 222, 110);
+}
+
+.hud-nameplate-player {
+    color: rgb(245, 240, 225);
+}
+
+.hud-nameplate-npc {
+    color: rgb(140, 230, 130);
+}
+
+.hud-nameplate-monster {
+    color: rgb(255, 170, 150);
+    font-size: 12px;
+}
+
+.hud-nameplate-target {
+    color: rgb(255, 120, 90);
+    font-size: 14px;
+}
+
+.hud-nameplate-dead {
+    opacity: 0.5;
+}
+
+.hud-float {
+    position: absolute;
+    font-size: 20px;
+    -unity-font-style: bold;
+    white-space: nowrap;
+    -unity-text-align: middle-center;
+    -unity-text-outline-width: 0;
+    text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.95);
+}
+
+.hud-float-dealt {
+    color: rgb(255, 236, 140);
+}
+
+.hud-float-taken {
+    color: rgb(255, 90, 70);
+}
+
+.hud-float-other {
+    color: rgb(230, 225, 215);
+    font-size: 15px;
+}
+
+.hud-float-miss,
+.hud-float-dodge {
+    color: rgb(170, 200, 255);
+    font-size: 16px;
+}
+
+.hud-death-screen {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    background-color: rgba(40, 0, 0, 0.45);
+    align-items: center;
+    justify-content: center;
+}
+
+.hud-death-panel {
+    padding: 14px 34px 16px 34px;
+    background-color: rgba(10, 6, 4, 0.82);
+    border-width: 2px;
+    border-color: rgb(150, 50, 40);
+    border-radius: 4px;
+    align-items: center;
+}
+
+.hud-death-title {
+    color: rgb(255, 110, 90);
+    font-size: 30px;
+    -unity-font-style: bold;
+    -unity-text-outline-width: 0;
+    text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.95);
+}
+
+.hud-death-countdown {
+    margin-top: 6px;
+    color: rgb(245, 235, 215);
+    font-size: 16px;
+    -unity-text-outline-width: 0;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.95);
+}

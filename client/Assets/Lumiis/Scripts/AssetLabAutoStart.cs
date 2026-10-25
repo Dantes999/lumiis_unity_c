@@ -77,6 +77,17 @@ namespace Lumiis.Client
             ScreenCapture.CaptureScreenshot("/tmp/lumiis-hud.png", 1);
             yield return new WaitForEndOfFrame();
 
+            _gameClient.DebugShowCombatPreview();
+            yield return new WaitForSeconds(0.25f);
+            ScreenCapture.CaptureScreenshot("/tmp/lumiis-hud-combat.png", 1);
+            yield return new WaitForEndOfFrame();
+
+            _gameClient.DebugSimulateDeath();
+            yield return new WaitForSeconds(0.6f);
+            ScreenCapture.CaptureScreenshot("/tmp/lumiis-hud-death.png", 1);
+            yield return new WaitForEndOfFrame();
+            _gameClient.DebugEndSimulatedDeath();
+
             yield return new WaitForSeconds(0.5f);
             File.WriteAllText(MarkerPath, "done");
             Debug.Log("Asset-Testlabor-Screenshots geschrieben: /tmp/lumiis-asset-lab-*.png");

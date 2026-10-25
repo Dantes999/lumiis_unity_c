@@ -106,6 +106,7 @@ namespace Lumiis.Client
         private VisualElement _smithWindow;
         private VisualElement _taskbarCenter;
         private readonly List<VisualElement> _openWindows = new List<VisualElement>();
+        private HudWorldOverlay _worldOverlay;
 
         private sealed class ItemSlotView
         {
@@ -233,6 +234,7 @@ namespace Lumiis.Client
             BindChat();
             BindWindows();
             BindTooltip();
+            _worldOverlay = new HudWorldOverlay(_gameClient, _root);
 
             _root.Q<Button>("hud-btn-character").clicked += () => ToggleWindow(_characterWindow);
             _root.Q<Button>("hud-btn-inventory").clicked += () => ToggleWindow(_inventoryWindow);
@@ -1299,9 +1301,11 @@ namespace Lumiis.Client
                 if (_chatOpen) CloseChat();
                 if (_partyRoot != null) _partyRoot.style.display = DisplayStyle.None;
                 HideTooltip();
+                _worldOverlay?.Clear();
                 return;
             }
 
+            _worldOverlay?.Update();
             HandleHotkeys();
             UpdateContextMenu();
             KeepWindowsInView();
@@ -1699,6 +1703,7 @@ namespace Lumiis.Client
                 _gameClient.PartyInviteReceived -= OnPartyInvite;
                 _gameClient.PlayerContextRequested -= OnPlayerContext;
                 _gameClient.UiPointerHitTest = null;
+                _worldOverlay?.Dispose();
             }
             if (_panelSettings != null)
                 Destroy(_panelSettings);
