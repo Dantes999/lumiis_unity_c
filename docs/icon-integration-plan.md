@@ -63,6 +63,16 @@ Point-Filter, keine Kompression). Das Manifest ist JsonUtility-freundlich:
 | 6 | Lederkappe | `helmet_ninja_1` | 32×32 |
 | 7 | Rundschild | `shield_1` | 32×32 |
 | 8 | Heiltrank | `red_s` | 32×32 |
+| 20 | Kurzschwert | `sword_1` | 32×64 |
+| 21 | Langschwert | `sword_10` | 32×64 |
+| 22 | Streitaxt | `twohand_10` | 32×96 |
+| 23 | Jagdspeer | `twohand_5` | 32×96 |
+| 24 | Plattenruestung | `armor_warrior_18` | 32×64 |
+| 25 | Leichte Ruestung | `armor_warrior_1` | 32×64 |
+| 26 | Vollhelm | `helmet_ninja_21` | 32×32 |
+| 27 | Turmschild | `shield_21` | 32×32 |
+| 35 | Heiltrank mittel | `red_m` | 32×32 |
+| 36 | Heiltrank gross | `red_l` | 32×32 |
 
 Die nachgeladenen Low-Level-Varianten (`sword_1`/`sword_20`/`twohand_10`/`armor_warrior_1`)
 stehen jetzt für frühe Item-Tiers zur Verfügung.
@@ -70,6 +80,7 @@ stehen jetzt für frühe Item-Tiers zur Verfügung.
 ## Offene Punkte
 
 - Weitere Item-Typen mit `iconKey` versorgen (Material, Buch, Geiststein, Truhe,
-  Schlüssel, Karte, Teleport, Schmuck, Schuhe, Kostüm, Pferd).
+  Schlüssel, Karte, Teleport, Schmuck, Schuhe, Kostüm, Pferd); erste Ausrüstungs- und
+  Trank-Erweiterung ist umgesetzt.
 - Optional: Sprite-Atlas, sobald Profiling es rechtfertigt.
 - Windows-Check nach dem Import (keine `:`-Dateien mehr).
