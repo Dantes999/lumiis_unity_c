@@ -18,6 +18,6 @@ namespace Lumiis.Client.Tests.PlayMode
         public Task<AuthResult> RegisterAsync(string authUrl, string username, string password) => Task.FromResult(RegisterResult);
         public Task<AuthResult<string>> LoginAsync(string authUrl, string username, string password) => Task.FromResult(LoginResult);
         public Task<AuthResult<IReadOnlyList<CharacterInfo>>> GetCharactersAsync(string authUrl, string token) => Task.FromResult(GetCharactersResult);
-        public Task<AuthResult<CharacterInfo>> CreateCharacterAsync(string authUrl, string token, string name) => Task.FromResult(CreateCharacterResult);
+        public Task<AuthResult<CharacterInfo>> CreateCharacterAsync(string authUrl, string token, string name, CharacterLookChoice look = default) => Task.FromResult(CreateCharacterResult);
     }
 }

@@ -85,6 +85,25 @@ namespace Lumiis.Client
         }
     }
 
+    /// <summary>Optionale Aussehens-Wahl bei der Charaktererstellung (LookIds aus looks.json, HairColorId
+    /// 1-basiert). null = Server-Default (erster gültiger Eintrag), default(CharacterLookChoice) = heutiges
+    /// Verhalten ohne Auswahl. Der Server validiert jeden Wert (400 "Ungültiges Aussehen.").</summary>
+    public readonly struct CharacterLookChoice
+    {
+        public int? BodyId { get; }
+        public int? HairStyleId { get; }
+        public int? HairColorId { get; }
+
+        public CharacterLookChoice(int? bodyId, int? hairStyleId, int? hairColorId)
+        {
+            BodyId = bodyId;
+            HairStyleId = hairStyleId;
+            HairColorId = hairColorId;
+        }
+
+        public bool IsEmpty => !BodyId.HasValue && !HairStyleId.HasValue && !HairColorId.HasValue;
+    }
+
     /// <summary>Vertrag gegen Lumiis.Auth (HTTP), ohne UnityEngine-/UnityWebRequest-Typen im Signatur - so bleibt
     /// LoginFlow ohne Unity testbar. UnityWebRequestAuthClient ist die einzige echte Implementierung.</summary>
     public interface IAuthClient
@@ -92,6 +111,6 @@ namespace Lumiis.Client
         Task<AuthResult> RegisterAsync(string authUrl, string username, string password);
         Task<AuthResult<string>> LoginAsync(string authUrl, string username, string password);
         Task<AuthResult<IReadOnlyList<CharacterInfo>>> GetCharactersAsync(string authUrl, string token);
-        Task<AuthResult<CharacterInfo>> CreateCharacterAsync(string authUrl, string token, string name);
+        Task<AuthResult<CharacterInfo>> CreateCharacterAsync(string authUrl, string token, string name, CharacterLookChoice look = default);
     }
 }

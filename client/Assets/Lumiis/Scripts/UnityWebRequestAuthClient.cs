@@ -47,15 +47,30 @@ namespace Lumiis.Client
             return AuthResult<IReadOnlyList<CharacterInfo>>.Success(characters);
         }
 
-        public async Task<AuthResult<CharacterInfo>> CreateCharacterAsync(string authUrl, string token, string name)
+        public async Task<AuthResult<CharacterInfo>> CreateCharacterAsync(string authUrl, string token, string name,
+            CharacterLookChoice look = default)
         {
             (bool ok, int status, string body) = await SendJsonAsync(authUrl + "characters", "POST",
-                JsonUtility.ToJson(new CreateCharacterRequestDto(name)), token);
+                BuildCreateCharacterJson(name, look), token);
             if (!ok) return AuthResult<CharacterInfo>.Network();
             if (status != 201) return AuthResult<CharacterInfo>.Http(status, TryGetServerMessage(body));
 
             CharacterDto dto = JsonUtility.FromJson<CharacterDto>(body);
             return AuthResult<CharacterInfo>.Success(ToInfo(dto));
+        }
+
+        /// <summary>JsonUtility kennt keine Nullable-Felder - die optionalen Aussehenswerte werden deshalb nur
+        /// angehängt, wenn sie gesetzt sind (fehlend = Server-Default).</summary>
+        private static string BuildCreateCharacterJson(string name, CharacterLookChoice look)
+        {
+            string json = JsonUtility.ToJson(new CreateCharacterRequestDto(name));
+            if (look.IsEmpty) return json;
+
+            var extra = new StringBuilder();
+            if (look.BodyId.HasValue) extra.Append(",\"bodyId\":").Append(look.BodyId.Value);
+            if (look.HairStyleId.HasValue) extra.Append(",\"hairStyleId\":").Append(look.HairStyleId.Value);
+            if (look.HairColorId.HasValue) extra.Append(",\"hairColorId\":").Append(look.HairColorId.Value);
+            return json.Substring(0, json.Length - 1) + extra + "}";
         }
 
         private static CharacterInfo ToInfo(CharacterDto dto)
