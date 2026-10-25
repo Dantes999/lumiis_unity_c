@@ -509,6 +509,66 @@ namespace Lumiis.Tests.Integration
         }
 
         [Fact]
+        public void Party_KillSharesHalfXpWithOtherMember()
+        {
+            string dataDir = ResolveDataDirectory();
+            ClassCatalog classCatalog = ClassCatalog.LoadFromFile(Path.Combine(dataDir, "classes.json"));
+            ProgressionCatalog progressionCatalog = ProgressionCatalog.LoadFromFile(Path.Combine(dataDir, "progression.json"));
+            MobCatalog mobCatalog = MobCatalog.LoadFromJson(@"{
+              ""mobs"": [
+                { ""id"": 1, ""name"": ""Xp-Testmob"", ""speedWire"": 100, ""wanderRadiusWire"": 100, ""wanderIntervalMinMs"": 999999, ""wanderIntervalMaxMs"": 999999, ""maxHp"": 5, ""attack"": 0, ""defense"": 0, ""yangMin"": 0, ""yangMax"": 0, ""meleeRangeWire"": 100, ""attackCooldownMs"": 1000, ""aggressive"": false, ""aggroRangeWire"": 0, ""leashRangeWire"": 500, ""level"": 1, ""baseXp"": 100 }
+              ]
+            }");
+            var fixture = new ServerFixture(mobCatalog: mobCatalog, classCatalog: classCatalog, progressionCatalog: progressionCatalog);
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var clientA = new TestClient();
+                using var clientB = new TestClient();
+                clientA.Connect(server.ListenPort);
+                clientB.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, clientA, clientB));
+
+                (int aliceId, string aliceToken) = fixture.CreateCharacter("Alice", positionX: 50000, positionY: 50000);
+                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = aliceToken, CharacterId = aliceId });
+                Assert.True(Pump(() => clientA.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
+                int aliceEntityId = clientA.Received.OfType<JoinAcceptedPacket>().First().EntityId;
+
+                (int bobId, string bobToken) = fixture.CreateCharacter("Bob", positionX: 50000, positionY: 50000);
+                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = bobToken, CharacterId = bobId });
+                Assert.True(Pump(() => clientB.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
+
+                // Gruppe bilden (Chat-Rate-Limit: zwischen den beiden Befehlen warten).
+                clientA.Send(new ChatRequestPacket { Channel = ChatChannel.Map, Text = "/invite Bob" });
+                Assert.True(Pump(() => clientB.Received.OfType<ChatMessagePacket>().Any(p => p.Channel == ChatChannel.System), server, clientA, clientB));
+                PumpForDuration(TimeSpan.FromMilliseconds(450), server, clientA, clientB);
+                clientB.Send(new ChatRequestPacket { Channel = ChatChannel.Map, Text = "/accept" });
+                Assert.True(Pump(() => clientA.Received.OfType<PartyChangedPacket>().Any(p => p.Members.Count == 2), server, clientA, clientB));
+
+                World world = server.WorldForMap("village");
+                Assert.True(mobCatalog.TryGet(1, out MobDefinition mobDef));
+                Entity monster = world.SpawnMonster(1, mobDef.Name, 50000, 50000, mobDef.SpeedWire,
+                    mobDef.WanderRadiusWire, mobDef.WanderIntervalMinMs, mobDef.WanderIntervalMaxMs, nowMs: 0,
+                    maxHp: mobDef.MaxHp, attack: mobDef.Attack, defense: mobDef.Defense,
+                    meleeRangeWire: mobDef.MeleeRangeWire, attackCooldownMs: mobDef.AttackCooldownMs,
+                    level: mobDef.Level, baseXp: mobDef.BaseXp);
+
+                clientA.Send(new AttackRequestPacket { TargetEntityId = monster.Id });
+                Assert.True(Pump(() => clientA.Received.OfType<EntityDiedPacket>().Any(p => p.EntityId == monster.Id), server, clientA, clientB));
+
+                Assert.True(Pump(() => clientB.Received.OfType<CharacterStatsPacket>().Any(p => p.Xp > 0), server, clientA, clientB));
+                CharacterStatsPacket bobStats = clientB.Received.OfType<CharacterStatsPacket>().Last(p => p.Xp > 0);
+                Assert.True(bobStats.Xp >= 1);
+                Assert.True(aliceEntityId > 0);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
         public void TwoClients_JoinAndSeeEachOthersSpawn()
         {
             var fixture = new ServerFixture();
@@ -1196,6 +1256,18 @@ namespace Lumiis.Tests.Integration
         /// <summary>Sucht data/maps/village/collision.bin ausgehend vom tatsächlichen Testassembly-Verzeichnis
         /// (AppContext.BaseDirectory, nicht abhängig davon, welches Arbeitsverzeichnis der Testrunner setzt) -
         /// läuft die Verzeichnisse bis zum Repo-Root hoch.</summary>
+        private static string ResolveDataDirectory()
+        {
+            DirectoryInfo? dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while (dir != null)
+            {
+                string candidate = Path.Combine(dir.FullName, "data", "classes.json");
+                if (File.Exists(candidate)) return Path.Combine(dir.FullName, "data");
+                dir = dir.Parent;
+            }
+            throw new FileNotFoundException("data/classes.json nicht gefunden (ausgehend von " + AppContext.BaseDirectory + ").");
+        }
+
         private static string ResolveVillageCollisionMapPath()
         {
             DirectoryInfo? dir = new DirectoryInfo(AppContext.BaseDirectory);

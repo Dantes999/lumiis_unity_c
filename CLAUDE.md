@@ -1144,7 +1144,7 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   unter `Resources/Characters`; `CharacterSheetGallery` zeigt Krieger/Ninja/Sura/Schamane (m/w) im
   Labor und der Screenshot-Lauf legt `/tmp/lumiis-asset-lab-characters.png` ab. (4) Feature-Gap-,
   Icon- und Kartenplanung als `docs/feature-gap-lumiis.md`, `docs/icon-integration-plan.md`,
-  `docs/map-import-plan.md`. 636 Server-/Unit-Tests und 13 PlayMode-Tests grün.
+  `docs/map-import-plan.md`. 637 Server-/Unit-Tests und 13 PlayMode-Tests grün.
 - M7-HUD + Chat-MVP: (1) `Hud.uxml`/`HudController` zeigen Name/Level, HP/SP/EXP/Yang, Ziel + HP,
   Meldungen, vier Skill-Slots mit Cooldowns, aktive Buffs und einen Chat mit Karte/Global/Flüstern.
   Das alte IMGUI-Overlay bleibt F1-Debug. (2) Chat-Protokoll: `ChatRequestPacket` (16),
@@ -1166,7 +1166,7 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   `Random`, verbraucht Schleifstein (und Rolle) immer, zerstört bei Fehlschlag ohne Rolle das Item.
   Protocol.Version 16 mit `UpgradeItemRequest/Result/ActionFailed`; `InventorySyncPacket` trägt Stufen
   pro Slot und je Equipped-Slot. Client: +N-Anzeige, Aufwerten-Knopf + Bewahrungsrollen-Checkbox im
-  Debug-Panel, deutsche Overlay-/Systemmeldungen. 636 Server-Tests grün (inkl. 20 neue Aufwertungs-/
+  Debug-Panel, deutsche Overlay-/Systemmeldungen. 637 Server-Tests grün (inkl. 20 neue Aufwertungs-/
   Katalog-/Packet-Tests und 3 LiteNetLib-Integrationstests inkl. Disconnect/Rejoin), Unity-PlayMode
   grün.
 - Offen als nächster M7-Block: Party-Persistenz/Rollen und weitere soziale Integrationstests; siehe
