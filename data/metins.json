@@ -1,0 +1,13 @@
+{
+  "_hinweis": "Lumiis-Stein-Wellen (MVP): Bei 75/50/25 % Rest-HP erscheinen Verstaerkungen. Die MobIds muessen in mobs.json existieren; die Wellen werden serverseitig in World.ResolveHit ausgeloest.",
+  "metins": [
+    {
+      "mobId": 3,
+      "waves": [
+        { "hpPercent": 75, "mobId": 1, "count": 2 },
+        { "hpPercent": 50, "mobId": 1, "count": 3 },
+        { "hpPercent": 25, "mobId": 2, "count": 2 }
+      ]
+    }
+  ]
+}
