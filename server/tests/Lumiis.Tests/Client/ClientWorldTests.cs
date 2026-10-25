@@ -377,5 +377,18 @@ namespace Lumiis.Tests.Client
             world.HandleEntitySpawn(5, "Wildhund", EntityKind.Monster, 1, 100, 100, SomeAppearance, level: 3);
             Assert.Equal(3, world.Entities[5].Level);
         }
+    
+        [Fact]
+        public void HandleEntityMove_LocalFacingFollowsAim_KeepsAimFacingWhileWalkingBackwards()
+        {
+            var world = new ClientWorld { LocalFacingFollowsAim = true };
+            world.HandleJoinAccepted(entityId: 1, x: 50000, y: 50000, localName: "Me", appearance: SomeAppearance);
+            world.SetFacingOverride(1, 51000, 50000); // Maus rechts
+
+            world.HandleEntityMove(1, 50000, 50000, 49000, 50000, 500, receivedAtTime: 0.0); // läuft nach links
+
+            Assert.Equal(FacingDirection.Side, world.Entities[1].Facing.Direction);
+            Assert.False(world.Entities[1].Facing.FlipX);
+        }
     }
 }

@@ -243,6 +243,7 @@ namespace Lumiis.Client
         {
             _netClient = netClient;
             _camera = camera;
+            _world.LocalFacingFollowsAim = true; // eigene Figur schaut zur Maus, siehe UpdateMouseFacing
             _squareSprite = PlaceholderSprites.CreateSquare();
             _localMarkerSprite = PlaceholderSprites.CreateRing();
             _monsterCircleSprite = PlaceholderSprites.CreateCircle();
@@ -1896,7 +1897,8 @@ namespace Lumiis.Client
             // (Monster gegen Spieler, anderer Spieler gegen Monster) reaktiv zum Ziel drehen - beide
             // Positionen sind hier ohnehin schon bekannt. Fuer den lokalen Spieler redundant zur
             // optimistischen Drehung beim Senden (HandleRightClickAttack/UseSkillHotkey), aber harmlos.
-            _world.SetFacingOverride(attackerEntityId, target.IntX, target.IntY);
+            if (!(_world.LocalFacingFollowsAim && attackerEntityId == _world.LocalEntityId))
+                _world.SetFacingOverride(attackerEntityId, target.IntX, target.IntY);
         }
 
         private static string InventoryActionFailedReasonText(InventoryActionFailedReason reason)

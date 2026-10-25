@@ -90,6 +90,11 @@ namespace Lumiis.Client
         private readonly Dictionary<int, ClientEntity> _entities = new Dictionary<int, ClientEntity>();
 
         public int LocalEntityId { get; private set; } = -1;
+
+        /// <summary>true = die Blickrichtung der eigenen Figur bestimmt der Client (Mauszeiger, siehe
+        /// GameClient.UpdateMouseFacing); EntityMove dreht sie dann nicht mehr in Laufrichtung. Sonst würde die
+        /// Figur beim Rückwärtslaufen mit jedem MoveTo (alle 100 ms) kurz in Laufrichtung zucken.</summary>
+        public bool LocalFacingFollowsAim { get; set; }
         public IReadOnlyDictionary<int, ClientEntity> Entities
         {
             get { return _entities; }
@@ -228,7 +233,8 @@ namespace Lumiis.Client
             entity.Speed = speed;
             entity.MoveStartTime = receivedAtTime;
             Resync(entity, startX, startY);
-            entity.Facing = FacingMath.FromDelta(targetX - startX, targetY - startY, entity.Facing);
+            if (!(LocalFacingFollowsAim && entityId == LocalEntityId))
+                entity.Facing = FacingMath.FromDelta(targetX - startX, targetY - startY, entity.Facing);
         }
 
         public void HandleEntityStop(int entityId, int x, int y)
