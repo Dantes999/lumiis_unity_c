@@ -30,12 +30,46 @@ namespace Lumiis.Tests
         public void JoinAccepted_RoundTrip()
         {
             var appearance = new Appearance { BodyId = 1, HairStyleId = 2, HairColorId = 3, ArmorId = 4, HelmetId = 0, WeaponId = 1, ShieldId = 0 };
-            var original = new JoinAcceptedPacket { EntityId = 42, X = 50000, Y = 50000, Appearance = appearance };
+            var original = new JoinAcceptedPacket
+            {
+                EntityId = 42, X = 50000, Y = 50000, Appearance = appearance,
+                MapId = "greenfield", MapName = "Gruenes Feld", MapWidth = 100000, MapHeight = 100000
+            };
             var decoded = Assert.IsType<JoinAcceptedPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
             Assert.Equal(original.EntityId, decoded.EntityId);
             Assert.Equal(original.X, decoded.X);
             Assert.Equal(original.Y, decoded.Y);
             Assert.Equal(original.Appearance, decoded.Appearance);
+            Assert.Equal("greenfield", decoded.MapId);
+            Assert.Equal("Gruenes Feld", decoded.MapName);
+            Assert.Equal(100000, decoded.MapWidth);
+            Assert.Equal(100000, decoded.MapHeight);
+        }
+
+        [Fact]
+        public void MapChanged_RoundTrip()
+        {
+            var original = new MapChangedPacket
+            {
+                EntityId = 7, X = 50000, Y = 65000,
+                MapId = "greenfield", MapName = "Gruenes Feld", MapWidth = 100000, MapHeight = 100000
+            };
+            var decoded = Assert.IsType<MapChangedPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal(original.EntityId, decoded.EntityId);
+            Assert.Equal(original.X, decoded.X);
+            Assert.Equal(original.Y, decoded.Y);
+            Assert.Equal(original.MapId, decoded.MapId);
+            Assert.Equal(original.MapName, decoded.MapName);
+            Assert.Equal(original.MapWidth, decoded.MapWidth);
+            Assert.Equal(original.MapHeight, decoded.MapHeight);
+        }
+
+        [Fact]
+        public void DebugChangeMapRequest_RoundTrip()
+        {
+            var original = new DebugChangeMapRequestPacket { MapId = "village" };
+            var decoded = Assert.IsType<DebugChangeMapRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
+            Assert.Equal("village", decoded.MapId);
         }
 
         [Fact]

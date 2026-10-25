@@ -30,6 +30,15 @@ public sealed class Entity
 
     public EntityKind Kind { get; }
 
+    /// <summary>Id der Karte, auf der diese Entity aktuell steht (Multi-Map, Protocol.Version 15). Wird von
+    /// World beim Anlegen/Transfer gesetzt und von GameServer für Persistenz (Position/CharacterSave) genutzt -
+    /// Mobs/NPCs bleiben zeitlebens auf ihrer Karte, Spieler wechseln per Portal/Dev-Tool.</summary>
+    public string MapId { get; set; } = "village";
+
+    /// <summary>Wandzeit, ab wann dieses Portal-Ereignis erneut auslösen darf (Multi-Map: Sperre gegen
+    /// Mehrfachauslösung, siehe World.CheckPortal) - 0 = sofort. Nur bei Kind=Player relevant.</summary>
+    public long PortalReadyAtMs { get; set; }
+
     /// <summary>Bei Kind=Monster ein Index in data/mobs.json, bei Kind=Npc (M5b) ein Index in data/npcs.json,
     /// bei Kind=Player ungenutzt/0 - bis M5a "MobId" genannt, seit M5b umbenannt (reiner Rename, siehe
     /// docs/tasks/M5b-shop.md Abschnitt 0b und EntitySpawnPacket.TypeId).</summary>

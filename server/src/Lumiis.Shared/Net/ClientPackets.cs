@@ -420,4 +420,27 @@ namespace Lumiis.Shared.Net
             Text = reader.ReadString();
         }
     }
+
+    /// <summary>Multi-Map (Protocol.Version 15): nur wirksam mit --allow-debug-commands (sonst still
+    /// verworfen, siehe DebugSpawnMonsterRequestPacket). Versetzt den eigenen Charakter auf die
+    /// Startposition der Zielkarte - Debug-API zum Testen des Kartenwechsels ohne Portal.</summary>
+    public sealed class DebugChangeMapRequestPacket : IPacket
+    {
+        public string MapId = "";
+
+        public PacketId Id
+        {
+            get { return PacketId.DebugChangeMapRequest; }
+        }
+
+        public void Write(PacketWriter writer)
+        {
+            writer.WriteString(MapId);
+        }
+
+        public void Read(PacketReader reader)
+        {
+            MapId = reader.ReadString();
+        }
+    }
 }

@@ -69,6 +69,14 @@ namespace Lumiis.Client
             Send(new DebugSpawnMonsterRequestPacket { MobId = mobId });
         }
 
+        /// <summary>Multi-Map-Debug-API (GameClient.DebugChangeMap): nur wirksam mit
+        /// --allow-debug-commands, sonst still ohne Wirkung (siehe HandleDebugChangeMapRequest).</summary>
+        public void SendDebugChangeMap(string mapId)
+        {
+            if (_peer == null || !IsConnected) return;
+            Send(new DebugChangeMapRequestPacket { MapId = mapId });
+        }
+
         /// <summary>M5a: Klick auf einen belegten Ausrüstungs-Item-Slot im Debug-Panel (siehe
         /// GameClient.DrawInventoryPanel) - der Server prüft alles erneut (Slot belegt, ItemType passt).</summary>
         public void SendEquipItem(int inventorySlotIndex)

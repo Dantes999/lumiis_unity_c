@@ -31,11 +31,16 @@ public sealed class World
     private readonly Dictionary<int, int> _entityIdByCharacterId = new();
     private readonly Dictionary<int, PendingMonsterRespawn> _pendingMonsterRespawns = new();
     private readonly CollisionMap? _collisionMap;
+    private readonly MapDefinition? _mapDefinition;
     private readonly ItemCatalog? _itemCatalog;
     private readonly ProgressionCatalog? _progressionCatalog;
     private readonly SkillCatalog? _skillCatalog;
     private readonly Random _random;
+    private readonly Func<int> _allocateEntityId;
     private int _nextEntityId = 1;
+
+    /// <summary>Multi-Map: Sperre gegen Mehrfachauslösung eines Portals (siehe CheckPortal) - 1s, fix.</summary>
+    private const long PortalCooldownMs = 1000;
 
     /// <summary>Fix, keine Konfiguration (siehe docs/tasks/M4a-combat-core.md Abschnitt 4) - 3s nach dem Tod
     /// respawnt ein Spieler automatisch (siehe ApplyDamage/Tick).</summary>
@@ -56,17 +61,40 @@ public sealed class World
     /// jeden Versuch mit NotLearned ab, siehe dort) - Program.cs lädt beim echten Serverstart immer eine
     /// Instanz aus data/skills.json (M6b).</summary>
     public World(int maxPlayers, CollisionMap? collisionMap = null, Random? random = null, ItemCatalog? itemCatalog = null,
-        ProgressionCatalog? progressionCatalog = null, SkillCatalog? skillCatalog = null)
+        ProgressionCatalog? progressionCatalog = null, SkillCatalog? skillCatalog = null,
+        MapDefinition? mapDefinition = null, Func<int>? entityIdGenerator = null)
     {
         MaxPlayers = maxPlayers;
-        _collisionMap = collisionMap;
+        _mapDefinition = mapDefinition;
+        _collisionMap = mapDefinition?.Collision ?? collisionMap;
+        MapId = mapDefinition?.Id ?? "village";
         _itemCatalog = itemCatalog;
         _progressionCatalog = progressionCatalog;
         _skillCatalog = skillCatalog;
         _random = random ?? new Random();
+        _allocateEntityId = entityIdGenerator ?? (() => _nextEntityId++);
     }
 
     public int MaxPlayers { get; }
+
+    /// <summary>Multi-Map: Id der Karte, die diese World hält (siehe MapDefinition).</summary>
+    public string MapId { get; }
+
+    /// <summary>Startposition der Karte (auch Respawn-Ziel für Spieler) - ohne MapDefinition die Kartenmitte.</summary>
+    public int StartX
+    {
+        get { return _mapDefinition?.StartX ?? GameConstants.MapWidth / 2; }
+    }
+
+    public int StartY
+    {
+        get { return _mapDefinition?.StartY ?? GameConstants.MapHeight / 2; }
+    }
+
+    public IReadOnlyList<PortalDefinition> Portals
+    {
+        get { return _mapDefinition?.Portals ?? (IReadOnlyList<PortalDefinition>)Array.Empty<PortalDefinition>(); }
+    }
 
     public IReadOnlyCollection<Entity> Entities => _entities.Values;
 
@@ -100,17 +128,18 @@ public sealed class World
             return false;
         }
 
-        if (_entities.Count >= MaxPlayers)
+        if (_entityIdByCharacterId.Count >= MaxPlayers)
         {
             reason = JoinRejectReason.ServerFull;
             return false;
         }
 
-        int spawnX = Math.Clamp(x ?? GameConstants.MapWidth / 2, 0, GameConstants.MapWidth);
-        int spawnY = Math.Clamp(y ?? GameConstants.MapHeight / 2, 0, GameConstants.MapHeight);
+        int spawnX = Math.Clamp(x ?? StartX, 0, GameConstants.MapWidth);
+        int spawnY = Math.Clamp(y ?? StartY, 0, GameConstants.MapHeight);
 
-        int id = _nextEntityId++;
+        int id = _allocateEntityId();
         Entity created = new(id, characterId, name, spawnX, spawnY, maxHp, attack, defense, meleeRangeWire, attackCooldownMs, classDef);
+        created.MapId = MapId;
         created.Level = level;
         created.Xp = xp;
         created.SpentSt = spentSt;
@@ -133,7 +162,7 @@ public sealed class World
         {
             created.CurrentHp = created.MaxHp;
             created.CurrentSp = created.MaxSp;
-            created.Teleport(GameConstants.MapWidth / 2, GameConstants.MapHeight / 2);
+            created.Teleport(StartX, StartY);
         }
         else
         {
@@ -172,10 +201,11 @@ public sealed class World
         int clampedX = Math.Clamp(x, 0, GameConstants.MapWidth);
         int clampedY = Math.Clamp(y, 0, GameConstants.MapHeight);
 
-        int id = _nextEntityId++;
+        int id = _allocateEntityId();
         Entity entity = Entity.CreateMonster(id, mobId, spawnPointId, name, clampedX, clampedY, speedWire,
             wanderRadiusWire, wanderIntervalMinMs, wanderIntervalMaxMs, maxHp, attack, defense, yangMin, yangMax, respawnSeconds,
             meleeRangeWire, attackCooldownMs, aggressive, aggroRangeWire, leashRangeWire, drops, level, baseXp);
+        entity.MapId = MapId;
         entity.NextWanderAtMs = nowMs + _random.Next(wanderIntervalMinMs, wanderIntervalMaxMs + 1);
         _entities[id] = entity;
         return entity;
@@ -193,10 +223,11 @@ public sealed class World
         int clampedX = Math.Clamp(x, 0, GameConstants.MapWidth);
         int clampedY = Math.Clamp(y, 0, GameConstants.MapHeight);
 
-        int id = _nextEntityId++;
+        int id = _allocateEntityId();
         Entity entity = Entity.CreateNpc(id, npcId, name, clampedX, clampedY);
         entity.Appearance = appearance;
         entity.ShopItemIds = shopItemIds ?? Array.Empty<int>();
+        entity.MapId = MapId;
         _entities[id] = entity;
         return entity;
     }
@@ -227,9 +258,44 @@ public sealed class World
         return true;
     }
 
+    /// <summary>Multi-Map: setzt eine bereits existierende Spieler-Entity auf diese Karte (Portal-/Dev-Tool-
+    /// Wechsel). Die EntityId bleibt erhalten (der Client behält seine lokale Figur), MapId wird
+    /// aktualisiert. Kein Spielerlimit-/Doppel-Online-Check - der Aufrufer (GameServer) hat die Entity gerade
+    /// aus einer anderen World entfernt.</summary>
+    public void AddExistingEntity(Entity entity)
+    {
+        entity.MapId = MapId;
+        entity.PortalReadyAtMs = 0;
+        _entities[entity.Id] = entity;
+        if (entity.CharacterId is int characterId) _entityIdByCharacterId[characterId] = entity.Id;
+    }
+
+    /// <summary>Multi-Map: prüft, ob ein Spieler gerade in einem Portal dieser Karte steht und der
+    /// Portal-Cooldown abgelaufen ist. Reine Entscheidung ohne Seiteneffekt außer dem Cooldown-Stempel -
+    /// der eigentliche Kartenwechsel (Entity aus dieser World entfernen, in die Ziel-World setzen, Pakete)
+    /// bleibt Sache von GameServer. Tote Spieler lösen keine Portale aus.</summary>
+    public PortalDefinition? CheckPortal(Entity entity, long nowMs)
+    {
+        if (entity.Kind != EntityKind.Player || entity.IsDead) return null;
+        if (nowMs < entity.PortalReadyAtMs) return null;
+
+        foreach (PortalDefinition portal in Portals)
+        {
+            if (!portal.Contains(entity.IntX, entity.IntY)) continue;
+            entity.PortalReadyAtMs = nowMs + PortalCooldownMs;
+            return portal;
+        }
+        return null;
+    }
+
     public bool TryGet(int entityId, out Entity? entity)
     {
         return _entities.TryGetValue(entityId, out entity);
+    }
+
+    public bool IsBlockedAtWire(int wireX, int wireY)
+    {
+        return _collisionMap != null && _collisionMap.IsBlockedAtWire(wireX, wireY);
     }
 
     /// <summary>Setzt ein Bewegungsziel, zuerst auf die Kartengrenzen geklemmt, danach (falls eine
@@ -1152,7 +1218,7 @@ public sealed class World
             if (entity.Kind != EntityKind.Player) continue;
             if (entity.RespawnAtMs == 0 || nowMs < entity.RespawnAtMs) continue;
 
-            entity.Teleport(GameConstants.MapWidth / 2, GameConstants.MapHeight / 2);
+            entity.Teleport(StartX, StartY);
             entity.CurrentHp = entity.MaxHp;
             entity.CurrentSp = entity.MaxSp; // M6a: Respawn heilt HP UND SP voll.
             entity.RespawnAtMs = 0;

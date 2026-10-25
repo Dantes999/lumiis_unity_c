@@ -3,6 +3,7 @@
     <ui:VisualElement name="hud-root" class="hud-root">
         <ui:VisualElement class="hud-player">
             <ui:Label name="hud-player-name" text="-" class="hud-player-name" />
+            <ui:Label name="hud-map-name" text="-" class="hud-map-name" />
             <ui:VisualElement class="hud-bar-row">
                 <ui:Label text="HP" class="hud-bar-label" />
                 <ui:VisualElement class="hud-bar-bg"><ui:VisualElement name="hud-hp-fill" class="hud-bar-fill hud-bar-hp" /></ui:VisualElement>

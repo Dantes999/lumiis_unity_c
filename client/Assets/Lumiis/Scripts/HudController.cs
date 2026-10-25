@@ -21,6 +21,7 @@ namespace Lumiis.Client
         private VisualElement _root;
 
         private Label _playerName;
+        private Label _mapName;
         private Label _hpText;
         private Label _spText;
         private Label _xpText;
@@ -86,6 +87,7 @@ namespace Lumiis.Client
             _uiDocument.rootVisualElement.Add(_root);
 
             _playerName = _root.Q<Label>("hud-player-name");
+            _mapName = _root.Q<Label>("hud-map-name");
             _hpText = _root.Q<Label>("hud-hp-text");
             _spText = _root.Q<Label>("hud-sp-text");
             _xpText = _root.Q<Label>("hud-xp-text");
@@ -174,6 +176,8 @@ namespace Lumiis.Client
                 world.Entities.TryGetValue(world.LocalEntityId, out local);
 
             _playerName.text = (local != null ? local.Name : "Spieler") + "  ·  Level " + (stats.Level > 0 ? stats.Level.ToString() : "-");
+            if (_mapName != null)
+                _mapName.text = "Karte: " + _gameClient.CurrentMapName;
 
             int hp = local != null ? Mathf.Max(0, local.CurrentHp) : 0;
             int maxHp = local != null ? Mathf.Max(0, local.MaxHp) : 0;

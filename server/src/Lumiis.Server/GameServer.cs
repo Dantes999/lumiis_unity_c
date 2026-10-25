@@ -33,6 +33,10 @@ public sealed class GameServer : INetEventListener
     {
         public readonly NetPeer Peer;
         public int? EntityId;
+
+        /// <summary>Multi-Map: World, in der die eigene Entity gerade steht (null bis zum erfolgreichen Join).
+        /// AOI/Sichtbarkeit/Portalwechsel laufen ausschließlich über diese World (siehe UpdateVisibility).</summary>
+        public World? World;
         public bool JoinPending;
         public bool Closing;
         public long CloseAtMs;
@@ -69,7 +73,7 @@ public sealed class GameServer : INetEventListener
 
     /// <summary>Eine zu speichernde Position, per Channel an den Hintergrund-Task übergeben (siehe
     /// RunPositionSaveConsumerAsync).</summary>
-    private readonly record struct PositionSaveRequest(int CharacterId, int X, int Y);
+    private readonly record struct PositionSaveRequest(int CharacterId, string MapId, int X, int Y);
 
     /// <summary>Ein zu speichernder Yang-Gesamtbetrag (M4a), per Channel an den Hintergrund-Task übergeben
     /// (siehe RunYangSaveConsumerAsync) - eigener Channel statt Wiederverwendung des Positions-Channels
@@ -104,7 +108,7 @@ public sealed class GameServer : INetEventListener
     /// dort: sofort bei AllocateSkillPoint (analog zu AllocateStatPoint), sonst über denselben periodischen/
     /// Disconnect-Save wie der restliche Fortschritt (Skill-Cooldowns/aktive Buffs werden NICHT persistiert,
     /// siehe Entity.ActiveBuffs-Kommentar).</summary>
-    private readonly record struct CharacterSaveRequest(int CharacterId, long Yang, List<(int SlotIndex, int ItemId)> Slots,
+    private readonly record struct CharacterSaveRequest(int CharacterId, string MapId, long Yang, List<(int SlotIndex, int ItemId)> Slots,
         int EquippedArmorItemId, int EquippedHelmetItemId, int EquippedWeaponItemId, int EquippedShieldItemId,
         int Level, long Xp, int SpentSt, int SpentHt, int SpentDx, int SpentIq,
         int UnspentStatPoints, int UnspentSkillPoints, int CurrentHp, int CurrentSp,
@@ -127,6 +131,11 @@ public sealed class GameServer : INetEventListener
 
     private readonly ServerConfig _config;
     private readonly World _world;
+
+    /// <summary>Multi-Map: alle Karten-Welten (Id -> World). Ohne MapCatalog (bestehende Tests) enthält das
+    /// Dictionary nur die eine Legacy-World "village" - Routing/Portale funktionieren dann trivial.</summary>
+    private readonly Dictionary<string, World> _worlds;
+    private readonly MapCatalog? _mapCatalog;
     private readonly TokenService _tokenService;
     private readonly Func<LumiisDbContext> _dbContextFactory;
     private readonly ClassCatalog? _classCatalog;
@@ -134,6 +143,10 @@ public sealed class GameServer : INetEventListener
     /// <summary>Nur für den Dev-Tools-Debug-Spawn gehalten (siehe HandleDebugSpawnMonster) - der reguläre
     /// Katalog-Spawn im Konstruktor braucht die Referenz danach nicht mehr.</summary>
     private readonly MobCatalog? _mobCatalog;
+
+    /// <summary>Multi-Map: nur für den Start-Spawn der Karten (SpawnMapContent) gehalten - Laufzeit-Handler
+    /// arbeiten mit den bereits auf der Entity gespeicherten Sortimenten/Definitionen.</summary>
+    private readonly NpcCatalog? _npcCatalog;
 
     /// <summary>An World durchgereicht (siehe World-Konstruktor) UND hier für ToAppearance/CompleteJoin
     /// gehalten (Equipped-ItemId -> LookId auflösen, M5a) sowie für ShopContentPacket (BuyPrice je
@@ -194,7 +207,7 @@ public sealed class GameServer : INetEventListener
     public GameServer(ServerConfig config, ILogger logger, TokenService tokenService, Func<LumiisDbContext> dbContextFactory,
         Func<long>? nowMs = null, CollisionMap? collisionMap = null, MobCatalog? mobCatalog = null, SpawnCatalog? spawnCatalog = null,
         ClassCatalog? classCatalog = null, ItemCatalog? itemCatalog = null, NpcCatalog? npcCatalog = null, NpcSpawnCatalog? npcSpawnCatalog = null,
-        ProgressionCatalog? progressionCatalog = null, SkillCatalog? skillCatalog = null)
+        ProgressionCatalog? progressionCatalog = null, SkillCatalog? skillCatalog = null, MapCatalog? mapCatalog = null)
     {
         _config = config;
         _logger = logger;
@@ -202,35 +215,45 @@ public sealed class GameServer : INetEventListener
         _dbContextFactory = dbContextFactory;
         _classCatalog = classCatalog;
         _mobCatalog = mobCatalog;
+        _npcCatalog = npcCatalog;
         _itemCatalog = itemCatalog;
         _progressionCatalog = progressionCatalog;
-        _world = new World(config.MaxPlayers, collisionMap, itemCatalog: itemCatalog, progressionCatalog: progressionCatalog, skillCatalog: skillCatalog);
+        _mapCatalog = mapCatalog;
+
+        // Gemeinsamer EntityId-Zähler über ALLE Karten: EntityIds müssen global eindeutig bleiben, sonst
+        // könnte eine Entity in Karte A dieselbe Id haben wie eine in Karte B (der Client/das Routing kennt
+        // nur eine Id -> MapId-Zuordnung). Ohne MapCatalog bleibt es bei genau einer World.
+        int nextEntityId = 0;
+        Func<int> allocateEntityId = () => ++nextEntityId;
+
         _netManager = new NetManager(this) { UpdateTime = 15 };
         _nowMs = nowMs ?? DefaultNowMs;
 
-        if (spawnCatalog != null && mobCatalog != null)
+        if (mapCatalog != null)
         {
-            foreach (SpawnPoint spawn in spawnCatalog.Spawns)
+            _worlds = new Dictionary<string, World>(StringComparer.Ordinal);
+            foreach (MapDefinition map in mapCatalog.Maps)
             {
-                mobCatalog.TryGet(spawn.MobId, out MobDefinition mobDef); // Existenz bereits von SpawnCatalog.LoadFromFile geprüft.
-                _world.SpawnMonster(spawn.MobId, mobDef.Name, spawn.PositionX, spawn.PositionY, mobDef.SpeedWire,
-                    mobDef.WanderRadiusWire, mobDef.WanderIntervalMinMs, mobDef.WanderIntervalMaxMs, _nowMs(),
-                    mobDef.MaxHp, mobDef.Attack, mobDef.Defense, mobDef.YangMin, mobDef.YangMax,
-                    spawnPointId: spawn.Id, respawnSeconds: spawn.RespawnSeconds,
-                    meleeRangeWire: mobDef.MeleeRangeWire, attackCooldownMs: mobDef.AttackCooldownMs,
-                    aggressive: mobDef.Aggressive, aggroRangeWire: mobDef.AggroRangeWire, leashRangeWire: mobDef.LeashRangeWire,
-                    drops: mobDef.Drops.Select(d => (d.ItemId, d.ChancePercent)).ToList(),
-                    level: mobDef.Level, baseXp: mobDef.BaseXp);
+                var world = new World(config.MaxPlayers, collisionMap: null, itemCatalog: itemCatalog,
+                    progressionCatalog: progressionCatalog, skillCatalog: skillCatalog,
+                    mapDefinition: map, entityIdGenerator: allocateEntityId);
+                _worlds[map.Id] = world;
+                SpawnMapContent(world, map.Spawns, map.NpcPlacements);
             }
+            _world = _worlds[mapCatalog.StartMapId];
         }
-
-        if (npcSpawnCatalog != null && npcCatalog != null)
+        else
         {
-            foreach (NpcPlacement placement in npcSpawnCatalog.Placements)
-            {
-                npcCatalog.TryGet(placement.NpcId, out NpcDefinition npcDef); // Existenz bereits von NpcSpawnCatalog.LoadFromFile geprüft.
-                _world.SpawnNpc(placement.NpcId, npcDef.Name, placement.PositionX, placement.PositionY, npcDef.Appearance, npcDef.ShopItemIds);
-            }
+            // Legacy-Pfad (bestehende Tests/Serverstarts ohne MapCatalog): eine World "village" mit den
+            // bisherigen optionalen Katalogen - Verhalten unverändert.
+            _world = new World(config.MaxPlayers, collisionMap, itemCatalog: itemCatalog,
+                progressionCatalog: progressionCatalog, skillCatalog: skillCatalog,
+                entityIdGenerator: allocateEntityId);
+            _worlds = new Dictionary<string, World>(StringComparer.Ordinal) { { _world.MapId, _world } };
+            if (spawnCatalog != null && mobCatalog != null)
+                SpawnMapContent(_world, spawnCatalog.Spawns, Array.Empty<NpcPlacement>());
+            if (npcSpawnCatalog != null && npcCatalog != null)
+                SpawnMapContent(_world, Array.Empty<SpawnPoint>(), npcSpawnCatalog.Placements);
         }
 
         // Kapazität = MaxPlayers: höchstens einmal pro Spieler pro 30s-Zyklus (oder einmalig bei
@@ -278,8 +301,45 @@ public sealed class GameServer : INetEventListener
         });
     }
 
+    /// <summary>Legt Monster/NPCs einer Karte an (Serverstart). Katalog-Existenz wurde von
+    /// SpawnCatalog/NpcSpawnCatalog (bzw. MapCatalog.LoadFromDirectory) bereits validiert - hier nur noch
+    /// die Entity-Erzeugung, identisch zum bisherigen Ein-Karten-Pfad.</summary>
+    private void SpawnMapContent(World world, IReadOnlyList<SpawnPoint> spawns, IReadOnlyList<NpcPlacement> npcPlacements)
+    {
+        if (_mobCatalog != null)
+        {
+            foreach (SpawnPoint spawn in spawns)
+            {
+                _mobCatalog.TryGet(spawn.MobId, out MobDefinition mobDef);
+                world.SpawnMonster(spawn.MobId, mobDef.Name, spawn.PositionX, spawn.PositionY, mobDef.SpeedWire,
+                    mobDef.WanderRadiusWire, mobDef.WanderIntervalMinMs, mobDef.WanderIntervalMaxMs, _nowMs(),
+                    mobDef.MaxHp, mobDef.Attack, mobDef.Defense, mobDef.YangMin, mobDef.YangMax,
+                    spawnPointId: spawn.Id, respawnSeconds: spawn.RespawnSeconds,
+                    meleeRangeWire: mobDef.MeleeRangeWire, attackCooldownMs: mobDef.AttackCooldownMs,
+                    aggressive: mobDef.Aggressive, aggroRangeWire: mobDef.AggroRangeWire, leashRangeWire: mobDef.LeashRangeWire,
+                    drops: mobDef.Drops.Select(d => (d.ItemId, d.ChancePercent)).ToList(),
+                    level: mobDef.Level, baseXp: mobDef.BaseXp);
+            }
+        }
+
+        if (_npcCatalog != null)
+        {
+            foreach (NpcPlacement placement in npcPlacements)
+            {
+                _npcCatalog.TryGet(placement.NpcId, out NpcDefinition npcDef);
+                world.SpawnNpc(placement.NpcId, npcDef.Name, placement.PositionX, placement.PositionY, npcDef.Appearance, npcDef.ShopItemIds);
+            }
+        }
+    }
+
     /// <summary>Tatsächlich gebundener Port (nach Start relevant, falls ServerConfig.Port 0 war).</summary>
     public int ListenPort => _netManager.LocalPort;
+
+    /// <summary>Nur für Tests: direkter Zugriff auf eine Karten-World (Monster-/Entity-Trennung prüfen).</summary>
+    internal World WorldForMap(string mapId) => _worlds[mapId];
+
+    /// <summary>Nur für Tests: Karte, auf der eine Entity aktuell steht (null = unbekannt).</summary>
+    internal string? MapIdOfEntity(int entityId) => FindWorldOfEntity(entityId)?.MapId;
 
     public void Start()
     {
@@ -347,9 +407,33 @@ public sealed class GameServer : INetEventListener
 
         double deltaSeconds = 1.0 / Protocol.TickRate;
         long tickNowMs = _nowMs();
-        (List<Entity> arrived, List<Entity> startedWandering, List<Entity> respawned, List<Entity> respawnedMonsters,
-            List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> monsterAttacks, List<Entity> regeneratedPlayers,
-            List<Entity> buffsExpired) = _world.Tick(deltaSeconds, tickNowMs);
+        List<Entity> arrived = new();
+        List<Entity> startedWandering = new();
+        List<Entity> respawned = new();
+        List<Entity> respawnedMonsters = new();
+        List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> monsterAttacks = new();
+        List<Entity> regeneratedPlayers = new();
+        List<Entity> buffsExpired = new();
+
+        // Multi-Map: jede Karte hat ihre eigene World (Entities, Kollision, Spawns, Monster-KI). Ticks werden
+        // nacheinander ausgeführt; die Ergebnislisten werden zusammengeführt, weil die Paket-/Persistenz-Seite
+        // darunter unverändert pro Entity arbeitet (SendToVisible filtert zusätzlich nach Karte).
+        foreach (World world in _worlds.Values)
+        {
+            (List<Entity> worldArrived, List<Entity> worldStartedWandering, List<Entity> worldRespawned,
+                List<Entity> worldRespawnedMonsters,
+                List<(int AttackerEntityId, int TargetEntityId, AttackResult Result)> worldMonsterAttacks,
+                List<Entity> worldRegeneratedPlayers, List<Entity> worldBuffsExpired) = world.Tick(deltaSeconds, tickNowMs);
+
+            arrived.AddRange(worldArrived);
+            startedWandering.AddRange(worldStartedWandering);
+            respawned.AddRange(worldRespawned);
+            respawnedMonsters.AddRange(worldRespawnedMonsters);
+            monsterAttacks.AddRange(worldMonsterAttacks);
+            regeneratedPlayers.AddRange(worldRegeneratedPlayers);
+            buffsExpired.AddRange(worldBuffsExpired);
+        }
+
         foreach (Entity entity in arrived)
             SendToVisible(entity.Id, new EntityStopPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY });
 
@@ -424,8 +508,73 @@ public sealed class GameServer : INetEventListener
                 (result.TargetDied ? ", Ziel gestorben" : ""));
         }
 
+        // Multi-Map: nach der Bewegung prüfen, ob ein Spieler in einem Portal seiner Karte steht. Der Wechsel
+        // entfernt die Entity aus der alten World, setzt sie in die neue und schickt MapChangedPacket; die
+        // AOI-Buchhaltung wird beim Wechsel geleert (siehe TransitionEntityToMap).
+        ProcessPortalTransitions(tickNowMs);
+
         UpdateVisibility();
         EnqueueDuePositionSaves();
+    }
+
+    /// <summary>Prüft pro Karte alle Spieler auf Portalberührung und wechselt die Karte. Reine
+    /// Welt-Entscheidung liegt in World.CheckPortal (inkl. Cooldown) - hier nur die kartenübergreifende
+    /// Orchestrierung (GameServer hält alle Worlds).</summary>
+    private void ProcessPortalTransitions(long nowMs)
+    {
+        foreach (World world in _worlds.Values)
+        {
+            List<Entity> players = world.Entities.Where(e => e.Kind == EntityKind.Player).ToList();
+            foreach (Entity player in players)
+            {
+                PortalDefinition? portal = world.CheckPortal(player, nowMs);
+                if (portal == null) continue;
+                if (!_worlds.TryGetValue(portal.TargetMapId, out World? targetWorld)) continue; // von MapCatalog validiert
+                TransitionEntityToMap(player, world, targetWorld, portal.TargetX, portal.TargetY, nowMs);
+            }
+        }
+    }
+
+    /// <summary>Versetzt eine Spieler-Entity auf eine andere Karte. Reihenfolge ist wichtig:
+    /// 1. alte World entfernen, 2. alte AOI-Beobachter per Despawn informieren, 3. Position/MapId in der
+    /// Entity setzen und in die neue World legen, 4. Verbindung umhängen und ihre Sichtbarkeitsliste leeren
+    /// (der Client leert beim MapChanged ohnehin alles, sonst kämen falsche Despawns), 5. MapChangedPacket
+    /// mit bereits gesetzter Zielposition senden, 6. sofort Position+MapId persistieren. Fremde Entities der
+    /// neuen Karte erscheinen danach über den normalen AOI-Diff als EntitySpawn.</summary>
+    private void TransitionEntityToMap(Entity entity, World fromWorld, World toWorld, int targetX, int targetY, long nowMs)
+    {
+        fromWorld.Remove(entity.Id);
+        BroadcastDespawn(entity.Id);
+
+        entity.StopMoving();
+        entity.TargetEntityId = null;
+        entity.Teleport(targetX, targetY);
+        toWorld.AddExistingEntity(entity);
+
+        ConnectionState? conn = FindConnectionByEntityId(entity.Id);
+        if (conn != null)
+        {
+            conn.World = toWorld;
+            conn.VisibleEntityIds.Clear();
+            conn.Peer.SendPacket(new MapChangedPacket
+            {
+                EntityId = entity.Id,
+                X = entity.IntX,
+                Y = entity.IntY,
+                MapId = toWorld.MapId,
+                MapName = _mapCatalog?.Get(toWorld.MapId).Name ?? toWorld.MapId,
+                MapWidth = GameConstants.MapWidth,
+                MapHeight = GameConstants.MapHeight
+            });
+        }
+
+        if (entity.CharacterId is int characterId)
+        {
+            _positionSaveChannel.Writer.TryWrite(new PositionSaveRequest(characterId, toWorld.MapId, entity.IntX, entity.IntY));
+            _characterSaveChannel.Writer.TryWrite(BuildCharacterSaveRequest(entity));
+        }
+
+        _logger.Info($"{entity.Name} (Entity {entity.Id}) wechselt Karte {fromWorld.MapId} -> {toWorld.MapId} bei ({entity.IntX},{entity.IntY})");
     }
 
     /// <summary>Nicht-blockierend (Channel.Writer.TryWrite): reine Buchhaltung + Enqueue, kein DB-Zugriff
@@ -433,15 +582,18 @@ public sealed class GameServer : INetEventListener
     private void EnqueueDuePositionSaves()
     {
         long now = _nowMs();
-        foreach (Entity entity in SelectDueForSave(_world.Entities, now, PositionSaveIntervalMs))
+        foreach (World world in _worlds.Values)
         {
-            entity.LastSaveAtMs = now;
-            _positionSaveChannel.Writer.TryWrite(new PositionSaveRequest(entity.CharacterId!.Value, entity.IntX, entity.IntY));
+            foreach (Entity entity in SelectDueForSave(world.Entities, now, PositionSaveIntervalMs))
+            {
+                entity.LastSaveAtMs = now;
+                _positionSaveChannel.Writer.TryWrite(new PositionSaveRequest(entity.CharacterId!.Value, world.MapId, entity.IntX, entity.IntY));
 
-            // M6a (siehe docs/tasks/M6a-progression.md Abschnitt 0b/5): dieselbe 30s-Fälligkeit wie Position -
-            // damit die kontinuierlichen HP/SP-Änderungen durch Kampf/Regeneration (bewusst OHNE eigenes
-            // sofortiges Save, siehe RunRegeneration/World.TryAttack) trotzdem regelmäßig persistiert werden.
-            _characterSaveChannel.Writer.TryWrite(BuildCharacterSaveRequest(entity));
+                // M6a (siehe docs/tasks/M6a-progression.md Abschnitt 0b/5): dieselbe 30s-Fälligkeit wie Position -
+                // damit die kontinuierlichen HP/SP-Änderungen durch Kampf/Regeneration (bewusst OHNE eigenes
+                // sofortiges Save, siehe RunRegeneration/World.TryAttack) trotzdem regelmäßig persistiert werden.
+                _characterSaveChannel.Writer.TryWrite(BuildCharacterSaveRequest(entity));
+            }
         }
     }
 
@@ -461,44 +613,54 @@ public sealed class GameServer : INetEventListener
     /// HandleMoveTo/RunTick - eingeschränkt auf sichtbare Verbindungen in Abschnitt 4 dieser Aufgabe).</summary>
     private void UpdateVisibility()
     {
-        Dictionary<int, HashSet<int>> visibility = _world.ComputeVisibility(GameConstants.AoiRadiusWire);
-
-        foreach (ConnectionState conn in _connections.Values)
+        // Multi-Map: Sichtbarkeit wird pro Karte berechnet und nur an Verbindungen DIESER Karte verteilt -
+        // EntityIds sind zwar global eindeutig, aber eine Entity auf Karte B darf für einen Spieler auf Karte A
+        // nie sichtbar werden. Verbindungen ohne World (vor dem Join) werden übersprungen.
+        foreach (World world in _worlds.Values)
         {
-            if (conn.EntityId is not int selfId) continue;
+            List<ConnectionState> worldConnections = _connections.Values
+                .Where(c => c.EntityId.HasValue && ReferenceEquals(c.World, world)).ToList();
+            if (worldConnections.Count == 0) continue;
 
-            HashSet<int> nowVisible = visibility.TryGetValue(selfId, out HashSet<int>? v) ? v : new HashSet<int>();
+            Dictionary<int, HashSet<int>> visibility = world.ComputeVisibility(GameConstants.AoiRadiusWire);
 
-            foreach (int otherId in nowVisible)
+            foreach (ConnectionState conn in worldConnections)
             {
-                if (conn.VisibleEntityIds.Contains(otherId)) continue;
-                if (!_world.TryGet(otherId, out Entity? other)) continue; // sollte nicht vorkommen (Entity gerade erst in ComputeVisibility gesehen)
+                if (conn.EntityId is not int selfId) continue;
 
-                conn.Peer.SendPacket(new EntitySpawnPacket { EntityId = other!.Id, Name = other.Name, X = other.IntX, Y = other.IntY, Appearance = other.Appearance, Kind = other.Kind, TypeId = other.TypeId });
-                SendHpIfDamaged(conn.Peer, other);
-                if (other.IsMoving)
+                HashSet<int> nowVisible = visibility.TryGetValue(selfId, out HashSet<int>? v) ? v : new HashSet<int>();
+
+                foreach (int otherId in nowVisible)
                 {
-                    conn.Peer.SendPacket(new EntityMovePacket
+                    if (conn.VisibleEntityIds.Contains(otherId)) continue;
+                    if (!world.TryGet(otherId, out Entity? other)) continue; // sollte nicht vorkommen (Entity gerade erst in ComputeVisibility gesehen)
+
+                    conn.Peer.SendPacket(new EntitySpawnPacket { EntityId = other!.Id, Name = other.Name, X = other.IntX, Y = other.IntY, Appearance = other.Appearance, Kind = other.Kind, TypeId = other.TypeId });
+                    SendHpIfDamaged(conn.Peer, other);
+                    if (other.IsMoving)
                     {
-                        EntityId = other.Id,
-                        StartX = other.IntX,
-                        StartY = other.IntY,
-                        TargetX = other.TargetX,
-                        TargetY = other.TargetY,
-                        Speed = other.Speed,
-                        ServerTick = _tick
-                    });
+                        conn.Peer.SendPacket(new EntityMovePacket
+                        {
+                            EntityId = other.Id,
+                            StartX = other.IntX,
+                            StartY = other.IntY,
+                            TargetX = other.TargetX,
+                            TargetY = other.TargetY,
+                            Speed = other.Speed,
+                            ServerTick = _tick
+                        });
+                    }
                 }
-            }
 
-            foreach (int otherId in conn.VisibleEntityIds)
-            {
-                if (!nowVisible.Contains(otherId))
-                    conn.Peer.SendPacket(new EntityDespawnPacket { EntityId = otherId });
-            }
+                foreach (int otherId in conn.VisibleEntityIds)
+                {
+                    if (!nowVisible.Contains(otherId))
+                        conn.Peer.SendPacket(new EntityDespawnPacket { EntityId = otherId });
+                }
 
-            conn.VisibleEntityIds.Clear();
-            conn.VisibleEntityIds.UnionWith(nowVisible);
+                conn.VisibleEntityIds.Clear();
+                conn.VisibleEntityIds.UnionWith(nowVisible);
+            }
         }
     }
 
@@ -519,6 +681,7 @@ public sealed class GameServer : INetEventListener
 
                     character.PositionX = request.X;
                     character.PositionY = request.Y;
+                    character.MapId = request.MapId;
                     await db.SaveChangesAsync(cancellationToken);
                 }
                 catch (Exception ex)
@@ -625,6 +788,7 @@ public sealed class GameServer : INetEventListener
                     if (character == null) continue; // Charakter inzwischen gelöscht o. Ä. - kein Fehler, einfach überspringen.
 
                     character.Yang = request.Yang;
+                    character.MapId = request.MapId;
                     character.EquippedArmorItemId = request.EquippedArmorItemId == 0 ? null : request.EquippedArmorItemId;
                     character.EquippedHelmetItemId = request.EquippedHelmetItemId == 0 ? null : request.EquippedHelmetItemId;
                     character.EquippedWeaponItemId = request.EquippedWeaponItemId == 0 ? null : request.EquippedWeaponItemId;
@@ -733,14 +897,14 @@ public sealed class GameServer : INetEventListener
                 // (conn.EntityId), Monster werden nie über eine Verbindung angelegt (siehe World.SpawnMonster).
                 // M6a: ebenso sofort der volle Fortschritts-Stand (siehe CharacterSaveRequest-Kommentar) -
                 // sonst könnte der letzte HP/SP-Stand vor dem Logout bis zu 30s verloren gehen.
-                if (_world.TryGet(entityId, out Entity? entity) && entity!.CharacterId.HasValue)
+                if (conn.World != null && conn.World.TryGet(entityId, out Entity? entity) && entity!.CharacterId.HasValue)
                 {
-                    _positionSaveChannel.Writer.TryWrite(new PositionSaveRequest(entity.CharacterId.Value, entity.IntX, entity.IntY));
+                    _positionSaveChannel.Writer.TryWrite(new PositionSaveRequest(entity.CharacterId.Value, entity.MapId, entity.IntX, entity.IntY));
                     _characterSaveChannel.Writer.TryWrite(BuildCharacterSaveRequest(entity));
                 }
 
                 RemoveFromParty(entityId, notifyRemaining: true);
-                _world.Remove(entityId);
+                (conn.World ?? _world).Remove(entityId);
                 BroadcastDespawn(entityId);
 
                 _logger.Info($"Entity {entityId} despawnt (Disconnect, {disconnectInfo.Reason})");
@@ -868,6 +1032,9 @@ public sealed class GameServer : INetEventListener
             case ChatRequestPacket chat:
                 HandleChatRequest(conn, chat);
                 break;
+            case DebugChangeMapRequestPacket debugChangeMap:
+                HandleDebugChangeMapRequest(conn, debugChangeMap);
+                break;
             default:
                 _logger.Warn($"Unerwartetes Paket {packet.Id} von Verbindung {conn.Peer.Id}");
                 conn.Peer.Disconnect();
@@ -969,15 +1136,39 @@ public sealed class GameServer : INetEventListener
 
     private void CompleteJoin(ConnectionState conn, Character character)
     {
+        // Multi-Map: die gespeicherte MapId bestimmt die Ziel-World. Unbekannte/leere Werte (z. B. sehr alte
+        // Zeilen ohne Migration) fallen bewusst auf die Startkarte zurück ("village bleibt Legacy-Fallback"),
+        // statt den Join abzulehnen - ein kaputter/alter MapId-Wert soll niemanden aussperren.
+        World world = ResolveJoinWorld(character.MapId);
+
+        // Globales Spielerlimit über ALLE Karten (World.TryJoin prüft nur seine eigene Karte).
+        if (_worlds.Values.Sum(w => w.Entities.Count(e => e.Kind == EntityKind.Player)) >= _config.MaxPlayers)
+        {
+            RejectJoin(conn, JoinRejectReason.ServerFull);
+            return;
+        }
+
         // Alpha-Umfang kennt nur "Krieger" (siehe DefaultClassName-Kommentar) - classCatalog==null oder ein
         // fehlender Eintrag (sollte bei korrekt validierter classes.json nie vorkommen) fällt auf
         // Entity.DefaultXxx zurück, genau wie TryJoin es ohne die optionalen Parameter täte.
+        // Defensive: eine gespeicherte Position kann aus einer anderen (nicht mehr bekannten) Karte stammen
+        // oder inzwischen blockiert sein - dann auf die validierte Startposition der Karte zurückfallen,
+        // statt den Spieler unbeweglich in einer Wand zu platzieren.
+        int? spawnX = character.PositionX;
+        int? spawnY = character.PositionY;
+        if (spawnX.HasValue && spawnY.HasValue && world.IsBlockedAtWire(spawnX.Value, spawnY.Value))
+        {
+            _logger.Warn($"Gespeicherte Position ({spawnX},{spawnY}) von {character.Name} ist auf Karte '{world.MapId}' blockiert - nutze Kartenstart.");
+            spawnX = null;
+            spawnY = null;
+        }
+
         bool joined;
         Entity? entity;
         JoinRejectReason reason;
         if (_classCatalog != null && _classCatalog.TryGet(DefaultClassName, out ClassDefinition classDef))
         {
-            joined = _world.TryJoin(character.Id, character.Name, character.PositionX, character.PositionY, out entity, out reason,
+            joined = world.TryJoin(character.Id, character.Name, spawnX, spawnY, out entity, out reason,
                 meleeRangeWire: classDef.MeleeRangeWire, attackCooldownMs: classDef.AttackCooldownMs, classDef: classDef,
                 level: character.Level, xp: character.Xp,
                 spentSt: character.SpentSt, spentHt: character.SpentHt, spentDx: character.SpentDx, spentIq: character.SpentIq,
@@ -986,7 +1177,7 @@ public sealed class GameServer : INetEventListener
         }
         else
         {
-            joined = _world.TryJoin(character.Id, character.Name, character.PositionX, character.PositionY, out entity, out reason);
+            joined = world.TryJoin(character.Id, character.Name, spawnX, spawnY, out entity, out reason);
         }
 
         if (!joined)
@@ -996,6 +1187,7 @@ public sealed class GameServer : INetEventListener
         }
 
         conn.EntityId = entity!.Id;
+        conn.World = world;
         entity.Yang = character.Yang;
         entity.LastSaveAtMs = _nowMs(); // Position kommt gerade erst aus der DB - kein sofortiger Save nötig.
 
@@ -1019,10 +1211,21 @@ public sealed class GameServer : INetEventListener
         foreach (CharacterSkillLevel skillLevel in character.SkillLevels)
             entity.SkillLevels[skillLevel.SkillId] = skillLevel.Level;
 
-        _world.RecomputeDerivedStats(entity.Id);
+        world.RecomputeDerivedStats(entity.Id);
         entity.Appearance = ToAppearance(character);
 
-        conn.Peer.SendPacket(new JoinAcceptedPacket { EntityId = entity.Id, X = entity.IntX, Y = entity.IntY, Appearance = entity.Appearance });
+        MapDefinition? mapDefinition = _mapCatalog?.Get(world.MapId);
+        conn.Peer.SendPacket(new JoinAcceptedPacket
+        {
+            EntityId = entity.Id,
+            X = entity.IntX,
+            Y = entity.IntY,
+            Appearance = entity.Appearance,
+            MapId = world.MapId,
+            MapName = mapDefinition?.Name ?? world.MapId,
+            MapWidth = GameConstants.MapWidth,
+            MapHeight = GameConstants.MapHeight
+        });
         conn.Peer.SendPacket(BuildInventorySyncPacket(entity));
 
         // Bugfix (Yang-Anzeige zeigte 0 bis zum ersten Kauf/Verkauf/Kill): Yang und eigenes Leben hatten sonst
@@ -1047,12 +1250,12 @@ public sealed class GameServer : INetEventListener
         // alle), laufende Bewegungen zusätzlich als EntityMove ab aktueller Position. VisibleEntityIds wird
         // hier schon auf denselben Stand gebracht wie das Gesendete, damit der nächste UpdateVisibility-Tick
         // dieselben Entities nicht nochmal als "neu sichtbar" meldet.
-        HashSet<int> visibleToJoiner = _world.ComputeVisibility(GameConstants.AoiRadiusWire)
+        HashSet<int> visibleToJoiner = world.ComputeVisibility(GameConstants.AoiRadiusWire)
             .TryGetValue(entity.Id, out HashSet<int>? v) ? v : new HashSet<int>();
 
         foreach (int otherId in visibleToJoiner)
         {
-            if (!_world.TryGet(otherId, out Entity? other)) continue; // sollte nicht vorkommen
+            if (!world.TryGet(otherId, out Entity? other)) continue; // sollte nicht vorkommen
 
             conn.Peer.SendPacket(new EntitySpawnPacket { EntityId = other!.Id, Name = other.Name, X = other.IntX, Y = other.IntY, Appearance = other.Appearance, Kind = other.Kind, TypeId = other.TypeId });
             SendHpIfDamaged(conn.Peer, other);
@@ -1077,7 +1280,17 @@ public sealed class GameServer : INetEventListener
         // World.TryJoin oben bereits Teil der World, der nächste UpdateVisibility-Tick erkennt sie für jede
         // Verbindung im AOI-Radius als "neu sichtbar" und verschickt EntitySpawn ganz normal über den
         // Tick-Diff (Abschnitt 3) - kein Sonderfall nötig.
-        _logger.Info($"{entity.Name} (Entity {entity.Id}, Character {character.Id}) beigetreten");
+        _logger.Info($"{entity.Name} (Entity {entity.Id}, Character {character.Id}) beigetreten (Karte {world.MapId})");
+    }
+
+    /// <summary>Multi-Map: gespeicherte MapId -> World. Unbekannt/leer -> Startkarte (Legacy-Fallback), mit
+    /// Warnung im Log, damit ein Datenfehler sichtbar bleibt, ohne den Join zu blockieren.</summary>
+    private World ResolveJoinWorld(string? mapId)
+    {
+        if (mapId != null && _worlds.TryGetValue(mapId, out World? world)) return world;
+        if (!string.IsNullOrEmpty(mapId) && _mapCatalog != null)
+            _logger.Warn($"Unbekannte MapId '{mapId}' beim Join - Fallback auf Startkarte '{_world.MapId}'.");
+        return _world;
     }
 
     /// <summary>M5a: Armor/Helmet/Weapon/Shield werden über ItemCatalog aus den EquippedXItemId-Spalten der
@@ -1142,8 +1355,9 @@ public sealed class GameServer : INetEventListener
 
         TestFaultHook?.Invoke();
 
-        _world.SetDestination(entityId, moveTo.X, moveTo.Y);
-        _world.TryGet(entityId, out Entity? entity);
+        World world = conn.World ?? _world;
+        world.SetDestination(entityId, moveTo.X, moveTo.Y);
+        TryGetEntity(entityId, out Entity? entity);
 
         SendToVisible(entityId, new EntityMovePacket
         {
@@ -1210,7 +1424,8 @@ public sealed class GameServer : INetEventListener
             return;
         }
 
-        AttackResult result = _world.TryAttack(attackerId, attack.TargetEntityId, _nowMs());
+        World world = conn.World ?? _world;
+        AttackResult result = world.TryAttack(attackerId, attack.TargetEntityId, _nowMs());
 
         if (!result.Success)
         {
@@ -1231,7 +1446,7 @@ public sealed class GameServer : INetEventListener
     {
         BroadcastAttackResult(attackerId, targetEntityId, result);
 
-        if (result.YangAwarded > 0 && _world.TryGet(attackerId, out Entity? attackerEntity))
+        if (result.YangAwarded > 0 && TryGetEntity(attackerId, out Entity? attackerEntity))
         {
             conn.Peer.SendPacket(new YangChangedPacket { NewTotal = attackerEntity!.Yang });
             if (attackerEntity.CharacterId is int characterId)
@@ -1242,7 +1457,7 @@ public sealed class GameServer : INetEventListener
         // bei XP-Gewinn (auch ohne Levelaufstieg, XpToNext hat sich schließlich geändert), sofortiges Save
         // aber nur bei tatsächlichem Levelaufstieg (siehe docs/tasks/M6a-progression.md Abschnitt 5 - sonst
         // greift der periodische/Disconnect-Save wie bei jeder anderen HP/SP-Änderung durch Kampf).
-        if (result.XpAwarded > 0 && _world.TryGet(attackerId, out Entity? xpEntity))
+        if (result.XpAwarded > 0 && TryGetEntity(attackerId, out Entity? xpEntity))
         {
             conn.Peer.SendPacket(BuildCharacterStatsPacket(xpEntity!));
             if (result.LeveledUp && xpEntity!.CharacterId is int levelCharacterId)
@@ -1254,7 +1469,7 @@ public sealed class GameServer : INetEventListener
         // Inventar hat sich geändert), bei vollem Inventar zusätzlich/stattdessen InventoryActionFailedPacket
         // NUR als Info (kein harter Fehler, der Kill oben bleibt gültig). Persistenz (siehe docs/tasks/
         // M5a-items-equipment.md Abschnitt 0b, eigener InventorySaveRequest-Channel) folgt in Abschnitt 6.
-        if (result.DroppedItemIds.Count > 0 && _world.TryGet(attackerId, out Entity? looter))
+        if (result.DroppedItemIds.Count > 0 && TryGetEntity(attackerId, out Entity? looter))
         {
             conn.Peer.SendPacket(BuildInventorySyncPacket(looter!));
             _inventorySaveChannel.Writer.TryWrite(BuildInventorySaveRequest(looter!));
@@ -1291,7 +1506,8 @@ public sealed class GameServer : INetEventListener
         }
 
         long nowMs = _nowMs();
-        SkillUseResult result = _world.TryUseSkill(userId, request.SkillId, request.TargetEntityId, nowMs);
+        World world = conn.World ?? _world;
+        SkillUseResult result = world.TryUseSkill(userId, request.SkillId, request.TargetEntityId, nowMs);
 
         if (!result.Success)
         {
@@ -1302,7 +1518,7 @@ public sealed class GameServer : INetEventListener
 
         if (result.BuffApplied is BuffType buffType)
         {
-            if (!_world.TryGet(userId, out Entity? user)) return; // sollte nicht vorkommen.
+            if (!TryGetEntity(userId, out Entity? user)) return; // sollte nicht vorkommen.
             conn.Peer.SendPacket(BuildActiveBuffsChangedPacket(user!, nowMs));
             conn.Peer.SendPacket(BuildCharacterStatsPacket(user!));
             _logger.Info($"Entity {userId} setzt Skill {request.SkillId} ein (Buff {buffType})");
@@ -1328,11 +1544,12 @@ public sealed class GameServer : INetEventListener
             return;
         }
 
-        bool success = _world.TryAllocateSkillPoint(entityId, request.SkillId);
+        World world = conn.World ?? _world;
+        bool success = world.TryAllocateSkillPoint(entityId, request.SkillId);
         if (!success)
             _logger.Info($"AllocateSkillPointRequest von Entity {entityId} (Skill {request.SkillId}) abgelehnt (keine Punkte, unbekannter Skill oder bereits Stufe {SkillCatalog.MaxSkillLevel})");
 
-        if (!_world.TryGet(entityId, out Entity? entity)) return; // sollte nicht vorkommen.
+        if (!TryGetEntity(entityId, out Entity? entity)) return; // sollte nicht vorkommen.
 
         conn.Peer.SendPacket(BuildCharacterStatsPacket(entity!));
         if (success && entity!.CharacterId is int characterId)
@@ -1348,7 +1565,7 @@ public sealed class GameServer : INetEventListener
             return;
         }
 
-        if (!_world.TryGet(entityId, out Entity? sender) || sender == null)
+        if (!TryGetEntity(entityId, out Entity? sender) || sender == null)
             return;
 
         long now = _nowMs();
@@ -1395,15 +1612,19 @@ public sealed class GameServer : INetEventListener
             SenderName = sender.Name,
             Text = text
         };
-        BroadcastChat(message);
+        BroadcastChat(message, conn.World);
     }
 
-    private void BroadcastChat(ChatMessagePacket message)
+    /// <summary>Broadcast einer Chat-Nachricht. Global geht an alle verbundenen Spieler, Karte nur an
+    /// Verbindungen derselben World (Multi-Map) - System/Whisper laufen nicht über diesen Pfad.</summary>
+    private void BroadcastChat(ChatMessagePacket message, World? sourceWorld = null)
     {
         byte[] data = PacketCodec.Encode(message);
         foreach (ConnectionState conn in _connections.Values)
         {
             if (conn.EntityId == null) continue;
+            if (message.Channel == ChatChannel.Map && sourceWorld != null && !ReferenceEquals(conn.World, sourceWorld))
+                continue;
             conn.Peer.Send(data, DeliveryMethod.ReliableOrdered);
         }
     }
@@ -1421,10 +1642,13 @@ public sealed class GameServer : INetEventListener
     private Entity? FindPlayerEntityByName(string name)
     {
         if (string.IsNullOrWhiteSpace(name)) return null;
-        foreach (Entity entity in _world.Entities)
+        foreach (World world in _worlds.Values)
         {
-            if (entity.Kind == EntityKind.Player && string.Equals(entity.Name, name, StringComparison.OrdinalIgnoreCase))
-                return entity;
+            foreach (Entity entity in world.Entities)
+            {
+                if (entity.Kind == EntityKind.Player && string.Equals(entity.Name, name, StringComparison.OrdinalIgnoreCase))
+                    return entity;
+            }
         }
         return null;
     }
@@ -1531,7 +1755,7 @@ public sealed class GameServer : INetEventListener
             SendSystemChat(conn, "Keine offene Einladung.");
             return;
         }
-        if (!_world.TryGet(inviterId, out Entity? inviter) || inviter == null || inviter.Kind != EntityKind.Player)
+        if (!TryGetEntity(inviterId, out Entity? inviter) || inviter == null || inviter.Kind != EntityKind.Player)
         {
             SendSystemChat(conn, "Der Einladende ist nicht mehr online.");
             return;
@@ -1619,7 +1843,7 @@ public sealed class GameServer : INetEventListener
         var packet = new PartyChangedPacket { LeaderEntityId = party.LeaderEntityId };
         foreach (int memberId in party.Members)
         {
-            if (_world.TryGet(memberId, out Entity? entity) && entity != null)
+            if (TryGetEntity(memberId, out Entity? entity) && entity != null)
                 packet.Members.Add((memberId, entity.Name, entity.Level, entity.CurrentHp, entity.MaxHp));
         }
 
@@ -1644,9 +1868,11 @@ public sealed class GameServer : INetEventListener
         foreach (int memberId in party.Members)
         {
             if (memberId == attackerId) continue;
-            if (!_world.TryGet(memberId, out Entity? member) || member == null) continue;
+            if (!TryGetEntity(memberId, out Entity? member) || member == null) continue;
 
-            (long gained, bool leveledUp) = _world.GrantXp(member, share);
+            World? memberWorld = FindWorldOfEntity(memberId);
+            if (memberWorld == null) continue;
+            (long gained, bool leveledUp) = memberWorld.GrantXp(member, share);
             if (gained <= 0) continue;
 
             ConnectionState? memberConn = FindConnectionByEntityId(memberId);
@@ -1742,8 +1968,9 @@ public sealed class GameServer : INetEventListener
 
     /// <summary>M5b: wie BuildInventorySaveRequest, zusätzlich Yang - für den kombinierten
     /// CharacterSaveRequest-Channel (Kauf/Verkauf, Levelaufstieg/Punkteverteilung, periodisch, Disconnect -
-    /// siehe CharacterSaveRequest-Kommentar). Seit M6a zusätzlich der volle Fortschritts-Stand.</summary>
-    private static CharacterSaveRequest BuildCharacterSaveRequest(Entity entity)
+    /// siehe CharacterSaveRequest-Kommentar). Seit M6a zusätzlich der volle Fortschritts-Stand, seit
+    /// Multi-Map zusätzlich die Karten-Id der Entity.</summary>
+    private CharacterSaveRequest BuildCharacterSaveRequest(Entity entity)
     {
         var slots = new List<(int SlotIndex, int ItemId)>();
         for (int slotIndex = 0; slotIndex < entity.Inventory.Length; slotIndex++)
@@ -1757,7 +1984,7 @@ public sealed class GameServer : INetEventListener
         foreach (KeyValuePair<int, int> kvp in entity.SkillLevels)
             skillLevels.Add((kvp.Key, kvp.Value));
 
-        return new CharacterSaveRequest(entity.CharacterId!.Value, entity.Yang, slots,
+        return new CharacterSaveRequest(entity.CharacterId!.Value, entity.MapId, entity.Yang, slots,
             entity.EquippedArmorItemId, entity.EquippedHelmetItemId, entity.EquippedWeaponItemId, entity.EquippedShieldItemId,
             entity.Level, entity.Xp, entity.SpentSt, entity.SpentHt, entity.SpentDx, entity.SpentIq,
             entity.UnspentStatPoints, entity.UnspentSkillPoints, entity.CurrentHp, entity.CurrentSp, skillLevels);
@@ -1775,7 +2002,8 @@ public sealed class GameServer : INetEventListener
             return;
         }
 
-        (bool success, InventoryActionFailedReason reason) = _world.TryEquip(entityId, request.InventorySlotIndex);
+        World world = conn.World ?? _world;
+        (bool success, InventoryActionFailedReason reason) = world.TryEquip(entityId, request.InventorySlotIndex);
         if (!success)
         {
             conn.Peer.SendPacket(new InventoryActionFailedPacket { Reason = reason });
@@ -1796,7 +2024,8 @@ public sealed class GameServer : INetEventListener
             return;
         }
 
-        (bool success, InventoryActionFailedReason reason) = _world.TryUnequip(entityId, request.EquipmentSlot);
+        World world = conn.World ?? _world;
+        (bool success, InventoryActionFailedReason reason) = world.TryUnequip(entityId, request.EquipmentSlot);
         if (!success)
         {
             conn.Peer.SendPacket(new InventoryActionFailedPacket { Reason = reason });
@@ -1820,14 +2049,15 @@ public sealed class GameServer : INetEventListener
             return;
         }
 
-        (bool success, InventoryActionFailedReason reason) = _world.TryUseConsumable(entityId, request.InventorySlotIndex, _nowMs());
+        World world = conn.World ?? _world;
+        (bool success, InventoryActionFailedReason reason) = world.TryUseConsumable(entityId, request.InventorySlotIndex, _nowMs());
         if (!success)
         {
             conn.Peer.SendPacket(new InventoryActionFailedPacket { Reason = reason });
             return;
         }
 
-        if (_world.TryGet(entityId, out Entity? entity))
+        if (TryGetEntity(entityId, out Entity? entity))
         {
             conn.Peer.SendPacket(BuildInventorySyncPacket(entity!));
             _inventorySaveChannel.Writer.TryWrite(BuildInventorySaveRequest(entity!));
@@ -1850,7 +2080,7 @@ public sealed class GameServer : INetEventListener
     /// asynchrones Speichern (siehe InventorySaveRequest).</summary>
     private void ApplyInventoryAndAppearanceChange(ConnectionState conn, int entityId)
     {
-        if (!_world.TryGet(entityId, out Entity? entity)) return; // sollte nicht vorkommen - Entity gerade erst erfolgreich geändert.
+        if (!TryGetEntity(entityId, out Entity? entity)) return; // sollte nicht vorkommen - Entity gerade erst erfolgreich geändert.
 
         entity!.Appearance = ToAppearance(entity);
         conn.Peer.SendPacket(BuildInventorySyncPacket(entity));
@@ -1875,7 +2105,8 @@ public sealed class GameServer : INetEventListener
             return;
         }
 
-        (bool success, ShopActionFailedReason reason) = _world.TryOpenShop(entityId, request.NpcEntityId);
+        World world = conn.World ?? _world;
+        (bool success, ShopActionFailedReason reason) = world.TryOpenShop(entityId, request.NpcEntityId);
         if (!success)
         {
             conn.Peer.SendPacket(new ShopActionFailedPacket { Reason = reason });
@@ -1883,7 +2114,7 @@ public sealed class GameServer : INetEventListener
             return;
         }
 
-        if (!_world.TryGet(request.NpcEntityId, out Entity? npc)) return; // sollte nicht vorkommen - TryOpenShop hat das gerade bestätigt.
+        if (!TryGetEntity(request.NpcEntityId, out Entity? npc)) return; // sollte nicht vorkommen - TryOpenShop hat das gerade bestätigt.
 
         var content = new ShopContentPacket { NpcEntityId = request.NpcEntityId };
         foreach (int itemId in npc!.ShopItemIds)
@@ -1905,7 +2136,8 @@ public sealed class GameServer : INetEventListener
             return;
         }
 
-        (bool success, ShopActionFailedReason reason) = _world.TryBuy(entityId, request.NpcEntityId, request.ItemId);
+        World world = conn.World ?? _world;
+        (bool success, ShopActionFailedReason reason) = world.TryBuy(entityId, request.NpcEntityId, request.ItemId);
         if (!success)
         {
             conn.Peer.SendPacket(new ShopActionFailedPacket { Reason = reason });
@@ -1928,7 +2160,8 @@ public sealed class GameServer : INetEventListener
             return;
         }
 
-        (bool success, ShopActionFailedReason reason) = _world.TrySell(entityId, request.NpcEntityId, request.InventorySlotIndex);
+        World world = conn.World ?? _world;
+        (bool success, ShopActionFailedReason reason) = world.TrySell(entityId, request.NpcEntityId, request.InventorySlotIndex);
         if (!success)
         {
             conn.Peer.SendPacket(new ShopActionFailedPacket { Reason = reason });
@@ -1946,7 +2179,7 @@ public sealed class GameServer : INetEventListener
     /// CharacterSaveRequest, siehe Abschnitt 0d/RunCharacterSaveConsumerAsync).</summary>
     private void SendShopActionSuccess(ConnectionState conn, int entityId)
     {
-        if (!_world.TryGet(entityId, out Entity? entity)) return; // sollte nicht vorkommen - Entity gerade erst erfolgreich geändert.
+        if (!TryGetEntity(entityId, out Entity? entity)) return; // sollte nicht vorkommen - Entity gerade erst erfolgreich geändert.
 
         conn.Peer.SendPacket(BuildInventorySyncPacket(entity!));
         conn.Peer.SendPacket(new YangChangedPacket { NewTotal = entity!.Yang });
@@ -1966,13 +2199,14 @@ public sealed class GameServer : INetEventListener
             return;
         }
 
-        if (conn.EntityId is not int entityId || !_world.TryGet(entityId, out Entity? entity))
+        if (conn.EntityId is not int entityId || !TryGetEntity(entityId, out Entity? entity))
         {
             _logger.Warn($"DebugGiveYangRequest vor Join von Verbindung {conn.Peer.Id}");
             return;
         }
 
-        _world.CreditYang(entityId, request.Amount);
+        World world = conn.World ?? _world;
+        world.CreditYang(entityId, request.Amount);
         conn.Peer.SendPacket(new YangChangedPacket { NewTotal = entity!.Yang });
         if (entity.CharacterId is int characterId)
             _yangSaveChannel.Writer.TryWrite(new YangSaveRequest(characterId, entity.Yang));
@@ -1994,11 +2228,12 @@ public sealed class GameServer : INetEventListener
             return;
         }
 
-        bool success = _world.TryAllocateStatPoint(entityId, request.Stat);
+        World world = conn.World ?? _world;
+        bool success = world.TryAllocateStatPoint(entityId, request.Stat);
         if (!success)
             _logger.Info($"AllocateStatPointRequest von Entity {entityId} (Stat {request.Stat}) abgelehnt (keine Punkte oder unbekannter Wert)");
 
-        if (!_world.TryGet(entityId, out Entity? entity)) return; // sollte nicht vorkommen.
+        if (!TryGetEntity(entityId, out Entity? entity)) return; // sollte nicht vorkommen.
 
         conn.Peer.SendPacket(BuildCharacterStatsPacket(entity!));
         if (success && entity!.CharacterId is int characterId)
@@ -2024,19 +2259,56 @@ public sealed class GameServer : INetEventListener
             return;
         }
 
-        if (!_world.TryDebugSetLevel(entityId, request.Level))
+        World world = conn.World ?? _world;
+        if (!world.TryDebugSetLevel(entityId, request.Level))
         {
             _logger.Warn($"DebugSetLevelRequest mit ungültigem Level {request.Level} von Verbindung {conn.Peer.Id} ignoriert");
             return;
         }
 
-        if (!_world.TryGet(entityId, out Entity? entity)) return; // sollte nicht vorkommen.
+        if (!TryGetEntity(entityId, out Entity? entity)) return; // sollte nicht vorkommen.
 
         conn.Peer.SendPacket(BuildCharacterStatsPacket(entity!));
         if (entity!.CharacterId is int characterId)
             _characterSaveChannel.Writer.TryWrite(BuildCharacterSaveRequest(entity));
 
         _logger.Info($"Dev-Tools: Entity {entityId} auf Level {request.Level} gesetzt");
+    }
+
+    /// <summary>Dev-Tool (Multi-Map, Protocol.Version 15): versetzt den eigenen Charakter auf die Startposition
+    /// der angegebenen Karte - nur mit --allow-debug-commands, sonst still verworfen (wie die anderen
+    /// Debug-Befehle, siehe HandleDebugSpawnMonster-Kommentar). Debug-API zum Testen des Kartenwechsels ohne
+    /// Portal (der Client nutzt sie aus dem Debug-Panel).</summary>
+    private void HandleDebugChangeMapRequest(ConnectionState conn, DebugChangeMapRequestPacket request)
+    {
+        if (!_config.AllowDebugCommands)
+        {
+            _logger.Warn($"DebugChangeMapRequest von Verbindung {conn.Peer.Id} ohne --allow-debug-commands ignoriert");
+            return;
+        }
+
+        if (conn.EntityId is not int entityId || conn.World == null
+            || !conn.World.TryGet(entityId, out Entity? entity) || entity == null)
+        {
+            _logger.Warn($"DebugChangeMapRequest vor Join von Verbindung {conn.Peer.Id}");
+            return;
+        }
+
+        if (!_worlds.TryGetValue(request.MapId ?? "", out World? targetWorld))
+        {
+            _logger.Warn($"DebugChangeMapRequest mit unbekannter MapId '{request.MapId}' von Verbindung {conn.Peer.Id}");
+            return;
+        }
+
+        if (ReferenceEquals(targetWorld, conn.World))
+        {
+            entity.Teleport(targetWorld.StartX, targetWorld.StartY);
+            SendToVisible(entityId, new EntityStopPacket { EntityId = entityId, X = entity.IntX, Y = entity.IntY });
+            return;
+        }
+
+        TransitionEntityToMap(entity, conn.World, targetWorld, targetWorld.StartX, targetWorld.StartY, _nowMs());
+        _logger.Info($"Dev-Tools: Entity {entityId} auf Karte '{targetWorld.MapId}' versetzt");
     }
 
     /// <summary>Dev-Tools (siehe CLAUDE.md "Dev-Tools"): nur wirksam, wenn der Server mit
@@ -2056,7 +2328,7 @@ public sealed class GameServer : INetEventListener
             return;
         }
 
-        if (conn.EntityId is not int senderId || !_world.TryGet(senderId, out Entity? sender))
+        if (conn.EntityId is not int senderId || !TryGetEntity(senderId, out Entity? sender))
         {
             _logger.Warn($"DebugSpawnMonsterRequest vor Join von Verbindung {conn.Peer.Id}");
             return;
@@ -2068,8 +2340,9 @@ public sealed class GameServer : INetEventListener
             return;
         }
 
-        (int x, int y) = _world.FindNearbyWalkablePoint(sender!.IntX, sender.IntY, offsetMin: 100, offsetMax: 300);
-        _world.SpawnMonster(debugSpawn.MobId, mobDef.Name, x, y, mobDef.SpeedWire,
+        World world = conn.World ?? _world;
+        (int x, int y) = world.FindNearbyWalkablePoint(sender!.IntX, sender.IntY, offsetMin: 100, offsetMax: 300);
+        world.SpawnMonster(debugSpawn.MobId, mobDef.Name, x, y, mobDef.SpeedWire,
             mobDef.WanderRadiusWire, mobDef.WanderIntervalMinMs, mobDef.WanderIntervalMaxMs, _nowMs(),
             mobDef.MaxHp, mobDef.Attack, mobDef.Defense, mobDef.YangMin, mobDef.YangMax, // spawnPointId bewusst weggelassen (Default null).
             drops: mobDef.Drops.Select(d => (d.ItemId, d.ChancePercent)).ToList(),
@@ -2124,6 +2397,27 @@ public sealed class GameServer : INetEventListener
     /// Request-Handlern). O(Verbindungen) - wie SendToVisible bei unserer Spielergrößenordnung
     /// vernachlässigbar, nur für seltene Ereignisse pro Tick aufgerufen. Null, wenn die Entity keine
     /// (mehr eine) Verbindung hat (sollte für die aktuellen Aufrufer nicht vorkommen).</summary>
+    /// <summary>Multi-Map: sucht eine Entity in allen Karten-Welten (EntityIds sind global eindeutig, siehe
+    /// Konstruktor). O(Karten) - bei unserer Kartengrößenordnung vernachlässigbar.</summary>
+    private bool TryGetEntity(int entityId, out Entity? entity)
+    {
+        foreach (World world in _worlds.Values)
+        {
+            if (world.TryGet(entityId, out entity)) return true;
+        }
+        entity = null;
+        return false;
+    }
+
+    private World? FindWorldOfEntity(int entityId)
+    {
+        foreach (World world in _worlds.Values)
+        {
+            if (world.TryGet(entityId, out _)) return world;
+        }
+        return null;
+    }
+
     private ConnectionState? FindConnectionByEntityId(int entityId)
     {
         foreach (ConnectionState conn in _connections.Values)

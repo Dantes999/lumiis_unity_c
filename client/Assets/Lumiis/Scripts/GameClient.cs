@@ -44,6 +44,8 @@ namespace Lumiis.Client
         private ItemIconCatalog _iconCatalog;
         private SkillCatalogClient _skillCatalog;
         private ClassCatalogClient _classCatalog;
+        private MapCatalogClient _mapCatalogClient;
+        private GameObject _mapRoot;
         private CachingSpriteProvider _spriteProvider;
         private AudioService _audio;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -69,6 +71,7 @@ namespace Lumiis.Client
         // ergänzt. Reine Dev-Bequemlichkeit, kein neuer Lade-Mechanismus für ein Dev-Only-Feature.
         private static readonly (int MobId, string Name)[] DebugMobTypes = { (1, "Wildhund"), (2, "Waldschrat") };
         private int _debugSpawnMobIndex;
+        private int _debugMapIndex;
 #endif
 
         // Login/Charakterauswahl übernimmt LoginController (UI Toolkit) - GameClient merkt sich nur, ob
@@ -170,6 +173,26 @@ namespace Lumiis.Client
             _gameplayInputLocked = locked;
         }
 
+        /// <summary>Multi-Map: aktueller Kartenname/-Id für HUD/Debug-Anzeige (nur Anzeige, Server bleibt
+        /// autoritativ).</summary>
+        public string CurrentMapName
+        {
+            get { return _world.MapName; }
+        }
+
+        public string CurrentMapId
+        {
+            get { return _world.MapId; }
+        }
+
+        /// <summary>Multi-Map-Debug-API (nur sinnvoll mit --allow-debug-commands): bittet den Server, den
+        /// eigenen Charakter auf die Startposition der Karte zu setzen. Der Server bleibt autoritativ - ohne
+        /// Flag passiert nichts (kein Fehlerpaket, wie die übrigen Dev-Befehle).</summary>
+        public void DebugChangeMap(string mapId)
+        {
+            _netClient?.SendDebugChangeMap(mapId);
+        }
+
         public void Initialize(NetClient netClient, Camera camera)
         {
             _netClient = netClient;
@@ -229,6 +252,18 @@ namespace Lumiis.Client
                 Debug.LogError("classes.json konnte nicht geladen werden (Assets/StreamingAssets/lumiis-data/classes.json). "
                     + "Wurde 'cd server && dotnet build' vor dem Öffnen von Unity ausgeführt? " + ex);
                 throw;
+            }
+
+            // Multi-Map: Kartenname/Portale nur für die Anzeige - fehlt die Kopie (z. B. alter Build), läuft
+            // der Client ohne Portalmarkierungen weiter statt am fehlenden Anzeige-Katalog zu scheitern.
+            try
+            {
+                _mapCatalogClient = MapCatalogClient.LoadFromStreamingAssets();
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning("maps/index.json konnte nicht geladen werden - Portale werden nicht angezeigt: " + ex.Message);
+                _mapCatalogClient = null;
             }
 
             _world.EntitySpawned += OnEntitySpawned;
@@ -692,6 +727,8 @@ namespace Lumiis.Client
             if (GUILayout.Button("Waffen-Testfeld +0..+9: " + (_weaponTestboard != null && _weaponTestboard.gameObject.activeSelf ? "an" : "aus")))
                 ToggleWeaponTest();
 
+            DrawDebugMapRow();
+
             if (_world.LocalEntityId >= 0 && _world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity local))
             {
                 Appearance appearance = local.Appearance;
@@ -949,6 +986,34 @@ namespace Lumiis.Client
             _debugSpawnMobIndex = (_debugSpawnMobIndex + direction + DebugMobTypes.Length) % DebugMobTypes.Length;
         }
 
+        /// <summary>Multi-Map-Debug-API im Test-Panel: Karte wählen und per DebugChangeMapRequestPacket
+        /// wechseln (nur mit --allow-debug-commands am Server wirksam). Kartenliste kommt aus
+        /// StreamingAssets/maps/index.json, Fallback auf die beiden bekannten Karten.</summary>
+        private void DrawDebugMapRow()
+        {
+            GUILayout.Space(6);
+            GUILayout.Label("Karte wechseln (Dev-Tools)");
+            IReadOnlyList<string> mapIds = _mapCatalogClient != null && _mapCatalogClient.MapIds.Count > 0
+                ? _mapCatalogClient.MapIds
+                : new[] { "village", "greenfield" };
+            _debugMapIndex = Mathf.Clamp(_debugMapIndex, 0, mapIds.Count - 1);
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("<", GUILayout.Width(24)))
+                _debugMapIndex = (_debugMapIndex - 1 + mapIds.Count) % mapIds.Count;
+            GUILayout.Label(mapIds[_debugMapIndex], GUILayout.Width(94));
+            if (GUILayout.Button(">", GUILayout.Width(24)))
+                _debugMapIndex = (_debugMapIndex + 1) % mapIds.Count;
+            GUILayout.EndHorizontal();
+
+            if (GUILayout.Button("Karte wechseln"))
+            {
+                string targetMapId = mapIds[_debugMapIndex];
+                if (targetMapId == _world.MapId) _debugMapIndex = (_debugMapIndex + 1) % mapIds.Count;
+                DebugChangeMap(targetMapId);
+            }
+        }
+
         private void DrawCycleRow(string label, string slot, int currentId)
         {
             GUILayout.BeginHorizontal();
@@ -1120,9 +1185,25 @@ namespace Lumiis.Client
             if (accepted != null)
             {
                 _world.Reset();
-                _world.HandleJoinAccepted(accepted.EntityId, accepted.X, accepted.Y, _pendingLoginName, accepted.Appearance);
-                _statusMessage = "Verbunden als " + _pendingLoginName;
+                _world.HandleJoinAccepted(accepted.EntityId, accepted.X, accepted.Y, _pendingLoginName, accepted.Appearance,
+                    accepted.MapId, accepted.MapName, accepted.MapWidth, accepted.MapHeight);
+                RebuildMapVisuals();
+                _statusMessage = "Verbunden als " + _pendingLoginName + " (" + _world.MapName + ")";
                 _inGame = true;
+                return;
+            }
+
+            MapChangedPacket mapChanged = packet as MapChangedPacket;
+            if (mapChanged != null)
+            {
+                // Reihenfolge: Views der alten Karte zerstören, Entity-Zustand leeren (behält Level/XP/
+                // Inventar), lokale Figur an der Zielposition neu anlegen, Boden/Portale der neuen Karte
+                // bauen. Fremde Entities folgen über EntitySpawn (AOI-Diff des Servers).
+                CleanupMapViews();
+                _world.HandleMapChanged(mapChanged.EntityId, mapChanged.X, mapChanged.Y,
+                    mapChanged.MapId, mapChanged.MapName, mapChanged.MapWidth, mapChanged.MapHeight);
+                RebuildMapVisuals();
+                _statusMessage = "Karte: " + _world.MapName;
                 return;
             }
 
@@ -1738,6 +1819,14 @@ namespace Lumiis.Client
             if (_assetTestLab != null) _assetTestLab.Close();
 #endif
 
+            CleanupMapViews(includeBuffRings: true);
+            _world.Reset();
+        }
+
+        /// <summary>Multi-Map: räumt nur die Welt-Views auf (Figuren/Monster/Reichweitenring), ohne
+        /// ClientWorld-Reset - beim Kartenwechsel bleiben Fortschritt/Inventar und aktive Buff-Ringe erhalten.</summary>
+        private void CleanupMapViews(bool includeBuffRings = false)
+        {
             foreach (CharacterView view in _views.Values)
                 if (view != null) Destroy(view.gameObject);
             _views.Clear();
@@ -1750,21 +1839,38 @@ namespace Lumiis.Client
             if (_rangeRingView != null) Destroy(_rangeRingView.gameObject);
             _rangeRingView = null;
 
-            foreach (RangeRingView buffRing in _buffRingViews.Values)
-                Destroy(buffRing.gameObject);
-            _buffRingViews.Clear();
+            if (includeBuffRings)
+            {
+                foreach (RangeRingView buffRing in _buffRingViews.Values)
+                    Destroy(buffRing.gameObject);
+                _buffRingViews.Clear();
+            }
 
-            _world.Reset();
+            _targetEntityId = -1;
+            _shopOpenNpcEntityId = -1;
+            _shopItems.Clear();
         }
 
         // ---- Boden & Kartenbegrenzung ----
 
+        /// <summary>Multi-Map: baut Boden/Ränder/Portalmarkierungen der aktuellen Karte neu (alte Objekte
+        /// werden verworfen). Maße kommen aus ClientWorld (JoinAccepted/MapChanged).</summary>
+        private void RebuildMapVisuals()
+        {
+            CreateFloorAndBoundary();
+            CreatePortalViews();
+        }
+
         private void CreateFloorAndBoundary()
         {
-            float mapUnitsX = GameConstants.MapWidth / 100f;
-            float mapUnitsY = GameConstants.MapHeight / 100f;
+            if (_mapRoot != null) Destroy(_mapRoot);
+            _mapRoot = new GameObject("MapRoot");
+
+            float mapUnitsX = _world.MapWidth / 100f;
+            float mapUnitsY = _world.MapHeight / 100f;
 
             var floorGo = new GameObject("Floor");
+            floorGo.transform.SetParent(_mapRoot.transform, false);
             var floorRenderer = floorGo.AddComponent<SpriteRenderer>();
             floorRenderer.sprite = PlaceholderSprites.CreateCheckerTile();
             floorRenderer.drawMode = SpriteDrawMode.Tiled;
@@ -1780,9 +1886,32 @@ namespace Lumiis.Client
             CreateBorderBar(borderColor, new Vector3(mapUnitsX + thickness / 2f, mapUnitsY / 2f, 0f), new Vector3(thickness, mapUnitsY + thickness, 1f));
         }
 
+        /// <summary>Zeichnet die Portale der aktuellen Karte als halbtransparente Rechtecke (rein optisch,
+        /// Daten aus StreamingAssets/lumiis-data/maps). Ohne MapCatalogClient bleibt die Karte portal-frei
+        /// sichtbar - der Server wechselt trotzdem korrekt.</summary>
+        private void CreatePortalViews()
+        {
+            if (_mapRoot == null || _mapCatalogClient == null) return;
+            Color portalColor = new Color(0.2f, 0.8f, 1f, 0.35f);
+            foreach (PortalJson portal in _mapCatalogClient.PortalsFor(_world.MapId))
+            {
+                var go = new GameObject("Portal_" + portal.id + "_" + portal.targetMapId);
+                go.transform.SetParent(_mapRoot.transform, false);
+                var renderer = go.AddComponent<SpriteRenderer>();
+                renderer.sprite = _squareSprite;
+                renderer.color = portalColor;
+                renderer.sortingOrder = -60;
+                float width = Mathf.Max(0.1f, (portal.x2 - portal.x1) / 100f);
+                float height = Mathf.Max(0.1f, (portal.y2 - portal.y1) / 100f);
+                go.transform.localScale = new Vector3(width, height, 1f);
+                go.transform.position = new Vector3((portal.x1 + portal.x2) / 200f, (portal.y1 + portal.y2) / 200f, 0f);
+            }
+        }
+
         private void CreateBorderBar(Color color, Vector3 position, Vector3 scale)
         {
             var go = new GameObject("MapBoundaryBar");
+            if (_mapRoot != null) go.transform.SetParent(_mapRoot.transform, false);
             var renderer = go.AddComponent<SpriteRenderer>();
             renderer.sprite = _squareSprite;
             renderer.color = color;

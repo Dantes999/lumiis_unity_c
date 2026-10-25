@@ -42,6 +42,11 @@ namespace Lumiis.Shared.Net
         /// <summary>M7-Chat: Chat-Nachricht senden (Karte/Global/Flüstern).</summary>
         ChatRequest = 16,
 
+        /// <summary>Multi-Map (Protocol.Version 15): nur wirksam mit --allow-debug-commands, sonst still
+        /// verworfen (siehe DebugSpawnMonsterRequest-Kommentar). Versetzt den eigenen Charakter auf die
+        /// Startposition der angegebenen Karte - Debug-API zum Testen des Kartenwechsels ohne Portal.</summary>
+        DebugChangeMapRequest = 17,
+
         // Server -> Client: ab 1000
         JoinAccepted = 1000,
         JoinRejected = 1001,
@@ -94,6 +99,11 @@ namespace Lumiis.Shared.Net
 
         /// <summary>M7-Party: voller Gruppenstand (Resync).</summary>
         PartyChanged = 1021,
+
+        /// <summary>Multi-Map (Protocol.Version 15): der eigene Charakter hat die Karte gewechselt (Portal
+        /// oder Dev-Tool). Der Client leert seine Entities/Umgebung und baut Boden/Portale der neuen Karte
+        /// neu auf; die Zielposition ist bereits enthalten (kein separates EntityStop nötig).</summary>
+        MapChanged = 1022,
     }
 
     /// <summary>Jede neue PacketId braucht hier eine Zeile (ein Test prüft das).</summary>
@@ -141,6 +151,8 @@ namespace Lumiis.Shared.Net
                 case PacketId.ChatRequest: return new ChatRequestPacket();
                 case PacketId.ChatMessage: return new ChatMessagePacket();
                 case PacketId.PartyChanged: return new PartyChangedPacket();
+                case PacketId.DebugChangeMapRequest: return new DebugChangeMapRequestPacket();
+                case PacketId.MapChanged: return new MapChangedPacket();
                 default: return null;
             }
         }

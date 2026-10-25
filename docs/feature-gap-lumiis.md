@@ -1,6 +1,6 @@
 # Feature-Gap: Lumiis-Referenzprojekte → lumiis_unity_c
 
-Stand: 2026-10-24
+Stand: 2026-10-25
 
 Verglichen:
 - `lumiis` (`/home/nutzer/Desktop/lumiis`, TypeScript/Phaser): technischer/UX-Maßstab
@@ -14,12 +14,14 @@ Aufwand: S = wenige Tage, M = 1–2 Wochen, L = mehrere Wochen (inkl. Tests/Doku
 Der Serverkern ist solide: autoritativer 25-Hz-Loop, LiteNetLib, PostgreSQL/EF Core, Token-Auth,
 AOI, Kollision, Monster-KI, Kampf, Items/Inventar/Shop, Level/XP/Stats, vier Skills, Paper-Doll
 und breite Tests. HUD, Chat, Gruppe inkl. EXP-Teilen, Audio-Platzhalter, 546 Item-Icons,
-18 Items sowie ein Lumiis-Stein/Boss-MVP sind umgesetzt. Offen sind vor allem **Multi-Map**,
-**Aufwertung +0…+9**, echte Stein-Wellen, Quests/Trade und mehr Content.
+18 Items, Multi-Map mit zwei Karten/Portalen sowie ein Lumiis-Stein/Boss-MVP sind umgesetzt.
+Offen sind vor allem **Aufwertung +0…+9**, echte Stein-Wellen, Quests/Trade und mehr Content.
 
 ## P0 – spielbarer Alpha-Test / M7
 
-**Stand 2026-10-25:** HUD, Chat-MVP und Gruppen-MVP (Chat-Befehle, PartyChanged, HUD-Panel) sind umgesetzt; Protocol.Version 14. Offen: Party-Rollen/Persistenz und weitere soziale Integrationstests. YangChanged beim Join ist bereits im Code.
+**Stand 2026-10-25:** HUD, Chat-MVP, Gruppen-MVP und Multi-Map/Portale sind umgesetzt;
+Protocol.Version 15. Offen: Party-Rollen/Persistenz und weitere soziale Integrationstests.
+YangChanged beim Join ist bereits im Code.
 
 | Feature | Warum | Beleg | Aufwand |
 |---|---|---|---|
@@ -37,7 +39,7 @@ und breite Tests. HUD, Chat, Gruppe inkl. EXP-Teilen, Audio-Platzhalter, 546 Ite
 | Aufwertung +0…+9 (DB-Stufen, Material/Schutzrolle, Pakete, UI) | Design liegt fertig vor; günstiger Alpha-Gewinn | `docs/tasks/M6c-upgrade.md` | M |
 | Audio + konsistente Kampf-/Loot-VFX | **Audio-Platzhalter umgesetzt** (`AudioService`, prozedurale Clips); VFX weiterhin nur Ringe/Linien/Trail | `lumiis/packages/client/src/audio.ts` | –/M |
 | Item-Icons/Tooltips + kleines Content-Paket | **Icons + Content-Paket umgesetzt**: 546 Icons, 18 Items mit iconKey, 13 fehlende Archivdateien nachgeladen; Tooltips weiterhin knapp | `Resources/Icons`, `ItemIconCatalog`, `data/items.json` | –/S |
-| Lesbare Kartenoptik / Feldkarte | Boden ist Platzhalter-Checker; Alpha nennt Startdorf + Feld | `PlaceholderSprites.cs`, `data/maps/village/collision-source.png` | M–L |
+| Lesbare Kartenoptik / Feldkarte | **Multi-Map umgesetzt** (Dorf + generiertes Grünes Feld, Portale, HUD-Kartenname); Boden weiterhin Platzhalter-Checker, kein echtes Terrain | `docs/map-import-plan.md`, `data/maps/`, `MapCatalog.cs`, `GameClient.RebuildMapVisuals` | M–L |
 | Rate-Limits (Verbindung/Chat), Auth-Brute-Force-Schutz, Backups | M8 Alpha-Betrieb | `ServerConfig`, `AuthEndpoints`; Referenz `lumiis/packages/server/src/net/gateway.ts`, `lumiis-2d/docs/SECURITY.md` | S–M |
 | Last-/Flow-Tests mit Bots | Bot kann nur bewegen | `lumiis-2d/tests/perf.test.js`, `lumiis-2d/tools/flow/` | M |
 
@@ -46,7 +48,7 @@ und breite Tests. HUD, Chat, Gruppe inkl. EXP-Teilen, Audio-Platzhalter, 546 Ite
 | Feature | Beleg | Aufwand |
 |---|---|---|
 | Vier Klassen (Krieger/Ninja/Sura/Schamane), Geschlecht/Frisur, Starter-Sets | `lumiis/packages/shared/src/classes.ts`, `lumiis-2d/shared/classes.js` | L |
-| Mehrkarten + Portale + Kanäle | `lumiis/packages/server/src/game/realm.ts`, `lumiis-2d/docs/PORTALE.md` | L |
+| Mehrkarten + Portale + Kanäle | **Portale/Kartenwechsel umgesetzt** (realms/Instanzen/Kanäle weiter offen) | `lumiis/packages/server/src/game/realm.ts`, `lumiis-2d/docs/PORTALE.md`, `docs/map-import-plan.md` | L |
 | Map-Editor + Content-Pipeline | `lumiis/packages/client/src/editor/main.ts`, `lumiis-2d/client/editor-map.js` | L |
 | Handel/privater Laden (erst nach Item-Instanz-IDs!) | `lumiis-2d/shared/trade.js`, `server/trade.js` | L |
 | Quests/Dialoge/Quest-Log | `lumiis-2d/shared/quests.js`, `server/quests.js`, `client/questui.js` | L |
@@ -57,22 +59,22 @@ und breite Tests. HUD, Chat, Gruppe inkl. EXP-Teilen, Audio-Platzhalter, 546 Ite
 
 ## Architektur-Risiken
 
-1. **Eine Karte ist hartkodiert**: `Program.cs` lädt nur `data/maps/village`; `GameConstants.MapWidth/Height` sind global; `Character` hat keine `MapId`.
+1. **Kartenmaße global**: Multi-Map + `Character.MapId`/Portale sind umgesetzt, aber `GameConstants.MapWidth/Height` gelten weiterhin für alle Karten (1000×1000); die Referenzkarten wurden noch nicht importiert.
 2. **Keine `ClassId`**: `Character` hat keine Klassenspalte; `GameServer.DefaultClassName` ist fest „Krieger“.
 3. **Keine Item-Instanz-IDs**: Inventar ist nur `(SlotIndex, ItemId)`; Handel/Anti-Dupe erst nach Instanz-ID-Schicht.
 4. **UI ist Debug-IMGUI**: für Alpha durch UI Toolkit ersetzen; Login/Escape/Labor sind gute Muster.
 5. **Kein Audio-Service** und **keine Rate-Limits**.
-6. **Neue Pakete** brauchen `PacketId` + `PacketFactory` + Roundtrip-Test; `Protocol.Version` derzeit 12.
+6. **Neue Pakete** brauchen `PacketId` + `PacketFactory` + Roundtrip-Test; `Protocol.Version` derzeit 15.
 
 ## Nicht in M7 / Alpha
 
-Quests/Lua, Reittiere, Kostüme, Drachenseelen, Gildenkrieg, weitere Reiche; zusätzlich
-Map-Editor, Mehrkarten/Portale, vier Klassen, Handel, Dungeons, PvP, Touch und 99-Level-Kurve.
+Quests/Lua, Reittiere, Kostüme, Drachenseelen, Gildenkrieg, weitere Reiche (Multi-Map/Portale
+sind umgesetzt); zusätzlich Map-Editor, vier Klassen, Handel, Dungeons, PvP, Touch und
+99-Level-Kurve.
 
 ## Nächste konkrete Schritte
 
-1. HUD als UI-Toolkit-Wurzel (HP/SP/EXP/Yang/Level/Skills/Buffs) + F1 nur noch Debug.
-2. Chat-Pakete + Chat-Panel + 400-ms-Limit + Tests.
-3. Party-MVP (max. 8, Leiter, EXP-Teilen) + Party-Panel + Tests.
-4. YangChangedPacket beim Join.
-5. Danach P1: Lumiis-Stein/Boss, M6c-Upgrade, Audio/VFX, Rate-Limits.
+1. Echte Lumiis-Karten importieren (Skalierung/Konverter aus `docs/map-import-plan.md`), terraintauglicher Boden.
+2. M6c-Aufwertung (+0…+9) und weitere Item-/Monster-Inhalte.
+3. Party-Rollen/Persistenz und weitere soziale Integrationstests.
+4. Rate-Limits/Alpha-Betrieb, Lasttests mit Bots.

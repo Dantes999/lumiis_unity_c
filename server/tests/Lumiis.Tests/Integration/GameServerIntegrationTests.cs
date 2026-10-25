@@ -7,12 +7,14 @@ using LiteNetLib;
 using Lumiis.Data;
 using Lumiis.Data.Classes;
 using Lumiis.Data.Items;
+using Lumiis.Data.Looks;
 using Lumiis.Data.Maps;
 using Lumiis.Data.Mobs;
 using Lumiis.Data.Npcs;
 using Lumiis.Data.Progression;
 using Lumiis.Data.Skills;
 using Lumiis.Server;
+using Lumiis.Server.Game;
 using Lumiis.Server.Logging;
 using Lumiis.Server.Net;
 using Lumiis.Shared;
@@ -49,7 +51,8 @@ namespace Lumiis.Tests.Integration
             public ServerFixture(Func<long>? nowMs = null, Func<long>? tokenNowUnixSeconds = null, CollisionMap? collisionMap = null,
                 MobCatalog? mobCatalog = null, SpawnCatalog? spawnCatalog = null, ClassCatalog? classCatalog = null,
                 ItemCatalog? itemCatalog = null, NpcCatalog? npcCatalog = null, NpcSpawnCatalog? npcSpawnCatalog = null,
-                bool allowDebugCommands = false, ProgressionCatalog? progressionCatalog = null, SkillCatalog? skillCatalog = null)
+                bool allowDebugCommands = false, ProgressionCatalog? progressionCatalog = null, SkillCatalog? skillCatalog = null,
+                MapCatalog? mapCatalog = null)
             {
                 DbContextOptions<LumiisDbContext> options = new DbContextOptionsBuilder<LumiisDbContext>()
                     .UseInMemoryDatabase("gameserver-test-" + Guid.NewGuid())
@@ -65,7 +68,7 @@ namespace Lumiis.Tests.Integration
                     AllowDebugCommands = allowDebugCommands
                 };
                 Server = new GameServer(config, new NullLogger(), TokenService, _dbFactory, nowMs, collisionMap, mobCatalog, spawnCatalog, classCatalog,
-                    itemCatalog, npcCatalog, npcSpawnCatalog, progressionCatalog, skillCatalog);
+                    itemCatalog, npcCatalog, npcSpawnCatalog, progressionCatalog, skillCatalog, mapCatalog);
             }
 
             /// <summary>level/xp/spent*/unspent*/currentHp/currentSp: M6a-Fortschrittsstand der neuen Zeile
@@ -74,7 +77,7 @@ namespace Lumiis.Tests.Integration
             public (int CharacterId, string Token) CreateCharacter(string name, int? positionX = null, int? positionY = null, int? accountId = null,
                 int level = 1, long xp = 0, int spentSt = 0, int spentHt = 0, int spentDx = 0, int spentIq = 0,
                 int unspentStatPoints = 0, int unspentSkillPoints = 0, int? currentHp = null, int? currentSp = null,
-                IEnumerable<(int SkillId, int Level)>? skillLevels = null)
+                IEnumerable<(int SkillId, int Level)>? skillLevels = null, string? mapId = null)
             {
                 using LumiisDbContext db = _dbFactory();
                 int ownerAccountId = accountId ?? CreateAccount(db);
@@ -96,7 +99,8 @@ namespace Lumiis.Tests.Integration
                     UnspentStatPoints = unspentStatPoints,
                     UnspentSkillPoints = unspentSkillPoints,
                     CurrentHp = currentHp,
-                    CurrentSp = currentSp
+                    CurrentSp = currentSp,
+                    MapId = mapId ?? "village"
                 };
                 if (skillLevels != null)
                 {
@@ -162,6 +166,241 @@ namespace Lumiis.Tests.Integration
                 server.Update();
                 foreach (TestClient client in clients) client.Poll();
                 Thread.Sleep(15);
+            }
+        }
+
+        private static MapCatalog LoadRealMapCatalog(out MobCatalog mobCatalog, out NpcCatalog npcCatalog)
+        {
+            DirectoryInfo? dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while (dir != null && !File.Exists(Path.Combine(dir.FullName, "data", "maps", "index.json")))
+                dir = dir.Parent;
+            if (dir == null) throw new FileNotFoundException("Repo-Root mit data/maps/index.json nicht gefunden.");
+            string dataDir = Path.Combine(dir.FullName, "data");
+
+            mobCatalog = MobCatalog.LoadFromFile(Path.Combine(dataDir, "mobs.json"));
+            LookCatalog lookCatalog = LookCatalog.LoadFromFile(Path.Combine(dataDir, "looks.json"));
+            ItemCatalog itemCatalog = ItemCatalog.LoadFromFile(Path.Combine(dataDir, "items.json"), lookCatalog);
+            npcCatalog = NpcCatalog.LoadFromFile(Path.Combine(dataDir, "npcs.json"), itemCatalog, lookCatalog);
+            return MapCatalog.LoadFromDirectory(Path.Combine(dataDir, "maps"), mobCatalog, npcCatalog);
+        }
+
+        private static (ServerFixture Fixture, MapCatalog Catalog) CreateMultiMapFixture(bool allowDebugCommands = false)
+        {
+            MapCatalog catalog = LoadRealMapCatalog(out MobCatalog mobCatalog, out NpcCatalog npcCatalog);
+            var fixture = new ServerFixture(mapCatalog: catalog, mobCatalog: mobCatalog, npcCatalog: npcCatalog,
+                allowDebugCommands: allowDebugCommands);
+            return (fixture, catalog);
+        }
+
+        [Fact]
+        public void MultiMap_MonstersAndNpcs_AreSeparatedPerMap()
+        {
+            (ServerFixture fixture, MapCatalog catalog) = CreateMultiMapFixture();
+            Assert.Equal("village", catalog.StartMapId);
+
+            List<Entity> villageMonsters = fixture.Server.WorldForMap("village").Entities
+                .Where(e => e.Kind == EntityKind.Monster).ToList();
+            List<Entity> greenfieldMonsters = fixture.Server.WorldForMap("greenfield").Entities
+                .Where(e => e.Kind == EntityKind.Monster).ToList();
+
+            Assert.Equal(17, villageMonsters.Count);
+            Assert.Equal(6, greenfieldMonsters.Count);
+            Assert.Empty(villageMonsters.Select(m => m.Id).Intersect(greenfieldMonsters.Select(m => m.Id)));
+            Assert.NotEmpty(fixture.Server.WorldForMap("village").Entities.Where(e => e.Kind == EntityKind.Npc));
+            Assert.Empty(fixture.Server.WorldForMap("greenfield").Entities.Where(e => e.Kind == EntityKind.Npc));
+        }
+
+        [Fact]
+        public void MultiMap_JoinOnVillage_ReportsMapAndSpawnsOnlyItsMonsters()
+        {
+            (ServerFixture fixture, _) = CreateMultiMapFixture();
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Alice", positionX: 50000, positionY: 50000);
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+
+                JoinAcceptedPacket accepted = client.Received.OfType<JoinAcceptedPacket>().First();
+                Assert.Equal("village", accepted.MapId);
+                Assert.Equal("Dorf", accepted.MapName);
+                Assert.Equal(GameConstants.MapWidth, accepted.MapWidth);
+                Assert.Equal(GameConstants.MapHeight, accepted.MapHeight);
+
+                // Die Spawn-Punkte 6-15 liegen nahe der Kartenmitte und damit in der AOI des Startpunkts.
+                Assert.True(Pump(() => client.Received.OfType<EntitySpawnPacket>()
+                    .Any(p => p.Kind == EntityKind.Monster), server, client), "kein Monster-Spawn in Village-AOI");
+
+                int aliceEntityId = accepted.EntityId;
+                Assert.Equal("village", server.MapIdOfEntity(aliceEntityId));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void MultiMap_PortalSwitch_ChangesMapCleansAoiAndPersists()
+        {
+            (ServerFixture fixture, _) = CreateMultiMapFixture();
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var clientA = new TestClient();
+                using var clientB = new TestClient();
+                clientA.Connect(server.ListenPort);
+                clientB.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, clientA, clientB));
+
+                // A startet knapp WESTLICH des Portals (52000..52800), B noch weiter westlich - beide in AOI,
+                // keiner löst beim Join sofort aus.
+                (int aliceId, string aliceToken) = fixture.CreateCharacter("Alice)", positionX: 51000, positionY: 50000);
+                clientA.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = aliceToken, CharacterId = aliceId });
+                Assert.True(Pump(() => clientA.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
+                JoinAcceptedPacket aliceAccepted = clientA.Received.OfType<JoinAcceptedPacket>().First();
+
+                (int bobId, string bobToken) = fixture.CreateCharacter("Bob", positionX: 51500, positionY: 50000);
+                clientB.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = bobToken, CharacterId = bobId });
+                Assert.True(Pump(() => clientB.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA, clientB));
+                Assert.True(Pump(() => clientB.Received.OfType<EntitySpawnPacket>().Any(p => p.EntityId == aliceAccepted.EntityId), server, clientA, clientB),
+                    "Bob sieht Alice vor dem Portalwechsel nicht");
+
+                // A läuft ins Portal (Rechteck 52000..52800 / 49500..50500).
+                clientA.Send(new MoveToPacket { X = 52600, Y = 50000 });
+                Assert.True(Pump(() => clientA.Received.OfType<MapChangedPacket>().Any(), server, clientA, clientB),
+                    "kein MapChangedPacket nach Betreten des Portals");
+
+                MapChangedPacket mapChanged = clientA.Received.OfType<MapChangedPacket>().First();
+                Assert.Equal("greenfield", mapChanged.MapId);
+                Assert.Equal("Gruenes Feld", mapChanged.MapName);
+                Assert.Equal(50000, mapChanged.X);
+                Assert.Equal(65000, mapChanged.Y);
+                Assert.Equal("greenfield", server.MapIdOfEntity(aliceAccepted.EntityId));
+
+                // AOI-Cleanup: Bob (village) bekommt ein Despawn für Alice, Alice' Verbindung hat keine
+                // Village-Entities mehr in ihrer Sichtbarkeitsliste (neue Karte startet leer).
+                Assert.True(Pump(() => clientB.Received.OfType<EntityDespawnPacket>()
+                    .Any(p => p.EntityId == aliceAccepted.EntityId), server, clientA, clientB), "Bob bekam kein Despawn für Alice");
+
+                // Persistenz: Position+MapId werden sofort nach dem Wechsel gespeichert (Channel/Background).
+                bool persisted = false;
+                DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+                while (DateTime.UtcNow < deadline)
+                {
+                    using (LumiisDbContext db = fixture.OpenDb())
+                    {
+                        Character? stored = db.Characters.SingleOrDefault(c => c.Id == aliceId);
+                        if (stored != null && stored.MapId == "greenfield" && stored.PositionY == 65000)
+                        {
+                            persisted = true;
+                            break;
+                        }
+                    }
+                    server.Update();
+                    clientA.Poll();
+                    clientB.Poll();
+                    Thread.Sleep(20);
+                }
+                Assert.True(persisted, "MapId/Position wurden nach dem Portalwechsel nicht gespeichert");
+
+                // Reload: trennen, Server aufräumen lassen, mit demselben Charakter neu joinen.
+                clientA.Dispose();
+                Pump(() => server.MapIdOfEntity(aliceAccepted.EntityId) == null, server, clientB);
+
+                using var clientA2 = new TestClient();
+                clientA2.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, clientA2));
+                clientA2.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = aliceToken, CharacterId = aliceId });
+                Assert.True(Pump(() => clientA2.Received.OfType<JoinAcceptedPacket>().Any(), server, clientA2, clientB));
+                JoinAcceptedPacket rejoined = clientA2.Received.OfType<JoinAcceptedPacket>().First();
+                Assert.Equal("greenfield", rejoined.MapId);
+                Assert.Equal(50000, rejoined.X);
+                Assert.Equal(65000, rejoined.Y);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void MultiMap_UnknownSavedMap_FallsBackToStartMap()
+        {
+            (ServerFixture fixture, _) = CreateMultiMapFixture();
+            GameServer server = fixture.Server;
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                (int characterId, string token) = fixture.CreateCharacter("Legacy", mapId: "karte-gibt-es-nicht");
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+
+                JoinAcceptedPacket accepted = client.Received.OfType<JoinAcceptedPacket>().First();
+                Assert.Equal("village", accepted.MapId);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
+        public void MultiMap_DebugChangeMap_RequiresFlag()
+        {
+            var (blockedFixture, _) = CreateMultiMapFixture(allowDebugCommands: false);
+            blockedFixture.Server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(blockedFixture.Server.ListenPort);
+                Assert.True(WaitConnected(blockedFixture.Server, client));
+
+                (int characterId, string token) = blockedFixture.CreateCharacter("NoDebug", positionX: 50000, positionY: 50000);
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), blockedFixture.Server, client));
+
+                client.Send(new DebugChangeMapRequestPacket { MapId = "greenfield" });
+                PumpForDuration(TimeSpan.FromMilliseconds(400), blockedFixture.Server, client);
+                Assert.DoesNotContain(client.Received.OfType<MapChangedPacket>(), p => p.MapId == "greenfield");
+            }
+            finally
+            {
+                blockedFixture.Server.Stop();
+            }
+
+            var (debugFixture, _) = CreateMultiMapFixture(allowDebugCommands: true);
+            debugFixture.Server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(debugFixture.Server.ListenPort);
+                Assert.True(WaitConnected(debugFixture.Server, client));
+
+                (int characterId, string token) = debugFixture.CreateCharacter("DebugMap", positionX: 50000, positionY: 50000);
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = token, CharacterId = characterId });
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), debugFixture.Server, client));
+
+                client.Send(new DebugChangeMapRequestPacket { MapId = "greenfield" });
+                Assert.True(Pump(() => client.Received.OfType<MapChangedPacket>().Any(), debugFixture.Server, client));
+                MapChangedPacket changed = client.Received.OfType<MapChangedPacket>().First();
+                Assert.Equal("greenfield", changed.MapId);
+                Assert.Equal(50000, changed.X);
+                Assert.Equal(50000, changed.Y);
+            }
+            finally
+            {
+                debugFixture.Server.Stop();
             }
         }
 
