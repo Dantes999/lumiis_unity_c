@@ -84,6 +84,12 @@ namespace Lumiis.Client
         private int _frameSortingOffset;
         private bool _framePoseInitialized;
 
+        // Schwerthieb (CharacterAnimator): Klinge zeigt in eine Weltrichtung und kreist um die Brust.
+        private bool _swingActive;
+        private float _swingBladeDegrees;
+        private float _swingStretch = 1f;
+        private const float SwingGripRadius = 0.2f;
+
         // ---- Rüstungs-Palette (MaterialPropertyBlock) ----
         private Material _armorMaterial;
         private MaterialPropertyBlock _armorPropertyBlock;
@@ -257,6 +263,57 @@ namespace Lumiis.Client
             RefreshWeaponSocketPose();
         }
 
+        /// <summary>Hieb-Pose: die Klinge zeigt in Weltrichtung bladeWorldDegrees (0 = rechts, 90 = oben), der Griff
+        /// kreist dabei um die Brust - so fährt das Schwert sichtbar durch den Trefferbogen. stretch verlängert
+        /// die Klinge in der schnellen Schlagphase leicht (Bewegungsunschärfe). active=false kehrt zur
+        /// Frame-Pose des Animators zurück.</summary>
+        public void SetSwingPose(bool active, float bladeWorldDegrees, float stretch = 1f)
+        {
+            if (!active && !_swingActive) return;
+            _swingActive = active;
+            _swingBladeDegrees = bladeWorldDegrees;
+            _swingStretch = Mathf.Max(0.5f, stretch);
+            if (_weaponRenderer != null) _weaponRenderer.flipX = active ? false : _facing.FlipX;
+            RefreshWeaponSocketPose();
+        }
+
+        /// <summary>Weltposition der Klingenspitze (für Funken am Treffpunkt).</summary>
+        public Vector3 WeaponTipWorldPosition =>
+            _weaponTrailAnchor != null ? _weaponTrailAnchor.position : transform.position;
+
+        /// <summary>Nachbild der Waffe an der aktuellen Stelle (verblasst von selbst) - ergibt zusammen mit dem
+        /// Schweif den "Schatten", den die Klinge durch den Bogen zieht.</summary>
+        public void SpawnWeaponAfterimage(float alpha)
+        {
+            if (_weaponRenderer == null || !_weaponRenderer.enabled || _weaponRenderer.sprite == null) return;
+            var go = new GameObject("SwordAfterimage");
+            go.transform.SetPositionAndRotation(_weaponRenderer.transform.position, _weaponRenderer.transform.rotation);
+            go.transform.localScale = _weaponRenderer.transform.lossyScale;
+            var renderer = go.AddComponent<SpriteRenderer>();
+            renderer.sprite = _weaponRenderer.sprite;
+            renderer.flipX = _weaponRenderer.flipX;
+            renderer.sortingOrder = SwordAfterimageSortingOrder;
+            go.AddComponent<SwordAfterimage>().Initialize(renderer, new Color(0.82f, 0.92f, 1f, alpha), 0.11f);
+        }
+
+        /// <summary>Eine Probe für den Schwertschweif (Band Griff -> Spitze), pro Frame während des Schlags.</summary>
+        public void AddSweepSample()
+        {
+            if (_weaponSocket == null || _weaponTrailAnchor == null) return;
+            if (_sweepView == null)
+            {
+                var go = new GameObject("SwordSweep");
+                _sweepView = go.AddComponent<SwordSweepView>();
+                _sweepView.Initialize(SwordAfterimageSortingOrder + 1);
+            }
+            _sweepView.AddSample(_weaponSocket.position, _weaponTrailAnchor.position);
+        }
+
+        private SwordSweepView _sweepView;
+
+        // Nachbilder hängen an keiner SortingGroup; knapp über den Figuren, unter Namensschildern/HUD.
+        private const int SwordAfterimageSortingOrder = 55;
+
         /// <summary>TrailRenderer nur während der aktiven Schlagphase einschalten (CharacterAnimator). Beim
         /// Ausschalten wird nicht geleert, damit der vorhandene Schweif kurz ausklingen kann.</summary>
         public void SetAttackTrailActive(bool active)
@@ -351,6 +408,7 @@ namespace Lumiis.Client
         {
             foreach (SpriteRenderer renderer in _renderers.Values)
                 renderer.flipX = _facing.FlipX;
+            if (_swingActive && _weaponRenderer != null) _weaponRenderer.flipX = false;
 
             RefreshWeaponSocketPose();
         }
@@ -371,14 +429,31 @@ namespace Lumiis.Client
                 rotation = -rotation;
             }
 
-            _weaponSocket.localPosition = new Vector3(anchor.x + offset.x, anchor.y + offset.y, 0f);
-            _weaponSocket.localEulerAngles = new Vector3(0f, 0f, rotation);
-
-            if (_weaponRenderer == null || _bodyRenderer == null) return;
-
             int sortingOffset = _framePoseInitialized
                 ? _frameSortingOffset
                 : WeaponSocketFrameConfig.SortingOffsetFor(WeaponSocketFrameConfig.FromFacing(_facing));
+
+            if (_swingActive)
+            {
+                // Griff auf einem Kreis um die Brust, Klinge radial nach außen (Klinge zeigt im Sprite nach oben).
+                float rad = _swingBladeDegrees * Mathf.Deg2Rad;
+                Vector2 dir = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
+                Vector2 center = new Vector2(0f, anchor.y + 0.04f);
+                _weaponSocket.localPosition = new Vector3(center.x + dir.x * SwingGripRadius, center.y + dir.y * SwingGripRadius * 0.7f, 0f);
+                _weaponSocket.rotation = Quaternion.Euler(0f, 0f, _swingBladeDegrees - 90f);
+                _weaponSocket.localScale = new Vector3(1f, _swingStretch, 1f);
+                // Klinge oberhalb der Figur liegt hinter dem Körper, sonst davor.
+                sortingOffset = dir.y > 0.35f ? WeaponSocketFrameConfig.SortingOffsetUp : WeaponSocketFrameConfig.SortingOffsetDown;
+            }
+            else
+            {
+                _weaponSocket.localPosition = new Vector3(anchor.x + offset.x, anchor.y + offset.y, 0f);
+                _weaponSocket.localEulerAngles = new Vector3(0f, 0f, rotation);
+                _weaponSocket.localScale = Vector3.one;
+            }
+
+            if (_weaponRenderer == null || _bodyRenderer == null) return;
+
             int weaponOrder = _bodyRenderer.sortingOrder + sortingOffset;
             _weaponRenderer.sortingOrder = weaponOrder;
 
@@ -562,9 +637,9 @@ namespace Lumiis.Client
 
             var trail = trailAnchorGo.AddComponent<TrailRenderer>();
             trail.material = _weaponVfxMaterial;
-            trail.time = 0.35f;
+            trail.time = 0.12f;
             trail.minVertexDistance = 0.02f;
-            trail.startWidth = 0.24f;
+            trail.startWidth = 0.07f;
             trail.endWidth = 0.02f;
             trail.startColor = new Color(0.75f, 0.92f, 1f, 0.95f);
             trail.endColor = new Color(0.75f, 0.92f, 1f, 0f);
@@ -587,6 +662,8 @@ namespace Lumiis.Client
 
         private void OnDestroy()
         {
+            if (_sweepView != null)
+                Destroy(_sweepView.gameObject);
             if (_weaponVfxMaterial != null)
                 Destroy(_weaponVfxMaterial);
             if (_particleMaterial != null)

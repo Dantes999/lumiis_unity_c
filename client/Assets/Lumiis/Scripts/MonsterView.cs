@@ -11,6 +11,13 @@ namespace Lumiis.Client
         private SpriteRenderer _renderer;
         private Sprite[] _frames;
         private float _uniformScale = 1f;
+        private Color _baseColor = Color.white;
+
+        // Trefferreaktion: kurzer Rückstoß weg vom Angreifer, Aufblitzen und Stauchen.
+        private const float HitReactionSeconds = 0.18f;
+        private const float KnockbackUnits = 0.16f;
+        private float _hitStartTime = float.NegativeInfinity;
+        private Vector2 _hitDirection;
 
         private SpriteRenderer _hpBackground;
         private SpriteRenderer _hpFill;
@@ -23,6 +30,7 @@ namespace Lumiis.Client
             _uniformScale = uniformScale;
             _renderer = gameObject.AddComponent<SpriteRenderer>();
             _renderer.color = color;
+            _baseColor = color;
             _renderer.sortingOrder = 0;
             // Sortierung am Fußpunkt (wie Bäume/Häuser im TerrainRenderer), damit Monster hinter Bäumen verschwinden
             _renderer.spriteSortPoint = SpriteSortPoint.Pivot;
@@ -60,7 +68,32 @@ namespace Lumiis.Client
 
         public void SetWorldPosition(double worldX, double worldY)
         {
-            transform.position = new Vector3((float)worldX, (float)worldY, 0f);
+            Vector3 position = new Vector3((float)worldX, (float)worldY, 0f);
+            float u = (Time.time - _hitStartTime) / HitReactionSeconds;
+            if (u >= 0f && u < 1f && _renderer != null)
+            {
+                // Schneller Ausschlag, weiches Zurückfedern.
+                float push = Mathf.Sin(Mathf.Min(1f, u * 3f) * Mathf.PI * 0.5f) * (1f - u);
+                position += new Vector3(_hitDirection.x, _hitDirection.y * 0.6f, 0f) * (KnockbackUnits * push);
+                float flash = (1f - u) * (1f - u);
+                _renderer.color = Color.Lerp(_baseColor, new Color(1f, 0.42f, 0.36f, _baseColor.a), flash * 0.85f);
+                float squash = 1f - 0.12f * flash;
+                transform.localScale = new Vector3(_uniformScale * (2f - squash), _uniformScale * squash, 1f);
+            }
+            else if (_renderer != null && _hitStartTime > float.NegativeInfinity)
+            {
+                _renderer.color = _baseColor;
+                transform.localScale = new Vector3(_uniformScale, _uniformScale, 1f);
+                _hitStartTime = float.NegativeInfinity;
+            }
+            transform.position = position;
+        }
+
+        /// <summary>Trefferreaktion abspielen; awayFromAttacker ist die Richtung vom Angreifer zum Monster.</summary>
+        public void PlayHitReaction(Vector2 awayFromAttacker)
+        {
+            _hitStartTime = Time.time;
+            _hitDirection = awayFromAttacker.sqrMagnitude > 0.0001f ? awayFromAttacker.normalized : Vector2.zero;
         }
 
         /// <summary>Setzt Blickrichtung und Lauf-Frame. Die vier Sheet-Zeilen sind unten/links/rechts/oben;

@@ -1360,6 +1360,16 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   (Map1) und den 256×256-Jayang-Ausschnitt von vorher. 702 Tests grün. Annahmen: Tier-HP nach Formel (das Wiki
   nennt keine TP), Menschen-HP = TP×2,5, hungrige Varianten aggressiv, Metin-Werte eigene Wahl, Nachbarkarten
   fehlen. Noch zu prüfen im Unity-Build: Chunk-Nachladen beim Laufen, Sortierung hinter Bäumen/Häusern.
+- Treffergefühl (2026-10-25, rein clientseitig, keine Protokolländerung): Der Hieb ist ein echter Schwertschwung
+  statt Bogenlinie/Trefferring. `SwingMath` (UnityEngine-frei, per `dotnet test` geprüft) beschreibt Ausholen
+  (0,07 s), Schlag (0,12 s, ease-out) und Nachschwung (0,17 s) über ±82° um die Mausrichtung, Kombo wechselt
+  die Schlagrichtung. `CharacterView.SetSwingPose` lässt die echte Waffe um die Brust kreisen,
+  `SwordSweepView` zieht ein Lichtband Griff->Spitze, `SwordAfterimage` Nachbilder. Der AttackRequest geht erst im
+  Kontaktmoment raus (`SwingMath.ContactSeconds`, Winkel des Gegners im Bogen) und nur, wenn das Ziel dann noch
+  lebt und in Reichweite ist; dabei kurzer Treffer-Stopp (`CharacterAnimator.HitPause`). Bestätigter Treffer
+  (`EntityDamaged`): `ImpactSparkView` am Kontaktpunkt, `MonsterView.PlayHitReaction` (Rückstoß, Aufblitzen,
+  Stauchen), `GameClient.ShakeCamera` (eigener Treffer leicht, Kill stärker, erlittener Schaden am stärksten).
+  Die eigene Figur schwingt bei EntityDamaged nicht mehr ein zweites Mal; Trefferlinien und Schlagbogen entfallen.
 - Offen: Monster-Sheets für die Jayang-Mobs, weitere Zonen/Dungeons, Reittiere; siehe
   `docs/feature-gap-lumiis.md`.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client

@@ -118,6 +118,17 @@ namespace Lumiis.Client
         private float _nextMoveSendAt;
         private bool _keyboardMoveSent;
         private Vector2 _aimDirection = Vector2.down;
+
+        // Schwerthieb mit Kontaktzeitpunkt: der AttackRequest geht erst raus, wenn die Klinge den Gegner
+        // überstreicht (SwingMath.ContactSeconds). -1 = kein Hieb unterwegs.
+        private int _pendingAttackTargetId = -1;
+        private float _pendingAttackAt;
+
+        // Kamera-Wackeln bei Treffern (rein lokal, LateUpdate).
+        private float _shakeAmplitude;
+        private float _shakeStartTime;
+        private float _shakeDuration;
+        private const float HitStopSeconds = 0.055f;
         private long _yangTotal;
         private bool _isDead;
         private float _diedAtTime;
@@ -383,6 +394,7 @@ namespace Lumiis.Client
         private void Update()
         {
             _world.Tick(Time.timeAsDouble);
+            ProcessPendingAttack();
 
             foreach (KeyValuePair<int, CharacterView> kvp in _views)
             {
@@ -493,7 +505,8 @@ namespace Lumiis.Client
             (int skillId, bool requiresTarget) = SkillHotkeys[hotkeyIndex];
             int targetEntityId = requiresTarget && _targetEntityId >= 0 ? _targetEntityId : 0;
             _netClient.SendUseSkill(skillId, targetEntityId);
-            PlayAttackAnimation(_world.LocalEntityId);
+            PlayAttackAnimation(_world.LocalEntityId, _comboIndex, AimDegrees);
+            _comboIndex = (_comboIndex + 1) % 3;
             _audio?.PlaySwing();
 
             // Optimistische lokale Cooldown-Anzeige (siehe SkillCooldownReadyAtTime-Kommentar) - nur wenn der
@@ -1285,7 +1298,8 @@ namespace Lumiis.Client
             {
                 Vector3 target = localView.transform.position;
                 Vector3 camPos = _camera.transform.position;
-                _camera.transform.position = new Vector3(target.x, target.y, camPos.z);
+                Vector2 shake = CurrentShakeOffset();
+                _camera.transform.position = new Vector3(target.x + shake.x, target.y + shake.y, camPos.z);
             }
             _terrainRenderer?.Tick(_camera);
         }
@@ -1447,45 +1461,113 @@ namespace Lumiis.Client
 
         private void PerformSwingOnly()
         {
-            PlayAttackAnimation(_world.LocalEntityId, _comboIndex);
+            PlayAttackAnimation(_world.LocalEntityId, _comboIndex, AimDegrees);
             _audio?.PlaySwing();
-            SpawnMeleeArc();
             _comboIndex = (_comboIndex + 1) % 3;
         }
 
-        private void SpawnMeleeArc()
-        {
-            if (_world.LocalEntityId < 0 || !_world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity local))
-                return;
+        private float AimDegrees => Mathf.Atan2(_aimDirection.y, _aimDirection.x) * Mathf.Rad2Deg;
 
-            float radius = _classCatalog != null ? _classCatalog.MeleeRangeWire / 100f : 1.5f;
-            Vector3 origin = new Vector3((float)(local.X / 100.0), (float)(local.Y / 100.0), 0f);
-            var arcGo = new GameObject("MeleeArc");
-            var arc = arcGo.AddComponent<MeleeArcView>();
-            arc.Initialize(origin, _aimDirection, radius, new Color(1f, 0.88f, 0.35f, 0.65f), 0.2f);
+        /// <summary>Schickt den beim Hiebbeginn vorgemerkten Angriff genau im Kontaktmoment ab - nur wenn das Ziel
+        /// dann noch lebt und in Reichweite ist (sonst geht der Hieb ins Leere, wie bei einem echten Schwert).</summary>
+        private void ProcessPendingAttack()
+        {
+            if (_pendingAttackTargetId <= 0 || Time.time < _pendingAttackAt) return;
+            int targetId = _pendingAttackTargetId;
+            _pendingAttackTargetId = -1;
+
+            if (_isDead || _world.LocalEntityId < 0) return;
+            if (!_world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity local)) return;
+            if (!_world.Entities.TryGetValue(targetId, out ClientEntity target) || target.CurrentHp == 0) return;
+            float range = (_classCatalog != null ? _classCatalog.MeleeRangeWire : 150) / 100f;
+            if (Distance(local, target) > range) return;
+
+            _netClient.SendAttack(targetId);
+            if (_animators.TryGetValue(_world.LocalEntityId, out CharacterAnimator animator) && animator != null)
+                animator.HitPause(HitStopSeconds);
         }
 
-        private void SpawnTargetHitbox(int targetId)
+        /// <summary>Kamera-Wackeln: abklingendes Rauschen, Amplitude in Welteinheiten.</summary>
+        public void ShakeCamera(float amplitude, float durationSeconds)
         {
-            if (_unitRingSprite == null || !_world.Entities.TryGetValue(targetId, out ClientEntity target))
-                return;
+            float remaining = CurrentShakeStrength();
+            if (amplitude < remaining) return;
+            _shakeAmplitude = amplitude;
+            _shakeStartTime = Time.time;
+            _shakeDuration = Mathf.Max(0.01f, durationSeconds);
+        }
 
-            var go = new GameObject("TargetHitbox");
-            var ring = go.AddComponent<RadiusFlashView>();
-            ring.Initialize(_unitRingSprite,
-                new Vector3((float)(target.X / 100.0), (float)(target.Y / 100.0), 0f),
-                1.15f, new Color(1f, 0.25f, 0.2f, 0.55f), 0.22f);
+        private float CurrentShakeStrength()
+        {
+            float u = (Time.time - _shakeStartTime) / Mathf.Max(0.01f, _shakeDuration);
+            if (u >= 1f || u < 0f) return 0f;
+            float decay = 1f - u;
+            return _shakeAmplitude * decay * decay;
+        }
+
+        private Vector2 CurrentShakeOffset()
+        {
+            float strength = CurrentShakeStrength();
+            if (strength <= 0f) return Vector2.zero;
+            float t = Time.time * 38f;
+            return new Vector2(Mathf.PerlinNoise(t, 0.37f) * 2f - 1f, Mathf.PerlinNoise(0.71f, t) * 2f - 1f) * strength;
+        }
+
+        /// <summary>Trefferwirkung am Ziel: Funke am Kontaktpunkt, Monster zuckt zurück und blitzt auf.</summary>
+        private void ShowImpact(int attackerEntityId, int targetEntityId)
+        {
+            if (!_world.Entities.TryGetValue(targetEntityId, out ClientEntity target)) return;
+            Vector3 targetPos = new Vector3((float)(target.X / 100.0), (float)(target.Y / 100.0), 0f);
+            Vector2 away = Vector2.down;
+            if (_world.Entities.TryGetValue(attackerEntityId, out ClientEntity attacker))
+            {
+                away = new Vector2((float)((target.X - attacker.X) / 100.0), (float)((target.Y - attacker.Y) / 100.0));
+                if (away.sqrMagnitude < 0.0001f) away = Vector2.down;
+                away.Normalize();
+            }
+
+            // Kontaktpunkt: Körpermitte des Ziels, etwas zum Angreifer hin.
+            Vector3 contact = targetPos + new Vector3(-away.x * 0.22f, 0.42f - away.y * 0.12f, 0f);
+            Vector2 slash = new Vector2(-away.y, away.x);
+            var go = new GameObject("ImpactSpark");
+            go.AddComponent<ImpactSparkView>().Initialize(contact, slash, new Color(1f, 0.78f, 0.35f, 1f), 62,
+                targetEntityId * 31 + Time.frameCount);
+
+            if (_monsterViews.TryGetValue(targetEntityId, out MonsterView monster) && monster != null)
+                monster.PlayHitReaction(away);
+        }
+
+        /// <summary>Nur noch die reaktive Blickrichtung fremder Angreifer (früher zusätzlich eine Trefferlinie).</summary>
+        private void FaceAttackerToTarget(int attackerEntityId, int targetEntityId)
+        {
+            if (!_world.Entities.TryGetValue(targetEntityId, out ClientEntity target)) return;
+            if (!(_world.LocalFacingFollowsAim && attackerEntityId == _world.LocalEntityId))
+                _world.SetFacingOverride(attackerEntityId, target.IntX, target.IntY);
+        }
+
+        private float DegreesBetween(int fromEntityId, int toEntityId)
+        {
+            if (!_world.Entities.TryGetValue(fromEntityId, out ClientEntity from)) return float.NaN;
+            if (!_world.Entities.TryGetValue(toEntityId, out ClientEntity to)) return float.NaN;
+            double dx = to.X - from.X, dy = to.Y - from.Y;
+            if (dx * dx + dy * dy < 1) return float.NaN;
+            return (float)(Math.Atan2(dy, dx) * 180.0 / Math.PI);
         }
 
         private void PerformAttack(int targetId)
         {
             if (targetId <= 0) return;
             _targetEntityId = targetId;
-            _netClient.SendAttack(targetId);
-            PlayAttackAnimation(_world.LocalEntityId, _comboIndex);
+
+            // Hieb in Zielrichtung (Mauszeiger); der Angriff selbst geht im Kontaktmoment raus.
+            float aim = AimDegrees;
+            float toTarget = DegreesBetween(_world.LocalEntityId, targetId);
+            float offset = float.IsNaN(toTarget) ? 0f : SwingMath.NormalizeDegrees(toTarget - aim);
+            _pendingAttackTargetId = targetId;
+            _pendingAttackAt = Time.time + SwingMath.ContactSeconds(offset, _comboIndex);
+
+            PlayAttackAnimation(_world.LocalEntityId, _comboIndex, aim);
             _audio?.PlaySwing();
-            SpawnMeleeArc();
-            SpawnTargetHitbox(targetId);
             _comboIndex = (_comboIndex + 1) % 3;
         }
 
@@ -1721,10 +1803,22 @@ namespace Lumiis.Client
             {
                 _world.HandleEntityDamaged(damaged.TargetEntityId, damaged.TargetHpAfter, damaged.TargetMaxHp);
                 DamageShown?.Invoke(damaged.TargetEntityId, damaged.Damage, damaged.AttackerEntityId);
-                SpawnHitLine(damaged.AttackerEntityId, damaged.TargetEntityId, hit: true);
-                PlayAttackAnimation(damaged.AttackerEntityId);
-                if (damaged.TargetEntityId == _world.LocalEntityId) _audio?.PlayHurt();
-                else _audio?.PlayHit();
+                FaceAttackerToTarget(damaged.AttackerEntityId, damaged.TargetEntityId);
+                // Der eigene Hieb läuft schon (lokal beim Drücken gestartet) - nur fremde Angreifer neu animieren.
+                if (damaged.AttackerEntityId != _world.LocalEntityId)
+                    PlayAttackAnimation(damaged.AttackerEntityId, 0, DegreesBetween(damaged.AttackerEntityId, damaged.TargetEntityId));
+                ShowImpact(damaged.AttackerEntityId, damaged.TargetEntityId);
+                if (damaged.TargetEntityId == _world.LocalEntityId)
+                {
+                    _audio?.PlayHurt();
+                    ShakeCamera(0.11f, 0.2f);
+                }
+                else
+                {
+                    _audio?.PlayHit();
+                    if (damaged.AttackerEntityId == _world.LocalEntityId)
+                        ShakeCamera(damaged.TargetHpAfter <= 0 ? 0.13f : 0.075f, 0.16f);
+                }
                 return;
             }
 
@@ -1862,9 +1956,10 @@ namespace Lumiis.Client
             {
                 if (dodged.TargetEntityId == _world.LocalEntityId) _lastDodgeMessage = "Ausgewichen!";
                 else if (dodged.AttackerEntityId == _world.LocalEntityId) _lastDodgeMessage = "Verfehlt!";
-                SpawnHitLine(dodged.AttackerEntityId, dodged.TargetEntityId, hit: false);
+                FaceAttackerToTarget(dodged.AttackerEntityId, dodged.TargetEntityId);
                 DodgeShown?.Invoke(dodged.TargetEntityId, dodged.AttackerEntityId);
-                PlayAttackAnimation(dodged.AttackerEntityId);
+                if (dodged.AttackerEntityId != _world.LocalEntityId)
+                    PlayAttackAnimation(dodged.AttackerEntityId, 0, DegreesBetween(dodged.AttackerEntityId, dodged.TargetEntityId));
                 return;
             }
 
@@ -1965,8 +2060,6 @@ namespace Lumiis.Client
         private const int RangeRingSortingOrder = -40;
         private static readonly Color RangeRingColor = new Color(1f, 1f, 1f, 0.25f);
 
-        private static readonly Color HitLineColor = new Color(0.9f, 0.15f, 0.15f, 0.9f);
-        private static readonly Color DodgeLineColor = new Color(0.4f, 0.6f, 0.9f, 0.9f);
 
         // Abschnitt 6: Kampfrausch (AttackBuff) rot-orange mit kleinerem Durchmesser, Hast (AttackSpeedBuff)
         // gelb mit groesserem Durchmesser - konzentrisch, ueberschneiden sich dadurch nie (keine
@@ -1976,30 +2069,6 @@ namespace Lumiis.Client
         private static readonly Color HastRingColor = new Color(0.95f, 0.85f, 0.1f, 0.6f);
         private const float KampfrauschRingDiameter = 2.6f;
         private const float HastRingDiameter = 3.4f;
-
-        /// <summary>Abschnitt 4: nur wenn BEIDE beteiligten Entities aktuell bekannte Positionen haben (auch
-        /// wenn keine davon der lokale Spieler ist, z. B. Monster gegen anderen Spieler) - sonst kein Effekt,
-        /// keine Fehlermeldung (analog zu ClientWorld.HandleEntityDamaged: unbekannte Id ist kein Fehler, nur
-        /// z. B. bereits despawnt). Treffer rot, Ausweichen blau-grau.</summary>
-        private void SpawnHitLine(int attackerEntityId, int targetEntityId, bool hit)
-        {
-            if (!_world.Entities.TryGetValue(attackerEntityId, out ClientEntity attacker)) return;
-            if (!_world.Entities.TryGetValue(targetEntityId, out ClientEntity target)) return;
-
-            Vector3 from = new Vector3((float)(attacker.X / 100.0), (float)(attacker.Y / 100.0), 0f);
-            Vector3 to = new Vector3((float)(target.X / 100.0), (float)(target.Y / 100.0), 0f);
-
-            var go = new GameObject("HitLine");
-            var line = go.AddComponent<HitLineView>();
-            line.Initialize(from, to, hit ? HitLineColor : DodgeLineColor, durationSeconds: 0.2f);
-
-            // Abschnitt 5 (optionale Erweiterung "ohne grossen Aufwand"): auch fuer fremde Angreifer
-            // (Monster gegen Spieler, anderer Spieler gegen Monster) reaktiv zum Ziel drehen - beide
-            // Positionen sind hier ohnehin schon bekannt. Fuer den lokalen Spieler redundant zur
-            // optimistischen Drehung beim Senden (HandleRightClickAttack/UseSkillHotkey), aber harmlos.
-            if (!(_world.LocalFacingFollowsAim && attackerEntityId == _world.LocalEntityId))
-                _world.SetFacingOverride(attackerEntityId, target.IntX, target.IntY);
-        }
 
         private static string InventoryActionFailedReasonText(InventoryActionFailedReason reason)
         {
@@ -2194,11 +2263,11 @@ namespace Lumiis.Client
             view.SetWeapon(weaponSprite, pivotOffset, upgradeLevel);
         }
 
-        private void PlayAttackAnimation(int entityId, int comboIndex = 0)
+        private void PlayAttackAnimation(int entityId, int comboIndex = 0, float aimDegrees = float.NaN)
         {
             if (entityId <= 0) return;
             if (_animators.TryGetValue(entityId, out CharacterAnimator animator) && animator != null)
-                animator.PlayAttack(comboIndex);
+                animator.PlayAttack(comboIndex, aimDegrees);
         }
 
         public bool HasLocalPlayer => _world.LocalEntityId >= 0 && _world.Entities.ContainsKey(_world.LocalEntityId);
