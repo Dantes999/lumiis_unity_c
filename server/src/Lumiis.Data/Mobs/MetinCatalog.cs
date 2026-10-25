@@ -92,7 +92,8 @@ public sealed class MetinCatalog
             {
                 if (wave.HpPercent <= 0 || wave.HpPercent >= 100)
                     throw new MetinCatalogException($"metins.json: Mob {entry.MobId} hat hpPercent ausserhalb 1-99 ({wave.HpPercent}).");
-                if (wave.HpPercent >= lastPercent)
+                // Gleiche Schwelle mehrfach ist erlaubt (eine Welle aus mehreren Mob-Typen).
+                if (wave.HpPercent > lastPercent)
                     throw new MetinCatalogException($"metins.json: Mob {entry.MobId} hat nicht absteigende Wellen-Schwellen.");
                 if (wave.MobId <= 0)
                     throw new MetinCatalogException($"metins.json: Mob {entry.MobId} hat eine Welle mit mobId <= 0.");

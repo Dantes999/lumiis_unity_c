@@ -39,6 +39,19 @@ namespace Lumiis.Tests.Data.Mobs
         }
 
         [Fact]
+        public void LoadFromJson_SameThresholdTwice_IsOneMixedWave()
+        {
+            const string json = @"{ ""metins"": [ { ""mobId"": 3, ""waves"": [
+                { ""hpPercent"": 75, ""mobId"": 1, ""count"": 2 },
+                { ""hpPercent"": 75, ""mobId"": 2, ""count"": 1 } ] } ] }";
+
+            MetinCatalog catalog = MetinCatalog.LoadFromJson(json);
+
+            Assert.True(catalog.TryGet(3, out MetinDefinition metin));
+            Assert.Equal(2, metin.Waves.Count);
+        }
+
+        [Fact]
         public void LoadFromJson_InvalidPercent_Throws()
         {
             const string json = @"{ ""metins"": [ { ""mobId"": 3, ""waves"": [
