@@ -8,9 +8,8 @@ using Lumiis.Shared.Net;
 
 namespace Lumiis.Data.Npcs;
 
-/// <summary>Ein NPC-Typ aus data/npcs.json (M5b, Platzhalterdaten). ShopItemIds leer würde bedeuten "kein
-/// Sortiment" - für den aktuellen Umfang (nur Händler-NPCs) validiert NpcCatalog deshalb mindestens ein
-/// Item je NPC (siehe LoadFromJson).</summary>
+/// <summary>Ein NPC-Typ aus data/npcs.json. Händler/Schmiede brauchen mindestens ein Item im Sortiment; NPCs ohne
+/// Dienst (Wächter, Bürger usw.) dürfen ein leeres Sortiment haben (siehe LoadFromJson).</summary>
 public sealed class NpcDefinition
 {
     public int Id { get; }
@@ -91,7 +90,8 @@ public sealed class NpcCatalog
                 throw new NpcCatalogException($"npcs.json: NPC {entry.Id} ({entry.Name}) hat einen unbekannten Service '{entry.Service}'.");
             }
 
-            if (entry.ShopItemIds.Count == 0)
+            // Ohne Dienst (Wächter, Bürger usw.) darf das Sortiment leer sein; ein Händler/Schmied braucht eins.
+            if (entry.ShopItemIds.Count == 0 && service != NpcService.None)
                 throw new NpcCatalogException($"npcs.json: NPC {entry.Id} ({entry.Name}) hat ein leeres Sortiment (shopItemIds).");
 
             foreach (int itemId in entry.ShopItemIds)

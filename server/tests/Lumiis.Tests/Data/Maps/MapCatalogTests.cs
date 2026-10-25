@@ -214,7 +214,7 @@ namespace Lumiis.Tests.Data.Maps
             Assert.Equal("map1", toMap1.TargetMapId);
             Assert.False(map1.Collision.IsBlockedAtWire(toMap1.TargetX, toMap1.TargetY));
             Assert.True(map2.Spawns.Count > 100);
-            Assert.Equal(2, map2.NpcPlacements.Count);
+            Assert.True(map2.NpcPlacements.Count >= 20); // Wiki-NPCs von Jayang
 
             MapDefinition village = catalog.Get("village");
             Assert.EndsWith("Dorf", village.Name);

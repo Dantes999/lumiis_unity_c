@@ -1,0 +1,46 @@
+{
+  "_hinweis": "Häuser aus tools/derive-wiki-map.py, übrige Einträge von Hand. Kachelkoordinaten, Zeile 0 = Norden.",
+  "props": [
+    {
+      "type": "house",
+      "kind": "small",
+      "tx": 220,
+      "ty": 275,
+      "w": 6,
+      "h": 6,
+      "v": 0
+    },
+    {
+      "type": "house",
+      "kind": "hall",
+      "tx": 217,
+      "ty": 291,
+      "w": 25,
+      "h": 11,
+      "v": 1
+    },
+    {
+      "type": "house",
+      "kind": "main",
+      "tx": 200,
+      "ty": 296,
+      "w": 11,
+      "h": 15,
+      "v": 2
+    },
+    {
+      "type": "house",
+      "kind": "main",
+      "tx": 242,
+      "ty": 332,
+      "w": 8,
+      "h": 8,
+      "v": 3
+    }
+  ],
+  "village": {
+    "cx": 229,
+    "cy": 317,
+    "r": 10
+  }
+}

@@ -22,6 +22,86 @@
       ]
     },
     {
+      "mobId": 24,
+      "waves": [
+        {
+          "hpPercent": 75,
+          "mobId": 21,
+          "count": 2
+        },
+        {
+          "hpPercent": 50,
+          "mobId": 22,
+          "count": 2
+        },
+        {
+          "hpPercent": 25,
+          "mobId": 20,
+          "count": 3
+        }
+      ]
+    },
+    {
+      "mobId": 50,
+      "waves": [
+        {
+          "hpPercent": 75,
+          "mobId": 26,
+          "count": 3
+        },
+        {
+          "hpPercent": 50,
+          "mobId": 28,
+          "count": 2
+        },
+        {
+          "hpPercent": 25,
+          "mobId": 23,
+          "count": 2
+        }
+      ]
+    },
+    {
+      "mobId": 51,
+      "waves": [
+        {
+          "hpPercent": 75,
+          "mobId": 29,
+          "count": 3
+        },
+        {
+          "hpPercent": 50,
+          "mobId": 32,
+          "count": 2
+        },
+        {
+          "hpPercent": 25,
+          "mobId": 35,
+          "count": 1
+        }
+      ]
+    },
+    {
+      "mobId": 52,
+      "waves": [
+        {
+          "hpPercent": 75,
+          "mobId": 36,
+          "count": 2
+        },
+        {
+          "hpPercent": 50,
+          "mobId": 39,
+          "count": 2
+        },
+        {
+          "hpPercent": 25,
+          "mobId": 37,
+          "count": 1
+        }
+      ]
+    },
+    {
       "mobId": 18,
       "waves": [
         {
@@ -42,36 +122,41 @@
       ]
     },
     {
-      "mobId": 24,
+      "mobId": 53,
       "waves": [
         {
           "hpPercent": 75,
-          "mobId": 21,
-          "count": 2
+          "mobId": 63,
+          "count": 4
         },
+        {
+          "hpPercent": 50,
+          "mobId": 66,
+          "count": 3
+        },
+        {
+          "hpPercent": 25,
+          "mobId": 69,
+          "count": 2
+        }
+      ]
+    },
+    {
+      "mobId": 54,
+      "waves": [
         {
           "hpPercent": 75,
-          "mobId": 20,
-          "count": 1
+          "mobId": 84,
+          "count": 4
         },
         {
           "hpPercent": 50,
-          "mobId": 22,
-          "count": 1
-        },
-        {
-          "hpPercent": 50,
-          "mobId": 21,
-          "count": 2
+          "mobId": 88,
+          "count": 3
         },
         {
           "hpPercent": 25,
-          "mobId": 22,
-          "count": 2
-        },
-        {
-          "hpPercent": 25,
-          "mobId": 21,
+          "mobId": 75,
           "count": 2
         }
       ]

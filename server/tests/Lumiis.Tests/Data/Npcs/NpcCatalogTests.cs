@@ -1,5 +1,6 @@
 using Lumiis.Data.Items;
 using Lumiis.Data.Npcs;
+using Lumiis.Shared.Net;
 using Lumiis.Tests;
 using Xunit;
 
@@ -98,15 +99,29 @@ namespace Lumiis.Tests.Data.Npcs
         }
 
         [Fact]
-        public void LoadFromJson_EmptyShopItemIds_Throws()
+        public void LoadFromJson_EmptyShopItemIds_ForMerchant_Throws()
         {
             const string json = @"{
   ""npcs"": [
-    { ""id"": 1, ""name"": ""Haendler"", ""appearance"": { ""bodyId"": 1, ""hairStyleId"": 1, ""hairColorId"": 1 }, ""shopItemIds"": [] }
+    { ""id"": 1, ""name"": ""Haendler"", ""service"": ""Merchant"", ""appearance"": { ""bodyId"": 1, ""hairStyleId"": 1, ""hairColorId"": 1 }, ""shopItemIds"": [] }
   ]
 }";
             var ex = Assert.Throws<NpcCatalogException>(() => NpcCatalog.LoadFromJson(json, CreateItemCatalog(), TestLookCatalogs.CreateMinimal()));
             Assert.Contains("leeres Sortiment", ex.Message);
+        }
+
+        [Fact]
+        public void LoadFromJson_EmptyShopItemIds_WithoutService_IsAllowed()
+        {
+            const string json = @"{
+  ""npcs"": [
+    { ""id"": 1, ""name"": ""Waechter"", ""appearance"": { ""bodyId"": 1, ""hairStyleId"": 1, ""hairColorId"": 1 }, ""shopItemIds"": [] }
+  ]
+}";
+            NpcCatalog catalog = NpcCatalog.LoadFromJson(json, CreateItemCatalog(), TestLookCatalogs.CreateMinimal());
+            Assert.True(catalog.TryGet(1, out NpcDefinition waechter));
+            Assert.Empty(waechter.ShopItemIds);
+            Assert.Equal(NpcService.None, waechter.Service);
         }
 
         [Fact]

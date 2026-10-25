@@ -1,10 +1,6 @@
 {
   "name": "Jayang",
-  "startX": 46650,
-  "startY": 51050,
-  "visualOriginX": 372,
-  "visualOriginY": 372,
-  "visualWidth": 256,
-  "visualHeight": 256,
-  "visualPixelsPerUnit": 16
+  "startX": 47350,
+  "startY": 43850,
+  "terrain": true
 }

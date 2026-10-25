@@ -49,7 +49,6 @@
     {
       "id": 2,
       "name": "Schmied",
-      "service": "Blacksmith",
       "appearance": {
         "bodyId": 1,
         "hairStyleId": 1,
@@ -62,7 +61,613 @@
       "shopItemIds": [
         9,
         10
-      ]
+      ],
+      "service": "Blacksmith"
+    },
+    {
+      "id": 3,
+      "name": "Wächter des Dorfplatzes",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 1,
+        "hairColorId": 2,
+        "armorId": 4,
+        "helmetId": 2,
+        "weaponId": 2,
+        "shieldId": 1
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 4,
+      "name": "Waffenhändler",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 2,
+        "hairColorId": 5,
+        "armorId": 2,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": [
+        20,
+        21,
+        2,
+        23,
+        3,
+        22
+      ],
+      "service": "Merchant"
+    },
+    {
+      "id": 5,
+      "name": "Rüstungshändler",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 3,
+        "hairColorId": 8,
+        "armorId": 3,
+        "helmetId": 1,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": [
+        25,
+        4,
+        5,
+        24,
+        6,
+        26,
+        7,
+        27
+      ],
+      "service": "Merchant"
+    },
+    {
+      "id": 6,
+      "name": "Gemischtwarenhändlerin",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 1,
+        "hairColorId": 3,
+        "armorId": 1,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": [
+        8,
+        35,
+        36,
+        9,
+        10
+      ],
+      "service": "Merchant"
+    },
+    {
+      "id": 7,
+      "name": "Lagerverwalter",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 2,
+        "hairColorId": 6,
+        "armorId": 2,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 8,
+      "name": "Alte Frau",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 3,
+        "hairColorId": 1,
+        "armorId": 3,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 9,
+      "name": "Alter Mann",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 1,
+        "hairColorId": 4,
+        "armorId": 1,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 10,
+      "name": "Ah-Yu",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 2,
+        "hairColorId": 7,
+        "armorId": 2,
+        "helmetId": 1,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 11,
+      "name": "Alchemist",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 3,
+        "hairColorId": 2,
+        "armorId": 3,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 12,
+      "name": "Aranyo",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 1,
+        "hairColorId": 5,
+        "armorId": 1,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 13,
+      "name": "Baek-Go",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 2,
+        "hairColorId": 8,
+        "armorId": 2,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 14,
+      "name": "Biologe Chaegirab",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 3,
+        "hairColorId": 3,
+        "armorId": 3,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 15,
+      "name": "Drachenwächter Jaharr",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 1,
+        "hairColorId": 6,
+        "armorId": 4,
+        "helmetId": 2,
+        "weaponId": 2,
+        "shieldId": 1
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 16,
+      "name": "Gayahändler",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 2,
+        "hairColorId": 1,
+        "armorId": 2,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 17,
+      "name": "Handelsverwalterin",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 3,
+        "hairColorId": 4,
+        "armorId": 3,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 18,
+      "name": "Handu-Up",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 1,
+        "hairColorId": 7,
+        "armorId": 1,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 19,
+      "name": "Hauptmann",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 2,
+        "hairColorId": 2,
+        "armorId": 4,
+        "helmetId": 2,
+        "weaponId": 2,
+        "shieldId": 1
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 20,
+      "name": "Kampfzonen-Meister",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 3,
+        "hairColorId": 5,
+        "armorId": 3,
+        "helmetId": 1,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 21,
+      "name": "Mirine",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 1,
+        "hairColorId": 8,
+        "armorId": 1,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 22,
+      "name": "Octavio",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 2,
+        "hairColorId": 3,
+        "armorId": 2,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 23,
+      "name": "Schlachtenverwalter",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 3,
+        "hairColorId": 6,
+        "armorId": 3,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 24,
+      "name": "Seon-Hae",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 1,
+        "hairColorId": 1,
+        "armorId": 1,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 25,
+      "name": "Soon",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 2,
+        "hairColorId": 4,
+        "armorId": 2,
+        "helmetId": 1,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 26,
+      "name": "Stadtwächter",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 3,
+        "hairColorId": 7,
+        "armorId": 4,
+        "helmetId": 2,
+        "weaponId": 2,
+        "shieldId": 1
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 27,
+      "name": "Stallbursche",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 1,
+        "hairColorId": 2,
+        "armorId": 1,
+        "helmetId": 0,
+        "weaponId": 4,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 28,
+      "name": "Teleporter",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 2,
+        "hairColorId": 5,
+        "armorId": 2,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 29,
+      "name": "Theowahdan",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 3,
+        "hairColorId": 8,
+        "armorId": 3,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 30,
+      "name": "Uriel",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 1,
+        "hairColorId": 3,
+        "armorId": 1,
+        "helmetId": 1,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 31,
+      "name": "Wonda-Rim",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 2,
+        "hairColorId": 6,
+        "armorId": 2,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 32,
+      "name": "Yonah",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 3,
+        "hairColorId": 1,
+        "armorId": 3,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 33,
+      "name": "Ariyoung",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 1,
+        "hairColorId": 4,
+        "armorId": 1,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 34,
+      "name": "Deokbae",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 2,
+        "hairColorId": 7,
+        "armorId": 2,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 35,
+      "name": "Fahrender Händler",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 3,
+        "hairColorId": 2,
+        "armorId": 3,
+        "helmetId": 1,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": [
+        8,
+        35,
+        36,
+        9
+      ],
+      "service": "Merchant"
+    },
+    {
+      "id": 36,
+      "name": "Harang",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 1,
+        "hairColorId": 5,
+        "armorId": 1,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 37,
+      "name": "Huahn-So",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 2,
+        "hairColorId": 8,
+        "armorId": 2,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 38,
+      "name": "Nakajima",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 3,
+        "hairColorId": 3,
+        "armorId": 3,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 39,
+      "name": "Taurean",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 1,
+        "hairColorId": 6,
+        "armorId": 1,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 40,
+      "name": "Verräter Balso",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 2,
+        "hairColorId": 1,
+        "armorId": 2,
+        "helmetId": 1,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 41,
+      "name": "Yang-Shin",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 3,
+        "hairColorId": 4,
+        "armorId": 3,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 42,
+      "name": "Yu-Hwan",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 1,
+        "hairColorId": 7,
+        "armorId": 1,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
+    },
+    {
+      "id": 43,
+      "name": "Yu-Rang",
+      "appearance": {
+        "bodyId": 1,
+        "hairStyleId": 2,
+        "hairColorId": 2,
+        "armorId": 2,
+        "helmetId": 0,
+        "weaponId": 0,
+        "shieldId": 0
+      },
+      "shopItemIds": []
     }
   ]
 }

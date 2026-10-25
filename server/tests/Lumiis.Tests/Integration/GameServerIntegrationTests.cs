@@ -229,7 +229,9 @@ namespace Lumiis.Tests.Integration
             List<Entity> greenfieldMonsters = fixture.Server.WorldForMap("greenfield").Entities
                 .Where(e => e.Kind == EntityKind.Monster).ToList();
 
-            Assert.Equal(138, map1Monsters.Count); // Yongan-Originalgruppen + 5 Lumiis-Steine + 3 Trainingspuppen
+            // Wiki-Spawns (Monsterkarte) + Lumiis-Steine (Metinkarte) + 3 Trainingspuppen, siehe tools/build-wiki-content.py
+            Assert.Equal(catalog.Get("map1").Spawns.Count, map1Monsters.Count);
+            Assert.True(map1Monsters.Count > 400);
             Assert.Equal(6, greenfieldMonsters.Count);
             Assert.Empty(map1Monsters.Select(m => m.Id).Intersect(greenfieldMonsters.Select(m => m.Id)));
             Assert.NotEmpty(fixture.Server.WorldForMap("map1").Entities.Where(e => e.Kind == EntityKind.Npc));
@@ -274,10 +276,13 @@ namespace Lumiis.Tests.Integration
         [Fact]
         public void MultiMap_Map1NorthPortal_LeadsToJayangVillage()
         {
-            (ServerFixture fixture, _) = CreateMultiMapFixture();
+            (ServerFixture fixture, MapCatalog catalog) = CreateMultiMapFixture();
             GameServer server = fixture.Server;
             Assert.True(server.WorldForMap("map2").Entities.Count(e => e.Kind == EntityKind.Monster) > 100);
-            Assert.Equal(2, server.WorldForMap("map2").Entities.Count(e => e.Kind == EntityKind.Npc));
+            Assert.Equal(catalog.Get("map2").NpcPlacements.Count, server.WorldForMap("map2").Entities.Count(e => e.Kind == EntityKind.Npc));
+            PortalDefinition portal = Assert.Single(catalog.Get("map1").Portals);
+            int portalX = (portal.X1 + portal.X2) / 2;
+            int portalY = (portal.Y1 + portal.Y2) / 2;
             server.Start();
             try
             {
@@ -285,20 +290,20 @@ namespace Lumiis.Tests.Integration
                 client.Connect(server.ListenPort);
                 Assert.True(WaitConnected(server, client));
 
-                // Auf dem Weg knapp südlich des Nordportals (44200..44399 / 52300..52599) starten.
-                (int aliceId, string aliceToken) = fixture.CreateCharacter("Alice", positionX: 44250, positionY: 52000, mapId: "map1");
+                // Knapp südlich des Jayang-Portals im Norden von Yongan starten (Wiki: Ausgang bei 405,73).
+                (int aliceId, string aliceToken) = fixture.CreateCharacter("Alice", positionX: portalX, positionY: portal.Y1 - 250, mapId: "map1");
                 client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = aliceToken, CharacterId = aliceId });
                 Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
                 Assert.Equal("map1", client.Received.OfType<JoinAcceptedPacket>().First().MapId);
 
-                client.Send(new MoveToPacket { X = 44250, Y = 52450 });
+                client.Send(new MoveToPacket { X = portalX, Y = portalY });
                 Assert.True(Pump(() => client.Received.OfType<MapChangedPacket>().Any(), server, client),
                     "kein MapChangedPacket nach Betreten des Map1-Nordportals");
                 MapChangedPacket changed = client.Received.OfType<MapChangedPacket>().First();
                 Assert.Equal("map2", changed.MapId);
                 Assert.Equal("Jayang", changed.MapName);
-                Assert.Equal(50650, changed.X);
-                Assert.Equal(51850, changed.Y);
+                Assert.Equal(portal.TargetX, changed.X);
+                Assert.Equal(portal.TargetY, changed.Y);
             }
             finally
             {

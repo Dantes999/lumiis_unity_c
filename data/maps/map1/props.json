@@ -1,0 +1,175 @@
+{
+  "_hinweis": "Häuser aus tools/derive-wiki-map.py, übrige Einträge von Hand. Kachelkoordinaten, Zeile 0 = Norden.",
+  "props": [
+    {
+      "type": "house",
+      "kind": "small",
+      "tx": 262,
+      "ty": 193,
+      "w": 4,
+      "h": 6,
+      "v": 0
+    },
+    {
+      "type": "house",
+      "kind": "small",
+      "tx": 421,
+      "ty": 212,
+      "w": 4,
+      "h": 9,
+      "v": 1
+    },
+    {
+      "type": "house",
+      "kind": "small",
+      "tx": 349,
+      "ty": 215,
+      "w": 5,
+      "h": 5,
+      "v": 2
+    },
+    {
+      "type": "house",
+      "kind": "small",
+      "tx": 309,
+      "ty": 226,
+      "w": 9,
+      "h": 3,
+      "v": 3
+    },
+    {
+      "type": "house",
+      "kind": "small",
+      "tx": 308,
+      "ty": 227,
+      "w": 10,
+      "h": 6,
+      "v": 4
+    },
+    {
+      "type": "house",
+      "kind": "small",
+      "tx": 303,
+      "ty": 252,
+      "w": 6,
+      "h": 8,
+      "v": 5
+    },
+    {
+      "type": "house",
+      "kind": "small",
+      "tx": 324,
+      "ty": 262,
+      "w": 4,
+      "h": 9,
+      "v": 6
+    },
+    {
+      "type": "house",
+      "kind": "small",
+      "tx": 314,
+      "ty": 264,
+      "w": 6,
+      "h": 4,
+      "v": 7
+    },
+    {
+      "type": "house",
+      "kind": "main",
+      "tx": 292,
+      "ty": 267,
+      "w": 14,
+      "h": 10,
+      "v": 8
+    },
+    {
+      "type": "house",
+      "kind": "small",
+      "tx": 408,
+      "ty": 269,
+      "w": 4,
+      "h": 6,
+      "v": 9
+    },
+    {
+      "type": "house",
+      "kind": "small",
+      "tx": 341,
+      "ty": 279,
+      "w": 6,
+      "h": 6,
+      "v": 10
+    },
+    {
+      "type": "house",
+      "kind": "small",
+      "tx": 363,
+      "ty": 280,
+      "w": 6,
+      "h": 6,
+      "v": 11
+    },
+    {
+      "type": "house",
+      "kind": "small",
+      "tx": 270,
+      "ty": 286,
+      "w": 4,
+      "h": 10,
+      "v": 12
+    },
+    {
+      "type": "house",
+      "kind": "small",
+      "tx": 343,
+      "ty": 300,
+      "w": 5,
+      "h": 4,
+      "v": 13
+    },
+    {
+      "type": "house",
+      "kind": "main",
+      "tx": 293,
+      "ty": 303,
+      "w": 12,
+      "h": 10,
+      "v": 14
+    },
+    {
+      "type": "house",
+      "kind": "hall",
+      "tx": 304,
+      "ty": 314,
+      "w": 16,
+      "h": 12,
+      "v": 15
+    },
+    {
+      "type": "house",
+      "kind": "small",
+      "tx": 330,
+      "ty": 319,
+      "w": 6,
+      "h": 10,
+      "v": 16
+    },
+    {
+      "type": "monument",
+      "name": "Statue der Illusionen",
+      "tx": 272,
+      "ty": 248
+    },
+    {
+      "type": "monument",
+      "name": "Weol-Denkmal",
+      "tx": 295,
+      "ty": 173
+    }
+  ],
+  "village": {
+    "cx": 323,
+    "cy": 292,
+    "r": 11
+  }
+}

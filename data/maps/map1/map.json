@@ -1,10 +1,6 @@
 {
   "name": "Yongan",
-  "startX": 46850,
-  "startY": 44150,
-  "visualOriginX": 400,
-  "visualOriginY": 400,
-  "visualWidth": 128,
-  "visualHeight": 128,
-  "visualPixelsPerUnit": 32
+  "startX": 56750,
+  "startY": 52750,
+  "terrain": true
 }

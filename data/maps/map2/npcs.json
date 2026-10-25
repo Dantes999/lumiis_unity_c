@@ -2,15 +2,135 @@
   "placements": [
     {
       "id": 1,
-      "npcId": 2,
-      "positionX": 45950,
-      "positionY": 51950
+      "npcId": 3,
+      "positionX": 47350,
+      "positionY": 44050
     },
     {
       "id": 2,
-      "npcId": 1,
-      "positionX": 46850,
-      "positionY": 50750
+      "npcId": 2,
+      "positionX": 45550,
+      "positionY": 44650
+    },
+    {
+      "id": 3,
+      "npcId": 4,
+      "positionX": 46950,
+      "positionY": 45150
+    },
+    {
+      "id": 4,
+      "npcId": 5,
+      "positionX": 47950,
+      "positionY": 45150
+    },
+    {
+      "id": 5,
+      "npcId": 6,
+      "positionX": 45550,
+      "positionY": 45250
+    },
+    {
+      "id": 6,
+      "npcId": 7,
+      "positionX": 45950,
+      "positionY": 46850
+    },
+    {
+      "id": 7,
+      "npcId": 8,
+      "positionX": 48750,
+      "positionY": 42450
+    },
+    {
+      "id": 8,
+      "npcId": 9,
+      "positionX": 29150,
+      "positionY": 68050
+    },
+    {
+      "id": 9,
+      "npcId": 33,
+      "positionX": 44850,
+      "positionY": 46550
+    },
+    {
+      "id": 10,
+      "npcId": 34,
+      "positionX": 53550,
+      "positionY": 47650
+    },
+    {
+      "id": 11,
+      "npcId": 35,
+      "positionX": 50250,
+      "positionY": 46650
+    },
+    {
+      "id": 12,
+      "npcId": 36,
+      "positionX": 53550,
+      "positionY": 46350
+    },
+    {
+      "id": 13,
+      "npcId": 37,
+      "positionX": 45350,
+      "positionY": 47450
+    },
+    {
+      "id": 14,
+      "npcId": 38,
+      "positionX": 48450,
+      "positionY": 60650
+    },
+    {
+      "id": 15,
+      "npcId": 23,
+      "positionX": 48350,
+      "positionY": 43950
+    },
+    {
+      "id": 16,
+      "npcId": 27,
+      "positionX": 51850,
+      "positionY": 46150
+    },
+    {
+      "id": 17,
+      "npcId": 39,
+      "positionX": 48150,
+      "positionY": 41350
+    },
+    {
+      "id": 18,
+      "npcId": 28,
+      "positionX": 49450,
+      "positionY": 46850
+    },
+    {
+      "id": 19,
+      "npcId": 40,
+      "positionX": 51450,
+      "positionY": 44550
+    },
+    {
+      "id": 20,
+      "npcId": 41,
+      "positionX": 52650,
+      "positionY": 45450
+    },
+    {
+      "id": 21,
+      "npcId": 42,
+      "positionX": 45150,
+      "positionY": 43650
+    },
+    {
+      "id": 22,
+      "npcId": 43,
+      "positionX": 51850,
+      "positionY": 47450
     }
   ]
 }
