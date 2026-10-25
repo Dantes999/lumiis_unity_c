@@ -177,7 +177,7 @@ namespace Lumiis.Tests.Data.Maps
             MapCatalog catalog = MapCatalog.LoadFromDirectory(Path.Combine(dataDir, "maps"), mobCatalog, npcCatalog);
 
             Assert.Equal("map1", catalog.StartMapId);
-            Assert.Equal(3, catalog.Maps.Count);
+            Assert.Equal(4, catalog.Maps.Count);
             Assert.True(catalog.TryGet("map1", out MapDefinition? map1));
             Assert.Equal("Yongan", map1!.Name);
             Assert.NotEmpty(map1.Spawns);
@@ -199,6 +199,20 @@ namespace Lumiis.Tests.Data.Maps
             Assert.NotEmpty(greenfield.Spawns);
             Assert.Single(greenfield.Portals);
             Assert.Equal("village", greenfield.Portals[0].TargetMapId);
+
+            // Map1 <-> Map2 (Jayang) sind per Portal verbunden, beide Ankünfte begehbar und außerhalb
+            // des jeweiligen Zielportals (prüft MapCatalog ohnehin, hier zusätzlich als Datenvertrag).
+            PortalDefinition toMap2 = Assert.Single(map1.Portals);
+            Assert.Equal("map2", toMap2.TargetMapId);
+            MapDefinition map2 = catalog.Get("map2");
+            Assert.Equal("Jayang", map2.Name);
+            Assert.False(map2.Collision.IsBlockedAtWire(map2.StartX, map2.StartY));
+            Assert.False(map2.Collision.IsBlockedAtWire(toMap2.TargetX, toMap2.TargetY));
+            PortalDefinition toMap1 = Assert.Single(map2.Portals);
+            Assert.Equal("map1", toMap1.TargetMapId);
+            Assert.False(map1.Collision.IsBlockedAtWire(toMap1.TargetX, toMap1.TargetY));
+            Assert.True(map2.Spawns.Count > 100);
+            Assert.Equal(2, map2.NpcPlacements.Count);
 
             MapDefinition village = catalog.Get("village");
             Assert.EndsWith("Dorf", village.Name);

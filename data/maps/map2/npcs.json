@@ -1,0 +1,16 @@
+{
+  "placements": [
+    {
+      "id": 1,
+      "npcId": 2,
+      "positionX": 45950,
+      "positionY": 51950
+    },
+    {
+      "id": 2,
+      "npcId": 1,
+      "positionX": 46850,
+      "positionY": 50750
+    }
+  ]
+}

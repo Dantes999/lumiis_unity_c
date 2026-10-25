@@ -272,6 +272,41 @@ namespace Lumiis.Tests.Integration
         }
 
         [Fact]
+        public void MultiMap_Map1NorthPortal_LeadsToJayangVillage()
+        {
+            (ServerFixture fixture, _) = CreateMultiMapFixture();
+            GameServer server = fixture.Server;
+            Assert.True(server.WorldForMap("map2").Entities.Count(e => e.Kind == EntityKind.Monster) > 100);
+            Assert.Equal(2, server.WorldForMap("map2").Entities.Count(e => e.Kind == EntityKind.Npc));
+            server.Start();
+            try
+            {
+                using var client = new TestClient();
+                client.Connect(server.ListenPort);
+                Assert.True(WaitConnected(server, client));
+
+                // Auf dem Weg knapp südlich des Nordportals (44200..44399 / 52300..52599) starten.
+                (int aliceId, string aliceToken) = fixture.CreateCharacter("Alice", positionX: 44250, positionY: 52000, mapId: "map1");
+                client.Send(new JoinRequestPacket { ProtocolVersion = Protocol.Version, Token = aliceToken, CharacterId = aliceId });
+                Assert.True(Pump(() => client.Received.OfType<JoinAcceptedPacket>().Any(), server, client));
+                Assert.Equal("map1", client.Received.OfType<JoinAcceptedPacket>().First().MapId);
+
+                client.Send(new MoveToPacket { X = 44250, Y = 52450 });
+                Assert.True(Pump(() => client.Received.OfType<MapChangedPacket>().Any(), server, client),
+                    "kein MapChangedPacket nach Betreten des Map1-Nordportals");
+                MapChangedPacket changed = client.Received.OfType<MapChangedPacket>().First();
+                Assert.Equal("map2", changed.MapId);
+                Assert.Equal("Jayang", changed.MapName);
+                Assert.Equal(50650, changed.X);
+                Assert.Equal(51850, changed.Y);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Fact]
         public void MultiMap_PortalSwitch_ChangesMapCleansAoiAndPersists()
         {
             (ServerFixture fixture, _) = CreateMultiMapFixture();
