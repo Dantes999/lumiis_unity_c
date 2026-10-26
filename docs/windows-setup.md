@@ -44,7 +44,8 @@ git clone https://github.com/Dantes999/lumiis_unity_c.git
 cd lumiis_unity_c
 ```
 
-Danach `.env` anlegen und ausfüllen:
+Danach **unbedingt** `.env` anlegen (ohne sie starten weder Datenbank-Setup noch Auth/Server). Bei
+Variante B in Abschnitt 4 erledigt `setup-postgres-native.ps1` das automatisch, sonst von Hand:
 
 ```powershell
 Copy-Item .env.example .env

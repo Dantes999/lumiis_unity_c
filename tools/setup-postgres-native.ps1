@@ -9,6 +9,24 @@
 
 param([string]$PsqlPath)
 
+# Fehlt .env noch, wird sie aus .env.example erzeugt - mit zufaelligem DB-Passwort und Token-Geheimnis.
+$envFile = Join-Path (Split-Path -Parent $PSScriptRoot) '.env'
+if (-not (Test-Path -LiteralPath $envFile)) {
+    function New-RandomSecret([int]$bytes) {
+        $b = New-Object byte[] $bytes
+        [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b)
+        return ([Convert]::ToBase64String($b) -replace '[+/=]', '')
+    }
+    $example = Join-Path (Split-Path -Parent $PSScriptRoot) '.env.example'
+    $content = (Get-Content -LiteralPath $example) | ForEach-Object {
+        if ($_ -match '^LUMIIS_DB_PASSWORD=') { 'LUMIIS_DB_PASSWORD=' + (New-RandomSecret 18) }
+        elseif ($_ -match '^LUMIIS_TOKEN_SECRET=') { 'LUMIIS_TOKEN_SECRET=' + (New-RandomSecret 48) }
+        else { $_ }
+    }
+    [System.IO.File]::WriteAllLines($envFile, [string[]]$content)
+    Write-Host ".env war nicht vorhanden und wurde aus .env.example erzeugt (zufaelliges Passwort und Token-Geheimnis)."
+}
+
 . (Join-Path $PSScriptRoot 'dev-env.ps1')
 foreach ($n in 'LUMIIS_DB_NAME', 'LUMIIS_DB_USER', 'LUMIIS_DB_PASSWORD') {
     if (-not (Get-Item "Env:$n" -ErrorAction SilentlyContinue)) { Write-Host "$n fehlt in .env." -ForegroundColor Red; exit 1 }
