@@ -587,10 +587,13 @@ def build_map(key, cfg, mobs_by_id, npc_ids, preview_dir):
     taken = set()
     sid = 1
 
-    def add(mob_id, tx, ty, respawn):
+    def add(mob_id, tx, ty, respawn, group=None):
         nonlocal sid
         x, y = g.wire(tx, ty)
-        spawns.append({"id": sid, "mobId": mob_id, "positionX": x, "positionY": y, "respawnSeconds": respawn})
+        sp = {"id": sid, "mobId": mob_id, "positionX": x, "positionY": y, "respawnSeconds": respawn}
+        if group:
+            sp["groupId"] = group  # Server: Gruppe greift gemeinsam an und wandert zusammen
+        spawns.append(sp)
         taken.add((tx, ty))
         sid += 1
 
@@ -612,13 +615,13 @@ def build_map(key, cfg, mobs_by_id, npc_ids, preview_dir):
     def free(x, y):
         return 0 <= x < g.w and 0 <= y < g.h and huntable[y, x] and (x, y) not in taken
 
-    def place(mob_id, tx, ty, respawn, maxr=4):
+    def place(mob_id, tx, ty, respawn, maxr=4, group=None):
         for r in range(maxr + 1):
             ring = [(tx + ox, ty + oy) for oy in range(-r, r + 1) for ox in range(-r, r + 1) if max(abs(ox), abs(oy)) == r]
             rng.shuffle(ring)
             for x, y in ring:
                 if free(x, y):
-                    add(mob_id, x, y, respawn)
+                    add(mob_id, x, y, respawn, group)
                     return True
         return False
 
@@ -644,6 +647,7 @@ def build_map(key, cfg, mobs_by_id, npc_ids, preview_dir):
 
     # Monstergruppen je Gebiet
     zone_names = {}
+    gid = 0
     for rg in z["regions"]:
         th = rg["theme"]
         zone_names.setdefault(th["name"], 0)
@@ -660,8 +664,9 @@ def build_map(key, cfg, mobs_by_id, npc_ids, preview_dir):
             group = [kind] * GROUP_SIZE
             lvl = MOB_LEVELS[kind]
             respawn = 30 if lvl < 10 else 45 if lvl < 25 else 60
+            gid += 1
             for m in group:
-                place(MOB_IDS[m], cx, cy, respawn)
+                place(MOB_IDS[m], cx, cy, respawn, group=gid)
 
     # Mini-Boss-Events: Gebiet mit passendem Level (und Habitat), mehrere Erscheinungsorte
     events = []

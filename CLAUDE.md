@@ -1423,7 +1423,8 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   (Minimap-Marker macht der UI-Thread). Siehe Abschnitt Map1. 733 Tests grün.
 - Monster in 3er-Gruppen (2026-10-26, Wunsch des Users): jede Spawn-Gruppe sind genau 3 Monster desselben
   Typs (`GROUP_SIZE` in `tools/build-wiki-content.py`, z. B. 3x Wildhund, 3x Hungriger Wildhund), Bosse
-  ausgenommen; Level-Ringe/Gebiete unverändert. Yongan 2952, Jayang 2694 Spawns.
+  ausgenommen; Level-Ringe/Gebiete unverändert. Yongan 2952, Jayang 2694 Spawns. Jede Gruppe trägt eine
+  `groupId` in spawns.json (greift gemeinsam an, wandert zusammen; Steine/Puppen ohne).
 - Flächenschlag + schwächere Hungrige Wildhunde (2026-10-26, Protocol.Version 23): normaler Hieb trifft alle
   Gegner im Schlagbogen (siehe Abschnitt Map1/Steuerung), `WorldSwingTests` (9). Hungriger Wildhund (Mob 25,
   `tools/build-wiki-content.py` custom_mobs) 140->105 HP, Angriff 14->11, Verteidigung 2->1, Takt 1500->1700 ms,
