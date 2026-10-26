@@ -1445,9 +1445,11 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   statt Unity-Rigidbody (der Server entscheidet die Position): `Game/BodyGrid.cs` (grobes 400-Wire-Raster aller
   lebenden Spieler/Monster) blockiert einen Schritt, der einem fremden Körper näher als 2×
   `GameConstants.BodyRadiusWire` (30) kommt UND sich ihm annähert - Wegbewegen geht immer. Keine Kollision
-  Spieler-Spieler (wie Metin2, Dorf verstopft sonst) und zwischen Monstern derselben `groupId` (Formation).
-  `World.Tick` stoppt blockierte Entities (EntityStop), `SetDestination` startet keine Bewegung, wenn schon der
-  erste Schritt blockiert ist; `HandleMoveTo` schickt dann EntityStop statt EntityMove. `WorldBodyCollisionTests`
+  Spieler-Spieler (wie Metin2, Dorf verstopft sonst); Monster kollidieren alle miteinander, auch innerhalb
+  einer `groupId` (User 2026-10-26). `World.Tick` stoppt blockierte Entities (EntityStop); ist in
+  `SetDestination` schon der erste Schritt blockiert, sucht `SteerAround` ein kurzes Ausweichziel (120 Wire unter
+  40/70/100°, zuerst die freie Seite), sonst keine Bewegung - `HandleMoveTo` schickt dann EntityStop statt
+  EntityMove. `WorldBodyCollisionTests`
   (6). 755 Tests grün.
 - Offen: Monster-Sheets für die Jayang-Mobs, weitere Zonen/Dungeons, Reittiere; siehe
   `docs/feature-gap-lumiis.md`.
