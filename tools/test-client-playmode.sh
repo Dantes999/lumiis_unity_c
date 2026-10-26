@@ -21,6 +21,18 @@ if [ ! -x "$UNITY_BIN" ]; then
     exit 1
 fi
 
+# Lumiis.Shared.dll (Pakete wie MapEventInfo) kommt per dotnet build nach client/Assets/Plugins/Lumiis/ - ohne
+# diesen Schritt kompiliert Unity nach einem git pull gegen eine veraltete DLL ("type ... could not be found").
+if command -v dotnet >/dev/null 2>&1; then
+    echo "Aktualisiere Lumiis.Shared.dll (dotnet build) ..."
+    if ! dotnet build "$REPO_ROOT/server/src/Lumiis.Shared/Lumiis.Shared.csproj" -nologo -v q >/tmp/lumiis-shared-build.log 2>&1; then
+        echo "dotnet build von Lumiis.Shared fehlgeschlagen, siehe /tmp/lumiis-shared-build.log" >&2
+        exit 1
+    fi
+else
+    echo "Warnung: dotnet nicht gefunden - Lumiis.Shared.dll wird nicht aktualisiert." >&2
+fi
+
 echo "Führe PlayMode-Tests aus - Unity-Editor muss geschlossen sein ..."
 echo "Log: $LOG_FILE"
 echo "Ergebnisse: $RESULTS_FILE"

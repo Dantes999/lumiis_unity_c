@@ -38,6 +38,18 @@ if [ -e "$LOCK_FILE" ] && command -v fuser >/dev/null 2>&1 && ! fuser "$LOCK_FIL
     rm -f "$LOCK_FILE"
 fi
 
+# Lumiis.Shared.dll (Pakete wie MapEventInfo) kommt per dotnet build nach client/Assets/Plugins/Lumiis/ - ohne
+# diesen Schritt kompiliert Unity nach einem git pull gegen eine veraltete DLL ("type ... could not be found").
+if command -v dotnet >/dev/null 2>&1; then
+    echo "Aktualisiere Lumiis.Shared.dll (dotnet build) ..."
+    if ! dotnet build "$REPO_ROOT/server/src/Lumiis.Shared/Lumiis.Shared.csproj" -nologo -v q >/tmp/lumiis-shared-build.log 2>&1; then
+        echo "dotnet build von Lumiis.Shared fehlgeschlagen, siehe /tmp/lumiis-shared-build.log" >&2
+        exit 1
+    fi
+else
+    echo "Warnung: dotnet nicht gefunden - Lumiis.Shared.dll wird nicht aktualisiert." >&2
+fi
+
 echo "Baue Client (Development, aktuelle Plattform) aus $PROJECT_DIR"
 echo "Log: $LOG_FILE"
 : > "$LOG_FILE"
