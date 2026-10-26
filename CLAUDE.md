@@ -1408,6 +1408,9 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   mehr 1:1 lumiis-2d, sondern Level-Ringe um die Stadt (Jayang ab Portal), Gebietsthemen nach Gelände, Steine
   nach Gebietslevel, `events.json` + `World.RunMapEvents` + `MapEventsPacket`, `ClientWorld.MapEvents`
   (Minimap-Marker macht der UI-Thread). Siehe Abschnitt Map1. 733 Tests grün.
+- Monster in 3er-Gruppen (2026-10-26, Wunsch des Users): jede Spawn-Gruppe sind genau 3 Monster desselben
+  Typs (`GROUP_SIZE` in `tools/build-wiki-content.py`, z. B. 3x Wildhund, 3x Hungriger Wildhund), Bosse
+  ausgenommen; Level-Ringe/Gebiete unverändert. Yongan 2952, Jayang 2694 Spawns.
 - Offen: Monster-Sheets für die Jayang-Mobs, weitere Zonen/Dungeons, Reittiere; siehe
   `docs/feature-gap-lumiis.md`.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client
