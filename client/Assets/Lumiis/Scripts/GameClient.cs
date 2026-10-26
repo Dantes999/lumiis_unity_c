@@ -2508,7 +2508,7 @@ namespace Lumiis.Client
             if (slotIndex >= 0) _netClient?.SendUseConsumable(slotIndex);
         }
 
-        /// <summary>Erster Inventarplatz mit einem Consumable (-1 = keiner) plus Gesamtanzahl solcher Plätze.</summary>
+        /// <summary>Erster Inventarplatz mit einem Consumable (-1 = keiner) plus Gesamtmenge (Stapel mitgezählt).</summary>
         public int FindFirstConsumableSlot(out int count)
         {
             count = 0;
@@ -2517,7 +2517,7 @@ namespace Lumiis.Client
             foreach ((int SlotIndex, int ItemId, int UpgradeLevel) entry in _inventorySlots)
             {
                 if (!_itemCatalog.TryGet(entry.ItemId, out ItemEntryJson item) || item.itemType != "Consumable") continue;
-                count++;
+                count += Math.Max(1, InventoryCount(entry.SlotIndex));
                 if (first < 0 || entry.SlotIndex < first) first = entry.SlotIndex;
             }
             return first;
