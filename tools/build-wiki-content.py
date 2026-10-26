@@ -453,6 +453,7 @@ def faction_themes(factions):
     return run
 
 
+GROUP_SIZE = 3
 MOB_LEVELS = {}  # wird in main() aus den lumiis-2d-Werten gefüllt
 
 
@@ -466,7 +467,7 @@ MAPS = {
         "bands": [
             {"upto": 0.10, "levels": (1, 2), "assign": assign_by_habitat([
                 pack("Wildhunde", ["wild_dog"], (3, 4), t=(0, 0.55)),
-                pack("Hungrige Wildhunde", ["hungry_wild_dog", "hungry_wild_dog", "wild_dog"], (3, 4), t=(0.45, 1))])},
+                pack("Hungrige Wildhunde", ["hungry_wild_dog"], (3, 4), t=(0.45, 1))])},
             {"upto": 0.24, "levels": (3, 5), "assign": assign_by_habitat([
                 pack("Wölfe", ["wolf"], (3, 4), t=(0, 0.5)),
                 pack("Alphawolf-Rudel", ["wolf"], (3, 4), leader=["alpha_wolf"], t=(0.5, 1))])},
@@ -650,13 +651,13 @@ def build_map(key, cfg, mobs_by_id, npc_ids, preview_dir):
         mask[rg["tiles"][1], rg["tiles"][0]] = True
         centers = poisson(mask, cfg["group_spacing"], rng)
         for cx, cy in centers:
-            n = int(rng.integers(th["size"][0], th["size"][1] + 1))
-            group = []
-            if th.get("leader") and rng.random() < 0.6:
-                group.append(str(rng.choice(th["leader"])))
-                n -= 1
-            group += [str(rng.choice(th["members"])) for _ in range(n)]
-            lvl = max(MOB_LEVELS[m] for m in group)
+            # Wie im Original: immer 3 Monster desselben Typs je Gruppe (Bosse ausgenommen, siehe Events)
+            if th.get("leader") and rng.random() < 0.3:
+                kind = str(rng.choice(th["leader"]))
+            else:
+                kind = str(rng.choice(th["members"]))
+            group = [kind] * GROUP_SIZE
+            lvl = MOB_LEVELS[kind]
             respawn = 30 if lvl < 10 else 45 if lvl < 25 else 60
             for m in group:
                 place(MOB_IDS[m], cx, cy, respawn)
