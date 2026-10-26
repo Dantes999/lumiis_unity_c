@@ -413,8 +413,51 @@ public sealed class World
     /// <summary>Setzt ein Bewegungsziel, zuerst auf die Kartengrenzen geklemmt, danach (falls eine
     /// CollisionMap gesetzt ist) gegen sie geprüft: die gerade Linie von der aktuellen Position zum
     /// geklemmten Ziel wird zellenweise abgeschritten (ClipToLastWalkableCell), die Bewegung stoppt an der
-    /// letzten begehbaren Zelle vor einer blockierten.</summary>
+    /// letzten begehbaren Zelle vor einer blockierten. Läuft schon der erste Schritt in einen fremden Körper
+    /// (siehe BodyGrid), startet keine Bewegung - Aufrufer prüfen danach Entity.IsMoving.</summary>
     public bool SetDestination(int entityId, int targetX, int targetY)
+    {
+        bool wasMoving = _entities.TryGetValue(entityId, out Entity? before) && before.IsMoving;
+        if (!SetDestinationThroughBodies(entityId, targetX, targetY)) return false;
+        Entity entity = _entities[entityId];
+        if (entity.IsMoving)
+        {
+            (double nextX, double nextY) = entity.PeekStep(BodyProbeSeconds);
+            if (Bodies().Blocks(entity, nextX, nextY))
+            {
+                entity.StopMoving();
+                // Nur wer gerade noch lief, braucht ein EntityStop (siehe Tick) - ein schon stehendes Monster,
+                // das jeden Tick erneut gegen denselben Körper verfolgt, erzeugt so keine Paketflut.
+                if (wasMoving && !_bodyStopped.Contains(entity)) _bodyStopped.Add(entity);
+            }
+        }
+        return true;
+    }
+
+    private readonly List<Entity> _bodyStopped = new();
+
+    /// <summary>Wie weit (in Sekunden Bewegung) SetDestination vorausschaut, ob der Weg gleich in einen Körper
+    /// läuft - ungefähr ein Server-Tick.</summary>
+    private const double BodyProbeSeconds = 0.05;
+
+    /// <summary>Körperraster für den aktuellen Tick, bei geänderter Entity-Anzahl neu aufgebaut (Join,
+    /// Spawn, Tod zwischen zwei Ticks).</summary>
+    private BodyGrid Bodies()
+    {
+        if (_bodyGridDirty || _bodyGridCount != _entities.Count)
+        {
+            _bodyGrid.Rebuild(_entities.Values);
+            _bodyGridCount = _entities.Count;
+            _bodyGridDirty = false;
+        }
+        return _bodyGrid;
+    }
+
+    private readonly BodyGrid _bodyGrid = new();
+    private int _bodyGridCount = -1;
+    private bool _bodyGridDirty = true;
+
+    private bool SetDestinationThroughBodies(int entityId, int targetX, int targetY)
     {
         if (!_entities.TryGetValue(entityId, out Entity? entity)) return false;
         if (entity.IsDead) return false; // Tote laufen nicht bis zum Respawn.
@@ -1757,8 +1800,21 @@ public sealed class World
         List<Entity> BuffsExpired) Tick(double deltaSeconds, long nowMs)
     {
         List<Entity> arrived = new();
+        _bodyGridDirty = true;
+        BodyGrid bodies = Bodies();
         foreach (Entity entity in _entities.Values)
         {
+            if (entity.IsMoving)
+            {
+                (double nextX, double nextY) = entity.PeekStep(deltaSeconds);
+                if (bodies.Blocks(entity, nextX, nextY))
+                {
+                    // Körperkollision: an Ort und Stelle stehen bleiben, Beobachter bekommen EntityStop.
+                    entity.StopMoving();
+                    arrived.Add(entity);
+                    continue;
+                }
+            }
             if (entity.Tick(deltaSeconds))
                 arrived.Add(entity);
         }
@@ -1851,6 +1907,15 @@ public sealed class World
             RecomputeDerivedStats(entity);
             buffsExpired.Add(entity);
         }
+
+        // Ein Monster, dessen neuer Weg gleich an einem Körper endet (SetDestination startet dann nicht),
+        // bekommt kein EntityMove mit veraltetem Ziel; lief es vorher noch, ein EntityStop (_bodyStopped).
+        startedWandering.RemoveAll(e => !e.IsMoving);
+        foreach (Entity stopped in _bodyStopped)
+        {
+            if (!stopped.IsMoving && !arrived.Contains(stopped)) arrived.Add(stopped);
+        }
+        _bodyStopped.Clear();
 
         return (arrived, startedWandering, respawned, respawnedMonsters, monsterAttacks, regeneratedPlayers, buffsExpired);
     }

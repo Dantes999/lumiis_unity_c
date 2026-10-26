@@ -1484,6 +1484,14 @@ public sealed class GameServer : INetEventListener
         world.SetDestination(entityId, moveTo.X, moveTo.Y);
         TryGetEntity(entityId, out Entity? entity);
 
+        if (!entity!.IsMoving)
+        {
+            // Weg gleich zu Beginn versperrt (Wand oder Körper eines Monsters): stehen bleiben statt ein
+            // altes Ziel weiterzuschicken.
+            SendToVisible(entityId, new EntityStopPacket { EntityId = entityId, X = entity.IntX, Y = entity.IntY });
+            return;
+        }
+
         SendToVisible(entityId, new EntityMovePacket
         {
             EntityId = entityId,

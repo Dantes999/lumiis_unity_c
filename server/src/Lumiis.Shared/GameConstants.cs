@@ -64,6 +64,10 @@ namespace Lumiis.Shared
         /// Winkel (sie stehen praktisch im Körper).</summary>
         public const int PlayerSwingPointBlankWire = 60;
 
+        /// <summary>Körperradius (Wire) für die Kollision zwischen Spielern und Monstern (siehe
+        /// Lumiis.Server BodyGrid): zwei Körper bleiben mindestens doppelt so weit auseinander.</summary>
+        public const int BodyRadiusWire = 30;
+
         /// <summary>Obergrenze getroffener Gegner je Hieb (begrenzt Pakete pro Schlag).</summary>
         public const int PlayerSwingMaxTargets = 12;
     }

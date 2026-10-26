@@ -489,21 +489,29 @@ public sealed class Entity
     {
         if (!IsMoving) return false;
 
+        (double nextX, double nextY) = PeekStep(deltaSeconds);
+        X = nextX;
+        Y = nextY;
+        if (X == TargetX && Y == TargetY)
+        {
+            IsMoving = false;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>Position nach deltaSeconds Bewegung, ohne sie zu übernehmen (für die Körperkollision, siehe
+    /// BodyGrid). Ohne Bewegung die aktuelle Position.</summary>
+    public (double X, double Y) PeekStep(double deltaSeconds)
+    {
+        if (!IsMoving) return (X, Y);
+
         double dx = TargetX - X;
         double dy = TargetY - Y;
         double distance = System.Math.Sqrt(dx * dx + dy * dy);
         double step = Speed * deltaSeconds;
 
-        if (step >= distance)
-        {
-            X = TargetX;
-            Y = TargetY;
-            IsMoving = false;
-            return true;
-        }
-
-        X += dx / distance * step;
-        Y += dy / distance * step;
-        return false;
+        if (step >= distance) return (TargetX, TargetY);
+        return (X + dx / distance * step, Y + dy / distance * step);
     }
 }
