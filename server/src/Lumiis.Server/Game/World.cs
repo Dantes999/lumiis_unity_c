@@ -548,7 +548,8 @@ public sealed class World
         if (attacker.IsDead)
             return SwingResult.Fail(AttackFailedReason.AttackerDead);
 
-        long range = EffectiveMeleeRangeWire(attacker);
+        long range = Math.Max(EffectiveMeleeRangeWire(attacker),
+            GameConstants.PlayerSwingRangeWire + GameConstants.PlayerMeleeRangeToleranceWire);
         long rangeSq = range * range;
 
         Entity? preferred = null;
@@ -615,6 +616,24 @@ public sealed class World
         return SwingResult.Ok(hits);
     }
 
+    /// <summary>Rudel-Aggro (Splasher-Kampf): wird ein Monster auf einen Spieler aufmerksam, nehmen alle
+    /// lebenden, zielfreien Monster derselben Art mit nahem Spawn-Anker (GameConstants.PackAlertRangeWire)
+    /// denselben Spieler ins Visier - wie in Metin2 kommt die ganze Gruppe, nicht nur das getroffene Tier.
+    /// O(n) über die Entities, läuft aber nur beim Wechsel eines Monsters von "kein Ziel" zu "Ziel".</summary>
+    private void AlertPack(Entity source, int playerId)
+    {
+        long alertSq = (long)GameConstants.PackAlertRangeWire * GameConstants.PackAlertRangeWire;
+        foreach (Entity other in _entities.Values)
+        {
+            if (other == source || other.Kind != EntityKind.Monster || other.TypeId != source.TypeId) continue;
+            if (other.IsDead || !other.FightsBack || other.TargetEntityId != null) continue;
+            long dx = other.WanderAnchorX - source.WanderAnchorX;
+            long dy = other.WanderAnchorY - source.WanderAnchorY;
+            if (dx * dx + dy * dy > alertSq) continue;
+            other.TargetEntityId = playerId;
+        }
+    }
+
     private static long DistanceSq(Entity a, Entity b)
     {
         long dx = a.IntX - b.IntX;
@@ -659,7 +678,10 @@ public sealed class World
         // dem Ausweichwurf (M6a) - ein ausgewichener Treffer ist immer noch ein Angriff, der den Verteidiger
         // aufmerksam macht (siehe docs/tasks/M6a-progression.md Abschnitt 0e).
         if (target.Kind == EntityKind.Monster && target.FightsBack && target.TargetEntityId == null)
+        {
             target.TargetEntityId = attacker.Id;
+            AlertPack(target, attacker.Id);
+        }
 
         // M6a: Ausweichwurf NACH reaktiver Zielerfassung (bleibt unverändert, siehe Kommentar oben) - Monster
         // haben DodgeBp 0 (nie neu berechnet, siehe RecomputeDerivedStats), weichen also nie aus. Bei
@@ -1821,6 +1843,7 @@ public sealed class World
             if (nearestPlayer != null)
             {
                 entity.TargetEntityId = nearestPlayer.Id;
+                AlertPack(entity, nearestPlayer.Id);
                 return; // Verfolgung beginnt im naechsten Tick (40ms Verzoegerung, nicht wahrnehmbar)
             }
         }

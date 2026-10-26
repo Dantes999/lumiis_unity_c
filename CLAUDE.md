@@ -223,13 +223,17 @@ Seit 2026-10-25 gibt es echte, begehbare Karten statt einer einzigen Welt. Detai
   Figur, bleibt die letzte Blickrichtung stehen (sonst kippte sie bei jeder kleinen Bewegung). `MeleeArcView` zeigt bei jedem Schlag einen sichtbaren Bogen in Zielrichtung und
   Reichweite; ein roter Ring markiert das getroffene Ziel.
 - Flächenschlag (Protocol.Version 23, Wunsch des Users: "Splasher" wie Metin2/Diablo): ein normaler
-  Spieler-Hieb trifft JEDEN Gegner in Nahkampf-Reichweite im Schlagbogen (±`GameConstants.
-  PlayerSwingHalfAngleDegrees` = 80° um die Mausrichtung, dazu alles innerhalb `PlayerSwingPointBlankWire`),
+  Spieler-Hieb trifft JEDEN Gegner in `GameConstants.PlayerSwingRangeWire` (250, größer als die
+  Einzelziel-Reichweite) im Schlagbogen (±`PlayerSwingHalfAngleDegrees` = 110° um die Mausrichtung, also
+  alles außer direkt hinter der Figur, dazu alles innerhalb `PlayerSwingPointBlankWire`),
   höchstens `PlayerSwingMaxTargets` (12), jeder mit vollem Schaden und eigenem Ausweichwurf
   (`World.TryPlayerSwing` -> je Treffer `ResolveHit`, getroffene Monster nehmen den Spieler ins Visier).
   `AttackRequestPacket` trägt dafür `AimX/AimY` (Richtung x1000, (0,0) = Richtung zum Ziel); TargetEntityId
   ist nur noch das bevorzugte Ziel (0 = keins). Trifft der Hieb niemanden, kommt AttackFailed ohne
-  Cooldown-Verbrauch. Monster greifen weiter einzeln per `TryAttack` an. Client: mehrere eigene Treffer im
+  Cooldown-Verbrauch. Rudel-Aggro (`World.AlertPack`): wird ein Monster aufmerksam (Treffer oder eigene
+  Aggro), kommen alle zielfreien Monster derselben Art mit Spawn-Anker in `PackAlertRangeWire` (500) mit -
+  die ganze 3er-Gruppe rennt los. Der Client schickt jeden Leertasten-Hieb ab, sobald im Kontaktmoment
+  jemand im Bogen steht (auch ohne Auto-Ziel). Monster greifen weiter einzeln per `TryAttack` an. Client: mehrere eigene Treffer im
   selben Frame = ein Sound, stärkeres Kamerawackeln und längerer Treffer-Stopp.
 - Kampf: Leertaste schlägt, gedrückt halten wiederholt den Schlag im Server-Cooldown-Takt. Der lokale
   Kombo-Zähler wechselt links/rechts/links und neigt die Figur sichtbar; Auto-Target wählt das nächste
@@ -1424,6 +1428,8 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   Gegner im Schlagbogen (siehe Abschnitt Map1/Steuerung), `WorldSwingTests` (9). Hungriger Wildhund (Mob 25,
   `tools/build-wiki-content.py` custom_mobs) 140->105 HP, Angriff 14->11, Verteidigung 2->1, Takt 1500->1700 ms,
   EXP 20->18. 742 Tests grün.
+  Nachgeschärft (User: "lokal nichts anders"): Bogen 80°->110°, eigene Reichweite 250 statt 150, Rudel-Aggro,
+  Leertaste schlägt auch ohne Auto-Ziel zu. 744 Tests grün.
 - Offen: Monster-Sheets für die Jayang-Mobs, weitere Zonen/Dungeons, Reittiere; siehe
   `docs/feature-gap-lumiis.md`.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client

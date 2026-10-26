@@ -1412,16 +1412,10 @@ namespace Lumiis.Client
             if (!_attackHeld || Time.time < _nextAutoAttackAt) return;
             _nextAutoAttackAt = Time.time + 0.82f;
 
-            int targetId = FindAutoAttackTarget();
-            if (targetId <= 0)
-            {
-                // Auch ohne Ziel immer schlagen: Animation, Sound und Kombo laufen lokal weiter. Ein
-                // AttackRequest an den Server wäre ohne Ziel nur ein garantiertes AttackFailed.
-                PerformSwingOnly();
-                return;
-            }
+            // Flächenschlag: jeder Hieb läuft als echter Angriff. Ob er rausgeht, entscheidet der Kontaktmoment
+            // (steht dann jemand im Schlagbogen?) - ein Einzelziel ist nur noch bevorzugt, nicht nötig.
             _lastAttackFailedMessage = "";
-            PerformAttack(targetId);
+            PerformAttack(FindAutoAttackTarget());
         }
 
         private int FindAutoAttackTarget()
@@ -1482,20 +1476,13 @@ namespace Lumiis.Client
             return Mathf.Sqrt(dx * dx + dy * dy);
         }
 
-        private void PerformSwingOnly()
-        {
-            PlayAttackAnimation(_world.LocalEntityId, _comboIndex, AimDegrees);
-            _audio?.PlaySwing();
-            _comboIndex = (_comboIndex + 1) % 3;
-        }
-
         private float AimDegrees => Mathf.Atan2(_aimDirection.y, _aimDirection.x) * Mathf.Rad2Deg;
 
         /// <summary>Schickt den beim Hiebbeginn vorgemerkten Angriff genau im Kontaktmoment ab - nur wenn das Ziel
         /// dann noch lebt und in Reichweite ist (sonst geht der Hieb ins Leere, wie bei einem echten Schwert).</summary>
         private void ProcessPendingAttack()
         {
-            if (_pendingAttackTargetId <= 0 || Time.time < _pendingAttackAt) return;
+            if (_pendingAttackTargetId < 0 || Time.time < _pendingAttackAt) return;
             int targetId = _pendingAttackTargetId;
             _pendingAttackTargetId = -1;
 
@@ -1506,7 +1493,7 @@ namespace Lumiis.Client
             // (z. B. vom letzten Hieb), geht der Schlag trotzdem raus, solange noch jemand im Bogen steht.
             int inArc = CountMonstersInSwingArc(local, _pendingAttackAim);
             if (inArc == 0) return;
-            if (!_world.Entities.TryGetValue(targetId, out ClientEntity target) || target.CurrentHp == 0) targetId = 0;
+            if (targetId > 0 && (!_world.Entities.TryGetValue(targetId, out ClientEntity target) || target.CurrentHp == 0)) targetId = 0;
 
             _netClient.SendAttack(targetId, Mathf.RoundToInt(_pendingAttackAim.x * 1000f), Mathf.RoundToInt(_pendingAttackAim.y * 1000f));
             if (_animators.TryGetValue(_world.LocalEntityId, out CharacterAnimator animator) && animator != null)
@@ -1517,7 +1504,7 @@ namespace Lumiis.Client
         /// die Entscheidung, ob ein Hieb rausgeht und wie stark der Treffer-Stopp ist.</summary>
         private int CountMonstersInSwingArc(ClientEntity local, Vector2 aim)
         {
-            float range = (_classCatalog != null ? _classCatalog.MeleeRangeWire : 150) / 100f;
+            float range = Mathf.Max(_classCatalog != null ? _classCatalog.MeleeRangeWire : 150, GameConstants.PlayerSwingRangeWire) / 100f;
             float cosHalf = Mathf.Cos(GameConstants.PlayerSwingHalfAngleDegrees * Mathf.Deg2Rad);
             float pointBlank = GameConstants.PlayerSwingPointBlankWire / 100f;
             int count = 0;
@@ -1599,14 +1586,16 @@ namespace Lumiis.Client
             return (float)(Math.Atan2(dy, dx) * 180.0 / Math.PI);
         }
 
+        /// <summary>Startet einen Hieb in Mausrichtung; targetId &lt;= 0 = kein bevorzugtes Ziel (Flächenschlag
+        /// trifft trotzdem alles im Bogen, siehe ProcessPendingAttack).</summary>
         private void PerformAttack(int targetId)
         {
-            if (targetId <= 0) return;
-            _targetEntityId = targetId;
+            if (targetId > 0) _targetEntityId = targetId;
+            else targetId = 0;
 
             // Hieb in Zielrichtung (Mauszeiger); der Angriff selbst geht im Kontaktmoment raus.
             float aim = AimDegrees;
-            float toTarget = DegreesBetween(_world.LocalEntityId, targetId);
+            float toTarget = targetId > 0 ? DegreesBetween(_world.LocalEntityId, targetId) : float.NaN;
             float offset = float.IsNaN(toTarget) ? 0f : SwingMath.NormalizeDegrees(toTarget - aim);
             _pendingAttackTargetId = targetId;
             _pendingAttackAim = _aimDirection;

@@ -48,8 +48,17 @@ namespace Lumiis.Shared
         public const int PlayerMeleeRangeToleranceWire = 50;
 
         /// <summary>Flächenschlag (Protocol 23): ein normaler Spieler-Hieb trifft jeden Gegner in Reichweite,
-        /// der höchstens so viele Grad neben der Schlagrichtung steht (Bogen = doppelter Wert).</summary>
-        public const int PlayerSwingHalfAngleDegrees = 80;
+        /// der höchstens so viele Grad neben der Schlagrichtung steht (Bogen = doppelter Wert, also alles außer
+        /// direkt hinter der Figur).</summary>
+        public const int PlayerSwingHalfAngleDegrees = 110;
+
+        /// <summary>Reichweite des Flächenschlags - bewusst größer als die Einzelziel-Nahkampfreichweite
+        /// (MeleeRangeWire), damit ein Hieb das ganze Rudel um die Figur erwischt.</summary>
+        public const int PlayerSwingRangeWire = 250;
+
+        /// <summary>Rudel: wird ein Monster auf einen Spieler aufmerksam, kommen alle Monster derselben Art mit,
+        /// deren Spawn-Anker höchstens so weit entfernt liegt (die 3er-Gruppe stammt aus demselben Punkt).</summary>
+        public const int PackAlertRangeWire = 500;
 
         /// <summary>Gegner, die enger als dieser Abstand an der Figur kleben, trifft der Hieb unabhängig vom
         /// Winkel (sie stehen praktisch im Körper).</summary>

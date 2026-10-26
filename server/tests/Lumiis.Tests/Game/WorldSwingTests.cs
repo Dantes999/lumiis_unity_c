@@ -146,6 +146,37 @@ namespace Lumiis.Tests.Game
         }
 
         [Fact]
+        public void Swing_ReachesBeyondSingleTargetMeleeRange()
+        {
+            var world = new World(maxPlayers: 10);
+            Entity player = JoinPlayer(world);
+            Entity farFront = SpawnMonster(world, X + 240, Y);
+
+            SwingResult swing = world.TryPlayerSwing(player.Id, 0, 1, 0, nowMs: 0);
+
+            Assert.Equal(new[] { farFront.Id }, swing.Hits.Select(h => h.TargetEntityId));
+        }
+
+        [Fact]
+        public void Hit_AlertsWholePackOfSameKind_ButNotOtherMobsOrFarGroups()
+        {
+            var world = new World(maxPlayers: 10);
+            Entity player = JoinPlayer(world);
+            Entity hit = SpawnMonster(world, X + 120, Y);
+            Entity packMate = SpawnMonster(world, X + 400, Y + 200);
+            Entity farGroup = SpawnMonster(world, X + 2000, Y);
+            Entity otherKind = world.SpawnMonster(mobId: 2, "Waldschrat", X - 280, Y, speedWire: 200,
+                wanderRadiusWire: 300, wanderIntervalMinMs: 1000, wanderIntervalMaxMs: 1000, nowMs: 0, 60, 5, 0, 0, 0);
+
+            world.TryPlayerSwing(player.Id, hit.Id, 1, 0, nowMs: 0);
+
+            Assert.Equal(player.Id, hit.TargetEntityId);
+            Assert.Equal(player.Id, packMate.TargetEntityId);
+            Assert.Null(farGroup.TargetEntityId);
+            Assert.Null(otherKind.TargetEntityId);
+        }
+
+        [Fact]
         public void Swing_CapsNumberOfTargets()
         {
             var world = new World(maxPlayers: 30);
