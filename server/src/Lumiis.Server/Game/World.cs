@@ -38,6 +38,33 @@ public sealed class World
 
     /// <summary>Abstand der Gruppenmitglieder um den gemeinsamen Wanderpunkt (Wire).</summary>
     private const int GroupFormationRadiusWire = 80;
+
+    // Natürlichere Monsterbewegung (2026-10-26, User: "sie laufen immer im Block").
+    /// <summary>Wandertempo in Prozent des Mob-Tempos - Monster schlendern, gerannt wird nur beim Verfolgen.</summary>
+    private const int WanderSpeedPercent = 55;
+    /// <summary>Lockere Formation: jedes Mitglied sucht sich einen eigenen Punkt in diesem Abstand ums Ziel.</summary>
+    private const int GroupLooseMinWire = 40;
+    private const int GroupLooseMaxWire = 160;
+    /// <summary>Mitläufer starten versetzt (ms nach dem Anführer).</summary>
+    private const int GroupStartDelayMinMs = 250;
+    private const int GroupStartDelayMaxMs = 1500;
+    /// <summary>Chance (Prozent), dass ein Mitglied eine Wanderrunde stehen bleibt (schaut sich um).</summary>
+    private const int GroupStayBehindPercent = 25;
+    /// <summary>Weiter als das vom Gruppenziel entfernt läuft ein Mitglied immer mit.</summary>
+    private const int GroupCatchUpWire = 300;
+    /// <summary>Chance (Prozent) je fälliger Runde, dass ein wartender Mitläufer ein paar Schritte trippelt.</summary>
+    private const int GroupFidgetPercent = 35;
+    private const int GroupFidgetStepWire = 90;
+    /// <summary>Ab dieser Weglänge geht ein Wanderweg leicht geschwungen über einen Zwischenpunkt.</summary>
+    private const int CurveMinDistanceWire = 220;
+    /// <summary>Reaktionszeit alarmierter Rudelmitglieder.</summary>
+    private const int AlertReactMinMs = 120;
+    private const int AlertReactMaxMs = 650;
+    /// <summary>Verfolger zielen nicht auf die Spielermitte, sondern auf einen Punkt im Nahkampfabstand
+    /// (Prozent der Nahkampfreichweite) unter ihrem eigenen Anlaufwinkel.</summary>
+    private const int ChaseSlotRangePercent = 70;
+    /// <summary>Neues Verfolgungsziel erst, wenn sich der Zielpunkt um mehr als das verschoben hat.</summary>
+    private const int ChaseRepathWire = 35;
     private readonly CollisionMap? _collisionMap;
     private readonly MapDefinition? _mapDefinition;
     private readonly ItemCatalog? _itemCatalog;
@@ -231,6 +258,8 @@ public sealed class World
             meleeRangeWire, attackCooldownMs, aggressive, aggroRangeWire, leashRangeWire, drops, level, baseXp);
         entity.MapId = MapId;
         entity.NextWanderAtMs = nowMs + _random.Next(wanderIntervalMinMs, wanderIntervalMaxMs + 1);
+        entity.SpeedPercent = _random.Next(92, 109);
+        entity.ChaseSlotDegrees = _random.Next(-50, 51);
         _entities[id] = entity;
         return entity;
     }
@@ -503,7 +532,7 @@ public sealed class World
 
         if (_collisionMap == null)
         {
-            entity.MoveTo(clampedX, clampedY, entity.MovementSpeed);
+            entity.MoveTo(clampedX, clampedY, MoveSpeedOf(entity));
             return true;
         }
 
@@ -523,16 +552,18 @@ public sealed class World
         if (stopCellX == targetCellX && stopCellY == targetCellY)
         {
             // Ganzer Weg begehbar - Ziel exakt wie ohne Kollisionsprüfung, kein Zellen-Snapping.
-            entity.MoveTo(clampedX, clampedY, entity.MovementSpeed);
+            entity.MoveTo(clampedX, clampedY, MoveSpeedOf(entity));
             return true;
         }
 
         if (stopCellX == startCellX && stopCellY == startCellY)
             return true; // Schon die erste Zelle Richtung Ziel ist blockiert - keine Bewegung.
 
-        entity.MoveTo(stopCellX * 100 + 50, stopCellY * 100 + 50, entity.MovementSpeed);
+        entity.MoveTo(stopCellX * 100 + 50, stopCellY * 100 + 50, MoveSpeedOf(entity));
         return true;
     }
+
+    private static int MoveSpeedOf(Entity entity) => entity.NextMoveSpeed > 0 ? entity.NextMoveSpeed : entity.MovementSpeed;
 
     /// <summary>Bresenham-Linienalgorithmus von der Start- zur Zielzelle: schreitet die Zellen der geraden
     /// Verbindungslinie ab und gibt die letzte NICHT blockierte Zelle zurück (das ist die Zielzelle selbst,
@@ -705,7 +736,7 @@ public sealed class World
     /// lebenden, zielfreien Monster derselben Art mit nahem Spawn-Anker (GameConstants.PackAlertRangeWire)
     /// denselben Spieler ins Visier - wie in Metin2 kommt die ganze Gruppe, nicht nur das getroffene Tier.
     /// O(n) über die Entities, läuft aber nur beim Wechsel eines Monsters von "kein Ziel" zu "Ziel".</summary>
-    private void AlertPack(Entity source, int playerId)
+    private void AlertPack(Entity source, int playerId, long nowMs)
     {
         // Echte Gruppe aus spawns.json: alle lebenden Mitglieder kommen mit, egal wo sie gerade stehen.
         if (source.GroupId > 0)
@@ -713,7 +744,7 @@ public sealed class World
             foreach (Entity member in LiveGroupMembers(source.GroupId))
             {
                 if (member != source && member.FightsBack && member.TargetEntityId == null)
-                    member.TargetEntityId = playerId;
+                    Alert(member, playerId, nowMs);
             }
             return;
         }
@@ -727,8 +758,18 @@ public sealed class World
             long dx = other.WanderAnchorX - source.WanderAnchorX;
             long dy = other.WanderAnchorY - source.WanderAnchorY;
             if (dx * dx + dy * dy > alertSq) continue;
-            other.TargetEntityId = playerId;
+            Alert(other, playerId, nowMs);
         }
+    }
+
+    /// <summary>Ein Kamerad hat den Spieler bemerkt: das Monster nimmt ihn ins Visier, rennt aber erst nach
+    /// einer kurzen eigenen Reaktionszeit los - so startet das Rudel nicht im selben Tick.</summary>
+    private void Alert(Entity monster, int playerId, long nowMs)
+    {
+        monster.TargetEntityId = playerId;
+        monster.ReactAtMs = nowMs + _random.Next(AlertReactMinMs, AlertReactMaxMs + 1);
+        monster.HasPendingMove = false;
+        monster.HasWaypoint = false;
     }
 
     /// <summary>Nimmt ein Monster in seine Gruppe auf (groupId &lt;= 0 = keine Gruppe). Auch nach einem
@@ -749,39 +790,127 @@ public sealed class World
         return members;
     }
 
-    /// <summary>Gruppen wandern zusammen: nur das erste lebende Mitglied (Anführer) entscheidet, alle
-    /// zielfreien Mitglieder laufen in kleiner Formation zum selben Punkt. Die anderen würfeln nicht selbst.
-    /// true = der Aufrufer (ein Gruppenmitglied) hat seinen Zug damit erledigt.</summary>
+    /// <summary>Gruppen wandern zusammen, aber nicht im Block: nur das erste lebende Mitglied (Anführer)
+    /// wählt das Ziel. Jedes zielfreie Mitglied sucht sich darum einen eigenen lockeren Punkt und läuft
+    /// versetzt los, manche bleiben eine Runde stehen (außer sie sind zu weit weg). Wartende Mitläufer
+    /// trippeln gelegentlich ein paar Schritte. true = der Aufrufer (ein Gruppenmitglied) hat seinen Zug
+    /// damit erledigt.</summary>
     private bool RunGroupWander(Entity entity, long nowMs, List<Entity> startedWandering)
     {
         List<Entity> members = LiveGroupMembers(entity.GroupId);
         if (members.Count == 0 || members[0] != entity)
         {
-            // Mitläufer: wartet auf den Anführer (nur Fälligkeit verschieben, kein eigenes Ziel).
-            entity.NextWanderAtMs = nowMs + entity.WanderIntervalMaxMs;
+            // Mitläufer: kein eigenes Wanderziel, höchstens ein kleiner Schritt in der Nähe des Anführers.
+            entity.NextWanderAtMs = nowMs + _random.Next(entity.WanderIntervalMinMs, entity.WanderIntervalMaxMs + 1);
+            if (members.Count > 0 && !entity.IsMoving && !entity.HasPendingMove && _random.Next(100) < GroupFidgetPercent)
+            {
+                Entity leader = members[0];
+                int fx = entity.IntX + _random.Next(-GroupFidgetStepWire, GroupFidgetStepWire + 1);
+                int fy = entity.IntY + _random.Next(-GroupFidgetStepWire, GroupFidgetStepWire + 1);
+                long ldx = fx - leader.IntX, ldy = fy - leader.IntY;
+                if (ldx * ldx + ldy * ldy <= (long)GroupCatchUpWire * GroupCatchUpWire && IsWalkable(fx, fy))
+                {
+                    MonsterMove(entity, fx, fy, running: false);
+                    startedWandering.Add(entity);
+                }
+            }
             return true;
         }
 
         entity.NextWanderAtMs = nowMs + _random.Next(entity.WanderIntervalMinMs, entity.WanderIntervalMaxMs + 1);
         int centerX = Math.Clamp(entity.WanderAnchorX + _random.Next(-entity.WanderRadiusWire, entity.WanderRadiusWire + 1), 0, GameConstants.MapWidth);
         int centerY = Math.Clamp(entity.WanderAnchorY + _random.Next(-entity.WanderRadiusWire, entity.WanderRadiusWire + 1), 0, GameConstants.MapHeight);
-        if (_collisionMap != null && _collisionMap.IsBlocked(centerX / 100, centerY / 100))
+        if (!IsWalkable(centerX, centerY))
             return true;
 
-        for (int i = 0; i < members.Count; i++)
+        foreach (Entity member in members)
         {
-            Entity member = members[i];
             if (member.TargetEntityId != null) continue;
-            double angle = i * 2.0 * Math.PI / Math.Max(1, members.Count) + Math.PI / 2;
-            int radius = members.Count > 1 ? GroupFormationRadiusWire : 0;
-            int x = Math.Clamp(centerX + (int)Math.Round(Math.Cos(angle) * radius), 0, GameConstants.MapWidth);
-            int y = Math.Clamp(centerY + (int)Math.Round(Math.Sin(angle) * radius), 0, GameConstants.MapHeight);
-            if (_collisionMap != null && _collisionMap.IsBlocked(x / 100, y / 100)) { x = centerX; y = centerY; }
-            SetDestination(member.Id, x, y);
-            if (member != entity) member.NextWanderAtMs = entity.NextWanderAtMs + 1000;
-            if (!startedWandering.Contains(member)) startedWandering.Add(member);
+            bool isLeader = member == entity;
+            if (member != entity) member.NextWanderAtMs = entity.NextWanderAtMs + _random.Next(0, 1500);
+
+            long cdx = member.IntX - centerX, cdy = member.IntY - centerY;
+            bool farAway = cdx * cdx + cdy * cdy > (long)GroupCatchUpWire * GroupCatchUpWire;
+            if (!isLeader && !farAway && _random.Next(100) < GroupStayBehindPercent) continue;
+
+            int x = centerX, y = centerY;
+            if (members.Count > 1)
+            {
+                double angle = _random.NextDouble() * 2.0 * Math.PI;
+                int radius = _random.Next(GroupLooseMinWire, GroupLooseMaxWire + 1);
+                x = Math.Clamp(centerX + (int)Math.Round(Math.Cos(angle) * radius), 0, GameConstants.MapWidth);
+                y = Math.Clamp(centerY + (int)Math.Round(Math.Sin(angle) * radius), 0, GameConstants.MapHeight);
+                if (!IsWalkable(x, y)) { x = centerX; y = centerY; }
+            }
+
+            if (isLeader)
+            {
+                WanderTo(member, x, y);
+                if (!startedWandering.Contains(member)) startedWandering.Add(member);
+            }
+            else
+            {
+                member.HasPendingMove = true;
+                member.PendingMoveX = x;
+                member.PendingMoveY = y;
+                member.PendingMoveAtMs = nowMs + _random.Next(GroupStartDelayMinMs, GroupStartDelayMaxMs + 1);
+            }
         }
         return true;
+    }
+
+    private bool IsWalkable(int x, int y) => _collisionMap == null || !_collisionMap.IsBlocked(x / 100, y / 100);
+
+    /// <summary>Bewegung eines Monsters mit seinem persönlichen Tempo: rennend (Verfolgung/Rückweg) oder
+    /// schlendernd (Wandern, WanderSpeedPercent).</summary>
+    private void MonsterMove(Entity monster, int x, int y, bool running)
+    {
+        int percent = running ? monster.SpeedPercent : monster.SpeedPercent * WanderSpeedPercent / 100;
+        monster.NextMoveSpeed = Math.Max(1, monster.MovementSpeed * percent / 100);
+        SetDestination(monster.Id, x, y);
+    }
+
+    /// <summary>Wanderweg zu (x, y): längere Wege laufen leicht geschwungen über einen seitlich versetzten
+    /// Zwischenpunkt (der Endpunkt wartet in Entity.Waypoint), kurze direkt.</summary>
+    private void WanderTo(Entity monster, int x, int y)
+    {
+        monster.HasWaypoint = false;
+        double dx = x - monster.IntX, dy = y - monster.IntY;
+        double dist = Math.Sqrt(dx * dx + dy * dy);
+        if (dist >= CurveMinDistanceWire)
+        {
+            double along = 0.35 + _random.NextDouble() * 0.3;
+            double bend = (0.12 + _random.NextDouble() * 0.18) * dist * (_random.Next(2) == 0 ? -1 : 1);
+            int mx = Math.Clamp((int)Math.Round(monster.IntX + dx * along - dy / dist * bend), 0, GameConstants.MapWidth);
+            int my = Math.Clamp((int)Math.Round(monster.IntY + dy * along + dx / dist * bend), 0, GameConstants.MapHeight);
+            if (IsWalkable(mx, my))
+            {
+                monster.HasWaypoint = true;
+                monster.WaypointX = x;
+                monster.WaypointY = y;
+                MonsterMove(monster, mx, my, running: false);
+                return;
+            }
+        }
+        MonsterMove(monster, x, y, running: false);
+    }
+
+    /// <summary>Verzögerte Wander-Starts und zweite Etappen geschwungener Wege. true = Bewegung gestartet.</summary>
+    private bool RunQueuedWander(Entity entity, long nowMs)
+    {
+        if (entity.HasPendingMove && nowMs >= entity.PendingMoveAtMs)
+        {
+            entity.HasPendingMove = false;
+            WanderTo(entity, entity.PendingMoveX, entity.PendingMoveY);
+            return true;
+        }
+        if (entity.HasWaypoint && !entity.IsMoving)
+        {
+            entity.HasWaypoint = false;
+            MonsterMove(entity, entity.WaypointX, entity.WaypointY, running: false);
+            return true;
+        }
+        return false;
     }
 
     private static long DistanceSq(Entity a, Entity b)
@@ -830,7 +959,9 @@ public sealed class World
         if (target.Kind == EntityKind.Monster && target.FightsBack && target.TargetEntityId == null)
         {
             target.TargetEntityId = attacker.Id;
-            AlertPack(target, attacker.Id);
+            target.HasPendingMove = false;
+            target.HasWaypoint = false;
+            AlertPack(target, attacker.Id, nowMs);
         }
 
         // M6a: Ausweichwurf NACH reaktiver Zielerfassung (bleibt unverändert, siehe Kommentar oben) - Monster
@@ -2070,7 +2201,8 @@ public sealed class World
             if (dxAnchor * dxAnchor + dyAnchor * dyAnchor > leashSq)
             {
                 entity.TargetEntityId = null;
-                SetDestination(entity.Id, entity.WanderAnchorX, entity.WanderAnchorY);
+                entity.LastChaseX = int.MinValue;
+                MonsterMove(entity, entity.WanderAnchorX, entity.WanderAnchorY, running: true);
                 startedWandering.Add(entity);
                 return;
             }
@@ -2089,7 +2221,15 @@ public sealed class World
                 return;
             }
 
-            SetDestination(entity.Id, targetPlayer.IntX, targetPlayer.IntY);
+            if (nowMs < entity.ReactAtMs) return; // alarmiert, rennt aber noch nicht los
+
+            (int chaseX, int chaseY) = ChaseSlot(entity, targetPlayer);
+            long rdx = chaseX - entity.LastChaseX, rdy = chaseY - entity.LastChaseY;
+            if (entity.IsMoving && entity.LastChaseX != int.MinValue && rdx * rdx + rdy * rdy <= (long)ChaseRepathWire * ChaseRepathWire)
+                return; // Ziel kaum verschoben - weiterlaufen statt jeden Tick neu ansetzen
+            entity.LastChaseX = chaseX;
+            entity.LastChaseY = chaseY;
+            MonsterMove(entity, chaseX, chaseY, running: true);
             startedWandering.Add(entity);
             return;
         }
@@ -2100,15 +2240,36 @@ public sealed class World
             if (nearestPlayer != null)
             {
                 entity.TargetEntityId = nearestPlayer.Id;
-                AlertPack(entity, nearestPlayer.Id);
+                entity.HasPendingMove = false;
+                entity.HasWaypoint = false;
+                AlertPack(entity, nearestPlayer.Id, nowMs);
                 return; // Verfolgung beginnt im naechsten Tick (40ms Verzoegerung, nicht wahrnehmbar)
             }
         }
 
+        if (RunQueuedWander(entity, nowMs))
+        {
+            startedWandering.Add(entity);
+            return;
+        }
         if (nowMs < entity.NextWanderAtMs) return;
         if (entity.GroupId > 0 && RunGroupWander(entity, nowMs, startedWandering)) return;
         if (RunWanderAi(entity, nowMs))
             startedWandering.Add(entity);
+    }
+
+    /// <summary>Anlaufpunkt eines Verfolgers: im Nahkampfabstand um den Spieler, auf der Seite, von der das
+    /// Monster kommt, um seinen eigenen Anlaufwinkel gedreht - ein Rudel verteilt sich so um den Spieler.</summary>
+    private static (int X, int Y) ChaseSlot(Entity monster, Entity target)
+    {
+        double dx = monster.IntX - target.IntX, dy = monster.IntY - target.IntY;
+        double dist = Math.Sqrt(dx * dx + dy * dy);
+        if (dist < 1) return (target.IntX, target.IntY);
+        double angle = Math.Atan2(dy, dx) + monster.ChaseSlotDegrees * Math.PI / 180.0;
+        double radius = monster.MeleeRangeWire * ChaseSlotRangePercent / 100.0;
+        int x = Math.Clamp((int)Math.Round(target.IntX + Math.Cos(angle) * radius), 0, GameConstants.MapWidth);
+        int y = Math.Clamp((int)Math.Round(target.IntY + Math.Sin(angle) * radius), 0, GameConstants.MapHeight);
+        return (x, y);
     }
 
     /// <summary>Nächstgelegener lebender Spieler innerhalb rangeWire um monster (quadrierte Distanz, wie
@@ -2156,7 +2317,7 @@ public sealed class World
         if (_collisionMap != null && _collisionMap.IsBlocked(targetX / 100, targetY / 100))
             return false;
 
-        SetDestination(entity.Id, targetX, targetY);
+        WanderTo(entity, targetX, targetY);
         return true;
     }
 }

@@ -112,8 +112,10 @@ namespace Lumiis.Tests.Game
 
             Assert.Empty(attacks); // 300 > MeleeRangeWire (130) - kein Angriff, sondern Bewegung
             Assert.True(monster.IsMoving);
-            Assert.Equal(player.IntX, monster.TargetX);
-            Assert.Equal(player.IntY, monster.TargetY);
+            // Ziel ist ein Anlaufpunkt im Nahkampfabstand um den Spieler (Rudel umringt ihn), nicht die Mitte.
+            long dx = monster.TargetX - player.IntX, dy = monster.TargetY - player.IntY;
+            Assert.True(dx * dx + dy * dy <= 130L * 130L, $"Anlaufpunkt zu weit vom Spieler: {monster.TargetX}/{monster.TargetY}");
+            Assert.True(monster.TargetX < player.IntX, "Monster läuft von seiner Seite an");
         }
 
         [Fact]

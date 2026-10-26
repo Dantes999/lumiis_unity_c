@@ -122,6 +122,36 @@ public sealed class Entity
     /// World.RunWanderAi) - von World gesetzt, nur bei Kind=Monster relevant.</summary>
     public long NextWanderAtMs { get; set; }
 
+    // ---- Natürlichere Monsterbewegung (2026-10-26): nur World schreibt diese Felder ----
+
+    /// <summary>Persönliches Tempo in Prozent (Monster bei Spawn 92-108, Spieler 100) - damit eine Gruppe
+    /// nicht im Gleichschritt läuft.</summary>
+    public int SpeedPercent { get; set; } = 100;
+
+    /// <summary>Tempo für die nächsten SetDestination-Aufrufe (0 = MovementSpeed). Monster schlendern beim
+    /// Wandern langsamer und rennen beim Verfolgen.</summary>
+    public int NextMoveSpeed { get; set; }
+
+    /// <summary>Wandzeit, ab der ein frisch alarmiertes Monster losrennt (Reaktionszeit im Rudel).</summary>
+    public long ReactAtMs { get; set; }
+
+    /// <summary>Verzögerter Wander-Start (Gruppenmitglieder laufen versetzt los).</summary>
+    public bool HasPendingMove { get; set; }
+    public int PendingMoveX { get; set; }
+    public int PendingMoveY { get; set; }
+    public long PendingMoveAtMs { get; set; }
+
+    /// <summary>Endpunkt eines geschwungenen Wanderwegs: erst der versetzte Zwischenpunkt, dann hierhin.</summary>
+    public bool HasWaypoint { get; set; }
+    public int WaypointX { get; set; }
+    public int WaypointY { get; set; }
+
+    /// <summary>Eigener Anlaufwinkel beim Verfolgen (Grad), damit ein Rudel den Spieler umringt statt in
+    /// einer Reihe hinter ihm zu laufen.</summary>
+    public int ChaseSlotDegrees { get; set; }
+    public int LastChaseX { get; set; } = int.MinValue;
+    public int LastChaseY { get; set; } = int.MinValue;
+
     /// <summary>Eigene Bewegungsgeschwindigkeit (1/100 Welteinheiten/s) - bei Kind=Player immer
     /// GameConstants.PlayerSpeed, bei Kind=Monster aus dem Mob-Typ (mobs.json SpeedWire). World.SetDestination
     /// nutzt das statt eines hartkodierten Werts, damit Spieler und Monster denselben Bewegungsmechanismus

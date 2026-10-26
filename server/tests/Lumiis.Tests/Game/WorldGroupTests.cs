@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Lumiis.Server.Game;
 using Xunit;
@@ -51,23 +52,76 @@ namespace Lumiis.Tests.Game
             Entity a = SpawnMember(world, X, Y, groupId: 1);
             Entity b = SpawnMember(world, X + 120, Y, groupId: 1);
             Entity c = SpawnMember(world, X, Y + 120, groupId: 1);
-
-            // Alle drei sind bei 1000 ms fällig (Intervall fix 1000); nur der Anführer entscheidet und schickt alle.
-            world.Tick(0.0, nowMs: 1000);
-
             var members = new[] { a, b, c };
-            Assert.All(members, m => Assert.True(m.IsMoving));
+
+            // Alle drei sind bei 1000 ms fällig (Intervall fix 1000); nur der Anführer entscheidet.
+            world.Tick(0.0, nowMs: 1000);
+            Assert.True(a.IsMoving);
+            // Mitläufer laufen nicht im selben Tick los, sondern versetzt (oder bleiben eine Runde stehen).
+            Assert.All(new[] { b, c }, m => Assert.False(m.IsMoving));
+
+            var started = new Dictionary<int, long>();
+            for (long t = 1040; t < 2000; t += 40) // vor der nächsten Runde des Anführers
+            {
+                world.Tick(0.0, nowMs: t);
+                foreach (Entity m in members)
+                    if (m.IsMoving && !started.ContainsKey(m.Id)) started[m.Id] = t;
+            }
+
+            // Wer mitläuft, landet in der Nähe der anderen (lockere Formation, kein starrer Ring).
             foreach (Entity m in members)
             foreach (Entity n in members)
             {
-                long dx = m.TargetX - n.TargetX;
-                long dy = m.TargetY - n.TargetY;
-                Assert.True(dx * dx + dy * dy <= 200L * 200L, $"Ziele zu weit auseinander: {m.Id}/{n.Id}");
+                if (!started.ContainsKey(m.Id) || !started.ContainsKey(n.Id)) continue;
+                int mx = m.HasWaypoint ? m.WaypointX : m.TargetX, my = m.HasWaypoint ? m.WaypointY : m.TargetY;
+                int nx = n.HasWaypoint ? n.WaypointX : n.TargetX, ny = n.HasWaypoint ? n.WaypointY : n.TargetY;
+                long dx = mx - nx, dy = my - ny;
+                Assert.True(dx * dx + dy * dy <= 340L * 340L, $"Ziele zu weit auseinander: {m.Id}/{n.Id}");
             }
-            // Mitläufer würfeln nicht selbst nach: nächster Tick ändert ihre Ziele nicht.
-            int bx = b.TargetX, by = b.TargetY;
-            world.Tick(0.0, nowMs: 1040);
-            Assert.Equal((bx, by), (b.TargetX, b.TargetY));
+            Assert.True(started.Count >= 2, "mindestens ein Mitläufer folgt dem Anführer");
+        }
+
+        [Fact]
+        public void Group_Members_DoNotAllStartOnTheSameTick()
+        {
+            for (int seed = 0; seed < 20; seed++)
+            {
+                var world = new World(maxPlayers: 10, random: new System.Random(seed));
+                Entity a = SpawnMember(world, X, Y, groupId: 1);
+                Entity b = SpawnMember(world, X + 120, Y, groupId: 1);
+                Entity c = SpawnMember(world, X, Y + 120, groupId: 1);
+                world.Tick(0.0, nowMs: 1000);
+                Assert.False(b.IsMoving && c.IsMoving, $"Seed {seed}: ganze Gruppe startet gleichzeitig");
+            }
+        }
+
+        [Fact]
+        public void Wandering_IsSlowerThanChasing()
+        {
+            var world = new World(maxPlayers: 10, random: new System.Random(1));
+            Entity a = SpawnMember(world, X, Y, groupId: 0);
+            world.Tick(0.0, nowMs: 1000);
+            Assert.True(a.IsMoving);
+            Assert.True(a.Speed < a.MovementSpeed * 70 / 100, $"Wandertempo {a.Speed} von {a.MovementSpeed}");
+        }
+
+        [Fact]
+        public void AlertedPack_ReactsWithDelay_AndSurroundsInsteadOfQueueing()
+        {
+            var world = new World(maxPlayers: 10, random: new System.Random(5));
+            Entity player = JoinPlayer(world, attack: 1);
+            Entity hit = SpawnMember(world, X + 120, Y, groupId: 1);
+            Entity b = SpawnMember(world, X + 650, Y + 60, groupId: 1);
+            Entity c = SpawnMember(world, X + 650, Y - 60, groupId: 1);
+
+            world.TryAttack(player.Id, hit.Id, nowMs: 0);
+            Assert.Equal(player.Id, b.TargetEntityId);
+            world.Tick(0.0, nowMs: 40);
+            Assert.False(b.IsMoving && c.IsMoving, "Rudel startet nicht im selben Tick");
+
+            for (long t = 80; t <= 800; t += 40) world.Tick(0.0, nowMs: t);
+            var targets = new[] { hit, b, c }.Select(m => (m.TargetX, m.TargetY)).Distinct().Count();
+            Assert.Equal(3, targets); // jeder hat seinen eigenen Anlaufpunkt
         }
 
         [Fact]

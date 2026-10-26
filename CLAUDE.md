@@ -1451,6 +1451,23 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   40/70/100°, zuerst die freie Seite), sonst keine Bewegung - `HandleMoveTo` schickt dann EntityStop statt
   EntityMove. `WorldBodyCollisionTests`
   (6). 755 Tests grün.
+- Items stapeln (2026-10-26, Protocol.Version 24, Bug vom User): gleiche Nicht-Ausrüstungs-Items liegen auf
+  einem Platz bis `GameConstants.MaxStackCount` (200, `ItemDefinition.MaxStack`, Ausrüstung immer 1).
+  `Entity.InventoryCounts`, `World.TryAddItemToInventory(..., count)` füllt erst Stapel, dann freie Plätze (alles
+  oder nichts); Trank/Schleifstein/Rolle verbrauchen ein Stück, Verkauf den ganzen Stapel (SellPrice je Stück).
+  `InventorySyncPacket.Slots` trägt `Count`, `CharacterInventoryItem.Count` (Migration `AddInventoryStackCount`),
+  alte Einzelplätze fasst `World.CompactInventoryStacks` beim Join zusammen. Client: `GameClient.InventoryCount`,
+  Badge zeigt die Menge (Schnellslot 5 die Trankanzahl).
+- Natürlichere Monsterbewegung (2026-10-26, User: "sie laufen immer im Block"), alles serverseitig in `World`:
+  persönliches Tempo je Monster (`Entity.SpeedPercent` 92-108), Wandern schlendernd mit 55 % Tempo, gerannt
+  wird nur beim Verfolgen/Rückweg (`MonsterMove`, Tempo über `Entity.NextMoveSpeed` im EntityMove). Gruppen:
+  lockere Formation (eigener Punkt 40-160 Wire ums Ziel), Mitläufer starten 250-1500 ms versetzt
+  (`Entity.HasPendingMove`), 25 % bleiben eine Runde stehen (außer > 300 Wire weg), wartende trippeln
+  gelegentlich ein paar Schritte. Längere Wanderwege gehen in einem Bogen über einen Zwischenpunkt
+  (`WanderTo`, `Entity.Waypoint`). Alarmierte Rudelmitglieder reagieren nach 120-650 ms (`Entity.ReactAtMs`);
+  Verfolger laufen einen eigenen Punkt im Nahkampfabstand an (`ChaseSlot`, Anlaufwinkel ±50°) und setzen erst
+  neu an, wenn er sich um > 35 Wire verschiebt - das Rudel umringt den Spieler statt hintereinander zu laufen.
+  Kein Plugin: der Server ist autoritativ, Unity-Steering würde nur die Anzeige verändern. 764 Tests grün.
 - Offen: Monster-Sheets für die Jayang-Mobs, weitere Zonen/Dungeons, Reittiere; siehe
   `docs/feature-gap-lumiis.md`.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client
