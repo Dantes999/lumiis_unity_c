@@ -220,7 +220,7 @@ namespace Lumiis.Tests.Data.Maps
             MapCatalog catalog = MapCatalog.LoadFromDirectory(Path.Combine(dataDir, "maps"), mobCatalog, npcCatalog);
 
             Assert.Equal("map1", catalog.StartMapId);
-            Assert.Equal(4, catalog.Maps.Count);
+            Assert.Equal(5, catalog.Maps.Count);
             Assert.True(catalog.TryGet("map1", out MapDefinition? map1));
             Assert.Equal("Yongan", map1!.Name);
             Assert.NotEmpty(map1.Spawns);
@@ -265,6 +265,32 @@ namespace Lumiis.Tests.Data.Maps
             Assert.EndsWith("Dorf", village.Name);
             Assert.Single(village.Portals);
             Assert.False(village.Collision.IsBlockedAtWire(village.Portals[0].X1, village.Portals[0].Y1));
+        }
+
+        [Fact]
+        public void Testfield_holds_only_wild_dogs_in_groups_of_three_away_from_the_start()
+        {
+            string dataDir = Path.Combine(FindRepoRoot(), "data");
+            MobCatalog mobCatalog = MobCatalog.LoadFromFile(Path.Combine(dataDir, "mobs.json"));
+            LookCatalog lookCatalog = LookCatalog.LoadFromFile(Path.Combine(dataDir, "looks.json"));
+            ItemCatalog itemCatalog = ItemCatalog.LoadFromFile(Path.Combine(dataDir, "items.json"), lookCatalog);
+            NpcCatalog npcCatalog = NpcCatalog.LoadFromFile(Path.Combine(dataDir, "npcs.json"), itemCatalog, lookCatalog);
+            MapCatalog catalog = MapCatalog.LoadFromDirectory(Path.Combine(dataDir, "maps"), mobCatalog, npcCatalog);
+
+            MapDefinition testfield = catalog.Get("testfield");
+
+            Assert.Equal("Testwiese", testfield.Name);
+            Assert.Empty(testfield.Portals);
+            Assert.Empty(testfield.NpcPlacements);
+            Assert.False(testfield.Collision.IsBlockedAtWire(testfield.StartX, testfield.StartY));
+            Assert.Equal(180, testfield.Spawns.Count);
+            Assert.All(testfield.Spawns, s => Assert.Equal(20, s.MobId)); // Wilder Hund
+            foreach (SpawnPoint spawn in testfield.Spawns)
+            {
+                long dx = spawn.PositionX - testfield.StartX;
+                long dy = spawn.PositionY - testfield.StartY;
+                Assert.True(dx * dx + dy * dy > 1000L * 1000L); // freier Ring von 10 Feldern um den Start
+            }
         }
 
         private static string FindRepoRoot()

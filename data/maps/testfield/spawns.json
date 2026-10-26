@@ -1,0 +1,1444 @@
+{
+ "spawns": [
+  {
+   "id": 1,
+   "mobId": 20,
+   "positionX": 46050,
+   "positionY": 44850,
+   "respawnSeconds": 20,
+   "groupId": 1
+  },
+  {
+   "id": 2,
+   "mobId": 20,
+   "positionX": 46250,
+   "positionY": 44750,
+   "respawnSeconds": 20,
+   "groupId": 1
+  },
+  {
+   "id": 3,
+   "mobId": 20,
+   "positionX": 45950,
+   "positionY": 44650,
+   "respawnSeconds": 20,
+   "groupId": 1
+  },
+  {
+   "id": 4,
+   "mobId": 20,
+   "positionX": 56650,
+   "positionY": 56650,
+   "respawnSeconds": 20,
+   "groupId": 2
+  },
+  {
+   "id": 5,
+   "mobId": 20,
+   "positionX": 56850,
+   "positionY": 56550,
+   "respawnSeconds": 20,
+   "groupId": 2
+  },
+  {
+   "id": 6,
+   "mobId": 20,
+   "positionX": 56550,
+   "positionY": 56450,
+   "respawnSeconds": 20,
+   "groupId": 2
+  },
+  {
+   "id": 7,
+   "mobId": 20,
+   "positionX": 51750,
+   "positionY": 48650,
+   "respawnSeconds": 20,
+   "groupId": 3
+  },
+  {
+   "id": 8,
+   "mobId": 20,
+   "positionX": 51950,
+   "positionY": 48550,
+   "respawnSeconds": 20,
+   "groupId": 3
+  },
+  {
+   "id": 9,
+   "mobId": 20,
+   "positionX": 51650,
+   "positionY": 48450,
+   "respawnSeconds": 20,
+   "groupId": 3
+  },
+  {
+   "id": 10,
+   "mobId": 20,
+   "positionX": 43850,
+   "positionY": 49750,
+   "respawnSeconds": 20,
+   "groupId": 4
+  },
+  {
+   "id": 11,
+   "mobId": 20,
+   "positionX": 44050,
+   "positionY": 49650,
+   "respawnSeconds": 20,
+   "groupId": 4
+  },
+  {
+   "id": 12,
+   "mobId": 20,
+   "positionX": 43750,
+   "positionY": 49550,
+   "respawnSeconds": 20,
+   "groupId": 4
+  },
+  {
+   "id": 13,
+   "mobId": 20,
+   "positionX": 43150,
+   "positionY": 46450,
+   "respawnSeconds": 20,
+   "groupId": 5
+  },
+  {
+   "id": 14,
+   "mobId": 20,
+   "positionX": 43350,
+   "positionY": 46350,
+   "respawnSeconds": 20,
+   "groupId": 5
+  },
+  {
+   "id": 15,
+   "mobId": 20,
+   "positionX": 43050,
+   "positionY": 46250,
+   "respawnSeconds": 20,
+   "groupId": 5
+  },
+  {
+   "id": 16,
+   "mobId": 20,
+   "positionX": 56350,
+   "positionY": 49550,
+   "respawnSeconds": 20,
+   "groupId": 6
+  },
+  {
+   "id": 17,
+   "mobId": 20,
+   "positionX": 56550,
+   "positionY": 49450,
+   "respawnSeconds": 20,
+   "groupId": 6
+  },
+  {
+   "id": 18,
+   "mobId": 20,
+   "positionX": 56250,
+   "positionY": 49350,
+   "respawnSeconds": 20,
+   "groupId": 6
+  },
+  {
+   "id": 19,
+   "mobId": 20,
+   "positionX": 47250,
+   "positionY": 53350,
+   "respawnSeconds": 20,
+   "groupId": 7
+  },
+  {
+   "id": 20,
+   "mobId": 20,
+   "positionX": 47450,
+   "positionY": 53250,
+   "respawnSeconds": 20,
+   "groupId": 7
+  },
+  {
+   "id": 21,
+   "mobId": 20,
+   "positionX": 47150,
+   "positionY": 53150,
+   "respawnSeconds": 20,
+   "groupId": 7
+  },
+  {
+   "id": 22,
+   "mobId": 20,
+   "positionX": 43550,
+   "positionY": 43550,
+   "respawnSeconds": 20,
+   "groupId": 8
+  },
+  {
+   "id": 23,
+   "mobId": 20,
+   "positionX": 43750,
+   "positionY": 43450,
+   "respawnSeconds": 20,
+   "groupId": 8
+  },
+  {
+   "id": 24,
+   "mobId": 20,
+   "positionX": 43450,
+   "positionY": 43350,
+   "respawnSeconds": 20,
+   "groupId": 8
+  },
+  {
+   "id": 25,
+   "mobId": 20,
+   "positionX": 55550,
+   "positionY": 47850,
+   "respawnSeconds": 20,
+   "groupId": 9
+  },
+  {
+   "id": 26,
+   "mobId": 20,
+   "positionX": 55750,
+   "positionY": 47750,
+   "respawnSeconds": 20,
+   "groupId": 9
+  },
+  {
+   "id": 27,
+   "mobId": 20,
+   "positionX": 55450,
+   "positionY": 47650,
+   "respawnSeconds": 20,
+   "groupId": 9
+  },
+  {
+   "id": 28,
+   "mobId": 20,
+   "positionX": 47350,
+   "positionY": 46250,
+   "respawnSeconds": 20,
+   "groupId": 10
+  },
+  {
+   "id": 29,
+   "mobId": 20,
+   "positionX": 47550,
+   "positionY": 46150,
+   "respawnSeconds": 20,
+   "groupId": 10
+  },
+  {
+   "id": 30,
+   "mobId": 20,
+   "positionX": 47250,
+   "positionY": 46050,
+   "respawnSeconds": 20,
+   "groupId": 10
+  },
+  {
+   "id": 31,
+   "mobId": 20,
+   "positionX": 45250,
+   "positionY": 51550,
+   "respawnSeconds": 20,
+   "groupId": 11
+  },
+  {
+   "id": 32,
+   "mobId": 20,
+   "positionX": 45450,
+   "positionY": 51450,
+   "respawnSeconds": 20,
+   "groupId": 11
+  },
+  {
+   "id": 33,
+   "mobId": 20,
+   "positionX": 45150,
+   "positionY": 51350,
+   "respawnSeconds": 20,
+   "groupId": 11
+  },
+  {
+   "id": 34,
+   "mobId": 20,
+   "positionX": 49650,
+   "positionY": 56950,
+   "respawnSeconds": 20,
+   "groupId": 12
+  },
+  {
+   "id": 35,
+   "mobId": 20,
+   "positionX": 49850,
+   "positionY": 56850,
+   "respawnSeconds": 20,
+   "groupId": 12
+  },
+  {
+   "id": 36,
+   "mobId": 20,
+   "positionX": 49550,
+   "positionY": 56750,
+   "respawnSeconds": 20,
+   "groupId": 12
+  },
+  {
+   "id": 37,
+   "mobId": 20,
+   "positionX": 46150,
+   "positionY": 54150,
+   "respawnSeconds": 20,
+   "groupId": 13
+  },
+  {
+   "id": 38,
+   "mobId": 20,
+   "positionX": 46350,
+   "positionY": 54050,
+   "respawnSeconds": 20,
+   "groupId": 13
+  },
+  {
+   "id": 39,
+   "mobId": 20,
+   "positionX": 46050,
+   "positionY": 53950,
+   "respawnSeconds": 20,
+   "groupId": 13
+  },
+  {
+   "id": 40,
+   "mobId": 20,
+   "positionX": 45150,
+   "positionY": 57250,
+   "respawnSeconds": 20,
+   "groupId": 14
+  },
+  {
+   "id": 41,
+   "mobId": 20,
+   "positionX": 45350,
+   "positionY": 57150,
+   "respawnSeconds": 20,
+   "groupId": 14
+  },
+  {
+   "id": 42,
+   "mobId": 20,
+   "positionX": 45050,
+   "positionY": 57050,
+   "respawnSeconds": 20,
+   "groupId": 14
+  },
+  {
+   "id": 43,
+   "mobId": 20,
+   "positionX": 42750,
+   "positionY": 51150,
+   "respawnSeconds": 20,
+   "groupId": 15
+  },
+  {
+   "id": 44,
+   "mobId": 20,
+   "positionX": 42950,
+   "positionY": 51050,
+   "respawnSeconds": 20,
+   "groupId": 15
+  },
+  {
+   "id": 45,
+   "mobId": 20,
+   "positionX": 42650,
+   "positionY": 50950,
+   "respawnSeconds": 20,
+   "groupId": 15
+  },
+  {
+   "id": 46,
+   "mobId": 20,
+   "positionX": 54750,
+   "positionY": 54350,
+   "respawnSeconds": 20,
+   "groupId": 16
+  },
+  {
+   "id": 47,
+   "mobId": 20,
+   "positionX": 54950,
+   "positionY": 54250,
+   "respawnSeconds": 20,
+   "groupId": 16
+  },
+  {
+   "id": 48,
+   "mobId": 20,
+   "positionX": 54650,
+   "positionY": 54150,
+   "respawnSeconds": 20,
+   "groupId": 16
+  },
+  {
+   "id": 49,
+   "mobId": 20,
+   "positionX": 49650,
+   "positionY": 45250,
+   "respawnSeconds": 20,
+   "groupId": 17
+  },
+  {
+   "id": 50,
+   "mobId": 20,
+   "positionX": 49850,
+   "positionY": 45150,
+   "respawnSeconds": 20,
+   "groupId": 17
+  },
+  {
+   "id": 51,
+   "mobId": 20,
+   "positionX": 49550,
+   "positionY": 45050,
+   "respawnSeconds": 20,
+   "groupId": 17
+  },
+  {
+   "id": 52,
+   "mobId": 20,
+   "positionX": 53450,
+   "positionY": 43350,
+   "respawnSeconds": 20,
+   "groupId": 18
+  },
+  {
+   "id": 53,
+   "mobId": 20,
+   "positionX": 53650,
+   "positionY": 43250,
+   "respawnSeconds": 20,
+   "groupId": 18
+  },
+  {
+   "id": 54,
+   "mobId": 20,
+   "positionX": 53350,
+   "positionY": 43150,
+   "respawnSeconds": 20,
+   "groupId": 18
+  },
+  {
+   "id": 55,
+   "mobId": 20,
+   "positionX": 45950,
+   "positionY": 43450,
+   "respawnSeconds": 20,
+   "groupId": 19
+  },
+  {
+   "id": 56,
+   "mobId": 20,
+   "positionX": 46150,
+   "positionY": 43350,
+   "respawnSeconds": 20,
+   "groupId": 19
+  },
+  {
+   "id": 57,
+   "mobId": 20,
+   "positionX": 45850,
+   "positionY": 43250,
+   "respawnSeconds": 20,
+   "groupId": 19
+  },
+  {
+   "id": 58,
+   "mobId": 20,
+   "positionX": 48250,
+   "positionY": 51450,
+   "respawnSeconds": 20,
+   "groupId": 20
+  },
+  {
+   "id": 59,
+   "mobId": 20,
+   "positionX": 48450,
+   "positionY": 51350,
+   "respawnSeconds": 20,
+   "groupId": 20
+  },
+  {
+   "id": 60,
+   "mobId": 20,
+   "positionX": 48150,
+   "positionY": 51250,
+   "respawnSeconds": 20,
+   "groupId": 20
+  },
+  {
+   "id": 61,
+   "mobId": 20,
+   "positionX": 50750,
+   "positionY": 54850,
+   "respawnSeconds": 20,
+   "groupId": 21
+  },
+  {
+   "id": 62,
+   "mobId": 20,
+   "positionX": 50950,
+   "positionY": 54750,
+   "respawnSeconds": 20,
+   "groupId": 21
+  },
+  {
+   "id": 63,
+   "mobId": 20,
+   "positionX": 50650,
+   "positionY": 54650,
+   "respawnSeconds": 20,
+   "groupId": 21
+  },
+  {
+   "id": 64,
+   "mobId": 20,
+   "positionX": 51750,
+   "positionY": 42650,
+   "respawnSeconds": 20,
+   "groupId": 22
+  },
+  {
+   "id": 65,
+   "mobId": 20,
+   "positionX": 51950,
+   "positionY": 42550,
+   "respawnSeconds": 20,
+   "groupId": 22
+  },
+  {
+   "id": 66,
+   "mobId": 20,
+   "positionX": 51650,
+   "positionY": 42450,
+   "respawnSeconds": 20,
+   "groupId": 22
+  },
+  {
+   "id": 67,
+   "mobId": 20,
+   "positionX": 51950,
+   "positionY": 52450,
+   "respawnSeconds": 20,
+   "groupId": 23
+  },
+  {
+   "id": 68,
+   "mobId": 20,
+   "positionX": 52150,
+   "positionY": 52350,
+   "respawnSeconds": 20,
+   "groupId": 23
+  },
+  {
+   "id": 69,
+   "mobId": 20,
+   "positionX": 51850,
+   "positionY": 52250,
+   "respawnSeconds": 20,
+   "groupId": 23
+  },
+  {
+   "id": 70,
+   "mobId": 20,
+   "positionX": 56750,
+   "positionY": 52050,
+   "respawnSeconds": 20,
+   "groupId": 24
+  },
+  {
+   "id": 71,
+   "mobId": 20,
+   "positionX": 56950,
+   "positionY": 51950,
+   "respawnSeconds": 20,
+   "groupId": 24
+  },
+  {
+   "id": 72,
+   "mobId": 20,
+   "positionX": 56650,
+   "positionY": 51850,
+   "respawnSeconds": 20,
+   "groupId": 24
+  },
+  {
+   "id": 73,
+   "mobId": 20,
+   "positionX": 53050,
+   "positionY": 55550,
+   "respawnSeconds": 20,
+   "groupId": 25
+  },
+  {
+   "id": 74,
+   "mobId": 20,
+   "positionX": 53250,
+   "positionY": 55450,
+   "respawnSeconds": 20,
+   "groupId": 25
+  },
+  {
+   "id": 75,
+   "mobId": 20,
+   "positionX": 52950,
+   "positionY": 55350,
+   "respawnSeconds": 20,
+   "groupId": 25
+  },
+  {
+   "id": 76,
+   "mobId": 20,
+   "positionX": 52450,
+   "positionY": 51050,
+   "respawnSeconds": 20,
+   "groupId": 26
+  },
+  {
+   "id": 77,
+   "mobId": 20,
+   "positionX": 52650,
+   "positionY": 50950,
+   "respawnSeconds": 20,
+   "groupId": 26
+  },
+  {
+   "id": 78,
+   "mobId": 20,
+   "positionX": 52350,
+   "positionY": 50850,
+   "respawnSeconds": 20,
+   "groupId": 26
+  },
+  {
+   "id": 79,
+   "mobId": 20,
+   "positionX": 56650,
+   "positionY": 45750,
+   "respawnSeconds": 20,
+   "groupId": 27
+  },
+  {
+   "id": 80,
+   "mobId": 20,
+   "positionX": 56850,
+   "positionY": 45650,
+   "respawnSeconds": 20,
+   "groupId": 27
+  },
+  {
+   "id": 81,
+   "mobId": 20,
+   "positionX": 56550,
+   "positionY": 45550,
+   "respawnSeconds": 20,
+   "groupId": 27
+  },
+  {
+   "id": 82,
+   "mobId": 20,
+   "positionX": 44550,
+   "positionY": 47050,
+   "respawnSeconds": 20,
+   "groupId": 28
+  },
+  {
+   "id": 83,
+   "mobId": 20,
+   "positionX": 44750,
+   "positionY": 46950,
+   "respawnSeconds": 20,
+   "groupId": 28
+  },
+  {
+   "id": 84,
+   "mobId": 20,
+   "positionX": 44450,
+   "positionY": 46850,
+   "respawnSeconds": 20,
+   "groupId": 28
+  },
+  {
+   "id": 85,
+   "mobId": 20,
+   "positionX": 43650,
+   "positionY": 54850,
+   "respawnSeconds": 20,
+   "groupId": 29
+  },
+  {
+   "id": 86,
+   "mobId": 20,
+   "positionX": 43850,
+   "positionY": 54750,
+   "respawnSeconds": 20,
+   "groupId": 29
+  },
+  {
+   "id": 87,
+   "mobId": 20,
+   "positionX": 43550,
+   "positionY": 54650,
+   "respawnSeconds": 20,
+   "groupId": 29
+  },
+  {
+   "id": 88,
+   "mobId": 20,
+   "positionX": 48050,
+   "positionY": 44450,
+   "respawnSeconds": 20,
+   "groupId": 30
+  },
+  {
+   "id": 89,
+   "mobId": 20,
+   "positionX": 48250,
+   "positionY": 44350,
+   "respawnSeconds": 20,
+   "groupId": 30
+  },
+  {
+   "id": 90,
+   "mobId": 20,
+   "positionX": 47950,
+   "positionY": 44250,
+   "respawnSeconds": 20,
+   "groupId": 30
+  },
+  {
+   "id": 91,
+   "mobId": 20,
+   "positionX": 53750,
+   "positionY": 51850,
+   "respawnSeconds": 20,
+   "groupId": 31
+  },
+  {
+   "id": 92,
+   "mobId": 20,
+   "positionX": 53950,
+   "positionY": 51750,
+   "respawnSeconds": 20,
+   "groupId": 31
+  },
+  {
+   "id": 93,
+   "mobId": 20,
+   "positionX": 53650,
+   "positionY": 51650,
+   "respawnSeconds": 20,
+   "groupId": 31
+  },
+  {
+   "id": 94,
+   "mobId": 20,
+   "positionX": 54550,
+   "positionY": 50050,
+   "respawnSeconds": 20,
+   "groupId": 32
+  },
+  {
+   "id": 95,
+   "mobId": 20,
+   "positionX": 54750,
+   "positionY": 49950,
+   "respawnSeconds": 20,
+   "groupId": 32
+  },
+  {
+   "id": 96,
+   "mobId": 20,
+   "positionX": 54450,
+   "positionY": 49850,
+   "respawnSeconds": 20,
+   "groupId": 32
+  },
+  {
+   "id": 97,
+   "mobId": 20,
+   "positionX": 44650,
+   "positionY": 42850,
+   "respawnSeconds": 20,
+   "groupId": 33
+  },
+  {
+   "id": 98,
+   "mobId": 20,
+   "positionX": 44850,
+   "positionY": 42750,
+   "respawnSeconds": 20,
+   "groupId": 33
+  },
+  {
+   "id": 99,
+   "mobId": 20,
+   "positionX": 44550,
+   "positionY": 42650,
+   "respawnSeconds": 20,
+   "groupId": 33
+  },
+  {
+   "id": 100,
+   "mobId": 20,
+   "positionX": 52850,
+   "positionY": 45250,
+   "respawnSeconds": 20,
+   "groupId": 34
+  },
+  {
+   "id": 101,
+   "mobId": 20,
+   "positionX": 53050,
+   "positionY": 45150,
+   "respawnSeconds": 20,
+   "groupId": 34
+  },
+  {
+   "id": 102,
+   "mobId": 20,
+   "positionX": 52750,
+   "positionY": 45050,
+   "respawnSeconds": 20,
+   "groupId": 34
+  },
+  {
+   "id": 103,
+   "mobId": 20,
+   "positionX": 53250,
+   "positionY": 48150,
+   "respawnSeconds": 20,
+   "groupId": 35
+  },
+  {
+   "id": 104,
+   "mobId": 20,
+   "positionX": 53450,
+   "positionY": 48050,
+   "respawnSeconds": 20,
+   "groupId": 35
+  },
+  {
+   "id": 105,
+   "mobId": 20,
+   "positionX": 53150,
+   "positionY": 47950,
+   "respawnSeconds": 20,
+   "groupId": 35
+  },
+  {
+   "id": 106,
+   "mobId": 20,
+   "positionX": 45550,
+   "positionY": 48750,
+   "respawnSeconds": 20,
+   "groupId": 36
+  },
+  {
+   "id": 107,
+   "mobId": 20,
+   "positionX": 45750,
+   "positionY": 48650,
+   "respawnSeconds": 20,
+   "groupId": 36
+  },
+  {
+   "id": 108,
+   "mobId": 20,
+   "positionX": 45450,
+   "positionY": 48550,
+   "respawnSeconds": 20,
+   "groupId": 36
+  },
+  {
+   "id": 109,
+   "mobId": 20,
+   "positionX": 49750,
+   "positionY": 42650,
+   "respawnSeconds": 20,
+   "groupId": 37
+  },
+  {
+   "id": 110,
+   "mobId": 20,
+   "positionX": 49950,
+   "positionY": 42550,
+   "respawnSeconds": 20,
+   "groupId": 37
+  },
+  {
+   "id": 111,
+   "mobId": 20,
+   "positionX": 49650,
+   "positionY": 42450,
+   "respawnSeconds": 20,
+   "groupId": 37
+  },
+  {
+   "id": 112,
+   "mobId": 20,
+   "positionX": 45850,
+   "positionY": 55450,
+   "respawnSeconds": 20,
+   "groupId": 38
+  },
+  {
+   "id": 113,
+   "mobId": 20,
+   "positionX": 46050,
+   "positionY": 55350,
+   "respawnSeconds": 20,
+   "groupId": 38
+  },
+  {
+   "id": 114,
+   "mobId": 20,
+   "positionX": 45750,
+   "positionY": 55250,
+   "respawnSeconds": 20,
+   "groupId": 38
+  },
+  {
+   "id": 115,
+   "mobId": 20,
+   "positionX": 50550,
+   "positionY": 44050,
+   "respawnSeconds": 20,
+   "groupId": 39
+  },
+  {
+   "id": 116,
+   "mobId": 20,
+   "positionX": 50750,
+   "positionY": 43950,
+   "respawnSeconds": 20,
+   "groupId": 39
+  },
+  {
+   "id": 117,
+   "mobId": 20,
+   "positionX": 50450,
+   "positionY": 43850,
+   "respawnSeconds": 20,
+   "groupId": 39
+  },
+  {
+   "id": 118,
+   "mobId": 20,
+   "positionX": 42650,
+   "positionY": 56550,
+   "respawnSeconds": 20,
+   "groupId": 40
+  },
+  {
+   "id": 119,
+   "mobId": 20,
+   "positionX": 42850,
+   "positionY": 56450,
+   "respawnSeconds": 20,
+   "groupId": 40
+  },
+  {
+   "id": 120,
+   "mobId": 20,
+   "positionX": 42550,
+   "positionY": 56350,
+   "respawnSeconds": 20,
+   "groupId": 40
+  },
+  {
+   "id": 121,
+   "mobId": 20,
+   "positionX": 43150,
+   "positionY": 45150,
+   "respawnSeconds": 20,
+   "groupId": 41
+  },
+  {
+   "id": 122,
+   "mobId": 20,
+   "positionX": 43350,
+   "positionY": 45050,
+   "respawnSeconds": 20,
+   "groupId": 41
+  },
+  {
+   "id": 123,
+   "mobId": 20,
+   "positionX": 43050,
+   "positionY": 44950,
+   "respawnSeconds": 20,
+   "groupId": 41
+  },
+  {
+   "id": 124,
+   "mobId": 20,
+   "positionX": 55750,
+   "positionY": 55450,
+   "respawnSeconds": 20,
+   "groupId": 42
+  },
+  {
+   "id": 125,
+   "mobId": 20,
+   "positionX": 55950,
+   "positionY": 55350,
+   "respawnSeconds": 20,
+   "groupId": 42
+  },
+  {
+   "id": 126,
+   "mobId": 20,
+   "positionX": 55650,
+   "positionY": 55250,
+   "respawnSeconds": 20,
+   "groupId": 42
+  },
+  {
+   "id": 127,
+   "mobId": 20,
+   "positionX": 56850,
+   "positionY": 47350,
+   "respawnSeconds": 20,
+   "groupId": 43
+  },
+  {
+   "id": 128,
+   "mobId": 20,
+   "positionX": 57050,
+   "positionY": 47250,
+   "respawnSeconds": 20,
+   "groupId": 43
+  },
+  {
+   "id": 129,
+   "mobId": 20,
+   "positionX": 56750,
+   "positionY": 47150,
+   "respawnSeconds": 20,
+   "groupId": 43
+  },
+  {
+   "id": 130,
+   "mobId": 20,
+   "positionX": 45850,
+   "positionY": 47450,
+   "respawnSeconds": 20,
+   "groupId": 44
+  },
+  {
+   "id": 131,
+   "mobId": 20,
+   "positionX": 46050,
+   "positionY": 47350,
+   "respawnSeconds": 20,
+   "groupId": 44
+  },
+  {
+   "id": 132,
+   "mobId": 20,
+   "positionX": 45750,
+   "positionY": 47250,
+   "respawnSeconds": 20,
+   "groupId": 44
+  },
+  {
+   "id": 133,
+   "mobId": 20,
+   "positionX": 55450,
+   "positionY": 44250,
+   "respawnSeconds": 20,
+   "groupId": 45
+  },
+  {
+   "id": 134,
+   "mobId": 20,
+   "positionX": 55650,
+   "positionY": 44150,
+   "respawnSeconds": 20,
+   "groupId": 45
+  },
+  {
+   "id": 135,
+   "mobId": 20,
+   "positionX": 55350,
+   "positionY": 44050,
+   "respawnSeconds": 20,
+   "groupId": 45
+  },
+  {
+   "id": 136,
+   "mobId": 20,
+   "positionX": 57250,
+   "positionY": 53950,
+   "respawnSeconds": 20,
+   "groupId": 46
+  },
+  {
+   "id": 137,
+   "mobId": 20,
+   "positionX": 57450,
+   "positionY": 53850,
+   "respawnSeconds": 20,
+   "groupId": 46
+  },
+  {
+   "id": 138,
+   "mobId": 20,
+   "positionX": 57150,
+   "positionY": 53750,
+   "respawnSeconds": 20,
+   "groupId": 46
+  },
+  {
+   "id": 139,
+   "mobId": 20,
+   "positionX": 54750,
+   "positionY": 52750,
+   "respawnSeconds": 20,
+   "groupId": 47
+  },
+  {
+   "id": 140,
+   "mobId": 20,
+   "positionX": 54950,
+   "positionY": 52650,
+   "respawnSeconds": 20,
+   "groupId": 47
+  },
+  {
+   "id": 141,
+   "mobId": 20,
+   "positionX": 54650,
+   "positionY": 52550,
+   "respawnSeconds": 20,
+   "groupId": 47
+  },
+  {
+   "id": 142,
+   "mobId": 20,
+   "positionX": 47350,
+   "positionY": 49650,
+   "respawnSeconds": 20,
+   "groupId": 48
+  },
+  {
+   "id": 143,
+   "mobId": 20,
+   "positionX": 47550,
+   "positionY": 49550,
+   "respawnSeconds": 20,
+   "groupId": 48
+  },
+  {
+   "id": 144,
+   "mobId": 20,
+   "positionX": 47250,
+   "positionY": 49450,
+   "respawnSeconds": 20,
+   "groupId": 48
+  },
+  {
+   "id": 145,
+   "mobId": 20,
+   "positionX": 54550,
+   "positionY": 46050,
+   "respawnSeconds": 20,
+   "groupId": 49
+  },
+  {
+   "id": 146,
+   "mobId": 20,
+   "positionX": 54750,
+   "positionY": 45950,
+   "respawnSeconds": 20,
+   "groupId": 49
+  },
+  {
+   "id": 147,
+   "mobId": 20,
+   "positionX": 54450,
+   "positionY": 45850,
+   "respawnSeconds": 20,
+   "groupId": 49
+  },
+  {
+   "id": 148,
+   "mobId": 20,
+   "positionX": 49950,
+   "positionY": 48450,
+   "respawnSeconds": 20,
+   "groupId": 50
+  },
+  {
+   "id": 149,
+   "mobId": 20,
+   "positionX": 50150,
+   "positionY": 48350,
+   "respawnSeconds": 20,
+   "groupId": 50
+  },
+  {
+   "id": 150,
+   "mobId": 20,
+   "positionX": 49850,
+   "positionY": 48250,
+   "respawnSeconds": 20,
+   "groupId": 50
+  },
+  {
+   "id": 151,
+   "mobId": 20,
+   "positionX": 53850,
+   "positionY": 56850,
+   "respawnSeconds": 20,
+   "groupId": 51
+  },
+  {
+   "id": 152,
+   "mobId": 20,
+   "positionX": 54050,
+   "positionY": 56750,
+   "respawnSeconds": 20,
+   "groupId": 51
+  },
+  {
+   "id": 153,
+   "mobId": 20,
+   "positionX": 53750,
+   "positionY": 56650,
+   "respawnSeconds": 20,
+   "groupId": 51
+  },
+  {
+   "id": 154,
+   "mobId": 20,
+   "positionX": 51150,
+   "positionY": 50850,
+   "respawnSeconds": 20,
+   "groupId": 52
+  },
+  {
+   "id": 155,
+   "mobId": 20,
+   "positionX": 51350,
+   "positionY": 50750,
+   "respawnSeconds": 20,
+   "groupId": 52
+  },
+  {
+   "id": 156,
+   "mobId": 20,
+   "positionX": 51050,
+   "positionY": 50650,
+   "respawnSeconds": 20,
+   "groupId": 52
+  },
+  {
+   "id": 157,
+   "mobId": 20,
+   "positionX": 52450,
+   "positionY": 46550,
+   "respawnSeconds": 20,
+   "groupId": 53
+  },
+  {
+   "id": 158,
+   "mobId": 20,
+   "positionX": 52650,
+   "positionY": 46450,
+   "respawnSeconds": 20,
+   "groupId": 53
+  },
+  {
+   "id": 159,
+   "mobId": 20,
+   "positionX": 52350,
+   "positionY": 46350,
+   "respawnSeconds": 20,
+   "groupId": 53
+  },
+  {
+   "id": 160,
+   "mobId": 20,
+   "positionX": 48350,
+   "positionY": 57050,
+   "respawnSeconds": 20,
+   "groupId": 54
+  },
+  {
+   "id": 161,
+   "mobId": 20,
+   "positionX": 48550,
+   "positionY": 56950,
+   "respawnSeconds": 20,
+   "groupId": 54
+  },
+  {
+   "id": 162,
+   "mobId": 20,
+   "positionX": 48250,
+   "positionY": 56850,
+   "respawnSeconds": 20,
+   "groupId": 54
+  },
+  {
+   "id": 163,
+   "mobId": 20,
+   "positionX": 44350,
+   "positionY": 56050,
+   "respawnSeconds": 20,
+   "groupId": 55
+  },
+  {
+   "id": 164,
+   "mobId": 20,
+   "positionX": 44550,
+   "positionY": 55950,
+   "respawnSeconds": 20,
+   "groupId": 55
+  },
+  {
+   "id": 165,
+   "mobId": 20,
+   "positionX": 44250,
+   "positionY": 55850,
+   "respawnSeconds": 20,
+   "groupId": 55
+  },
+  {
+   "id": 166,
+   "mobId": 20,
+   "positionX": 50250,
+   "positionY": 52250,
+   "respawnSeconds": 20,
+   "groupId": 56
+  },
+  {
+   "id": 167,
+   "mobId": 20,
+   "positionX": 50450,
+   "positionY": 52150,
+   "respawnSeconds": 20,
+   "groupId": 56
+  },
+  {
+   "id": 168,
+   "mobId": 20,
+   "positionX": 50150,
+   "positionY": 52050,
+   "respawnSeconds": 20,
+   "groupId": 56
+  },
+  {
+   "id": 169,
+   "mobId": 20,
+   "positionX": 50950,
+   "positionY": 46450,
+   "respawnSeconds": 20,
+   "groupId": 57
+  },
+  {
+   "id": 170,
+   "mobId": 20,
+   "positionX": 51150,
+   "positionY": 46350,
+   "respawnSeconds": 20,
+   "groupId": 57
+  },
+  {
+   "id": 171,
+   "mobId": 20,
+   "positionX": 50850,
+   "positionY": 46250,
+   "respawnSeconds": 20,
+   "groupId": 57
+  },
+  {
+   "id": 172,
+   "mobId": 20,
+   "positionX": 49050,
+   "positionY": 52950,
+   "respawnSeconds": 20,
+   "groupId": 58
+  },
+  {
+   "id": 173,
+   "mobId": 20,
+   "positionX": 49250,
+   "positionY": 52850,
+   "respawnSeconds": 20,
+   "groupId": 58
+  },
+  {
+   "id": 174,
+   "mobId": 20,
+   "positionX": 48950,
+   "positionY": 52750,
+   "respawnSeconds": 20,
+   "groupId": 58
+  },
+  {
+   "id": 175,
+   "mobId": 20,
+   "positionX": 47650,
+   "positionY": 47550,
+   "respawnSeconds": 20,
+   "groupId": 59
+  },
+  {
+   "id": 176,
+   "mobId": 20,
+   "positionX": 47850,
+   "positionY": 47450,
+   "respawnSeconds": 20,
+   "groupId": 59
+  },
+  {
+   "id": 177,
+   "mobId": 20,
+   "positionX": 47550,
+   "positionY": 47350,
+   "respawnSeconds": 20,
+   "groupId": 59
+  },
+  {
+   "id": 178,
+   "mobId": 20,
+   "positionX": 52250,
+   "positionY": 54150,
+   "respawnSeconds": 20,
+   "groupId": 60
+  },
+  {
+   "id": 179,
+   "mobId": 20,
+   "positionX": 52450,
+   "positionY": 54050,
+   "respawnSeconds": 20,
+   "groupId": 60
+  },
+  {
+   "id": 180,
+   "mobId": 20,
+   "positionX": 52150,
+   "positionY": 53950,
+   "respawnSeconds": 20,
+   "groupId": 60
+  }
+ ]
+}
