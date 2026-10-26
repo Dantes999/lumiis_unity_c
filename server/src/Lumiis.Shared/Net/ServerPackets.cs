@@ -364,10 +364,12 @@ namespace Lumiis.Shared.Net
     /// Empfänger, bei Join und nach jeder Änderung neu verschickt (voller Resync statt Delta, das Inventar ist
     /// mit maximal 20 Plätzen klein genug dafür). Slots enthält nur belegte Plätze (SlotIndex, ItemId,
     /// UpgradeLevel 0-9) - ein fehlender SlotIndex bedeutet leer, genau wie 0 bei den vier Equipped-Feldern.
-    /// Die vier Equipped...UpgradeLevel gehören jeweils zur Equipped...ItemId desselben Slots.</summary>
+    /// Die vier Equipped...UpgradeLevel gehören jeweils zur Equipped...ItemId desselben Slots. Seit
+    /// Protocol.Version 24 trägt jeder Platz zusätzlich Count (Stapelgröße 1..GameConstants.MaxStackCount,
+    /// Ausrüstung immer 1).</summary>
     public sealed class InventorySyncPacket : IPacket
     {
-        public List<(int SlotIndex, int ItemId, int UpgradeLevel)> Slots = new List<(int SlotIndex, int ItemId, int UpgradeLevel)>();
+        public List<(int SlotIndex, int ItemId, int UpgradeLevel, int Count)> Slots = new List<(int SlotIndex, int ItemId, int UpgradeLevel, int Count)>();
         public int EquippedArmorItemId;
         public int EquippedHelmetItemId;
         public int EquippedWeaponItemId;
@@ -385,11 +387,12 @@ namespace Lumiis.Shared.Net
         public void Write(PacketWriter writer)
         {
             writer.WriteByte((byte)Slots.Count);
-            foreach ((int slotIndex, int itemId, int upgradeLevel) in Slots)
+            foreach ((int slotIndex, int itemId, int upgradeLevel, int count) in Slots)
             {
                 writer.WriteByte((byte)slotIndex);
                 writer.WriteInt32(itemId);
                 writer.WriteByte((byte)upgradeLevel);
+                writer.WriteUInt16((ushort)count);
             }
             writer.WriteInt32(EquippedArmorItemId);
             writer.WriteInt32(EquippedHelmetItemId);
@@ -404,13 +407,14 @@ namespace Lumiis.Shared.Net
         public void Read(PacketReader reader)
         {
             int count = reader.ReadByte();
-            Slots = new List<(int SlotIndex, int ItemId, int UpgradeLevel)>(count);
+            Slots = new List<(int SlotIndex, int ItemId, int UpgradeLevel, int Count)>(count);
             for (int i = 0; i < count; i++)
             {
                 int slotIndex = reader.ReadByte();
                 int itemId = reader.ReadInt32();
                 int upgradeLevel = reader.ReadByte();
-                Slots.Add((slotIndex, itemId, upgradeLevel));
+                int stackCount = reader.ReadUInt16();
+                Slots.Add((slotIndex, itemId, upgradeLevel, stackCount));
             }
             EquippedArmorItemId = reader.ReadInt32();
             EquippedHelmetItemId = reader.ReadInt32();

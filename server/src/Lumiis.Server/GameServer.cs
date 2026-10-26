@@ -80,7 +80,7 @@ public sealed class GameServer : INetEventListener
     /// Slots + alle vier Equipped-Ids), kein Delta - DropOldest bleibt dadurch sicher, genau wie bei Yang
     /// konvergiert der zuletzt geschriebene Stand immer zum korrekten Endstand, ein übersprungener
     /// Zwischenstand ist unkritisch.</summary>
-    private readonly record struct InventorySaveRequest(int CharacterId, List<(int SlotIndex, int ItemId, int UpgradeLevel)> Slots,
+    private readonly record struct InventorySaveRequest(int CharacterId, List<(int SlotIndex, int ItemId, int UpgradeLevel, int Count)> Slots,
         int EquippedArmorItemId, int EquippedHelmetItemId, int EquippedWeaponItemId, int EquippedShieldItemId,
         int EquippedArmorUpgradeLevel, int EquippedHelmetUpgradeLevel, int EquippedWeaponUpgradeLevel, int EquippedShieldUpgradeLevel);
 
@@ -103,7 +103,7 @@ public sealed class GameServer : INetEventListener
     /// dort: sofort bei AllocateSkillPoint (analog zu AllocateStatPoint), sonst über denselben periodischen/
     /// Disconnect-Save wie der restliche Fortschritt (Skill-Cooldowns/aktive Buffs werden NICHT persistiert,
     /// siehe Entity.ActiveBuffs-Kommentar).</summary>
-    private readonly record struct CharacterSaveRequest(int CharacterId, string MapId, long Yang, List<(int SlotIndex, int ItemId, int UpgradeLevel)> Slots,
+    private readonly record struct CharacterSaveRequest(int CharacterId, string MapId, long Yang, List<(int SlotIndex, int ItemId, int UpgradeLevel, int Count)> Slots,
         int EquippedArmorItemId, int EquippedHelmetItemId, int EquippedWeaponItemId, int EquippedShieldItemId,
         int EquippedArmorUpgradeLevel, int EquippedHelmetUpgradeLevel, int EquippedWeaponUpgradeLevel, int EquippedShieldUpgradeLevel,
         int Level, long Xp, int SpentSt, int SpentHt, int SpentDx, int SpentIq,
@@ -803,8 +803,8 @@ public sealed class GameServer : INetEventListener
                     character.EquippedShieldUpgradeLevel = request.EquippedShieldItemId == 0 ? 0 : request.EquippedShieldUpgradeLevel;
 
                     db.CharacterInventoryItems.RemoveRange(character.InventoryItems);
-                    foreach ((int slotIndex, int itemId, int upgradeLevel) in request.Slots)
-                        character.InventoryItems.Add(new CharacterInventoryItem { CharacterId = request.CharacterId, SlotIndex = slotIndex, ItemId = itemId, UpgradeLevel = upgradeLevel });
+                    foreach ((int slotIndex, int itemId, int upgradeLevel, int count) in request.Slots)
+                        character.InventoryItems.Add(new CharacterInventoryItem { CharacterId = request.CharacterId, SlotIndex = slotIndex, ItemId = itemId, UpgradeLevel = upgradeLevel, Count = count });
 
                     await db.SaveChangesAsync(cancellationToken);
                 }
@@ -863,8 +863,8 @@ public sealed class GameServer : INetEventListener
                     character.CurrentSp = request.CurrentSp;
 
                     db.CharacterInventoryItems.RemoveRange(character.InventoryItems);
-                    foreach ((int slotIndex, int itemId, int upgradeLevel) in request.Slots)
-                        character.InventoryItems.Add(new CharacterInventoryItem { CharacterId = request.CharacterId, SlotIndex = slotIndex, ItemId = itemId, UpgradeLevel = upgradeLevel });
+                    foreach ((int slotIndex, int itemId, int upgradeLevel, int count) in request.Slots)
+                        character.InventoryItems.Add(new CharacterInventoryItem { CharacterId = request.CharacterId, SlotIndex = slotIndex, ItemId = itemId, UpgradeLevel = upgradeLevel, Count = count });
 
                     // M6b: voller Skillstufen-Snapshot, kein Delta - gleiches Muster wie Inventar oben.
                     db.CharacterSkillLevels.RemoveRange(character.SkillLevels);
@@ -1328,8 +1328,12 @@ public sealed class GameServer : INetEventListener
             {
                 entity.Inventory[inventoryItem.SlotIndex] = inventoryItem.ItemId;
                 entity.InventoryUpgradeLevels[inventoryItem.SlotIndex] = inventoryItem.ItemId == 0 ? 0 : inventoryItem.UpgradeLevel;
+                entity.InventoryCounts[inventoryItem.SlotIndex] = inventoryItem.ItemId == 0 ? 0
+                    : Math.Clamp(inventoryItem.Count, 1, GameConstants.MaxStackCount);
             }
         }
+        // Inventare von vor dem Stapeln hatten jeden Trank/Stein auf einem eigenen Platz.
+        world.CompactInventoryStacks(entity);
 
         // M6b: gelernte Skillstufen aus der Character-Zeile übertragen (kein Eintrag = Stufe 0/nicht gelernt,
         // siehe CharacterSkillLevel-Kommentar) - vor RecomputeDerivedStats, auch wenn Skills selbst dort
@@ -2289,7 +2293,7 @@ public sealed class GameServer : INetEventListener
         {
             int itemId = entity.Inventory[slotIndex];
             if (itemId != 0)
-                packet.Slots.Add((slotIndex, itemId, entity.InventoryUpgradeLevels[slotIndex]));
+                packet.Slots.Add((slotIndex, itemId, entity.InventoryUpgradeLevels[slotIndex], Math.Max(1, entity.InventoryCounts[slotIndex])));
         }
 
         return packet;
@@ -2344,12 +2348,12 @@ public sealed class GameServer : INetEventListener
     /// aus, siehe Handle-Methoden unten).</summary>
     private static InventorySaveRequest BuildInventorySaveRequest(Entity entity)
     {
-        var slots = new List<(int SlotIndex, int ItemId, int UpgradeLevel)>();
+        var slots = new List<(int SlotIndex, int ItemId, int UpgradeLevel, int Count)>();
         for (int slotIndex = 0; slotIndex < entity.Inventory.Length; slotIndex++)
         {
             int itemId = entity.Inventory[slotIndex];
             if (itemId != 0)
-                slots.Add((slotIndex, itemId, entity.InventoryUpgradeLevels[slotIndex]));
+                slots.Add((slotIndex, itemId, entity.InventoryUpgradeLevels[slotIndex], Math.Max(1, entity.InventoryCounts[slotIndex])));
         }
 
         return new InventorySaveRequest(entity.CharacterId!.Value, slots,
@@ -2363,12 +2367,12 @@ public sealed class GameServer : INetEventListener
     /// Multi-Map zusätzlich die Karten-Id der Entity.</summary>
     private CharacterSaveRequest BuildCharacterSaveRequest(Entity entity)
     {
-        var slots = new List<(int SlotIndex, int ItemId, int UpgradeLevel)>();
+        var slots = new List<(int SlotIndex, int ItemId, int UpgradeLevel, int Count)>();
         for (int slotIndex = 0; slotIndex < entity.Inventory.Length; slotIndex++)
         {
             int itemId = entity.Inventory[slotIndex];
             if (itemId != 0)
-                slots.Add((slotIndex, itemId, entity.InventoryUpgradeLevels[slotIndex]));
+                slots.Add((slotIndex, itemId, entity.InventoryUpgradeLevels[slotIndex], Math.Max(1, entity.InventoryCounts[slotIndex])));
         }
 
         var skillLevels = new List<(int SkillId, int Level)>();

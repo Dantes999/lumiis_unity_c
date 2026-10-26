@@ -1401,6 +1401,7 @@ public sealed class World
         entity.SetEquipped(slot, itemId, newUpgradeLevel);
         entity.Inventory[inventorySlotIndex] = previousEquippedItemId;
         entity.InventoryUpgradeLevels[inventorySlotIndex] = previousEquippedItemId == 0 ? 0 : previousEquippedUpgradeLevel;
+        entity.InventoryCounts[inventorySlotIndex] = previousEquippedItemId == 0 ? 0 : 1;
         RecomputeDerivedStats(entity);
         return (true, default);
     }
@@ -1420,6 +1421,7 @@ public sealed class World
         entity.SetEquipped(equipmentSlot, 0, 0);
         entity.Inventory[freeSlot] = currentItemId;
         entity.InventoryUpgradeLevels[freeSlot] = currentUpgradeLevel;
+        entity.InventoryCounts[freeSlot] = 1;
         RecomputeDerivedStats(entity);
         return (true, default);
     }
@@ -1444,24 +1446,106 @@ public sealed class World
         if (entity.CurrentHp >= entity.MaxHp) return (false, InventoryActionFailedReason.TargetAtFullHp);
 
         entity.CurrentHp = Math.Min(entity.MaxHp, entity.CurrentHp + item.HealAmount);
-        entity.Inventory[inventorySlotIndex] = 0;
-        entity.InventoryUpgradeLevels[inventorySlotIndex] = 0;
+        RemoveFromInventorySlot(entity, inventorySlotIndex);
         return (true, default);
     }
 
-    /// <summary>Legt itemId auf die erste freie Inventarstelle. Gibt false zurück, wenn kein Platz frei ist
-    /// (Inventar voll) - der Aufrufer entscheidet, wie er das meldet (siehe GameServer.HandleXxx bzw.
-    /// TryAttack für Monster-Drops). upgradeLevel (M6c, Default 0) ist die Stufe der neuen Item-Instanz.</summary>
-    public bool TryAddItemToInventory(int entityId, int itemId, int upgradeLevel = 0)
+    /// <summary>Legt count Stück von itemId ins Inventar. Stapelbare Items (ItemDefinition.MaxStack &gt; 1,
+    /// nur ohne Aufwertungsstufe) füllen zuerst vorhandene Stapel desselben Items, der Rest geht auf die
+    /// ersten freien Plätze. Alles oder nichts: passt nicht die ganze Menge, bleibt das Inventar unverändert
+    /// und es kommt false zurück (Inventar voll) - der Aufrufer entscheidet, wie er das meldet (siehe
+    /// GameServer.HandleXxx bzw. TryAttack für Monster-Drops). upgradeLevel (M6c, Default 0) ist die Stufe
+    /// der neuen Item-Instanz.</summary>
+    public bool TryAddItemToInventory(int entityId, int itemId, int upgradeLevel = 0, int count = 1)
     {
+        if (count <= 0) return false;
         if (!_entities.TryGetValue(entityId, out Entity? entity)) return false;
 
-        int freeSlot = FindFirstFreeInventorySlot(entity);
-        if (freeSlot < 0) return false;
+        int maxStack = upgradeLevel == 0 ? MaxStackFor(itemId) : 1;
+        if (InventoryRoomFor(entity, itemId, maxStack) < count) return false;
 
-        entity.Inventory[freeSlot] = itemId;
-        entity.InventoryUpgradeLevels[freeSlot] = upgradeLevel;
+        int remaining = count;
+        if (maxStack > 1)
+        {
+            for (int i = 0; i < entity.Inventory.Length && remaining > 0; i++)
+            {
+                if (entity.Inventory[i] != itemId || entity.InventoryUpgradeLevels[i] != 0) continue;
+                int added = Math.Min(remaining, maxStack - StackCount(entity, i));
+                if (added <= 0) continue;
+                entity.InventoryCounts[i] = StackCount(entity, i) + added;
+                remaining -= added;
+            }
+        }
+        for (int i = 0; i < entity.Inventory.Length && remaining > 0; i++)
+        {
+            if (entity.Inventory[i] != 0) continue;
+            int added = Math.Min(remaining, maxStack);
+            entity.Inventory[i] = itemId;
+            entity.InventoryUpgradeLevels[i] = upgradeLevel;
+            entity.InventoryCounts[i] = added;
+            remaining -= added;
+        }
         return true;
+    }
+
+    /// <summary>Wie viele Stück von itemId noch ins Inventar passen (Restplatz in passenden Stapeln plus
+    /// freie Plätze).</summary>
+    private static int InventoryRoomFor(Entity entity, int itemId, int maxStack)
+    {
+        int room = 0;
+        for (int i = 0; i < entity.Inventory.Length; i++)
+        {
+            if (entity.Inventory[i] == 0) room += maxStack;
+            else if (maxStack > 1 && entity.Inventory[i] == itemId && entity.InventoryUpgradeLevels[i] == 0)
+                room += Math.Max(0, maxStack - StackCount(entity, i));
+        }
+        return room;
+    }
+
+    /// <summary>Stapelgröße eines belegten Platzes, mindestens 1 (Tests setzen Inventory teils direkt ohne
+    /// InventoryCounts).</summary>
+    private static int StackCount(Entity entity, int slotIndex) =>
+        entity.Inventory[slotIndex] == 0 ? 0 : Math.Max(1, entity.InventoryCounts[slotIndex]);
+
+    private int MaxStackFor(int itemId) =>
+        _itemCatalog != null && _itemCatalog.TryGet(itemId, out ItemDefinition item) ? item.MaxStack : 1;
+
+    /// <summary>Nimmt ein Stück aus dem Inventarplatz; der Platz wird leer, sobald der Stapel aufgebraucht
+    /// ist.</summary>
+    private static void RemoveFromInventorySlot(Entity entity, int slotIndex)
+    {
+        entity.InventoryCounts[slotIndex] = StackCount(entity, slotIndex) - 1;
+        if (entity.InventoryCounts[slotIndex] > 0) return;
+        entity.Inventory[slotIndex] = 0;
+        entity.InventoryUpgradeLevels[slotIndex] = 0;
+        entity.InventoryCounts[slotIndex] = 0;
+    }
+
+    /// <summary>Fasst gleiche stapelbare Items zu möglichst wenigen Stapeln zusammen (beim Join: Inventare
+    /// von vor dem Stapeln hatten jeden Trank auf einem eigenen Platz). Reihenfolge bleibt erhalten, frei
+    /// gewordene Plätze werden einfach leer.</summary>
+    public void CompactInventoryStacks(Entity entity)
+    {
+        for (int i = 0; i < entity.Inventory.Length; i++)
+        {
+            int itemId = entity.Inventory[i];
+            if (itemId == 0 || entity.InventoryUpgradeLevels[i] != 0) continue;
+            int maxStack = MaxStackFor(itemId);
+            entity.InventoryCounts[i] = StackCount(entity, i);
+            for (int j = i + 1; j < entity.Inventory.Length && entity.InventoryCounts[i] < maxStack; j++)
+            {
+                if (entity.Inventory[j] != itemId || entity.InventoryUpgradeLevels[j] != 0) continue;
+                entity.InventoryCounts[j] = StackCount(entity, j);
+                int moved = Math.Min(entity.InventoryCounts[j], maxStack - entity.InventoryCounts[i]);
+                entity.InventoryCounts[i] += moved;
+                entity.InventoryCounts[j] -= moved;
+                if (entity.InventoryCounts[j] == 0)
+                {
+                    entity.Inventory[j] = 0;
+                    entity.InventoryUpgradeLevels[j] = 0;
+                }
+            }
+        }
     }
 
     private static int FindFirstFreeInventorySlot(Entity entity)
@@ -1528,13 +1612,9 @@ public sealed class World
         int successChancePercent = _upgradeCatalog.GetSuccessChancePercent(currentUpgradeLevel);
         bool success = _random.Next(100) < successChancePercent;
 
-        entity.Inventory[whetstoneSlot] = 0;
-        entity.InventoryUpgradeLevels[whetstoneSlot] = 0;
+        RemoveFromInventorySlot(entity, whetstoneSlot);
         if (protectionScrollSlot >= 0)
-        {
-            entity.Inventory[protectionScrollSlot] = 0;
-            entity.InventoryUpgradeLevels[protectionScrollSlot] = 0;
-        }
+            RemoveFromInventorySlot(entity, protectionScrollSlot);
 
         if (success)
         {
@@ -1716,7 +1796,7 @@ public sealed class World
         if (player.Yang < item.BuyPrice)
             return (false, ShopActionFailedReason.NotEnoughYang);
 
-        if (FindFirstFreeInventorySlot(player) < 0)
+        if (InventoryRoomFor(player, itemId, item.MaxStack) < 1)
             return (false, ShopActionFailedReason.InventoryFull);
 
         player.Yang -= item.BuyPrice;
@@ -1725,7 +1805,7 @@ public sealed class World
     }
 
     /// <summary>Verkauft das Item aus inventorySlotIndex an den NPC: NPC/Reichweite, Slot gültig und belegt,
-    /// SellPrice &gt; 0. Erfolg: Slot leeren, Yang gutschreiben über CreditYang (MaxYang-Deckel) - bei
+    /// SellPrice &gt; 0. Erfolg: Slot leeren (ganzer Stapel, SellPrice je Stück), Yang gutschreiben über CreditYang (MaxYang-Deckel) - bei
     /// Überschreitung Abbruch mit YangCapReached, NICHTS wird verändert (Slot bleibt belegt, kein
     /// Teilverkauf).</summary>
     public (bool Success, ShopActionFailedReason Reason) TrySell(int playerEntityId, int npcEntityId, int inventorySlotIndex)
@@ -1748,11 +1828,14 @@ public sealed class World
         if (item.SellPrice <= 0)
             return (false, ShopActionFailedReason.ItemNotSellable);
 
-        if (!CreditYang(playerEntityId, item.SellPrice))
+        // Wie Metin2: der ganze Stapel wird auf einmal verkauft.
+        int stackCount = StackCount(player, inventorySlotIndex);
+        if (!CreditYang(playerEntityId, item.SellPrice * stackCount))
             return (false, ShopActionFailedReason.YangCapReached);
 
         player.Inventory[inventorySlotIndex] = 0;
         player.InventoryUpgradeLevels[inventorySlotIndex] = 0;
+        player.InventoryCounts[inventorySlotIndex] = 0;
         return (true, default);
     }
 

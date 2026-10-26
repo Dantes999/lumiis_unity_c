@@ -774,7 +774,7 @@ namespace Lumiis.Client
             for (int i = 0; i < _inventorySlots.Length; i++)
             {
                 int itemId = ItemInSlot(i);
-                ApplySlot(_inventorySlots[i], itemId, UpgradeInSlot(i));
+                ApplySlot(_inventorySlots[i], itemId, UpgradeInSlot(i), _gameClient.InventoryCount(i));
                 _inventorySlots[i].Root.EnableInClassList("hud-item-slot-selected", i == _upgradeMaterialSlot);
             }
 
@@ -801,7 +801,7 @@ namespace Lumiis.Client
             _inventoryYang.text = FormatYang(_gameClient.YangTotal);
         }
 
-        private void ApplySlot(ItemSlotView view, int itemId, int upgradeLevel)
+        private void ApplySlot(ItemSlotView view, int itemId, int upgradeLevel, int stackCount = 1)
         {
             if (itemId == 0)
             {
@@ -815,7 +815,8 @@ namespace Lumiis.Client
             view.Icon.image = icon;
             view.Icon.style.display = icon != null ? DisplayStyle.Flex : DisplayStyle.None;
             view.Text.text = icon != null ? "" : ItemName(itemId);
-            view.Badge.text = upgradeLevel > 0 ? "+" + upgradeLevel : "";
+            // Stapel (nur Nicht-Ausrüstung) zeigen ihre Menge, Ausrüstung ihre Stufe.
+            view.Badge.text = stackCount > 1 ? stackCount.ToString() : upgradeLevel > 0 ? "+" + upgradeLevel : "";
         }
 
         private int ItemInSlot(int slotIndex)

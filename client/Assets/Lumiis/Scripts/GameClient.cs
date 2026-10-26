@@ -146,6 +146,7 @@ namespace Lumiis.Client
         // die Debug-UI, keine eigene ClientWorld-Anbindung nötig (analog zu _yangTotal/_targetEntityId).
         // Seit M6c trägt jeder Slot zusätzlich seine Aufwertungsstufe (0-9).
         private readonly List<(int SlotIndex, int ItemId, int UpgradeLevel)> _inventorySlots = new List<(int, int, int)>();
+        private readonly int[] _inventoryCounts = new int[GameConstants.InventorySize];
         private int _equippedArmorItemId;
         private int _equippedHelmetItemId;
         private int _equippedWeaponItemId;
@@ -1745,6 +1746,7 @@ namespace Lumiis.Client
             _yangTotal = 0;
             _isDead = false;
             _inventorySlots.Clear();
+            System.Array.Clear(_inventoryCounts, 0, _inventoryCounts.Length);
             _equippedArmorItemId = 0;
             _equippedHelmetItemId = 0;
             _equippedWeaponItemId = 0;
@@ -1918,9 +1920,17 @@ namespace Lumiis.Client
             InventorySyncPacket inventorySync = packet as InventorySyncPacket;
             if (inventorySync != null)
             {
-                int previousInventoryCount = _inventorySlots.Count;
+                int previousItemTotal = 0;
+                foreach (int stackCount in _inventoryCounts) previousItemTotal += stackCount;
                 _inventorySlots.Clear();
-                _inventorySlots.AddRange(inventorySync.Slots);
+                System.Array.Clear(_inventoryCounts, 0, _inventoryCounts.Length);
+                int itemTotal = 0;
+                foreach ((int SlotIndex, int ItemId, int UpgradeLevel, int Count) slot in inventorySync.Slots)
+                {
+                    _inventorySlots.Add((slot.SlotIndex, slot.ItemId, slot.UpgradeLevel));
+                    if (slot.SlotIndex >= 0 && slot.SlotIndex < _inventoryCounts.Length) _inventoryCounts[slot.SlotIndex] = slot.Count;
+                    itemTotal += slot.Count;
+                }
                 _equippedArmorItemId = inventorySync.EquippedArmorItemId;
                 _equippedHelmetItemId = inventorySync.EquippedHelmetItemId;
                 _equippedWeaponItemId = inventorySync.EquippedWeaponItemId;
@@ -1929,7 +1939,7 @@ namespace Lumiis.Client
                 _equippedHelmetUpgradeLevel = inventorySync.EquippedHelmetUpgradeLevel;
                 _equippedWeaponUpgradeLevel = inventorySync.EquippedWeaponUpgradeLevel;
                 _equippedShieldUpgradeLevel = inventorySync.EquippedShieldUpgradeLevel;
-                if (_inventorySlots.Count > previousInventoryCount) _audio?.PlayLoot();
+                if (itemTotal > previousItemTotal) _audio?.PlayLoot();
                 ApplyLocalWeaponVisual();
                 return;
             }
@@ -2430,6 +2440,11 @@ namespace Lumiis.Client
         public bool ChatClosedRecently => Time.frameCount - _chatClosedAtFrame <= 1;
 
         public IReadOnlyList<(int SlotIndex, int ItemId, int UpgradeLevel)> InventorySlots => _inventorySlots;
+
+        /// <summary>Stapelgröße des Inventarplatzes (0 = leer, sonst 1..GameConstants.MaxStackCount) aus dem
+        /// letzten InventorySync - für die Mengenzahl am Slot.</summary>
+        public int InventoryCount(int slotIndex) =>
+            slotIndex >= 0 && slotIndex < _inventoryCounts.Length ? _inventoryCounts[slotIndex] : 0;
         public ItemCatalogClient ItemCatalog => _itemCatalog;
 
         public int EquippedItemId(EquipmentSlot slot)

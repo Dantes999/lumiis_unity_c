@@ -21,6 +21,11 @@ namespace Lumiis.Shared
         /// sowie das Debug-Panel (Client) richten sich alle danach.</summary>
         public const int InventorySize = 20;
 
+        /// <summary>Höchste Stapelgröße eines Inventarplatzes für stapelbare Items (alles außer Ausrüstung:
+        /// Tränke, Schleifsteine, Rollen, Materialien) - gleiche Items füllen erst vorhandene Stapel, dann
+        /// einen freien Platz (World.TryAddItemToInventory). Ausrüstung stapelt nie (Stufe je Instanz).</summary>
+        public const int MaxStackCount = 200;
+
         /// <summary>Maximale Distanz (1/100 Welteinheiten) zu einem NPC, um dessen Shop zu öffnen/zu nutzen
         /// (M5b, siehe CLAUDE.md "Shop und NPCs") - quadrierte Distanz wie bei AOI/TryAttack, jede
         /// Shop-Aktion prüft das serverseitig erneut.</summary>

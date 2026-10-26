@@ -189,6 +189,11 @@ namespace Lumiis.Data.Migrations
                     b.Property<int>("CharacterId")
                         .HasColumnType("integer");
 
+                    b.Property<int>("Count")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
                     b.Property<int>("ItemId")
                         .HasColumnType("integer");
 

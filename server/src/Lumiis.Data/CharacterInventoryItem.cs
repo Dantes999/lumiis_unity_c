@@ -14,4 +14,8 @@ public sealed class CharacterInventoryItem
     /// <summary>M6c: Aufwertungsstufe dieser konkreten Item-Instanz (0-9) - bleibt beim Anlegen/Ablegen
     /// erhalten (siehe World.TryEquip/TryUnequip). 0 = nicht aufgewertet.</summary>
     public int UpgradeLevel { get; set; }
+
+    /// <summary>Stapelgröße (1..GameConstants.MaxStackCount), Ausrüstung immer 1. Spalten-Default 1, damit
+    /// bestehende Zeilen nach der Migration AddInventoryStackCount genau ein Item bleiben.</summary>
+    public int Count { get; set; } = 1;
 }

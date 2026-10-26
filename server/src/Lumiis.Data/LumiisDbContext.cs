@@ -58,6 +58,7 @@ public sealed class LumiisDbContext : DbContext
 
             // M6c: Item-Instanz-Aufwertungsstufe, Default 0 (bestehende Inventarzeilen bleiben +0).
             entity.Property(i => i.UpgradeLevel).HasDefaultValue(0);
+            entity.Property(i => i.Count).HasDefaultValue(1);
 
             entity.HasOne(i => i.Character)
                 .WithMany(c => c.InventoryItems)

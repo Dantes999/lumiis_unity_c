@@ -289,7 +289,7 @@ namespace Lumiis.Tests
         {
             var original = new InventorySyncPacket
             {
-                Slots = new System.Collections.Generic.List<(int SlotIndex, int ItemId, int UpgradeLevel)> { (0, 1, 3), (5, 8, 0), (19, 3, 9) },
+                Slots = new System.Collections.Generic.List<(int SlotIndex, int ItemId, int UpgradeLevel, int Count)> { (0, 1, 3, 1), (5, 8, 0, 200), (19, 3, 9, 1) },
                 EquippedArmorItemId = 4,
                 EquippedHelmetItemId = 0,
                 EquippedWeaponItemId = 1,

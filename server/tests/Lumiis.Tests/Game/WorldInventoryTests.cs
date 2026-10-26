@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Lumiis.Data.Items;
 using Lumiis.Server.Game;
+using Lumiis.Shared;
 using Lumiis.Shared.Net;
 using Lumiis.Tests;
 using Xunit;
@@ -302,5 +303,98 @@ namespace Lumiis.Tests.Game
             Assert.Empty(result.DroppedItemIds);
             Assert.True(result.ItemLostToFullInventory);
         }
-    }
+    
+        // ---- Stapeln ----
+
+        [Fact]
+        public void TryAddItemToInventory_SameConsumable_StacksOnOneSlot()
+        {
+            World world = CreateWorld();
+            Entity player = JoinPlayer(world);
+
+            Assert.True(world.TryAddItemToInventory(player.Id, 4));
+            Assert.True(world.TryAddItemToInventory(player.Id, 4));
+            Assert.True(world.TryAddItemToInventory(player.Id, 4, count: 3));
+
+            Assert.Equal(4, player.Inventory[0]);
+            Assert.Equal(5, player.InventoryCounts[0]);
+            Assert.Equal(0, player.Inventory[1]);
+        }
+
+        [Fact]
+        public void TryAddItemToInventory_Equipment_NeverStacks()
+        {
+            World world = CreateWorld();
+            Entity player = JoinPlayer(world);
+
+            world.TryAddItemToInventory(player.Id, 1);
+            world.TryAddItemToInventory(player.Id, 1);
+
+            Assert.Equal(1, player.Inventory[0]);
+            Assert.Equal(1, player.Inventory[1]);
+            Assert.Equal(1, player.InventoryCounts[0]);
+            Assert.Equal(1, player.InventoryCounts[1]);
+        }
+
+        [Fact]
+        public void TryAddItemToInventory_FullStack_OverflowsToNextFreeSlot()
+        {
+            World world = CreateWorld();
+            Entity player = JoinPlayer(world);
+
+            Assert.True(world.TryAddItemToInventory(player.Id, 4, count: GameConstants.MaxStackCount + 2));
+
+            Assert.Equal(GameConstants.MaxStackCount, player.InventoryCounts[0]);
+            Assert.Equal(4, player.Inventory[1]);
+            Assert.Equal(2, player.InventoryCounts[1]);
+        }
+
+        [Fact]
+        public void TryAddItemToInventory_FullInventoryButStackHasRoom_StillFits()
+        {
+            World world = CreateWorld();
+            Entity player = JoinPlayer(world);
+            world.TryAddItemToInventory(player.Id, 4);
+            for (int i = 1; i < GameConstants.InventorySize; i++) world.TryAddItemToInventory(player.Id, 1);
+
+            Assert.True(world.TryAddItemToInventory(player.Id, 4));
+            Assert.Equal(2, player.InventoryCounts[0]);
+            Assert.False(world.TryAddItemToInventory(player.Id, 2));
+        }
+
+        [Fact]
+        public void TryUseConsumable_Stack_ConsumesOnePiece()
+        {
+            World world = CreateWorld();
+            Entity player = JoinPlayer(world);
+            world.TryAddItemToInventory(player.Id, 4, count: 2);
+            player.CurrentHp = 10;
+
+            Assert.True(world.TryUseConsumable(player.Id, 0, 0).Success);
+            Assert.Equal(4, player.Inventory[0]);
+            Assert.Equal(1, player.InventoryCounts[0]);
+
+            Assert.True(world.TryUseConsumable(player.Id, 0, 0).Success);
+            Assert.Equal(0, player.Inventory[0]);
+            Assert.Equal(0, player.InventoryCounts[0]);
+        }
+
+        [Fact]
+        public void CompactInventoryStacks_MergesSingleSlotsFromBeforeStacking()
+        {
+            World world = CreateWorld();
+            Entity player = JoinPlayer(world);
+            player.Inventory[0] = 4; player.InventoryCounts[0] = 1;
+            player.Inventory[1] = 1; player.InventoryCounts[1] = 1;
+            player.Inventory[3] = 4; player.InventoryCounts[3] = 1;
+            player.Inventory[7] = 4; player.InventoryCounts[7] = 1;
+
+            world.CompactInventoryStacks(player);
+
+            Assert.Equal(3, player.InventoryCounts[0]);
+            Assert.Equal(1, player.Inventory[1]);
+            Assert.Equal(0, player.Inventory[3]);
+            Assert.Equal(0, player.Inventory[7]);
+        }
+}
 }

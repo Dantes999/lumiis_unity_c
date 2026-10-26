@@ -205,6 +205,11 @@ public sealed class Entity
     /// TryUnequip), damit eine Item-Instanz ihre Stufe behält.</summary>
     public int[] InventoryUpgradeLevels { get; } = new int[GameConstants.InventorySize];
 
+    /// <summary>Stapelgröße je Inventarplatz, parallel zu Inventory (0 bei leerem Platz, sonst
+    /// 1..GameConstants.MaxStackCount). Nur World.TryAddItemToInventory/RemoveFromInventorySlot und die
+    /// An-/Ablege-Pfade schreiben sie.</summary>
+    public int[] InventoryCounts { get; } = new int[GameConstants.InventorySize];
+
     /// <summary>Ausgerüstete Items (M5a, Item-IDs aus data/items.json, 0 = Slot leer) - nur bei Kind=Player
     /// relevant. Werden von World.TryEquip/TryUnequip gepflegt, beim Join zusätzlich aus der Character-Zeile
     /// übernommen (siehe GameServer.CompleteJoin).</summary>

@@ -84,6 +84,10 @@ public sealed class ItemDefinition
     /// <summary>Nur bei Armor/Helmet/Weapon/Shield true - Consumables/Aufwertungsmaterial können nicht
     /// angelegt werden.</summary>
     public bool IsEquipment => ItemType is ItemType.Armor or ItemType.Helmet or ItemType.Weapon or ItemType.Shield;
+
+    /// <summary>Wie viele Stück auf einen Inventarplatz passen: Ausrüstung 1 (jede Instanz hat ihre eigene
+    /// Stufe), alles andere GameConstants.MaxStackCount.</summary>
+    public int MaxStack => IsEquipment ? 1 : Lumiis.Shared.GameConstants.MaxStackCount;
 }
 
 /// <summary>Lädt und validiert data/items.json. Fehler beim Laden bedeuten Abbruch beim Serverstart (analog zu
