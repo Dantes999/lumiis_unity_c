@@ -222,6 +222,15 @@ Seit 2026-10-25 gibt es echte, begehbare Karten statt einer einzigen Welt. Detai
   weglaufen und nach hinten schlagen funktioniert. Liegt der Mauszeiger näher als 0,45 Einheiten an der
   Figur, bleibt die letzte Blickrichtung stehen (sonst kippte sie bei jeder kleinen Bewegung). `MeleeArcView` zeigt bei jedem Schlag einen sichtbaren Bogen in Zielrichtung und
   Reichweite; ein roter Ring markiert das getroffene Ziel.
+- Flächenschlag (Protocol.Version 23, Wunsch des Users: "Splasher" wie Metin2/Diablo): ein normaler
+  Spieler-Hieb trifft JEDEN Gegner in Nahkampf-Reichweite im Schlagbogen (±`GameConstants.
+  PlayerSwingHalfAngleDegrees` = 80° um die Mausrichtung, dazu alles innerhalb `PlayerSwingPointBlankWire`),
+  höchstens `PlayerSwingMaxTargets` (12), jeder mit vollem Schaden und eigenem Ausweichwurf
+  (`World.TryPlayerSwing` -> je Treffer `ResolveHit`, getroffene Monster nehmen den Spieler ins Visier).
+  `AttackRequestPacket` trägt dafür `AimX/AimY` (Richtung x1000, (0,0) = Richtung zum Ziel); TargetEntityId
+  ist nur noch das bevorzugte Ziel (0 = keins). Trifft der Hieb niemanden, kommt AttackFailed ohne
+  Cooldown-Verbrauch. Monster greifen weiter einzeln per `TryAttack` an. Client: mehrere eigene Treffer im
+  selben Frame = ein Sound, stärkeres Kamerawackeln und längerer Treffer-Stopp.
 - Kampf: Leertaste schlägt, gedrückt halten wiederholt den Schlag im Server-Cooldown-Takt. Der lokale
   Kombo-Zähler wechselt links/rechts/links und neigt die Figur sichtbar; Auto-Target wählt das nächste
   Monster in Reichweite. Rechtsklick auf ein Monster bleibt als manueller Angriff erhalten. Leertaste
@@ -1411,6 +1420,10 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
 - Monster in 3er-Gruppen (2026-10-26, Wunsch des Users): jede Spawn-Gruppe sind genau 3 Monster desselben
   Typs (`GROUP_SIZE` in `tools/build-wiki-content.py`, z. B. 3x Wildhund, 3x Hungriger Wildhund), Bosse
   ausgenommen; Level-Ringe/Gebiete unverändert. Yongan 2952, Jayang 2694 Spawns.
+- Flächenschlag + schwächere Hungrige Wildhunde (2026-10-26, Protocol.Version 23): normaler Hieb trifft alle
+  Gegner im Schlagbogen (siehe Abschnitt Map1/Steuerung), `WorldSwingTests` (9). Hungriger Wildhund (Mob 25,
+  `tools/build-wiki-content.py` custom_mobs) 140->105 HP, Angriff 14->11, Verteidigung 2->1, Takt 1500->1700 ms,
+  EXP 20->18. 742 Tests grün.
 - Offen: Monster-Sheets für die Jayang-Mobs, weitere Zonen/Dungeons, Reittiere; siehe
   `docs/feature-gap-lumiis.md`.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client

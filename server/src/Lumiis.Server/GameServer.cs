@@ -1570,7 +1570,7 @@ public sealed class GameServer : INetEventListener
         }
     }
 
-    /// <summary>AttackRequestPacket-Handler (M4a): ruft World.TryAttack auf und übersetzt das Ergebnis über
+    /// <summary>AttackRequestPacket-Handler (M4a, seit Protocol 23 Flächenschlag): ruft World.TryPlayerSwing auf und übersetzt das Ergebnis über
     /// BroadcastAttackResult in Pakete. Zusätzlich bei Yang-Gewinn YangChangedPacket NUR an den Angreifer,
     /// plus asynchrones Speichern (eigener Channel, siehe YangSaveRequest). Fehlschlag: AttackFailedPacket
     /// NUR an den Angreifer, geloggt, Verbindung bleibt bestehen.</summary>
@@ -1584,16 +1584,18 @@ public sealed class GameServer : INetEventListener
         }
 
         World world = conn.World ?? _world;
-        AttackResult result = world.TryAttack(attackerId, attack.TargetEntityId, _nowMs());
+        SwingResult swing = world.TryPlayerSwing(attackerId, attack.TargetEntityId, attack.AimX, attack.AimY, _nowMs());
 
-        if (!result.Success)
+        if (!swing.Success)
         {
-            conn.Peer.SendPacket(new AttackFailedPacket { Reason = result.Reason });
-            _logger.Info($"Angriff von Entity {attackerId} auf Entity {attack.TargetEntityId} abgelehnt ({result.Reason})");
+            conn.Peer.SendPacket(new AttackFailedPacket { Reason = swing.Reason });
+            _logger.Info($"Angriff von Entity {attackerId} auf Entity {attack.TargetEntityId} abgelehnt ({swing.Reason})");
             return;
         }
 
-        ApplyAttackResult(conn, attackerId, attack.TargetEntityId, result);
+        // Flächenschlag: jeder getroffene Gegner läuft durch denselben Einzeltreffer-Weg (Pakete, Yang, XP, Drops).
+        foreach ((int targetEntityId, AttackResult result) in swing.Hits)
+            ApplyAttackResult(conn, attackerId, targetEntityId, result);
     }
 
     /// <summary>M6b-Extraktion aus HandleAttackRequest (siehe docs/tasks/M6b-skills.md Abschnitt 5): die

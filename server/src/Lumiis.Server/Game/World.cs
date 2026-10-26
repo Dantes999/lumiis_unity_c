@@ -533,6 +533,95 @@ public sealed class World
         return ResolveHit(attacker, target, damageMultiplierPercent: 100, nowMs);
     }
 
+    /// <summary>Normaler Spieler-Hieb als Flächenschlag (Protocol 23, Splasher-Kampf): trifft JEDEN Gegner
+    /// innerhalb der Nahkampf-Reichweite, der im Schlagbogen (GameConstants.PlayerSwingHalfAngleDegrees um
+    /// die Schlagrichtung) oder direkt an der Figur steht - jeder bekommt den vollen Schaden über ResolveHit
+    /// (eigener Ausweichwurf, reaktive Zielerfassung, Tod/XP/Yang/Drops je Ziel). Schlagrichtung ist
+    /// (aimX, aimY), bei (0,0) die Richtung zum bevorzugten Ziel. Das bevorzugte Ziel wird auch knapp
+    /// außerhalb des Bogens getroffen (Latenz). Trifft der Hieb niemanden, gibt es den Grund des bevorzugten
+    /// Ziels zurück (dieselben Gründe/Reihenfolge wie TryAttack) bzw. OutOfRange - Cooldown wird dann NICHT
+    /// verbraucht. Monster greifen weiterhin per TryAttack einzeln an.</summary>
+    public SwingResult TryPlayerSwing(int attackerEntityId, int preferredTargetId, int aimX, int aimY, long nowMs)
+    {
+        if (!_entities.TryGetValue(attackerEntityId, out Entity? attacker))
+            return SwingResult.Fail(AttackFailedReason.TargetNotFound);
+        if (attacker.IsDead)
+            return SwingResult.Fail(AttackFailedReason.AttackerDead);
+
+        long range = EffectiveMeleeRangeWire(attacker);
+        long rangeSq = range * range;
+
+        Entity? preferred = null;
+        AttackFailedReason? preferredReason = null;
+        if (preferredTargetId > 0)
+        {
+            if (!_entities.TryGetValue(preferredTargetId, out preferred)) preferredReason = AttackFailedReason.TargetNotFound;
+            else if (preferred.IsDead) preferredReason = AttackFailedReason.TargetAlreadyDead;
+            else if (!IsCombatKind(preferred.Kind)) preferredReason = AttackFailedReason.TargetNotAttackable;
+            else if (preferred.Kind == attacker.Kind) preferredReason = AttackFailedReason.TargetIsPlayer;
+            else if (DistanceSq(attacker, preferred) > rangeSq) preferredReason = AttackFailedReason.OutOfRange;
+        }
+
+        double dirX = aimX, dirY = aimY;
+        if (dirX == 0 && dirY == 0 && preferred != null)
+        {
+            dirX = preferred.IntX - attacker.IntX;
+            dirY = preferred.IntY - attacker.IntY;
+        }
+        double dirLen = Math.Sqrt(dirX * dirX + dirY * dirY);
+        double cosHalf = Math.Cos(GameConstants.PlayerSwingHalfAngleDegrees * Math.PI / 180.0);
+        long pointBlankSq = (long)GameConstants.PlayerSwingPointBlankWire * GameConstants.PlayerSwingPointBlankWire;
+
+        var targets = new List<(Entity Entity, long DistSq)>();
+        foreach (Entity candidate in _entities.Values)
+        {
+            if (candidate.Id == attacker.Id || candidate.IsDead || !IsCombatKind(candidate.Kind) || candidate.Kind == attacker.Kind)
+                continue;
+            long distSq = DistanceSq(attacker, candidate);
+            if (distSq > rangeSq) continue;
+
+            bool hit = candidate == preferred || distSq <= pointBlankSq;
+            if (!hit && dirLen > 0)
+            {
+                double cx = candidate.IntX - attacker.IntX, cy = candidate.IntY - attacker.IntY;
+                hit = cx * dirX + cy * dirY >= cosHalf * dirLen * Math.Sqrt(distSq);
+            }
+            if (hit) targets.Add((candidate, distSq));
+        }
+
+        if (targets.Count == 0)
+            return SwingResult.Fail(preferredReason ?? AttackFailedReason.OutOfRange);
+
+        if (nowMs < attacker.AttackReadyAtMs)
+            return SwingResult.Fail(AttackFailedReason.OnCooldown);
+        attacker.AttackReadyAtMs = nowMs + EffectiveAttackCooldownMs(attacker);
+
+        // Nächste zuerst; das bevorzugte Ziel ist bei der Obergrenze immer dabei.
+        targets.Sort((a, b) =>
+        {
+            if (a.Entity == preferred) return -1;
+            if (b.Entity == preferred) return 1;
+            return a.DistSq.CompareTo(b.DistSq);
+        });
+        if (targets.Count > GameConstants.PlayerSwingMaxTargets)
+            targets.RemoveRange(GameConstants.PlayerSwingMaxTargets, targets.Count - GameConstants.PlayerSwingMaxTargets);
+
+        var hits = new List<(int TargetEntityId, AttackResult Result)>(targets.Count);
+        foreach ((Entity target, long _) in targets)
+        {
+            if (attacker.IsDead) break;
+            hits.Add((target.Id, ResolveHit(attacker, target, damageMultiplierPercent: 100, nowMs)));
+        }
+        return SwingResult.Ok(hits);
+    }
+
+    private static long DistanceSq(Entity a, Entity b)
+    {
+        long dx = a.IntX - b.IntX;
+        long dy = a.IntY - b.IntY;
+        return dx * dx + dy * dy;
+    }
+
     /// <summary>Nur Spieler und Monster nehmen am Kampf teil - NPCs und Boden-Drops (GroundItem) sind nie
     /// angreifbar, weder per normalem Angriff noch per Wuchtschlag/Kreisschlag.</summary>
     private static bool IsCombatKind(EntityKind kind) => kind == EntityKind.Player || kind == EntityKind.Monster;

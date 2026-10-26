@@ -46,5 +46,16 @@ namespace Lumiis.Shared
         /// angrenzenden Zielen "außer Reichweite". Der Client wählt Ziele weiterhin nur innerhalb der exakten
         /// MeleeRangeWire aus, die Toleranz fängt nur den Versatz ab.</summary>
         public const int PlayerMeleeRangeToleranceWire = 50;
+
+        /// <summary>Flächenschlag (Protocol 23): ein normaler Spieler-Hieb trifft jeden Gegner in Reichweite,
+        /// der höchstens so viele Grad neben der Schlagrichtung steht (Bogen = doppelter Wert).</summary>
+        public const int PlayerSwingHalfAngleDegrees = 80;
+
+        /// <summary>Gegner, die enger als dieser Abstand an der Figur kleben, trifft der Hieb unabhängig vom
+        /// Winkel (sie stehen praktisch im Körper).</summary>
+        public const int PlayerSwingPointBlankWire = 60;
+
+        /// <summary>Obergrenze getroffener Gegner je Hieb (begrenzt Pakete pro Schlag).</summary>
+        public const int PlayerSwingMaxTargets = 12;
     }
 }

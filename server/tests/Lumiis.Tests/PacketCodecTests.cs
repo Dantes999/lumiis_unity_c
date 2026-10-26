@@ -209,9 +209,11 @@ namespace Lumiis.Tests
         [Fact]
         public void AttackRequest_RoundTrip()
         {
-            var original = new AttackRequestPacket { TargetEntityId = 9 };
+            var original = new AttackRequestPacket { TargetEntityId = 9, AimX = -707, AimY = 707 };
             var decoded = Assert.IsType<AttackRequestPacket>(PacketCodec.Decode(PacketCodec.Encode(original)));
             Assert.Equal(original.TargetEntityId, decoded.TargetEntityId);
+            Assert.Equal(original.AimX, decoded.AimX);
+            Assert.Equal(original.AimY, decoded.AimY);
         }
 
         [Fact]

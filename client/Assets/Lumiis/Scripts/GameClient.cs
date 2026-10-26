@@ -124,6 +124,11 @@ namespace Lumiis.Client
         // überstreicht (SwingMath.ContactSeconds). -1 = kein Hieb unterwegs.
         private int _pendingAttackTargetId = -1;
         private float _pendingAttackAt;
+        private Vector2 _pendingAttackAim = Vector2.down;
+
+        // Flächenschlag: mehrere eigene Treffer im selben Frame verstärken Wackeln, ohne Sound-Gewitter.
+        private int _localHitFrame = -1;
+        private int _localHitCount;
 
         // Kamera-Wackeln bei Treffern (rein lokal, LateUpdate).
         private float _shakeAmplitude;
@@ -1496,13 +1501,35 @@ namespace Lumiis.Client
 
             if (_isDead || _world.LocalEntityId < 0) return;
             if (!_world.Entities.TryGetValue(_world.LocalEntityId, out ClientEntity local)) return;
-            if (!_world.Entities.TryGetValue(targetId, out ClientEntity target) || target.CurrentHp == 0) return;
-            float range = (_classCatalog != null ? _classCatalog.MeleeRangeWire : 150) / 100f;
-            if (Distance(local, target) > range) return;
 
-            _netClient.SendAttack(targetId);
+            // Flächenschlag: der Server trifft alle Gegner im Bogen. Ist das bevorzugte Ziel inzwischen tot
+            // (z. B. vom letzten Hieb), geht der Schlag trotzdem raus, solange noch jemand im Bogen steht.
+            int inArc = CountMonstersInSwingArc(local, _pendingAttackAim);
+            if (inArc == 0) return;
+            if (!_world.Entities.TryGetValue(targetId, out ClientEntity target) || target.CurrentHp == 0) targetId = 0;
+
+            _netClient.SendAttack(targetId, Mathf.RoundToInt(_pendingAttackAim.x * 1000f), Mathf.RoundToInt(_pendingAttackAim.y * 1000f));
             if (_animators.TryGetValue(_world.LocalEntityId, out CharacterAnimator animator) && animator != null)
-                animator.HitPause(HitStopSeconds);
+                animator.HitPause(Mathf.Min(0.1f, HitStopSeconds + 0.012f * (inArc - 1)));
+        }
+
+        /// <summary>Spiegelt die Server-Regel aus World.TryPlayerSwing (Reichweite, Bogen, Körperkontakt) nur für
+        /// die Entscheidung, ob ein Hieb rausgeht und wie stark der Treffer-Stopp ist.</summary>
+        private int CountMonstersInSwingArc(ClientEntity local, Vector2 aim)
+        {
+            float range = (_classCatalog != null ? _classCatalog.MeleeRangeWire : 150) / 100f;
+            float cosHalf = Mathf.Cos(GameConstants.PlayerSwingHalfAngleDegrees * Mathf.Deg2Rad);
+            float pointBlank = GameConstants.PlayerSwingPointBlankWire / 100f;
+            int count = 0;
+            foreach (ClientEntity entity in _world.Entities.Values)
+            {
+                if (entity.Kind != EntityKind.Monster || entity.CurrentHp == 0) continue;
+                float distance = Distance(local, entity);
+                if (distance > range) continue;
+                Vector2 to = new Vector2((float)((entity.PathX - local.PathX) / 100.0), (float)((entity.PathY - local.PathY) / 100.0));
+                if (distance <= pointBlank || Vector2.Dot(aim, to) >= cosHalf * distance) count++;
+            }
+            return Mathf.Min(count, GameConstants.PlayerSwingMaxTargets);
         }
 
         /// <summary>Kamera-Wackeln: abklingendes Rauschen, Amplitude in Welteinheiten.</summary>
@@ -1582,6 +1609,7 @@ namespace Lumiis.Client
             float toTarget = DegreesBetween(_world.LocalEntityId, targetId);
             float offset = float.IsNaN(toTarget) ? 0f : SwingMath.NormalizeDegrees(toTarget - aim);
             _pendingAttackTargetId = targetId;
+            _pendingAttackAim = _aimDirection;
             _pendingAttackAt = Time.time + SwingMath.ContactSeconds(offset, _comboIndex);
 
             PlayAttackAnimation(_world.LocalEntityId, _comboIndex, aim);
@@ -1838,11 +1866,23 @@ namespace Lumiis.Client
                     _audio?.PlayHurt();
                     ShakeCamera(0.11f, 0.2f);
                 }
+                else if (damaged.AttackerEntityId == _world.LocalEntityId)
+                {
+                    // Flächenschlag: alle Treffer eines Hiebs kommen im selben Frame - ein Treffer-Sound,
+                    // aber jedes weitere getroffene Monster macht das Wackeln wuchtiger.
+                    if (_localHitFrame != Time.frameCount)
+                    {
+                        _localHitFrame = Time.frameCount;
+                        _localHitCount = 0;
+                        _audio?.PlayHit();
+                    }
+                    _localHitCount++;
+                    float boost = 1f + 0.22f * Mathf.Min(_localHitCount - 1, 5);
+                    ShakeCamera((damaged.TargetHpAfter <= 0 ? 0.13f : 0.075f) * boost, 0.16f + 0.02f * Mathf.Min(_localHitCount - 1, 4));
+                }
                 else
                 {
                     _audio?.PlayHit();
-                    if (damaged.AttackerEntityId == _world.LocalEntityId)
-                        ShakeCamera(damaged.TargetHpAfter <= 0 ? 0.13f : 0.075f, 0.16f);
                 }
                 return;
             }

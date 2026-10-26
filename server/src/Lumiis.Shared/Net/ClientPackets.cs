@@ -236,11 +236,15 @@ namespace Lumiis.Shared.Net
         }
     }
 
-    /// <summary>Der Client greift eine sichtbare Entity an (M4a). Der Server prüft alles serverautoritativ
-    /// erneut (Existenz, Leben, PvP, Cooldown, Reichweite) - siehe World.TryAttack.</summary>
+    /// <summary>Der Client schlägt zu (M4a, seit Protocol 23 als Flächenschlag). Der Server prüft alles
+    /// serverautoritativ erneut (Leben, Cooldown, Reichweite, Bogen) - siehe World.TryPlayerSwing.
+    /// TargetEntityId ist das bevorzugte Ziel (0 = keins), AimX/AimY die Schlagrichtung als Vektor
+    /// (beliebige Länge, (0,0) = Richtung zum Ziel). Getroffen werden alle Gegner im Schlagbogen.</summary>
     public sealed class AttackRequestPacket : IPacket
     {
         public int TargetEntityId;
+        public short AimX;
+        public short AimY;
 
         public PacketId Id
         {
@@ -250,11 +254,15 @@ namespace Lumiis.Shared.Net
         public void Write(PacketWriter writer)
         {
             writer.WriteInt32(TargetEntityId);
+            writer.WriteInt16(AimX);
+            writer.WriteInt16(AimY);
         }
 
         public void Read(PacketReader reader)
         {
             TargetEntityId = reader.ReadInt32();
+            AimX = reader.ReadInt16();
+            AimY = reader.ReadInt16();
         }
     }
 

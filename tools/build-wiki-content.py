@@ -87,7 +87,8 @@ def custom_mobs(src):
                         size=size, tint=tint, cooldown=max(1200, b["cooldown"] - 200))
     out = {
         "hungry_wild_dog": _variant(src["wild_dog"], key="hungry_wild_dog", name="Hungriger Wildhund", level=2,
-                                    hp=140, atk=14, **{"def": 2}, exp=20, aggressive=True, tint="#ffb4a0"),
+                                    hp=105, atk=11, **{"def": 1}, exp=18, aggressive=True, cooldown=1700,
+                                    tint="#ffb4a0"),
         "boss_pack_leader": boss("alpha_wolf", "boss_pack_leader", "Rudelführer Aschpelz", 6, "alpha_wolf", 1.55,
                                  "#d8d0c8"),
         "boss_tusk_king": boss("wild_boar", "boss_tusk_king", "Hauerkönig", 10, "boar", 1.6),

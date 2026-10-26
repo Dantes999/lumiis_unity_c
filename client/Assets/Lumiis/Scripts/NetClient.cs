@@ -112,10 +112,16 @@ namespace Lumiis.Client
 
         /// <summary>M4a: Rechtsklick auf ein sichtbares Monster (siehe GameClient.HandleClickInput) - der
         /// Server prüft alles erneut serverautoritativ (Existenz, Leben, PvP, Cooldown, Reichweite).</summary>
-        public void SendAttack(int targetEntityId)
+        /// <summary>Flächenschlag (Protocol 23): bevorzugtes Ziel (0 = keins) plus Schlagrichtung (x1000).</summary>
+        public void SendAttack(int targetEntityId, int aimX = 0, int aimY = 0)
         {
             if (_peer == null || !IsConnected) return;
-            Send(new AttackRequestPacket { TargetEntityId = targetEntityId });
+            Send(new AttackRequestPacket
+            {
+                TargetEntityId = targetEntityId,
+                AimX = (short)Mathf.Clamp(aimX, short.MinValue, short.MaxValue),
+                AimY = (short)Mathf.Clamp(aimY, short.MinValue, short.MaxValue),
+            });
         }
 
         /// <summary>Dev-Tools (siehe CLAUDE.md "Dev-Tools", GameClient-Debug-Panel) - nur wirksam, wenn der
