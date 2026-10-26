@@ -166,6 +166,10 @@ public sealed class Entity
     /// <summary>false = Trainingspuppe (MobDefinition.FightsBack): erfasst nie ein Ziel, siehe World.TryAttack.</summary>
     public bool FightsBack { get; set; } = true;
 
+    /// <summary>Monster-Gruppe aus spawns.json ("groupId", 0 = keine): Mitglieder wandern zusammen und
+    /// greifen gemeinsam an, siehe World.AssignGroup/AlertPack/RunGroupWander.</summary>
+    public int GroupId { get; set; }
+
     /// <summary>M4c: Distanz vom WanderAnchor, ab der ein verfolgtes Ziel aufgegeben wird (siehe
     /// World-Tick-Monster-KI). Nur bei Kind=Monster gesetzt.</summary>
     public int LeashRangeWire { get; }

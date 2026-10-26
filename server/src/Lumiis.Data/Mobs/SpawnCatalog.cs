@@ -16,13 +16,17 @@ public sealed class SpawnPoint
     public int PositionY { get; }
     public int RespawnSeconds { get; }
 
-    public SpawnPoint(int id, int mobId, int positionX, int positionY, int respawnSeconds)
+    /// <summary>Monster-Gruppe (0 = keine), siehe SpawnPointEntry.GroupId.</summary>
+    public int GroupId { get; }
+
+    public SpawnPoint(int id, int mobId, int positionX, int positionY, int respawnSeconds, int groupId = 0)
     {
         Id = id;
         MobId = mobId;
         PositionX = positionX;
         PositionY = positionY;
         RespawnSeconds = respawnSeconds;
+        GroupId = groupId;
     }
 }
 
@@ -88,7 +92,7 @@ public sealed class SpawnCatalog
                     $"spawns.json: Spawn-Punkt {entry.Id} (MobId {entry.MobId}) liegt auf einer blockierten Zelle ({cellX},{cellY}, Position {entry.PositionX},{entry.PositionY}).");
             }
 
-            spawns.Add(new SpawnPoint(entry.Id, entry.MobId, entry.PositionX, entry.PositionY, entry.RespawnSeconds));
+            spawns.Add(new SpawnPoint(entry.Id, entry.MobId, entry.PositionX, entry.PositionY, entry.RespawnSeconds, Math.Max(0, entry.GroupId)));
         }
 
         return new SpawnCatalog(spawns);

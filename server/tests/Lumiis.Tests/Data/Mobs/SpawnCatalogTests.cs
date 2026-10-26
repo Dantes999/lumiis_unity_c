@@ -56,6 +56,22 @@ namespace Lumiis.Tests.Data.Mobs
             Assert.Equal(100, spawn.PositionX);
             Assert.Equal(100, spawn.PositionY);
             Assert.Equal(30, spawn.RespawnSeconds);
+            Assert.Equal(0, spawn.GroupId);
+        }
+
+        [Fact]
+        public void LoadFromJson_ReadsGroupId()
+        {
+            MobCatalog mobCatalog = MobCatalog.LoadFromJson(ValidMobsJson);
+            const string json = @"{
+  ""spawns"": [
+    { ""id"": 1, ""mobId"": 1, ""positionX"": 100, ""positionY"": 100, ""respawnSeconds"": 30, ""groupId"": 7 },
+    { ""id"": 2, ""mobId"": 1, ""positionX"": 120, ""positionY"": 100, ""respawnSeconds"": 30, ""groupId"": 7 }
+  ]
+}";
+            SpawnCatalog catalog = SpawnCatalog.LoadFromJson(json, mobCatalog, BuildCollisionMapWithBlockedCell(5, 5));
+
+            Assert.All(catalog.Spawns, s => Assert.Equal(7, s.GroupId));
         }
 
         [Fact]

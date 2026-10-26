@@ -26,4 +26,8 @@ public sealed class ServerConfig
     /// <summary>Default aus - schaltet DebugSpawnMonsterRequestPacket frei (siehe CLAUDE.md "Dev-Tools").
     /// Nur für die lokale Entwicklung gedacht, nie in einem "echten" Serverstart aktivieren.</summary>
     public bool AllowDebugCommands = false;
+
+    /// <summary>Optional (--start-map &lt;id&gt;, nur lokale Tests): jeder Join landet auf dieser Karte an deren
+    /// Startposition, unabhängig von der gespeicherten MapId/Position (z. B. die Testwiese). null = normal.</summary>
+    public string? ForcedStartMapId = null;
 }

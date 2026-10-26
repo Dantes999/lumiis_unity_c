@@ -31,7 +31,7 @@ client/ (Unity-Projekt), server/ (Solution mit Shared, Server, Bot, Data, Auth, 
 
 ## Befehle
 - Build/Test: cd server && dotnet build && dotnet test (läuft ohne laufendes Postgres - die Lumiis.Auth-Tests nutzen EF-Core-InMemory, siehe Status M2a)
-- Server: dotnet run --project server/src/Lumiis.Server (--data-dir überschreibt den Basispfad für Spieldaten, Default "data" relativ zum Arbeitsverzeichnis - lädt data/maps/index.json inkl. aller Karten, siehe Abschnitte "Kartenkollision"/"Multi-Map und Portale"; --allow-debug-commands NUR für lokale Entwicklung, siehe Abschnitt "Dev-Tools")
+- Server: dotnet run --project server/src/Lumiis.Server (--data-dir überschreibt den Basispfad für Spieldaten, Default "data" relativ zum Arbeitsverzeichnis - lädt data/maps/index.json inkl. aller Karten, siehe Abschnitte "Kartenkollision"/"Multi-Map und Portale"; --allow-debug-commands NUR für lokale Entwicklung, siehe Abschnitt "Dev-Tools"; --start-map <id> schickt jeden Join an den Start dieser Karte, z. B. `--start-map testfield`, nur für lokale Tests)
 - Bot: dotnet run --project server/src/Lumiis.Bot -- --count 3
 - Umgebungsvariablen laden: source tools/dev-env.sh (mit "source", NICHT ./ - sonst gelten die Variablen nur im Subprozess des Skripts). Davor nötig für docker compose, dotnet ef, dotnet run --project server/src/Lumiis.Auth UND (seit M2b) server/src/Lumiis.Server.
 - Postgres starten: docker compose up -d (Repo-Root, nach source tools/dev-env.sh)
@@ -1430,6 +1430,16 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   EXP 20->18. 742 Tests grün.
   Nachgeschärft (User: "lokal nichts anders"): Bogen 80°->110°, eigene Reichweite 250 statt 150, Rudel-Aggro,
   Leertaste schlägt auch ohne Auto-Ziel zu. 744 Tests grün.
+- Monster-Gruppen + Testwiese (2026-10-26, Wunsch des Users: "greife ich eins aus der Gruppe an, greifen alle
+  an, die Gruppe bleibt zusammen"): `spawns.json` hat optional `groupId` (gleiche Zahl = eine Gruppe,
+  `SpawnPoint.GroupId`, `Entity.GroupId`, `World.AssignGroup`, überlebt Respawn). `AlertPack` alarmiert bei
+  gesetzter Gruppe alle lebenden Mitglieder unabhängig von der Entfernung, sonst bleibt die Anker-Nähe-Regel.
+  Wandern: nur der Anführer (erstes lebendes Mitglied) würfelt, alle zielfreien Mitglieder laufen in kleiner
+  Formation (Radius 80 Wire) zum selben Punkt (`World.RunGroupWander`). Neue Karte `testfield` ("Testwiese",
+  `tools/generate-testfield-map.py`): nur Gras mit Baumrand, 60 Gruppen à 3 Wilde Hunde (Mob 20), Respawn
+  20 s. Server-Option `--start-map testfield` setzt jeden Join an deren Start (die Karte wird dabei
+  gespeichert; ohne Option landet man dann auch auf der Testwiese, zurück per F1 "Karte wechseln").
+  `WorldGroupTests` (3), SpawnCatalog-groupId-Test. 749 Tests grün.
 - Offen: Monster-Sheets für die Jayang-Mobs, weitere Zonen/Dungeons, Reittiere; siehe
   `docs/feature-gap-lumiis.md`.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client

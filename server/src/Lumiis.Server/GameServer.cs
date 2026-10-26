@@ -328,6 +328,7 @@ public sealed class GameServer : INetEventListener
                     drops: mobDef.Drops.Select(d => (d.ItemId, d.ChancePercent)).ToList(),
                     level: mobDef.Level, baseXp: mobDef.BaseXp);
                 monster.FightsBack = mobDef.FightsBack;
+                world.AssignGroup(monster, spawn.GroupId);
             }
         }
 
@@ -1255,7 +1256,8 @@ public sealed class GameServer : INetEventListener
         // Multi-Map: die gespeicherte MapId bestimmt die Ziel-World. Unbekannte/leere Werte (z. B. sehr alte
         // Zeilen ohne Migration) fallen bewusst auf die Startkarte zurück ("village bleibt Legacy-Fallback"),
         // statt den Join abzulehnen - ein kaputter/alter MapId-Wert soll niemanden aussperren.
-        World world = ResolveJoinWorld(character.MapId);
+        bool forcedMap = _config.ForcedStartMapId != null && _worlds.ContainsKey(_config.ForcedStartMapId);
+        World world = forcedMap ? _worlds[_config.ForcedStartMapId!] : ResolveJoinWorld(character.MapId);
 
         // Globales Spielerlimit über ALLE Karten (World.TryJoin prüft nur seine eigene Karte).
         if (_worlds.Values.Sum(w => w.Entities.Count(e => e.Kind == EntityKind.Player)) >= _config.MaxPlayers)
@@ -1270,8 +1272,9 @@ public sealed class GameServer : INetEventListener
         // Defensive: eine gespeicherte Position kann aus einer anderen (nicht mehr bekannten) Karte stammen
         // oder inzwischen blockiert sein - dann auf die validierte Startposition der Karte zurückfallen,
         // statt den Spieler unbeweglich in einer Wand zu platzieren.
-        int? spawnX = character.PositionX;
-        int? spawnY = character.PositionY;
+        // --start-map: immer an den Kartenstart der erzwungenen Karte, die gespeicherte Position gilt dort nicht.
+        int? spawnX = forcedMap ? null : character.PositionX;
+        int? spawnY = forcedMap ? null : character.PositionY;
         if (spawnX.HasValue && spawnY.HasValue && world.IsBlockedAtWire(spawnX.Value, spawnY.Value))
         {
             _logger.Warn($"Gespeicherte Position ({spawnX},{spawnY}) von {character.Name} ist auf Karte '{world.MapId}' blockiert - nutze Kartenstart.");

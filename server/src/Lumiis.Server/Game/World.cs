@@ -27,11 +27,17 @@ public sealed class World
         int WanderRadiusWire, int WanderIntervalMinMs, int WanderIntervalMaxMs,
         int MaxHp, int Attack, int Defense, int YangMin, int YangMax, int RespawnSeconds,
         int MeleeRangeWire, int AttackCooldownMs, bool Aggressive, int AggroRangeWire, int LeashRangeWire,
-        IReadOnlyList<(int ItemId, int ChancePercent)> Drops, int Level, int BaseXp, long DueAtMs, bool FightsBack);
+        IReadOnlyList<(int ItemId, int ChancePercent)> Drops, int Level, int BaseXp, long DueAtMs, bool FightsBack, int GroupId);
 
     private readonly Dictionary<int, Entity> _entities = new();
     private readonly Dictionary<int, int> _entityIdByCharacterId = new();
     private readonly Dictionary<int, PendingMonsterRespawn> _pendingMonsterRespawns = new();
+
+    /// <summary>Monster-Gruppen (GroupId -> Mitglieder, tote/entfernte werden beim Lesen ausgesiebt).</summary>
+    private readonly Dictionary<int, List<Entity>> _groupMembers = new();
+
+    /// <summary>Abstand der Gruppenmitglieder um den gemeinsamen Wanderpunkt (Wire).</summary>
+    private const int GroupFormationRadiusWire = 80;
     private readonly CollisionMap? _collisionMap;
     private readonly MapDefinition? _mapDefinition;
     private readonly ItemCatalog? _itemCatalog;
@@ -622,6 +628,18 @@ public sealed class World
     /// O(n) über die Entities, läuft aber nur beim Wechsel eines Monsters von "kein Ziel" zu "Ziel".</summary>
     private void AlertPack(Entity source, int playerId)
     {
+        // Echte Gruppe aus spawns.json: alle lebenden Mitglieder kommen mit, egal wo sie gerade stehen.
+        if (source.GroupId > 0)
+        {
+            foreach (Entity member in LiveGroupMembers(source.GroupId))
+            {
+                if (member != source && member.FightsBack && member.TargetEntityId == null)
+                    member.TargetEntityId = playerId;
+            }
+            return;
+        }
+
+        // Ohne groupId (ältere Spawn-Daten): Monster derselben Art mit nahem Spawn-Anker gelten als Rudel.
         long alertSq = (long)GameConstants.PackAlertRangeWire * GameConstants.PackAlertRangeWire;
         foreach (Entity other in _entities.Values)
         {
@@ -632,6 +650,59 @@ public sealed class World
             if (dx * dx + dy * dy > alertSq) continue;
             other.TargetEntityId = playerId;
         }
+    }
+
+    /// <summary>Nimmt ein Monster in seine Gruppe auf (groupId &lt;= 0 = keine Gruppe). Auch nach einem
+    /// Respawn, damit die neue Entity wieder zu ihren Kameraden gehört.</summary>
+    public void AssignGroup(Entity monster, int groupId)
+    {
+        if (groupId <= 0 || monster.Kind != EntityKind.Monster) return;
+        monster.GroupId = groupId;
+        if (!_groupMembers.TryGetValue(groupId, out List<Entity>? members))
+            _groupMembers[groupId] = members = new List<Entity>();
+        members.Add(monster);
+    }
+
+    private List<Entity> LiveGroupMembers(int groupId)
+    {
+        if (!_groupMembers.TryGetValue(groupId, out List<Entity>? members)) return new List<Entity>();
+        members.RemoveAll(m => m.IsDead || !_entities.TryGetValue(m.Id, out Entity? live) || live != m);
+        return members;
+    }
+
+    /// <summary>Gruppen wandern zusammen: nur das erste lebende Mitglied (Anführer) entscheidet, alle
+    /// zielfreien Mitglieder laufen in kleiner Formation zum selben Punkt. Die anderen würfeln nicht selbst.
+    /// true = der Aufrufer (ein Gruppenmitglied) hat seinen Zug damit erledigt.</summary>
+    private bool RunGroupWander(Entity entity, long nowMs, List<Entity> startedWandering)
+    {
+        List<Entity> members = LiveGroupMembers(entity.GroupId);
+        if (members.Count == 0 || members[0] != entity)
+        {
+            // Mitläufer: wartet auf den Anführer (nur Fälligkeit verschieben, kein eigenes Ziel).
+            entity.NextWanderAtMs = nowMs + entity.WanderIntervalMaxMs;
+            return true;
+        }
+
+        entity.NextWanderAtMs = nowMs + _random.Next(entity.WanderIntervalMinMs, entity.WanderIntervalMaxMs + 1);
+        int centerX = Math.Clamp(entity.WanderAnchorX + _random.Next(-entity.WanderRadiusWire, entity.WanderRadiusWire + 1), 0, GameConstants.MapWidth);
+        int centerY = Math.Clamp(entity.WanderAnchorY + _random.Next(-entity.WanderRadiusWire, entity.WanderRadiusWire + 1), 0, GameConstants.MapHeight);
+        if (_collisionMap != null && _collisionMap.IsBlocked(centerX / 100, centerY / 100))
+            return true;
+
+        for (int i = 0; i < members.Count; i++)
+        {
+            Entity member = members[i];
+            if (member.TargetEntityId != null) continue;
+            double angle = i * 2.0 * Math.PI / Math.Max(1, members.Count) + Math.PI / 2;
+            int radius = members.Count > 1 ? GroupFormationRadiusWire : 0;
+            int x = Math.Clamp(centerX + (int)Math.Round(Math.Cos(angle) * radius), 0, GameConstants.MapWidth);
+            int y = Math.Clamp(centerY + (int)Math.Round(Math.Sin(angle) * radius), 0, GameConstants.MapHeight);
+            if (_collisionMap != null && _collisionMap.IsBlocked(x / 100, y / 100)) { x = centerX; y = centerY; }
+            SetDestination(member.Id, x, y);
+            if (member != entity) member.NextWanderAtMs = entity.NextWanderAtMs + 1000;
+            if (!startedWandering.Contains(member)) startedWandering.Add(member);
+        }
+        return true;
     }
 
     private static long DistanceSq(Entity a, Entity b)
@@ -819,7 +890,8 @@ public sealed class World
             diedMonster.MaxHp, diedMonster.Attack, diedMonster.Defense, diedMonster.YangMin, diedMonster.YangMax,
             diedMonster.RespawnSeconds, diedMonster.MeleeRangeWire, diedMonster.AttackCooldownMs,
             diedMonster.Aggressive, diedMonster.AggroRangeWire, diedMonster.LeashRangeWire, diedMonster.Drops,
-            diedMonster.Level, diedMonster.BaseXp, nowMs + diedMonster.RespawnSeconds * 1000L, diedMonster.FightsBack);
+            diedMonster.Level, diedMonster.BaseXp, nowMs + diedMonster.RespawnSeconds * 1000L, diedMonster.FightsBack,
+            diedMonster.GroupId);
     }
 
     // ---- M6a: Fortschritt (Level/XP/Werte/SP/Regeneration, kein Netzwerkbezug, siehe GameServer für die
@@ -1741,6 +1813,7 @@ public sealed class World
                     aggressive: pending.Aggressive, aggroRangeWire: pending.AggroRangeWire, leashRangeWire: pending.LeashRangeWire,
                     drops: pending.Drops, level: pending.Level, baseXp: pending.BaseXp);
                 monster.FightsBack = pending.FightsBack;
+                AssignGroup(monster, pending.GroupId);
                 respawnedMonsters.Add(monster);
             }
         }
@@ -1849,6 +1922,7 @@ public sealed class World
         }
 
         if (nowMs < entity.NextWanderAtMs) return;
+        if (entity.GroupId > 0 && RunGroupWander(entity, nowMs, startedWandering)) return;
         if (RunWanderAi(entity, nowMs))
             startedWandering.Add(entity);
     }

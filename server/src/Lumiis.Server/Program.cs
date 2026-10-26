@@ -37,6 +37,9 @@ for (int i = 0; i < args.Length; i++)
         case "--allow-debug-commands":
             config.AllowDebugCommands = true;
             break;
+        case "--start-map":
+            config.ForcedStartMapId = args[++i];
+            break;
         default:
             logger.Warn($"Unbekanntes Argument: {args[i]}");
             break;
@@ -163,6 +166,15 @@ catch (Exception ex)
 {
     logger.Error($"Serverstart fehlgeschlagen (Karten-Daten): {ex.Message}");
     return 1;
+}
+if (config.ForcedStartMapId != null)
+{
+    if (!mapCatalog.Maps.Any(m => m.Id == config.ForcedStartMapId))
+    {
+        logger.Error($"Serverstart fehlgeschlagen: --start-map '{config.ForcedStartMapId}' ist keine Karte in maps/index.json.");
+        return 1;
+    }
+    logger.Warn($"--start-map aktiv: alle Spieler landen beim Join auf '{config.ForcedStartMapId}' (nur für lokale Tests).");
 }
 
 // M6d: Lumiis-Stein-Wellen. Die MobIds werden gegen mobCatalog geprueft, damit ein Tippfehler in
