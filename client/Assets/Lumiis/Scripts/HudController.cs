@@ -20,6 +20,9 @@ namespace Lumiis.Client
         private static readonly string[] SkillIconKeys = { "book_bash", "book_sword_spin", "book_berserk", "book_fast_attack" };
         private const int MaxSkillLevel = 17;
         private const int MaxChatLines = 60;
+        // Chat vorerst ausgeblendet (User 2026-10-26: man kam aus dem geöffneten Chatfenster nicht mehr heraus,
+        // erst Kampf, dann Features). Code bleibt, true schaltet ihn wieder ein.
+        private static readonly bool ChatEnabled = false;
         private const float OrbInnerSize = 84f;
         private const float ExpOrbSize = 18f;
         private const float MinimapSize = 148f;
@@ -242,7 +245,7 @@ namespace Lumiis.Client
             _root.Q<Button>("hud-btn-inventory").clicked += () => ToggleWindow(_inventoryWindow);
             _root.Q<Button>("hud-btn-system").clicked += () => SystemMenuRequested?.Invoke();
 
-            AddChatLine("System", "Willkommen in Lumiis! Enter öffnet den Chat, I das Inventar, C den Charakter.", ChatChannel.System);
+            AddChatLine("System", "Willkommen in Lumiis! I öffnet das Inventar, C den Charakter.", ChatChannel.System);
         }
 
         private void BindPlayer()
@@ -403,7 +406,7 @@ namespace Lumiis.Client
         {
             if (_contextMenu == null) return;
             ShowButton(_contextInvite, true);
-            ShowButton(_contextWhisper, true);
+            ShowButton(_contextWhisper, ChatEnabled);
             ShowButton(_contextKick, false);
             ShowButton(_contextPromote, false);
             ShowButton(_contextRoleAttacker, false);
@@ -417,7 +420,7 @@ namespace Lumiis.Client
         {
             if (_contextMenu == null) return;
             ShowButton(_contextInvite, false);
-            ShowButton(_contextWhisper, online && !isSelf);
+            ShowButton(_contextWhisper, ChatEnabled && online && !isSelf);
             ShowButton(_contextKick, !isSelf);
             ShowButton(_contextPromote, online && !isSelf);
             ShowButton(_contextRoleAttacker, role != PartyRole.Attacker);
@@ -484,6 +487,7 @@ namespace Lumiis.Client
             _chatTarget.focusable = false;
             _chatInputRow.style.display = DisplayStyle.None;
             _gameClient.SetChatInputFocused(false);
+            if (!ChatEnabled) _root.Q<VisualElement>("hud-chat").style.display = DisplayStyle.None;
 
             _chatInput.RegisterCallback<KeyDownEvent>(OnChatKeyDown, TrickleDown.TrickleDown);
             _chatTarget.RegisterCallback<KeyDownEvent>(OnChatKeyDown, TrickleDown.TrickleDown);
@@ -1337,7 +1341,7 @@ namespace Lumiis.Client
             if (keyboard == null || _chatOpen || _gameClient.IsChatInputFocused) return;
 
             bool enter = keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame;
-            if (enter && !_gameClient.ChatClosedRecently)
+            if (ChatEnabled && enter && !_gameClient.ChatClosedRecently)
             {
                 OpenChat();
                 return;
@@ -1540,6 +1544,7 @@ namespace Lumiis.Client
 
         private void OpenChat()
         {
+            if (!ChatEnabled) return;
             _chatOpen = true;
             _chatOpenedAtFrame = Time.frameCount;
             _chatInputRow.style.display = DisplayStyle.Flex;

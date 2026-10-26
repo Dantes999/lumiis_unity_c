@@ -264,7 +264,9 @@ Seit 2026-10-25 sind Login, Charakterauswahl, Systemmenü und HUD im Stil klassi
   Fertigkeitspunkte verteilen), Shop (öffnet sich per Rechtsklick auf einen Händler; Klick kauft,
   Rechtsklick im Inventar verkauft). Damit sind Inventar/Shop/Punkteverteilung auch in Release-Builds
   bedienbar, nicht mehr nur im Debug-Panel.
-- Chat wieder aktiv: Enter öffnet die Eingabezeile, Enter sendet und schließt, Escape schließt. Das Feld
+- Chat ist seit 2026-10-26 vorerst ausgeblendet (`HudController.ChatEnabled = false`, Wunsch des Users: man kam
+  aus dem geöffneten Chat nicht mehr heraus, erst Kampf, dann Features) - kein Chatfenster, Enter tut nichts,
+  "Flüstern" fehlt im Kontextmenü. Code und Protokoll bleiben. Verhalten bei Wiedereinschalten: Enter öffnet die Eingabezeile, Enter sendet und schließt, Escape schließt. Das Feld
   ist nur während der Eingabe fokussierbar, WASD/Leertaste landen also nie versehentlich darin; beim
   Öffnen wird eine laufende Tastaturbewegung gestoppt.
 - Lesbarkeit: kleinste Schrift 11 px, Schatten statt 1-px-Kontur. `UiSkin.ComputeScale` + `UiScaler`
