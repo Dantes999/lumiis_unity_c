@@ -414,24 +414,60 @@ public sealed class World
     /// CollisionMap gesetzt ist) gegen sie geprüft: die gerade Linie von der aktuellen Position zum
     /// geklemmten Ziel wird zellenweise abgeschritten (ClipToLastWalkableCell), die Bewegung stoppt an der
     /// letzten begehbaren Zelle vor einer blockierten. Läuft schon der erste Schritt in einen fremden Körper
-    /// (siehe BodyGrid), startet keine Bewegung - Aufrufer prüfen danach Entity.IsMoving.</summary>
+    /// (siehe BodyGrid), weicht die Entity seitlich aus (SteerAround: ein kurzes Stück schräg am Körper
+    /// vorbei, der nächste Aufruf - gehaltene Taste, Monster-Verfolgung jeden Tick - nimmt wieder Kurs aufs
+    /// Ziel); geht auch das nicht, startet keine Bewegung. Aufrufer prüfen danach Entity.IsMoving.</summary>
     public bool SetDestination(int entityId, int targetX, int targetY)
     {
         bool wasMoving = _entities.TryGetValue(entityId, out Entity? before) && before.IsMoving;
         if (!SetDestinationThroughBodies(entityId, targetX, targetY)) return false;
         Entity entity = _entities[entityId];
-        if (entity.IsMoving)
+        if (!entity.IsMoving) return true;
+
+        (double nextX, double nextY) = entity.PeekStep(BodyProbeSeconds);
+        Entity? blocker = Bodies().FindBlocker(entity, nextX, nextY);
+        if (blocker == null || SteerAround(entity, blocker, targetX, targetY)) return true;
+
+        entity.StopMoving();
+        // Nur wer gerade noch lief, braucht ein EntityStop (siehe Tick) - ein schon stehendes Monster,
+        // das jeden Tick erneut gegen denselben Körper verfolgt, erzeugt so keine Paketflut.
+        if (wasMoving && !_bodyStopped.Contains(entity)) _bodyStopped.Add(entity);
+        return true;
+    }
+
+    /// <summary>Ausweichwinkel (Grad, abwechselnd zur freien Seite zuerst) und Länge des Ausweichstücks.</summary>
+    private static readonly int[] SteerAnglesDegrees = { 40, 70, 100 };
+    private const int SteerStepWire = 120;
+
+    /// <summary>Sucht eine schräge Richtung am blockierenden Körper vorbei - zuerst auf der Seite, auf der er
+    /// NICHT steht - und setzt ein kurzes Ausweichziel, das weder durch Wände noch in einen Körper führt.</summary>
+    private bool SteerAround(Entity entity, Entity blocker, int targetX, int targetY)
+    {
+        double dirX = targetX - entity.X, dirY = targetY - entity.Y;
+        double length = Math.Sqrt(dirX * dirX + dirY * dirY);
+        if (length < 1) return false;
+        dirX /= length;
+        dirY /= length;
+        // Kreuzprodukt > 0: der Körper liegt links der Laufrichtung -> zuerst nach rechts (negativer Winkel).
+        double cross = dirX * (blocker.Y - entity.Y) - dirY * (blocker.X - entity.X);
+        int firstSide = cross > 0 ? -1 : 1;
+
+        foreach (int angle in SteerAnglesDegrees)
         {
-            (double nextX, double nextY) = entity.PeekStep(BodyProbeSeconds);
-            if (Bodies().Blocks(entity, nextX, nextY))
+            foreach (int side in new[] { firstSide, -firstSide })
             {
-                entity.StopMoving();
-                // Nur wer gerade noch lief, braucht ein EntityStop (siehe Tick) - ein schon stehendes Monster,
-                // das jeden Tick erneut gegen denselben Körper verfolgt, erzeugt so keine Paketflut.
-                if (wasMoving && !_bodyStopped.Contains(entity)) _bodyStopped.Add(entity);
+                double rad = side * angle * Math.PI / 180.0;
+                double sx = dirX * Math.Cos(rad) - dirY * Math.Sin(rad);
+                double sy = dirX * Math.Sin(rad) + dirY * Math.Cos(rad);
+                int detourX = (int)Math.Round(entity.X + sx * SteerStepWire);
+                int detourY = (int)Math.Round(entity.Y + sy * SteerStepWire);
+                SetDestinationThroughBodies(entity.Id, detourX, detourY);
+                if (!entity.IsMoving) continue;
+                (double nextX, double nextY) = entity.PeekStep(BodyProbeSeconds);
+                if (!Bodies().Blocks(entity, nextX, nextY)) return true;
             }
         }
-        return true;
+        return false;
     }
 
     private readonly List<Entity> _bodyStopped = new();

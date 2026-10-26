@@ -49,8 +49,8 @@ namespace Lumiis.Tests.Game
         {
             var world = new World(maxPlayers: 10, random: new System.Random(3));
             Entity a = SpawnMember(world, X, Y, groupId: 1);
-            Entity b = SpawnMember(world, X + 60, Y, groupId: 1);
-            Entity c = SpawnMember(world, X, Y + 60, groupId: 1);
+            Entity b = SpawnMember(world, X + 120, Y, groupId: 1);
+            Entity c = SpawnMember(world, X, Y + 120, groupId: 1);
 
             // Alle drei sind bei 1000 ms fällig (Intervall fix 1000); nur der Anführer entscheidet und schickt alle.
             world.Tick(0.0, nowMs: 1000);

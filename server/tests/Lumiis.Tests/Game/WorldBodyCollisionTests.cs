@@ -65,7 +65,7 @@ namespace Lumiis.Tests.Game
         }
 
         [Fact]
-        public void Members_of_one_monster_group_do_not_block_each_other()
+        public void Members_of_one_monster_group_collide_too()
         {
             var world = new World(maxPlayers: 10);
             Entity walker = SpawnMonster(world, X, Y);
@@ -76,7 +76,8 @@ namespace Lumiis.Tests.Game
             world.SetDestination(walker.Id, X + 2000, Y);
             RunTicks(world, 100);
 
-            Assert.Equal(X + 2000, walker.IntX);
+            Assert.True(walker.IntX < mate.IntX);
+            Assert.True(DistanceSq(walker, mate) >= (long)(MinGap - 5) * (MinGap - 5));
         }
 
         [Fact]
@@ -93,15 +94,26 @@ namespace Lumiis.Tests.Game
         }
 
         [Fact]
-        public void Move_straight_into_an_adjacent_monster_does_not_start()
+        public void Walking_on_against_a_monster_steers_around_it_without_overlapping()
         {
             var world = new World(maxPlayers: 10);
             Entity player = JoinPlayer(world, 1, X, Y);
-            SpawnMonster(world, X + MinGap, Y);
+            Entity monster = SpawnMonster(world, X + MinGap, Y);
+            long closestSq = long.MaxValue;
 
-            world.SetDestination(player.Id, X + 2000, Y);
+            // Wie gehaltenes WASD: der Client schickt alle 100 ms dasselbe Ziel.
+            for (int i = 0; i < 40; i++)
+            {
+                world.SetDestination(player.Id, X + 2000, Y);
+                for (int t = 0; t < 2; t++)
+                {
+                    world.Tick(0.05, nowMs: (i * 2 + t) * 50L);
+                    closestSq = System.Math.Min(closestSq, DistanceSq(player, monster));
+                }
+            }
 
-            Assert.False(player.IsMoving);
+            Assert.True(player.IntX > monster.IntX + 100);
+            Assert.True(closestSq >= (long)(MinGap - 5) * (MinGap - 5));
         }
 
         [Fact]

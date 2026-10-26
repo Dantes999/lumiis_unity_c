@@ -20,13 +20,8 @@ public sealed class BodyGrid
     public static bool IsBody(Entity entity) =>
         !entity.IsDead && (entity.Kind == EntityKind.Player || entity.Kind == EntityKind.Monster);
 
-    /// <summary>Mitglieder derselben Monstergruppe (groupId) blockieren sich nicht: sie laufen als Rudel in
-    /// Formation (World.GroupFormationRadiusWire) und würden sich beim gemeinsamen Losgehen sonst gegenseitig
-    /// stoppen.</summary>
     private static bool Collide(Entity a, Entity b) =>
-        a.Id != b.Id && IsBody(b)
-        && !(a.Kind == EntityKind.Player && b.Kind == EntityKind.Player)
-        && !(a.GroupId != 0 && a.GroupId == b.GroupId && a.Kind == EntityKind.Monster && b.Kind == EntityKind.Monster);
+        a.Id != b.Id && IsBody(b) && !(a.Kind == EntityKind.Player && b.Kind == EntityKind.Player);
 
     private static long Key(int cellX, int cellY) => ((long)cellX << 32) | (uint)cellY;
 
@@ -47,9 +42,12 @@ public sealed class BodyGrid
     }
 
     /// <summary>true, wenn mover beim Schritt nach (nextX, nextY) in einen fremden Körper liefe.</summary>
-    public bool Blocks(Entity mover, double nextX, double nextY)
+    public bool Blocks(Entity mover, double nextX, double nextY) => FindBlocker(mover, nextX, nextY) != null;
+
+    /// <summary>Der Körper, in den mover beim Schritt nach (nextX, nextY) liefe, oder null.</summary>
+    public Entity? FindBlocker(Entity mover, double nextX, double nextY)
     {
-        if (!IsBody(mover)) return false;
+        if (!IsBody(mover)) return null;
         long minGap = 2L * GameConstants.BodyRadiusWire;
         long minGapSq = minGap * minGap;
         int cellX = (int)nextX / CellWire;
@@ -66,10 +64,10 @@ public sealed class BodyGrid
                     double nextSq = nx * nx + ny * ny;
                     if (nextSq >= minGapSq) continue;
                     double cx = mover.X - other.X, cy = mover.Y - other.Y;
-                    if (nextSq < cx * cx + cy * cy) return true;
+                    if (nextSq < cx * cx + cy * cy) return other;
                 }
             }
         }
-        return false;
+        return null;
     }
 }
