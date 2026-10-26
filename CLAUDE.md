@@ -1441,6 +1441,14 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   20 s. Server-Option `--start-map testfield` setzt jeden Join an deren Start (die Karte wird dabei
   gespeichert; ohne Option landet man dann auch auf der Testwiese, zurück per F1 "Karte wechseln").
   `WorldGroupTests` (3), SpawnCatalog-groupId-Test. 749 Tests grün.
+- Körperkollision (2026-10-26, Wunsch des Users: "sie rennen ineinander und ich durch sie durch"), serverseitig
+  statt Unity-Rigidbody (der Server entscheidet die Position): `Game/BodyGrid.cs` (grobes 400-Wire-Raster aller
+  lebenden Spieler/Monster) blockiert einen Schritt, der einem fremden Körper näher als 2×
+  `GameConstants.BodyRadiusWire` (30) kommt UND sich ihm annähert - Wegbewegen geht immer. Keine Kollision
+  Spieler-Spieler (wie Metin2, Dorf verstopft sonst) und zwischen Monstern derselben `groupId` (Formation).
+  `World.Tick` stoppt blockierte Entities (EntityStop), `SetDestination` startet keine Bewegung, wenn schon der
+  erste Schritt blockiert ist; `HandleMoveTo` schickt dann EntityStop statt EntityMove. `WorldBodyCollisionTests`
+  (6). 755 Tests grün.
 - Offen: Monster-Sheets für die Jayang-Mobs, weitere Zonen/Dungeons, Reittiere; siehe
   `docs/feature-gap-lumiis.md`.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client
