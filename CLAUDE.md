@@ -38,6 +38,7 @@ client/ (Unity-Projekt), server/ (Solution mit Shared, Server, Bot, Data, Auth, 
 - Migration anwenden: cd server/src/Lumiis.Auth && dotnet ef database update --project ../Lumiis.Data (nach source tools/dev-env.sh; Migrationen liegen in Lumiis.Data, Lumiis.Auth referenziert Microsoft.EntityFrameworkCore.Design zusätzlich selbst, damit es als Startup-Projekt für dotnet ef taugt)
 - Auth-Dienst: dotnet run --project server/src/Lumiis.Auth (nach source tools/dev-env.sh; Port 5080, siehe Abschnitt "Datenbank & Auth-Dienst")
 - Unity-PlayMode-Tests: tools/test-client-playmode.sh (siehe Abschnitt "Teststrategie"; Unity-Editor muss geschlossen sein, Projekt-Lockfile)
+- Windows: PowerShell-Pendants `tools/dev-env.ps1` (mit `. .\tools\dev-env.ps1` einbinden), `build-client.ps1`, `run-client.ps1`, `test-client-playmode.ps1`, `start-dev.ps1` (Auth+Server in eigenen Fenstern), `setup-postgres-native.ps1` (Postgres ohne Docker); `check-repo.sh` in Git Bash. Komplette Einrichtung: docs/windows-setup.md. Die .ps1-Dateien bleiben ASCII-only (Windows PowerShell 5.1). Bei Änderungen an einem .sh-Skript das .ps1-Gegenstück mitziehen.
 
 ## Teststrategie
 Zwei Ebenen, seit der Client-Testinfrastruktur-Aufgabe (Anlass: mehrere M2c-Login-Laufzeitfehler bestanden den
@@ -1468,6 +1469,10 @@ Aktuelle Aufgabe: keine - Multi-Map/Portale, M6c-Aufwertung und M6d Lumiis-Stein
   Verfolger laufen einen eigenen Punkt im Nahkampfabstand an (`ChaseSlot`, Anlaufwinkel ±50°) und setzen erst
   neu an, wenn er sich um > 35 Wire verschiebt - das Rudel umringt den Spieler statt hintereinander zu laufen.
   Kein Plugin: der Server ist autoritativ, Unity-Steering würde nur die Anzeige verändern. 764 Tests grün.
+- Windows-Entwicklung (2026-10-26): PowerShell-Skripte für env/Build/Run/PlayMode-Tests/Start/natives Postgres,
+  Anleitung docs/windows-setup.md. Screenshot-/Asset-Labor-Pfade im Client nutzen `Path.GetTempPath()` statt
+  fest `/tmp` (Windows: %TEMP%), die zugehörigen .sh-Skripte respektieren `$TMPDIR`. Auf Windows noch nicht
+  ausprobiert (Cloud-Session ohne Windows/PowerShell).
 - Offen: Monster-Sheets für die Jayang-Mobs, weitere Zonen/Dungeons, Reittiere; siehe
   `docs/feature-gap-lumiis.md`.
 ### Geschlossen: später beitretende Entities erschienen nicht im Unity-Client

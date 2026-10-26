@@ -6,12 +6,12 @@ namespace Lumiis.Client
 {
     /// <summary>Nur Editor/Development: erlaubt Screenshots aus einem bereits laufenden Play-Modus, ohne
     /// Unity neu zu starten. Ein Aufruf von <c>tools/request-screenshot.sh</c> schreibt den Zielpfad in
-    /// /tmp/lumiis-screenshot-request; dieser Watcher nimmt den Screenshot beim nächsten Frame auf.
+    /// lumiis-screenshot-request im Temp-Ordner (Linux /tmp, Windows %TEMP%); dieser Watcher nimmt den Screenshot beim nächsten Frame auf.
     /// Zusätzlich gibt es F12 im Spiel und einen Button im Asset-Testlabor.</summary>
     public sealed class ScreenshotRequestWatcher : MonoBehaviour
     {
-        private const string RequestPath = "/tmp/lumiis-screenshot-request";
-        private const string DefaultTarget = "/tmp/lumiis-screenshot.png";
+        private static readonly string RequestPath = Path.Combine(Path.GetTempPath(), "lumiis-screenshot-request");
+        private static readonly string DefaultTarget = Path.Combine(Path.GetTempPath(), "lumiis-screenshot.png");
         private float _nextPoll;
 
         private void Update()

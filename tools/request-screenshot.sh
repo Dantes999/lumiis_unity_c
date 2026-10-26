@@ -7,8 +7,12 @@
 
 set -u
 
-TARGET="${1:-/tmp/lumiis-screenshot.png}"
-REQUEST="/tmp/lumiis-screenshot-request"
+# Muss zum Temp-Ordner passen, den Unity per Path.GetTempPath() nutzt ($TMPDIR, sonst /tmp).
+TMP_DIR="${TMPDIR:-/tmp}"
+TMP_DIR="${TMP_DIR%/}"
+
+TARGET="${1:-$TMP_DIR/lumiis-screenshot.png}"
+REQUEST="$TMP_DIR/lumiis-screenshot-request"
 
 rm -f "$TARGET"
 printf '%s\n' "$TARGET" > "$REQUEST"

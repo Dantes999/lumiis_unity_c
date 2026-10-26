@@ -13,7 +13,7 @@ namespace Lumiis.Editor
     public static class AssetLabCaptureTool
     {
         private const string SessionKey = "Lumiis.AssetLabCapture.Active";
-        private const string MarkerPath = "/tmp/lumiis-assetlab-done";
+        private static readonly string MarkerPath = Path.Combine(Path.GetTempPath(), "lumiis-assetlab-done");
         private const double TimeoutSeconds = 90.0;
 
         private static double _startedAt;

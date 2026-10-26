@@ -822,10 +822,11 @@ namespace Lumiis.Client
         }
 
         /// <summary>Schneller Screenshot aus dem laufenden Play-Modus (F12 oder Testlabor-Button) - kein
-        /// Unity-Neustart nötig. Schreibt nach /tmp/lumiis-screenshot-&lt;Zeitstempel&gt;.png.</summary>
+        /// Unity-Neustart nötig. Schreibt lumiis-screenshot-&lt;Zeitstempel&gt;.png in den Temp-Ordner (Linux /tmp, Windows %TEMP%).</summary>
         public void CaptureScreenshot()
         {
-            string path = "/tmp/lumiis-screenshot-" + System.DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".png";
+            string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(),
+                "lumiis-screenshot-" + System.DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".png");
             ScreenCapture.CaptureScreenshot(path, 1);
             Debug.Log("Screenshot: " + path);
         }

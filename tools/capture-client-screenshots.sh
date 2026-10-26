@@ -9,11 +9,15 @@
 
 set -u
 
+# Muss zum Temp-Ordner passen, den Unity per Path.GetTempPath() nutzt ($TMPDIR, sonst /tmp).
+TMP_DIR="${TMPDIR:-/tmp}"
+TMP_DIR="${TMP_DIR%/}"
+
 UNITY_BIN="${1:-$HOME/Unity/Hub/Editor/6000.3.24f1/Editor/Unity}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-LOG_FILE="/tmp/lumiis-capture-client-screenshots.log"
-MARKER="/tmp/lumiis-assetlab-done"
+LOG_FILE="$TMP_DIR/lumiis-capture-client-screenshots.log"
+MARKER="$TMP_DIR/lumiis-assetlab-done"
 
 if [ ! -x "$UNITY_BIN" ]; then
     echo "Unity-Editor nicht gefunden unter: $UNITY_BIN" >&2
@@ -26,7 +30,7 @@ if [ -e "$REPO_ROOT/client/Temp/UnityLockfile" ]; then
     exit 1
 fi
 
-rm -f "$MARKER" /tmp/lumiis-asset-lab-plus0.png /tmp/lumiis-asset-lab-plus9.png /tmp/lumiis-asset-lab-attack.png
+rm -f "$MARKER" $TMP_DIR/lumiis-asset-lab-plus0.png $TMP_DIR/lumiis-asset-lab-plus9.png $TMP_DIR/lumiis-asset-lab-attack.png
 echo "Starte Unity für Asset-Testlabor-Screenshots ..."
 echo "Log: $LOG_FILE"
 
@@ -43,7 +47,7 @@ if [ $EXIT_CODE -ne 0 ]; then
     exit $EXIT_CODE
 fi
 
-for f in /tmp/lumiis-asset-lab-plus0.png /tmp/lumiis-asset-lab-plus9.png /tmp/lumiis-asset-lab-attack.png /tmp/lumiis-asset-lab-icons.png /tmp/lumiis-asset-lab-map.png /tmp/lumiis-asset-lab-characters.png /tmp/lumiis-hud.png; do
+for f in $TMP_DIR/lumiis-asset-lab-plus0.png $TMP_DIR/lumiis-asset-lab-plus9.png $TMP_DIR/lumiis-asset-lab-attack.png $TMP_DIR/lumiis-asset-lab-icons.png $TMP_DIR/lumiis-asset-lab-map.png $TMP_DIR/lumiis-asset-lab-characters.png $TMP_DIR/lumiis-hud.png; do
     if [ ! -f "$f" ]; then
         echo "Screenshot fehlt: $f (Log: $LOG_FILE)" >&2
         exit 1
